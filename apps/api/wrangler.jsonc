@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "leave-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "leave-db",
+      // 실배포 전 `wrangler d1 create leave-db`로 생성한 실제 ID로 교체 (로컬 개발은 이 값 그대로 동작)
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      // 실배포 전 `wrangler r2 bucket create leave-images`로 생성
+      "bucket_name": "leave-images"
+    }
+  ],
+  "vars": {
+    // 실배포 시 웹 오리진으로 제한 (예: https://leave-web.example.workers.dev)
+    "CORS_ORIGIN": "*"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

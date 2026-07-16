@@ -1,159 +1,78 @@
-# Turborepo starter
+# 리브 (Leave)
 
-This Turborepo starter is maintained by the Turborepo core team.
+군 병사들이 부대별로 휴가를 계획·공유하고, 날짜별 **출타율**(부대 인원 대비 휴가 인원 비율)이 한도를 넘는 날을 미리 확인하는 서비스.
 
-## Using this example
+- 회원가입 시 군종(육/해/공)·입대일·전역예정일·계급을 등록하면 복무기간에 따라 **계급이 자동 진급**됩니다 (이병 2개월 → 일병 6개월 → 상병 6개월 → 병장).
+- 부대를 검색해 가입하거나, 없으면 **최대 출타율**(예: 전체 인원의 1/3)과 함께 새로 만들 수 있습니다.
+- 부대 달력에서 부대원들의 휴가를 함께 보고, **출타율 초과일은 빨간색**으로 표시됩니다.
+- 휴가 등록으로 특정 날짜의 출타율이 초과되면, 그 날짜에 휴가가 걸린 모든 부대원에게 **인앱 + Expo 푸시 알림**이 전송됩니다.
 
-Run the following command:
+## 구조 (Turborepo + pnpm)
 
-```sh
-npx create-turbo@latest
+| 경로 | 내용 | 스택 |
+|---|---|---|
+| `apps/api` | 백엔드 API | Hono + Cloudflare Workers, D1(Drizzle), R2, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
+| `apps/web` | 웹 앱 | Vite + React SPA, Jotai, TanStack Query, Cloudflare Workers 정적 에셋 배포 |
+| `apps/native` | iOS/Android 앱 | Expo SDK 57, expo-router(NativeTabs — iOS 26 Liquid Glass), expo-notifications, iPad 대응 |
+| `packages/shared` | 공유 도메인 로직 | 계급 자동진급 계산, 출타율 계산, zod 스키마, 날짜/달력 유틸 + vitest 테스트 |
+
+타입 안정성: `apps/api`가 `AppType`을 export → 웹/앱이 `hc<AppType>()`로 타입 안전 RPC 클라이언트 사용. 디자인은 `DESIGN.md`(Wise 스타일) 토큰을 웹·앱이 공유합니다.
+
+## 로컬 개발
+
+```bash
+pnpm install
+
+# 1. API (D1/R2 로컬 에뮬레이션) — http://localhost:8787
+cd apps/api
+pnpm db:migrate:local     # 최초 1회: 로컬 D1에 마이그레이션 적용
+pnpm dev
+
+# 2. 웹 — http://localhost:5173 (API가 8787에 떠 있어야 함)
+cd apps/web && pnpm dev
+
+# 3. 앱 (Expo)
+cd apps/native && pnpm start
+# 실기기 Expo Go/개발 빌드에서 실행. API 주소는 Metro 호스트의 8787 포트를
+# 자동 사용하며, EXPO_PUBLIC_API_URL로 재정의 가능.
 ```
 
-## What's inside?
+- API 문서: http://localhost:8787/docs (OpenAPI 자동 생성)
+- 도메인 로직 테스트: `pnpm test` (packages/shared vitest)
+- API 통합 시나리오: API 기동 후 `bash apps/api/scripts/integration.sh`
+  (가입 → 부대 생성(1/3) → 휴가 겹침 → 초과일/알림 검증)
+- 전체 타입체크/빌드: `pnpm check-types` / `pnpm build`
 
-This Turborepo includes the following packages/apps:
+## 배포 (Cloudflare)
 
-### Apps and Packages
+```bash
+# 1. 리소스 생성
+cd apps/api
+npx wrangler d1 create leave-db      # 출력된 database_id를 wrangler.jsonc에 반영
+npx wrangler r2 bucket create leave-images
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+# 2. API 배포 + 원격 마이그레이션
+pnpm db:migrate:remote
+pnpm deploy
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+# 3. 웹 배포 (배포된 API 주소를 빌드에 주입)
+cd apps/web
+VITE_API_URL=https://leave-api.<계정>.workers.dev pnpm deploy
+# 배포 후 apps/api/wrangler.jsonc의 CORS_ORIGIN을 웹 주소로 좁히는 것을 권장
 ```
 
-Without global `turbo`, use your package manager:
+### 앱 스토어 배포 (EAS)
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```bash
+cd apps/native
+npx eas init                          # projectId 발급 (푸시 토큰 발급에 필요)
+npx eas build --platform all
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+푸시 알림은 실기기 + EAS projectId가 있어야 동작합니다. 시뮬레이터/권한 거부 시 앱은 푸시 없이 정상 동작하며, 인앱 알림 목록은 항상 제공됩니다.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## 동작 규칙 요약
 
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- 하루 허용 출타 인원 = `floor(부대원 수 × 분자/분모)`. 초과일 = 그 날짜의 (중복 제거된) 휴가자 수가 허용 인원을 넘는 날.
+- 휴가 등록/수정 시 서버가 초과일을 계산해 응답(`exceededDates`)으로 돌려주고, 초과일에 휴가가 겹치는 부대원 전원에게 알림을 생성합니다.
+- 계급은 입대일 기준 표준 일정으로 계산하되, 가입 시 등록한 계급이 더 높으면 하한으로 유지합니다(조기 진급 대응). 날짜는 모두 한국 시간 기준 `YYYY-MM-DD`로 처리합니다.
