@@ -5,7 +5,14 @@ import {
 } from "@leave/shared";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
-import { leaves, notifications, units, users, type LeaveRow } from "../db/schema";
+import {
+  leaves,
+  notifications,
+  pushLogs,
+  units,
+  users,
+  type LeaveRow,
+} from "../db/schema";
 import { sendExpoPush } from "./push";
 
 function formatDateList(dates: ISODate[]): string {
@@ -78,9 +85,13 @@ export async function checkOverageAndNotify(params: {
     const title = "출타율 초과 알림";
     const body = `${unit.name}에서 ${formatDateList(exceededDates)}에 최대 출타 인원을 초과했습니다. 휴가 일정을 확인해주세요.`;
 
+    // 사용자별 인앱 알림 id를 미리 만들어 두면 푸시 발송 로그와 연결할 수 있다.
+    const notificationIdByUser = new Map(
+      affectedIds.map((userId) => [userId, crypto.randomUUID()]),
+    );
     await db.insert(notifications).values(
       affectedIds.map((userId) => ({
-        id: crypto.randomUUID(),
+        id: notificationIdByUser.get(userId)!,
         userId,
         title,
         body,
@@ -91,15 +102,44 @@ export async function checkOverageAndNotify(params: {
       })),
     );
 
-    const tokens = members
-      .filter((m) => affectedIds.includes(m.id))
-      .map((m) => m.expoPushToken);
+    const affectedMembers = members.filter((m) => affectedIds.includes(m.id));
+    const data = { type: "overage", unitId, dates: exceededDates };
+
+    // 푸시 발송과 발송 로그 저장을 하나의 백그라운드 작업으로 처리해 응답을 막지 않는다.
     waitUntil(
-      sendExpoPush(tokens, {
-        title,
-        body,
-        data: { type: "overage", unitId, dates: exceededDates },
-      }),
+      (async () => {
+        const results = await sendExpoPush(
+          affectedMembers.map((m) => m.expoPushToken),
+          { title, body, data },
+        );
+        const resultByToken = new Map(results.map((r) => [r.token, r]));
+        const dataJson = JSON.stringify(data);
+
+        // 부대원별로 발송 결과를 push_logs(direction: send)에 남긴다.
+        const logRows = affectedMembers.map((m) => {
+          const token = m.expoPushToken;
+          const result =
+            token && token.startsWith("ExponentPushToken")
+              ? resultByToken.get(token)
+              : undefined;
+          return {
+            id: crypto.randomUUID(),
+            userId: m.id,
+            notificationId: notificationIdByUser.get(m.id) ?? null,
+            direction: "send" as const,
+            title,
+            body,
+            dataJson,
+            // 유효 토큰이 없으면 skipped, 있으면 발송 결과(ok/error)
+            status: result ? result.status : "skipped",
+            detail: result?.detail ?? (token ? null : "토큰 없음"),
+            createdAt: new Date().toISOString(),
+          };
+        });
+        if (logRows.length > 0) {
+          await db.insert(pushLogs).values(logRows);
+        }
+      })(),
     );
   }
   return exceededDates;

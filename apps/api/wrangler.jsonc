@@ -1,29 +1,35 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "leave-api",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-07-01",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "leave-db",
-      // 실배포 전 `wrangler d1 create leave-db`로 생성한 실제 ID로 교체 (로컬 개발은 이 값 그대로 동작)
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      // 실배포 전 `wrangler r2 bucket create leave-images`로 생성
-      "bucket_name": "leave-images"
-    }
-  ],
-  "vars": {
-    // 실배포 시 웹 오리진으로 제한 (예: https://leave-web.example.workers.dev)
-    "CORS_ORIGIN": "*"
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "leave-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-01",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "leave-db",
+			"database_id": "ac2047fe-6c01-4f3d-a8c2-8d476cbcf9ea",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			// 실배포 전 `wrangler r2 bucket create leave-images`로 생성
+			"bucket_name": "leave-images"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			// 실배포 전 `wrangler kv namespace create CACHE`로 생성한 실제 ID로 교체 (로컬 개발은 로컬 시뮬레이션 사용)
+			"id": "a22fbf38ce4a41e291915286e120d51f"
+		}
+	],
+	"vars": {
+		// 웹 오리진으로 제한 (네이티브 앱은 브라우저 CORS 대상이 아니므로 영향 없음)
+		"CORS_ORIGIN": "https://leave-web.moveto.workers.dev"
+	},
+	"observability": {
+		"enabled": true
+	}
 }

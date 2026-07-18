@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { leaves, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
+import { bumpUnitVersion } from "../lib/cache";
 import { checkOverageAndNotify } from "../lib/overage";
 import {
   errorResponse,
@@ -134,6 +135,8 @@ export const leaveRoutes = app
       createdAt: new Date().toISOString(),
     };
     await db.insert(leaves).values(leave);
+    // 휴가가 추가되면 부대 달력이 바뀌므로 캐시를 무효화한다.
+    await bumpUnitVersion(c.env.CACHE, user.unitId);
 
     const exceededDates = await checkOverageAndNotify({
       db,
@@ -174,6 +177,7 @@ export const leaveRoutes = app
         reason: updated.reason,
       })
       .where(eq(leaves.id, id));
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
     const exceededDates = user.unitId
       ? await checkOverageAndNotify({
@@ -199,5 +203,6 @@ export const leaveRoutes = app
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
     await db.delete(leaves).where(eq(leaves.id, id));
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   });

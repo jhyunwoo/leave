@@ -19,7 +19,8 @@ for i in 1 2 3; do
     \"branch\": \"army\",
     \"enlistedAt\": \"2026-01-05\",
     \"dischargeAt\": \"2027-07-04\",
-    \"rank\": \"private\"
+    \"rank\": \"private\",
+    \"dataConsent\": true
   }")
   TOKENS[$i]=$(echo "$RES" | jqget "['token']")
   echo "  soldier$i 가입 완료, 계급: $(echo "$RES" | jqget "['user']['rankLabel']")"

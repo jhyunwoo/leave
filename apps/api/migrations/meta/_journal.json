@@ -8,6 +8,13 @@
       "when": 1784180599893,
       "tag": "0000_magenta_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784360418139,
+      "tag": "0001_add_logging_and_consent",
+      "breakpoints": true
     }
   ]
 }

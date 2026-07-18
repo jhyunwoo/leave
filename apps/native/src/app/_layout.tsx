@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { loadStoredToken } from "@/api/client";
+import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { tokenAtom } from "@/state/auth";
 import { colors } from "@/theme";
 
@@ -29,9 +30,11 @@ function RootNavigator() {
     });
   }, [setToken]);
 
-  if (!ready || token === undefined) return null; // 스플래시 유지
+  const isAuthed = token !== null && token !== undefined;
+  // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)
+  useNotificationLogging(isAuthed);
 
-  const isAuthed = token !== null;
+  if (!ready || token === undefined) return null; // 스플래시 유지
 
   return (
     <Stack

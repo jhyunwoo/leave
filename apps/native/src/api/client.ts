@@ -1,8 +1,12 @@
 import type { AppType } from "@leave/api";
+import { buildImageUrl } from "@leave/shared";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { hc } from "hono/client";
 import { Platform } from "react-native";
+
+// 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
+export { ApiError, unwrap } from "@leave/shared";
 
 const TOKEN_KEY = "leave.token";
 
@@ -50,36 +54,17 @@ export async function persistToken(token: string | null): Promise<void> {
   }
 }
 
+// 접속 기록에 남길 클라이언트 식별 정보 (플랫폼/앱 버전)
+const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "dev";
+
 export const api = hc<AppType>(API_URL, {
-  headers: (): Record<string, string> =>
-    authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  headers: (): Record<string, string> => ({
+    "X-Client-Platform": Platform.OS,
+    "X-Client-Version": CLIENT_VERSION,
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+  }),
 });
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
-
-export async function unwrap<T>(res: {
-  ok: boolean;
-  status: number;
-  json: () => Promise<unknown>;
-}): Promise<T> {
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message =
-      data && typeof data === "object" && "error" in data
-        ? String((data as { error: unknown }).error)
-        : "요청을 처리하지 못했습니다";
-    throw new ApiError(message, res.status);
-  }
-  return data as T;
-}
-
 export function imageUrl(key: string | null | undefined): string | null {
-  return key ? `${API_URL}/images/${key}` : null;
+  return buildImageUrl(API_URL, key);
 }

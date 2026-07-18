@@ -1,0 +1,43 @@
+# 동의 기반 회원가입 흐름.
+# 참고: 2단계의 입대일/전역일은 네이티브 DatePicker라 기기/OS별로 조작이 달라
+#       환경에 맞춰 tapOn 좌표나 값을 조정해야 할 수 있다. 안정적인 자동화를 위해
+#       입력 필드에 testID를 부여하는 것을 권장한다(현재는 문구/placeholder 기반).
+appId: app.leave.mobile
+env:
+  PASSWORD: "password123"
+---
+- launchApp:
+    clearState: true
+- tapOn: "가입하기"
+
+# 1단계: 계정
+- tapOn: "you@example.com"
+- inputRandomEmail
+- tapOn:
+    below: "비밀번호"
+    index: 0
+- inputText: ${PASSWORD}
+- tapOn:
+    below: "비밀번호 확인"
+- inputText: ${PASSWORD}
+- tapOn:
+    below: "이름"
+- inputText: "이순신"
+- tapOn: "다음"
+
+# 2단계: 군 정보 (기본값 육군/이병 사용, 날짜는 환경에 맞게 조정)
+- assertVisible: "입대일"
+# TODO: DatePicker 조작 — 기기별로 상이. 예시:
+# - tapOn: "입대일"
+# - ... (날짜 선택) ...
+- tapOn: "다음"
+
+# 3단계: 동의 후 가입
+- assertVisible:
+    text: "동의합니다"
+- tapOn:
+    text: ".*수집·이용하는 데.*동의합니다.*"  # 동의 체크박스 영역
+- tapOn: "가입 완료"
+
+# 가입 성공 시 탭 화면(부대/달력 등)으로 진입
+- assertVisible: "부대"

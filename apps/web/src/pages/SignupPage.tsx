@@ -30,6 +30,8 @@ export function SignupPage() {
   const [rank, setRank] = useState<Rank>("private");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // 개인정보(접속 기록·푸시 로그) 수집·이용 동의
+  const [dataConsent, setDataConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -78,6 +80,7 @@ export function SignupPage() {
       enlistedAt,
       dischargeAt,
       rank,
+      dataConsent,
     };
     const parsed = signupSchema.safeParse(input);
     if (!parsed.success) {
@@ -327,6 +330,28 @@ export function SignupPage() {
                 · 전역 {dischargeAt}
               </p>
             </div>
+
+            {/* 개인정보 수집·이용 동의 (접속 기록·푸시 로그) */}
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--sp-sm)",
+                alignItems: "flex-start",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={dataConsent}
+                onChange={(e) => setDataConsent(e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span className="caption text-body">
+                서비스 운영·보안을 위해 접속 기록(접속 시각·기기 플랫폼·앱 버전
+                등)과 이 앱의 푸시 알림 발송·수신 기록을 수집·이용하는 데
+                동의합니다. 수집된 내 기록은 앱에서 언제든 열람할 수 있습니다.
+              </span>
+            </label>
           </>
         )}
 
@@ -354,7 +379,7 @@ export function SignupPage() {
             type="submit"
             className="btn btn-primary"
             style={{ flex: 2 }}
-            disabled={signup.isPending}
+            disabled={signup.isPending || (step === 2 && !dataConsent)}
           >
             {step < 2 ? "다음" : signup.isPending ? "가입 중…" : "가입 완료"}
           </button>
