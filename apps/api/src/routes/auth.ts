@@ -4,6 +4,8 @@ import { desc, eq } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import {
   accessLogs,
+  leaves,
+  notifications,
   pushLogs,
   sessions,
   units,
@@ -11,6 +13,7 @@ import {
   type UserRow,
 } from "../db/schema";
 import { createApp } from "../lib/app";
+import { bumpUnitVersion } from "../lib/cache";
 import {
   generateSessionToken,
   hashPassword,
@@ -123,10 +126,25 @@ const activityRoute = createRoute({
   },
 });
 
+const deleteAccountRoute = createRoute({
+  method: "delete",
+  path: "/account",
+  tags: ["인증"],
+  summary: "계정 삭제 (관련 데이터 전체 삭제)",
+  description:
+    "내 계정과 등록한 휴가·알림·세션·접속/푸시 기록·프로필 이미지를 모두 삭제합니다. 되돌릴 수 없습니다.",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(okSchema, "삭제 완료"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
 const app = createApp();
 app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/activity", authMiddleware);
+app.use("/account", authMiddleware);
 
 export const authRoutes = app
   .openapi(signupRoute, async (c) => {
@@ -255,4 +273,27 @@ export const authRoutes = app
       },
       200,
     );
+  })
+  .openapi(deleteAccountRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    // R2에 저장된 프로필 이미지 삭제
+    if (user.profileImageKey) {
+      await c.env.BUCKET.delete(user.profileImageKey).catch(() => {});
+    }
+
+    // 관련 데이터를 명시적으로 모두 삭제한다.
+    // (Cloudflare D1은 외래키 ON DELETE CASCADE 적용을 보장하지 않으므로 직접 지운다.)
+    await db.delete(leaves).where(eq(leaves.userId, user.id));
+    await db.delete(notifications).where(eq(notifications.userId, user.id));
+    await db.delete(sessions).where(eq(sessions.userId, user.id));
+    await db.delete(accessLogs).where(eq(accessLogs.userId, user.id));
+    await db.delete(pushLogs).where(eq(pushLogs.userId, user.id));
+    await db.delete(users).where(eq(users.id, user.id));
+
+    // 부대원 수 변동 → 해당 부대 달력 통계 캐시 무효화
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
+
+    return c.json({ ok: true as const }, 200);
   });

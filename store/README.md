@@ -48,11 +48,13 @@ store/
 
 ---
 
-## ⚠️ 제출 전 반드시 처리할 3가지
+## 제출 전 체크리스트 — 대부분 완료됨
 
-1. **계정 삭제 경로** — Apple·Google 모두 계정 생성 앱에 필수. 앱 내 "계정 삭제" 기능을 추가하거나, 데이터 삭제 요청 이메일(`jhyunwoo0228@gmail.com`)을 스토어 양식에 기입. (상세: `metadata/data-safety-and-ratings.md`)
-2. **개인정보 처리방침 URL** — `legal/privacy-policy.html`을 `https://leave-web.moveto.workers.dev/privacy`에 게시. (아래 "배포" 참고)
-3. **심사용 데모 계정** — 프로덕션 API에 실제 계정 하나 생성 후 부대 1개·휴가 몇 건 등록. 계정 정보를 App Review 노트 / Play 앱 액세스 권한에 기입.
+1. ✅ **계정 삭제 경로** — 앱/웹 프로필에 "계정 삭제"(`DELETE /auth/account`) 구현·배포 완료. 프로덕션 검증 완료.
+2. ✅ **개인정보 처리방침 URL** — https://leave-web.moveto.workers.dev/privacy 게시 완료.
+3. ✅ **심사용 데모 계정** — `review@leave.app` / `reviewpass123` 생성 완료. "리브 데모부대"(6명, 1/3)에 소속, 2026-07-21·22 출타율 초과 + 알림 포함.
+4. ⬜ **스토어 계정에서 앱 등록** — App Store Connect / Play Console에 앱 생성 후 위 자료 입력(사람이 진행).
+5. ⬜ **스토어 메타데이터(스크린샷/설명 외)** — 데이터 안전·콘텐츠 등급 설문 제출(`metadata/data-safety-and-ratings.md` 답변 사용).
 
 ---
 

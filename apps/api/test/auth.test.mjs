@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { req, signup, sleep, uniq } from "./helpers.mjs";
+import { createUnit, req, signup, sleep, uniq } from "./helpers.mjs";
 
 test("회원가입은 개인정보 동의(dataConsent)가 없으면 400", async () => {
   const email = `${uniq("u")}@test.com`;
@@ -81,4 +81,39 @@ test("접속 기록이 남고 /auth/activity로 열람 가능 (동의 기반 로
   assert.equal(meLog.platform, "web");
   assert.equal(meLog.appVersion, "1.2.3");
   assert.equal(meLog.method, "GET");
+});
+
+test("계정 삭제는 인증이 필요하다", async () => {
+  const noAuth = await req("DELETE", "/auth/account");
+  assert.equal(noAuth.status, 401);
+});
+
+test("계정 삭제: 계정·휴가·부대 소속이 모두 사라진다", async () => {
+  // 부대 가입 + 휴가 등록으로 관련 데이터를 만든 뒤 삭제
+  const { token, email } = await signup();
+  await createUnit(token);
+  const leaveRes = await req("POST", "/leaves", {
+    token,
+    body: { title: "정기휴가", startDate: "2026-08-01", endDate: "2026-08-03" },
+  });
+  assert.equal(leaveRes.status, 201);
+
+  // 삭제 실행
+  const del = await req("DELETE", "/auth/account", { token });
+  assert.equal(del.status, 200);
+  assert.equal(del.data.ok, true);
+
+  // 토큰(세션)이 무효화되어 내 정보 조회가 401
+  const me = await req("GET", "/auth/me", { token });
+  assert.equal(me.status, 401);
+
+  // 같은 이메일로 다시 로그인 불가 (계정이 삭제됨)
+  const login = await req("POST", "/auth/login", {
+    body: { email, password: "password123" },
+  });
+  assert.equal(login.status, 401);
+
+  // 같은 이메일로 재가입이 가능해야 함 (완전히 삭제되었으므로)
+  const again = await signup({ email });
+  assert.equal(again.status, 201);
 });

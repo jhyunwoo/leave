@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_URL, getAuthToken } from "@/api/client";
-import { useLogout, useMe } from "@/api/queries";
+import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { colors, radius, spacing } from "@/theme";
@@ -21,6 +22,7 @@ import { colors, radius, spacing } from "@/theme";
 export function ProfileScreen() {
   const me = useMe();
   const logout = useLogout();
+  const deleteAccount = useDeleteAccount();
   const router = useRouter();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -36,6 +38,27 @@ export function ProfileScreen() {
 
   const { user, unit } = me.data;
   const progress = Math.round(user.serviceProgress * 100);
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      "계정 삭제",
+      "계정과 등록한 휴가·알림·접속 기록이 영구히 삭제됩니다. 이 작업은 되돌릴 수 없어요. 정말 삭제할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () =>
+            void deleteAccount.mutateAsync().catch((err) =>
+              Alert.alert(
+                "삭제 실패",
+                err instanceof Error ? err.message : "잠시 후 다시 시도해주세요",
+              ),
+            ),
+        },
+      ],
+    );
+  };
 
   const changePhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -159,6 +182,20 @@ export function ProfileScreen() {
           style={{ flex: 1 }}
         />
       </View>
+
+      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
+      <Pressable
+        accessibilityRole="button"
+        onPress={confirmDeleteAccount}
+        disabled={deleteAccount.isPending}
+        style={styles.deleteRow}
+      >
+        {deleteAccount.isPending ? (
+          <ActivityIndicator color={colors.negativeDeep} />
+        ) : (
+          <Text style={styles.deleteText}>계정 삭제</Text>
+        )}
+      </Pressable>
     </ScrollView>
   );
 }
@@ -242,4 +279,16 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 12, color: colors.mute },
   infoValue: { fontSize: 14, fontWeight: "600", color: colors.ink, marginTop: 2 },
+  deleteRow: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    minHeight: 44,
+  },
+  deleteText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.negativeDeep,
+    textDecorationLine: "underline",
+  },
 });

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { API_URL, getAuthToken } from "../api/client";
 import type { Me } from "../api/queries";
-import { useLogout } from "../api/queries";
+import { useDeleteAccount, useLogout } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "../components/Avatar";
 import { fmtDateShort } from "../lib/format";
@@ -10,11 +10,27 @@ import { fmtDateShort } from "../lib/format";
 export function ProfilePage(props: { me: Me }) {
   const { user, unit } = props.me;
   const logout = useLogout();
+  const deleteAccount = useDeleteAccount();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const onDeleteAccount = () => {
+    const ok = window.confirm(
+      "계정과 등록한 휴가·알림·접속 기록이 영구히 삭제됩니다. 이 작업은 되돌릴 수 없어요. 정말 삭제할까요?",
+    );
+    if (!ok) return;
+    void deleteAccount
+      .mutateAsync()
+      .then(() => navigate("/login"))
+      .catch((err) =>
+        window.alert(
+          err instanceof Error ? err.message : "삭제하지 못했습니다",
+        ),
+      );
+  };
 
   const progress = Math.round(user.serviceProgress * 100);
 
@@ -202,6 +218,26 @@ export function ProfilePage(props: { me: Me }) {
           로그아웃
         </button>
       </section>
+
+      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
+      <button
+        type="button"
+        onClick={onDeleteAccount}
+        disabled={deleteAccount.isPending}
+        style={{
+          alignSelf: "center",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "var(--negative-deep, #a72027)",
+          fontSize: 14,
+          fontWeight: 600,
+          textDecoration: "underline",
+          padding: "var(--sp-md)",
+        }}
+      >
+        {deleteAccount.isPending ? "삭제 중…" : "계정 삭제"}
+      </button>
     </div>
   );
 }
