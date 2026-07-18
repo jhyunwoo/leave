@@ -7,4 +7,18 @@ allowBuilds:
   sharp: true
   workerd: true
 
+# EAS는 Android=linux-x64, iOS=macOS arm64 빌더를 쓴다. 리눅스에서 생성된
+# lockfile이라도 두 플랫폼용 optional 바이너리(예: sharp @img/*)가 모두 설치되도록
+# 대상 아키텍처를 명시한다. 미지정 시 frozen 설치가 현재 플랫폼 바이너리만 링크해
+# macOS 빌더에서 sharp가 소스 빌드로 폴백하다 실패한다.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+    - darwin
+  cpu:
+    - current
+    - x64
+    - arm64
+
 verifyDepsBeforeRun: false
