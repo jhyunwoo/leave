@@ -19,6 +19,17 @@ export function maxAllowedOut(memberCount: number, ratio: LeaveRatio): number {
   return Math.floor((memberCount * ratio.numerator) / ratio.denominator);
 }
 
+/**
+ * 출타율 계산에 쓰는 기준 인원.
+ * 관리자가 설정한 부대 인원(headcount)이 있으면 그 값을, 없으면 앱 가입자 수를 쓴다.
+ */
+export function effectiveMemberCount(
+  headcount: number | null | undefined,
+  appMemberCount: number,
+): number {
+  return headcount != null && headcount > 0 ? headcount : appMemberCount;
+}
+
 export interface DayStat {
   date: ISODate;
   /** 이 날짜에 휴가 중인 사용자 (중복 제거). */
