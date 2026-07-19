@@ -8,6 +8,7 @@ import {
   notifications,
   pushLogs,
   sessions,
+  unitJoinRequests,
   units,
   users,
   type UserRow,
@@ -25,6 +26,7 @@ import {
   authResponseSchema,
   errorResponse,
   jsonContent,
+  myJoinRequestSchema,
   okSchema,
   unitSchema,
   userSchema,
@@ -105,7 +107,11 @@ const meRoute = createRoute({
   security: [{ Bearer: [] }],
   responses: {
     200: jsonContent(
-      z.object({ user: userSchema, unit: unitSchema.nullable() }),
+      z.object({
+        user: userSchema,
+        unit: unitSchema.nullable(),
+        joinRequest: myJoinRequestSchema.nullable(),
+      }),
       "내 정보",
     ),
     401: errorResponse("인증 실패"),
@@ -226,7 +232,25 @@ export const authRoutes = app
         unit = serializeUnit(row, memberCount);
       }
     }
-    return c.json({ user: serializeUser(user), unit }, 200);
+
+    // 소속이 없을 때만 대기 중인 가입 신청을 노출한다.
+    let joinRequest = null;
+    if (!user.unitId) {
+      const reqRow = await db
+        .select({ req: unitJoinRequests, unit: units })
+        .from(unitJoinRequests)
+        .innerJoin(units, eq(units.id, unitJoinRequests.unitId))
+        .where(eq(unitJoinRequests.userId, user.id))
+        .get();
+      if (reqRow) {
+        joinRequest = {
+          unitId: reqRow.unit.id,
+          unitName: reqRow.unit.name,
+          createdAt: reqRow.req.createdAt,
+        };
+      }
+    }
+    return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
   })
   .openapi(activityRoute, async (c) => {
     const user = c.get("user");

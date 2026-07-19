@@ -44,8 +44,30 @@ export const units = sqliteTable("units", {
   maxLeaveNumerator: integer("max_leave_numerator").notNull(),
   maxLeaveDenominator: integer("max_leave_denominator").notNull(),
   creatorId: text("creator_id").notNull(),
+  // 부대 관리자. 생성 시 생성자로 초기화되며 이관으로 바뀔 수 있다.
+  adminId: text("admin_id").notNull(),
+  // 관리자가 설정한 부대 인원(출타율 계산 기준). null이면 앱 가입자 수로 대체.
+  headcount: integer("headcount"),
+  // 부대 대표 이미지 R2 키.
+  imageKey: text("image_key"),
   createdAt: text("created_at").notNull(),
 });
+
+/**
+ * 부대 가입 신청 — 관리자 승인 전까지 대기 상태로 존재한다.
+ * 승인되면 users.unitId가 설정되고 이 행은 삭제된다. 거절 시에도 삭제된다.
+ */
+export const unitJoinRequests = sqliteTable(
+  "unit_join_requests",
+  {
+    id: text("id").primaryKey(),
+    unitId: text("unit_id").notNull(),
+    // 사용자당 동시에 하나의 대기 신청만 허용한다.
+    userId: text("user_id").notNull().unique(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("unit_join_requests_unit_idx").on(t.unitId)],
+);
 
 export const leaves = sqliteTable(
   "leaves",
@@ -143,6 +165,7 @@ export const pushLogs = sqliteTable(
 
 export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
+export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type AccessLogRow = typeof accessLogs.$inferSelect;

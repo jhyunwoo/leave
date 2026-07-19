@@ -15,6 +15,13 @@
       "when": 1784360418139,
       "tag": "0001_add_logging_and_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784421075357,
+      "tag": "0002_unusual_cloak",
+      "breakpoints": true
     }
   ]
 }

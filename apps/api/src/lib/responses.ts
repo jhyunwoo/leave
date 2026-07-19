@@ -47,10 +47,40 @@ export const unitSchema = z
     description: z.string().nullable(),
     maxLeaveNumerator: z.number(),
     maxLeaveDenominator: z.number(),
+    // 앱 가입자 수.
     memberCount: z.number(),
+    // 부대 관리자 사용자 id.
+    adminId: z.string(),
+    // 관리자가 설정한 부대 인원(출타율 기준). 미설정이면 null → 가입자 수 사용.
+    headcount: z.number().nullable(),
+    // 부대 대표 이미지 R2 키.
+    imageKey: z.string().nullable(),
     createdAt: z.string(),
   })
   .openapi("Unit");
+
+/** 대기 중인 부대 가입 신청(관리자 조회용). */
+export const joinRequestSchema = z
+  .object({
+    userId: z.string(),
+    name: z.string(),
+    branch: z.enum(BRANCHES),
+    branchLabel: z.string(),
+    rank: z.enum(RANKS),
+    rankLabel: z.string(),
+    profileImageKey: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("JoinRequest");
+
+/** 내가 낸 가입 신청 요약(/auth/me). */
+export const myJoinRequestSchema = z
+  .object({
+    unitId: z.string(),
+    unitName: z.string(),
+    createdAt: z.string(),
+  })
+  .openapi("MyJoinRequest");
 
 export const leaveSchema = z
   .object({

@@ -1,4 +1,5 @@
 import {
+  effectiveMemberCount,
   findExceededDates,
   usersOnLeaveDuring,
   type ISODate,
@@ -71,7 +72,7 @@ export async function checkOverageAndNotify(params: {
       startDate: changedLeave.startDate,
       endDate: changedLeave.endDate,
     },
-    memberCount: members.length,
+    memberCount: effectiveMemberCount(unit.headcount, members.length),
     ratio: {
       numerator: unit.maxLeaveNumerator,
       denominator: unit.maxLeaveDenominator,

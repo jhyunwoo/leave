@@ -65,6 +65,9 @@ export function serializeUnit(
     maxLeaveNumerator: unit.maxLeaveNumerator,
     maxLeaveDenominator: unit.maxLeaveDenominator,
     memberCount,
+    adminId: unit.adminId,
+    headcount: unit.headcount,
+    imageKey: unit.imageKey,
     createdAt: unit.createdAt,
   };
 }
