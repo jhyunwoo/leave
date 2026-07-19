@@ -93,6 +93,18 @@ export function useLogout() {
   });
 }
 
+export function useDeleteAccount() {
+  const [, setToken] = useAtom(tokenAtom);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(await api.auth.account.$delete()),
+    onSuccess: () => {
+      setToken(null);
+      qc.clear();
+    },
+  });
+}
+
 export function useUnitSearch(q: string) {
   return useQuery({
     queryKey: ["units", q],

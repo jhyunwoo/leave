@@ -1,6 +1,7 @@
 import { Scalar } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { createApp } from "./lib/app";
+import { accessLogMiddleware } from "./middleware/access-log";
 import { authRoutes } from "./routes/auth";
 import { imageRoutes } from "./routes/images";
 import { leaveRoutes } from "./routes/leaves";
@@ -9,6 +10,9 @@ import { pushRoutes } from "./routes/push";
 import { unitRoutes } from "./routes/units";
 
 const app = createApp();
+
+// 가장 바깥에서 모든 요청을 접속 기록에 남긴다 (동의 기반, next() 이후 사용자 식별 포함).
+app.use("*", accessLogMiddleware);
 
 app.use("*", async (c, next) => {
   const origin = c.env.CORS_ORIGIN ?? "*";

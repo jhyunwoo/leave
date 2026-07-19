@@ -1,33 +1,38 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.json"],
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env*"
-      ],
-      "outputs": [
-        "dist/**"
-      ]
-    },
-    "lint": {
-      "dependsOn": [
-        "^lint"
-      ]
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
     },
     "check-types": {
-      "dependsOn": [
-        "^check-types"
-      ]
+      "dependsOn": ["^check-types"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"]
     },
-    "dev": {
-      "cache": false,
-      "persistent": true
+    "lint": {
+      "dependsOn": ["^lint"]
     },
-    "test": {}
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "test/**", "migrations/**", "!**/*.md"],
+      "outputs": []
+    },
+    "test:e2e": {
+      "cache": false
+    },
+    "dev": { "cache": false, "persistent": true },
+    "start": { "cache": false, "persistent": true },
+    "android": { "cache": false, "persistent": true },
+    "ios": { "cache": false, "persistent": true },
+    "preview": { "cache": false, "persistent": true },
+    "deploy": {
+      "dependsOn": ["build", "check-types"],
+      "cache": false
+    },
+    "db:generate": { "cache": false },
+    "db:migrate:local": { "cache": false },
+    "db:migrate:remote": { "cache": false }
   }
 }

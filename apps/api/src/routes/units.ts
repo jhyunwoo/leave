@@ -5,6 +5,11 @@ import { drizzle } from "drizzle-orm/d1";
 import { leaves, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import {
+  bumpUnitVersion,
+  getCachedCalendar,
+  putCachedCalendar,
+} from "../lib/cache";
+import {
   calendarSchema,
   errorResponse,
   jsonContent,
@@ -190,6 +195,11 @@ export const unitRoutes = app
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     await db.update(users).set({ unitId: id }).where(eq(users.id, user.id));
+    // 부대원 변동은 새 부대(그리고 이전 부대)의 달력 통계를 바꾸므로 캐시를 무효화한다.
+    await bumpUnitVersion(c.env.CACHE, id);
+    if (user.unitId && user.unitId !== id) {
+      await bumpUnitVersion(c.env.CACHE, user.unitId);
+    }
     const memberCount = await db.$count(users, eq(users.unitId, id));
     return c.json({ unit: serializeUnit(unit, memberCount) }, 200);
   })
@@ -197,6 +207,7 @@ export const unitRoutes = app
     const user = c.get("user");
     const db = drizzle(c.env.DB);
     await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   })
   .openapi(membersRoute, async (c) => {
@@ -221,6 +232,15 @@ export const unitRoutes = app
     if (user.unitId !== id) {
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
+
+    // KV 캐시 히트 시 D1 조회·출타율 계산 없이 즉시 반환한다.
+    const cached = await getCachedCalendar<z.infer<typeof calendarSchema>>(
+      c.env.CACHE,
+      id,
+      month,
+    );
+    if (cached) return c.json(cached, 200);
+
     const db = drizzle(c.env.DB);
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
@@ -281,13 +301,13 @@ export const unitRoutes = app
       };
     });
 
-    return c.json(
-      {
-        month,
-        unit: serializeUnit(unit, members.length),
-        days,
-        leaves: calendarLeaves,
-      },
-      200,
-    );
+    const payload = {
+      month,
+      unit: serializeUnit(unit, members.length),
+      days,
+      leaves: calendarLeaves,
+    };
+    // 계산 결과를 캐싱(응답을 막지 않도록 백그라운드로).
+    c.executionCtx.waitUntil(putCachedCalendar(c.env.CACHE, id, month, payload));
+    return c.json(payload, 200);
   });

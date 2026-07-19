@@ -22,10 +22,16 @@ export const signupSchema = z
     enlistedAt: isoDateSchema,
     dischargeAt: isoDateSchema,
     rank: z.enum(RANKS),
+    // 접속 기록·푸시 로그 등 개인정보 수집·이용 동의 (가입 필수)
+    dataConsent: z.boolean(),
   })
   .refine((v) => v.enlistedAt < v.dischargeAt, {
     message: "전역 예정일은 입대일보다 뒤여야 합니다",
     path: ["dischargeAt"],
+  })
+  .refine((v) => v.dataConsent === true, {
+    message: "개인정보 수집 및 이용에 동의해야 가입할 수 있습니다",
+    path: ["dataConsent"],
   });
 
 export const loginSchema = z.object({
@@ -70,7 +76,20 @@ export const pushTokenSchema = z.object({
   token: z.string().min(1).max(200),
 });
 
+/**
+ * 앱이 자가 보고하는 푸시 이벤트 — 이 앱이 보낸 알림의 수신(receipt)·열람(open)만 대상으로 한다.
+ * 기기의 다른 앱 알림은 다루지 않는다.
+ */
+export const pushEventSchema = z.object({
+  direction: z.enum(["receipt", "open"]),
+  notificationId: z.string().max(100).optional(),
+  title: z.string().max(200).optional(),
+  body: z.string().max(500).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
 export type SignupInput = z.infer<typeof signupSchema>;
+export type PushEventInput = z.infer<typeof pushEventSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UnitCreateInput = z.infer<typeof unitCreateSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;

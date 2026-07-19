@@ -1,5 +1,9 @@
 import type { AppType } from "@leave/api";
+import { buildImageUrl } from "@leave/shared";
 import { hc } from "hono/client";
+
+// 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
+export { ApiError, unwrap } from "@leave/shared";
 
 export const API_URL: string =
   import.meta.env.VITE_API_URL ?? "http://localhost:8787";
@@ -18,37 +22,18 @@ export function setAuthToken(token: string | null): void {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+// 접속 기록에 남길 클라이언트 식별 정보 (플랫폼/버전)
+const CLIENT_PLATFORM = "web";
+const CLIENT_VERSION: string = import.meta.env.VITE_APP_VERSION ?? "dev";
+
 export const api = hc<AppType>(API_URL, {
-  headers: (): Record<string, string> =>
-    authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  headers: (): Record<string, string> => ({
+    "X-Client-Platform": CLIENT_PLATFORM,
+    "X-Client-Version": CLIENT_VERSION,
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+  }),
 });
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
-
-/** 응답을 열고, 실패 시 서버의 error 메시지로 ApiError를 던진다. */
-export async function unwrap<T>(res: {
-  ok: boolean;
-  status: number;
-  json: () => Promise<unknown>;
-}): Promise<T> {
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message =
-      data && typeof data === "object" && "error" in data
-        ? String((data as { error: unknown }).error)
-        : "요청을 처리하지 못했습니다";
-    throw new ApiError(message, res.status);
-  }
-  return data as T;
-}
-
 export function imageUrl(key: string | null | undefined): string | null {
-  return key ? `${API_URL}/images/${key}` : null;
+  return buildImageUrl(API_URL, key);
 }

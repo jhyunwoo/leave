@@ -116,6 +116,41 @@ export const authResponseSchema = z
   })
   .openapi("AuthResponse");
 
+export const accessLogSchema = z
+  .object({
+    id: z.string(),
+    method: z.string(),
+    path: z.string(),
+    status: z.number(),
+    platform: z.string().nullable(),
+    appVersion: z.string().nullable(),
+    ip: z.string().nullable(),
+    country: z.string().nullable(),
+    durationMs: z.number().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("AccessLog");
+
+export const pushLogSchema = z
+  .object({
+    id: z.string(),
+    notificationId: z.string().nullable(),
+    direction: z.enum(["send", "receipt", "open"]),
+    title: z.string().nullable(),
+    body: z.string().nullable(),
+    status: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("PushLog");
+
+/** 내가 수집된 접속·푸시 기록을 열람하는 응답(개인정보 열람권). */
+export const activitySchema = z
+  .object({
+    accessLogs: z.array(accessLogSchema),
+    pushLogs: z.array(pushLogSchema),
+  })
+  .openapi("Activity");
+
 export const jsonContent = <T extends z.ZodType>(
   schema: T,
   description: string,

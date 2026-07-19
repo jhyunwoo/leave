@@ -1,7 +1,9 @@
+import type { PushEventInput } from "@leave/shared";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { api } from "../api/client";
 import { colors } from "../theme";
 
 Notifications.setNotificationHandler({
@@ -46,5 +48,17 @@ export async function getPushToken(): Promise<string | null> {
     return token.data;
   } catch {
     return null;
+  }
+}
+
+/**
+ * 이 앱이 보낸 푸시의 수신/열람 이벤트를 서버에 보고한다 (동의 기반).
+ * 보고 실패는 앱 흐름을 막지 않는다.
+ */
+export async function reportPushEvent(input: PushEventInput): Promise<void> {
+  try {
+    await api.push.events.$post({ json: input });
+  } catch {
+    // 로깅 실패는 무시
   }
 }

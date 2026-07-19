@@ -1,3 +1,32 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# sharp의 install 스크립트는 실행하지 않는다(false). pnpm의 격리된 node_modules에서
+# sharp check.js가 @img/sharp-darwin-arm64를 찾지 못해 소스 빌드로 폴백하다 실패하기
+# 때문이다. sharp 0.34는 @img/* 플랫폼 패키지가 설치돼 있으면(supportedArchitectures로
+# 보장) install 스크립트 없이도 런타임에 해당 바이너리를 직접 로드한다.
+allowBuilds:
+  esbuild: true
+  sharp: false
+  workerd: true
+
+# 승인되지 않은(=무시된) 빌드 스크립트가 있어도 설치를 실패시키지 않고 경고만 낸다.
+# (CI=1에서 기본값 true면 ERR_PNPM_IGNORED_BUILDS로 실패)
+strictDepBuilds: false
+
+# EAS는 Android=linux-x64, iOS=macOS arm64 빌더를 쓴다. 리눅스에서 생성된
+# lockfile이라도 두 플랫폼용 optional 바이너리(예: sharp @img/*)가 모두 설치되도록
+# 대상 아키텍처를 명시한다. 미지정 시 frozen 설치가 현재 플랫폼 바이너리만 링크해
+# macOS 빌더에서 sharp가 소스 빌드로 폴백하다 실패한다.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+    - darwin
+  cpu:
+    - current
+    - x64
+    - arm64
+
+verifyDepsBeforeRun: false

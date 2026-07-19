@@ -44,6 +44,8 @@ export function SignupScreen() {
   const [dischargeTouched, setDischargeTouched] = useState(false);
   const [rank, setRank] = useState<Rank>("private");
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  // 개인정보(접속 기록·푸시 로그) 수집·이용 동의
+  const [dataConsent, setDataConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const signup = useSignup();
@@ -100,6 +102,7 @@ export function SignupScreen() {
       enlistedAt,
       dischargeAt,
       rank,
+      dataConsent,
     };
     const parsed = signupSchema.safeParse(input);
     if (!parsed.success) {
@@ -292,6 +295,25 @@ export function SignupScreen() {
                   {enlistedAt} · 전역 {dischargeAt}
                 </Text>
               </View>
+
+              {/* 개인정보 수집·이용 동의 (접속 기록·푸시 로그) */}
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: dataConsent }}
+                onPress={() => setDataConsent((v) => !v)}
+                style={styles.consentRow}
+              >
+                <View
+                  style={[styles.checkbox, dataConsent && styles.checkboxOn]}
+                >
+                  {dataConsent && <Text style={styles.checkboxMark}>✓</Text>}
+                </View>
+                <Text style={styles.consentText}>
+                  서비스 운영·보안을 위해 접속 기록(접속 시각·기기 플랫폼·앱 버전
+                  등)과 이 앱의 푸시 알림 발송·수신 기록을 수집·이용하는 데
+                  동의합니다. 수집된 내 기록은 앱에서 언제든 열람할 수 있습니다.
+                </Text>
+              </Pressable>
             </View>
           )}
 
@@ -315,6 +337,7 @@ export function SignupScreen() {
               }
               onPress={() => (step < 2 ? next() : void submit())}
               loading={signup.isPending}
+              disabled={step === 2 && !dataConsent}
               style={{ flex: 2 }}
             />
           </View>
@@ -395,6 +418,25 @@ const styles = StyleSheet.create({
   },
   summaryName: { fontSize: 15, fontWeight: "600", color: colors.ink },
   summaryDetail: { fontSize: 12, color: colors.body },
+  consentRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignSelf: "stretch",
+    alignItems: "flex-start",
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 2,
+    borderColor: colors.mute,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxMark: { color: colors.onPrimary, fontSize: 14, fontWeight: "900" },
+  consentText: { flex: 1, fontSize: 12, color: colors.body, lineHeight: 18 },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   actions: { flexDirection: "row", gap: spacing.md },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },
