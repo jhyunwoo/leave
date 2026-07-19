@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { useMe } from "./api/queries";
 import { AppLayout } from "./layouts/AppLayout";
 import { CalendarPage } from "./pages/CalendarPage";
+import { LandingPage } from "./pages/LandingPage";
 import { LeavesPage } from "./pages/LeavesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
@@ -48,6 +49,16 @@ function AuthedApp() {
   );
 }
 
+/** 로그아웃 상태: 첫 화면은 홍보 랜딩, 그 외 경로는 로그인으로. */
+function PublicApp() {
+  return (
+    <Routes>
+      <Route index element={<LandingPage />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
 export function App() {
   const isAuthed = useAtomValue(isAuthedAtom);
 
@@ -62,10 +73,7 @@ export function App() {
           path="/signup"
           element={isAuthed ? <Navigate to="/" replace /> : <SignupPage />}
         />
-        <Route
-          path="*"
-          element={isAuthed ? <AuthedApp /> : <Navigate to="/login" replace />}
-        />
+        <Route path="*" element={isAuthed ? <AuthedApp /> : <PublicApp />} />
       </Routes>
     </BrowserRouter>
   );
