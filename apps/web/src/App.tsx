@@ -8,6 +8,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SignupPage } from "./pages/SignupPage";
+import { UnitManagePage } from "./pages/UnitManagePage";
 import { UnitsPage } from "./pages/UnitsPage";
 import { isAuthedAtom } from "./state/auth";
 
@@ -37,6 +38,7 @@ function AuthedApp() {
       <Route element={<AppLayout me={me.data} />}>
         <Route index element={<CalendarPage me={me.data} />} />
         <Route path="units" element={<UnitsPage me={me.data} />} />
+        <Route path="units/manage" element={<UnitManagePage me={me.data} />} />
         <Route path="leaves" element={<LeavesPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="profile" element={<ProfilePage me={me.data} />} />
