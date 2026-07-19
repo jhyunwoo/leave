@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
-import { users } from "../db/schema";
+import { units, users } from "../db/schema";
 import type { AppEnv } from "../lib/app";
 import { authMiddleware } from "../middleware/auth";
 
@@ -49,6 +49,39 @@ export const imageRoutes = new Hono<AppEnv>()
       .where(eq(users.id, user.id));
     if (user.profileImageKey) {
       c.executionCtx.waitUntil(c.env.BUCKET.delete(user.profileImageKey));
+    }
+    return c.json({ key }, 201);
+  })
+  .put("/unit/:id", authMiddleware, async (c) => {
+    const contentType = c.req.header("content-type") ?? "";
+    const ext = EXT_BY_TYPE[contentType.split(";")[0]?.trim() ?? ""];
+    if (!ext) {
+      return c.json(
+        { error: "JPEG, PNG, WebP 이미지만 업로드할 수 있습니다" },
+        415,
+      );
+    }
+
+    const id = c.req.param("id");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== user.id) {
+      return c.json({ error: "부대 관리자만 이미지를 바꿀 수 있습니다" }, 403);
+    }
+
+    const body = await c.req.arrayBuffer();
+    if (body.byteLength === 0) return c.json({ error: "빈 파일입니다" }, 400);
+    if (body.byteLength > MAX_BYTES) {
+      return c.json({ error: "이미지는 5MB 이하여야 합니다" }, 413);
+    }
+
+    const key = `units/${id}/${crypto.randomUUID()}.${ext}`;
+    await c.env.BUCKET.put(key, body, { httpMetadata: { contentType } });
+    await db.update(units).set({ imageKey: key }).where(eq(units.id, id));
+    if (unit.imageKey) {
+      c.executionCtx.waitUntil(c.env.BUCKET.delete(unit.imageKey));
     }
     return c.json({ key }, 201);
   })

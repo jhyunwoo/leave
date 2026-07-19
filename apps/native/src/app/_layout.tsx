@@ -55,6 +55,16 @@ function RootNavigator() {
             headerTitleStyle: { fontWeight: "900", color: colors.ink },
           }}
         />
+        <Stack.Screen
+          name="unit-manage"
+          options={{
+            presentation: "modal",
+            headerShown: true,
+            title: "부대 관리",
+            headerStyle: { backgroundColor: colors.canvasSoft },
+            headerTitleStyle: { fontWeight: "900", color: colors.ink },
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthed}>
         <Stack.Screen name="login" />

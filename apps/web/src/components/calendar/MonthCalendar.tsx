@@ -1,4 +1,4 @@
-import { todayInSeoul } from "@leave/shared";
+import { getHoliday, todayInSeoul } from "@leave/shared";
 import { useMemo } from "react";
 import type { Calendar } from "../../api/queries";
 import { buildMonthGrid, WEEKDAYS } from "../../lib/format";
@@ -8,8 +8,10 @@ export function MonthCalendar(props: {
   calendar: Calendar;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
+  /** 스크롤 달력처럼 요일 헤더를 위에서 한 번만 그릴 때 true. */
+  hideWeekdays?: boolean;
 }) {
-  const { calendar, selectedDate, onSelectDate } = props;
+  const { calendar, selectedDate, onSelectDate, hideWeekdays } = props;
   const today = todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
   const statByDate = useMemo(
@@ -24,17 +26,19 @@ export function MonthCalendar(props: {
 
   return (
     <div className="cal" role="grid" aria-label={`${calendar.month} 부대 휴가 달력`}>
-      <div className="cal-weekdays" role="row">
-        {WEEKDAYS.map((w, i) => (
-          <div
-            key={w}
-            role="columnheader"
-            className={`cal-weekday ${i === 0 ? "is-sunday" : ""}`}
-          >
-            {w}
-          </div>
-        ))}
-      </div>
+      {!hideWeekdays && (
+        <div className="cal-weekdays" role="row">
+          {WEEKDAYS.map((w, i) => (
+            <div
+              key={w}
+              role="columnheader"
+              className={`cal-weekday ${i === 0 ? "is-sunday" : ""}`}
+            >
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
       {weeks.map((week, wi) => (
         <div key={wi} className="cal-week" role="row">
           {week.map((cell) => {
@@ -44,6 +48,7 @@ export function MonthCalendar(props: {
             const exceeded = stat?.exceeded ?? false;
             const dayNum = Number(cell.date.slice(8));
             const sunday = new Date(cell.date).getUTCDay() === 0;
+            const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const names = (stat?.userIds ?? [])
               .map((id) => namesById.get(id))
               .filter((n): n is string => !!n);
@@ -57,7 +62,7 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
                     : undefined
                 }
                 className={[
@@ -72,12 +77,17 @@ export function MonthCalendar(props: {
                   className={[
                     "cal-daynum",
                     isToday ? "is-today" : "",
-                    sunday && cell.inMonth ? "is-sunday" : "",
+                    (sunday || holiday) && cell.inMonth ? "is-sunday" : "",
                     exceeded ? "is-exceeded" : "",
                   ].join(" ")}
                 >
                   {dayNum}
                 </span>
+                {holiday && (
+                  <span className="cal-holiday" title={holiday}>
+                    {holiday}
+                  </span>
+                )}
                 {cell.inMonth && names.length > 0 && (
                   <span className="cal-chips">
                     {names.slice(0, 2).map((n) => (

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Me } from "../api/queries";
 import {
+  useCancelJoinRequest,
   useCreateUnit,
   useJoinUnit,
   useLeaveUnit,
@@ -19,9 +20,12 @@ const RATIO_PRESETS = [
 
 export function UnitsPage(props: { me: Me }) {
   const myUnit = props.me.unit;
+  const joinRequest = props.me.joinRequest;
+  const isAdmin = myUnit != null && myUnit.adminId === props.me.user.id;
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,10 +36,31 @@ export function UnitsPage(props: { me: Me }) {
   const search = useUnitSearch(debounced);
   const join = useJoinUnit();
   const leaveUnit = useLeaveUnit();
+  const cancelRequest = useCancelJoinRequest();
 
   const doJoin = async (unitId: string) => {
-    await join.mutateAsync(unitId);
-    navigate("/", { replace: true });
+    setError(null);
+    try {
+      // 가입은 관리자 승인이 필요 — 신청만 하고 대기 상태로 전환된다.
+      await join.mutateAsync(unitId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "가입 신청에 실패했어요");
+    }
+  };
+
+  const doLeave = async () => {
+    setError(null);
+    if (!myUnit) return;
+    if (!confirm(`${myUnit.name}에서 나갈까요?`)) return;
+    try {
+      await leaveUnit.mutateAsync();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "부대를 나가지 못했어요. 관리자라면 먼저 다른 부대원에게 관리자를 넘겨주세요.",
+      );
+    }
   };
 
   return (
@@ -82,7 +107,7 @@ export function UnitsPage(props: { me: Me }) {
               {myUnit.maxLeaveNumerator}/{myUnit.maxLeaveDenominator}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
+          <div style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -90,20 +115,65 @@ export function UnitsPage(props: { me: Me }) {
             >
               달력 보기
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate("/units/manage")}
+              >
+                부대 관리
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-danger btn-sm"
               disabled={leaveUnit.isPending}
-              onClick={() => {
-                if (confirm(`${myUnit.name}에서 나갈까요?`)) {
-                  void leaveUnit.mutateAsync();
-                }
-              }}
+              onClick={() => void doLeave()}
             >
               부대 나가기
             </button>
           </div>
         </div>
+      )}
+
+      {!myUnit && joinRequest && (
+        <div
+          className="card"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "var(--sp-lg)",
+            flexWrap: "wrap",
+            border: "1px solid var(--warning)",
+          }}
+        >
+          <div>
+            <p className="eyebrow" style={{ color: "var(--warning-content)" }}>
+              가입 신청 중
+            </p>
+            <p className="display-xs" style={{ marginTop: 4 }}>
+              {joinRequest.unitName}
+            </p>
+            <p className="caption text-body" style={{ marginTop: 4 }}>
+              관리자의 승인을 기다리고 있어요. 승인되면 바로 달력이 열려요.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-tertiary btn-sm"
+            disabled={cancelRequest.isPending}
+            onClick={() => void cancelRequest.mutateAsync()}
+          >
+            신청 취소
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
       )}
 
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}>
@@ -151,14 +221,17 @@ export function UnitsPage(props: { me: Me }) {
                 </div>
                 {myUnit?.id === u.id ? (
                   <span className="badge badge-positive">소속됨</span>
+                ) : joinRequest?.unitId === u.id ? (
+                  <span className="badge badge-warning">신청 중</span>
                 ) : (
                   <button
                     type="button"
                     className="btn btn-tertiary btn-sm"
-                    disabled={join.isPending}
+                    disabled={join.isPending || myUnit != null}
+                    title={myUnit != null ? "옮기려면 먼저 부대를 나가세요" : undefined}
                     onClick={() => void doJoin(u.id)}
                   >
-                    가입
+                    가입 신청
                   </button>
                 )}
               </li>

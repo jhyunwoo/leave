@@ -4,6 +4,53 @@
   gap: 2px;
 }
 
+/* 세로 무한 스크롤 달력 */
+.cal-scroll-shell {
+  display: flex;
+  flex-direction: column;
+}
+.cal-weekdays-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--canvas-soft);
+}
+.cal-scroll {
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+.cal-month-block {
+  padding-top: var(--sp-sm);
+}
+.cal-month-block + .cal-month-block {
+  border-top: 1px dashed var(--canvas-soft);
+}
+.cal-month-label {
+  position: sticky;
+  top: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: var(--sp-sm) 2px;
+  background: linear-gradient(var(--canvas) 70%, transparent);
+}
+.cal-sentinel {
+  height: 1px;
+}
+.cal-month-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-2xl);
+}
+.cal-month-error {
+  padding: var(--sp-lg);
+  font-size: 14px;
+  color: var(--body);
+}
+
 .cal-weekdays,
 .cal-week {
   display: grid;
@@ -82,6 +129,18 @@
 .cal-daynum.is-today {
   background: var(--primary);
   color: var(--on-primary);
+}
+
+.cal-holiday {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--negative);
+  line-height: 1.2;
 }
 
 .cal-chips {

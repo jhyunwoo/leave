@@ -3,6 +3,8 @@ import type {
   LoginInput,
   SignupInput,
   UnitCreateInput,
+  UnitTransferInput,
+  UnitUpdateInput,
 } from "@leave/shared";
 import type { InferResponseType } from "hono/client";
 import {
@@ -12,7 +14,7 @@ import {
 } from "@tanstack/react-query";
 import { useAtom } from "jotai";
 import { tokenAtom } from "../state/auth";
-import { api, ApiError, unwrap } from "./client";
+import { api, API_URL, ApiError, getAuthToken, unwrap } from "./client";
 
 export type Me = InferResponseType<typeof api.auth.me.$get, 200>;
 export type Unit = InferResponseType<
@@ -33,6 +35,14 @@ export type NotificationList = InferResponseType<
   typeof api.notifications.$get,
   200
 >;
+export type Member = InferResponseType<
+  (typeof api.units)[":id"]["members"]["$get"],
+  200
+>["members"][number];
+export type JoinRequest = InferResponseType<
+  (typeof api.units)[":id"]["requests"]["$get"],
+  200
+>["requests"][number];
 export type AuthResponse = InferResponseType<typeof api.auth.login.$post, 200>;
 
 export function useMe(enabled: boolean) {
@@ -122,14 +132,23 @@ export function useCreateUnit() {
   });
 }
 
+/** 부대 가입 신청 (관리자 승인 필요). */
 export function useJoinUnit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (unitId: string) =>
-      unwrap<{ unit: Unit }>(
+      unwrap<{ requested: true }>(
         await api.units[":id"].join.$post({ param: { id: unitId } }),
       ),
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useCancelJoinRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(await api.units.join.cancel.$post()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
   });
 }
 
@@ -137,6 +156,119 @@ export function useLeaveUnit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => unwrap(await api.units.leave.$post()),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useUnitMembers(unitId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["unitMembers", unitId],
+    enabled: enabled && unitId !== null,
+    queryFn: async () =>
+      unwrap<{ members: Member[] }>(
+        await api.units[":id"].members.$get({ param: { id: unitId! } }),
+      ),
+  });
+}
+
+export function useJoinRequests(unitId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["joinRequests", unitId],
+    enabled: enabled && unitId !== null,
+    refetchInterval: 30_000,
+    queryFn: async () =>
+      unwrap<{ requests: JoinRequest[] }>(
+        await api.units[":id"].requests.$get({ param: { id: unitId! } }),
+      ),
+  });
+}
+
+/** 부대 정보 수정 (관리자). */
+export function useUpdateUnit(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UnitUpdateInput) =>
+      unwrap<{ unit: Unit }>(
+        await api.units[":id"].$patch({ param: { id: unitId }, json: input }),
+      ),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useApproveJoinRequest(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) =>
+      unwrap(
+        await api.units[":id"].requests[":userId"].approve.$post({
+          param: { id: unitId, userId },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useRejectJoinRequest(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) =>
+      unwrap(
+        await api.units[":id"].requests[":userId"].reject.$post({
+          param: { id: unitId, userId },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["joinRequests"] }),
+  });
+}
+
+export function useRemoveMember(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) =>
+      unwrap(
+        await api.units[":id"].members[":userId"].remove.$post({
+          param: { id: unitId, userId },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useTransferAdmin(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UnitTransferInput) =>
+      unwrap<{ unit: Unit }>(
+        await api.units[":id"].transfer.$post({
+          param: { id: unitId },
+          json: input,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+/** 부대 이미지 업로드 (관리자). 바이너리 본문이라 raw fetch 사용. */
+export function useUploadUnitImage(unitId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const res = await fetch(`${API_URL}/images/unit/${unitId}`, {
+        method: "PUT",
+        headers: {
+          "content-type": file.type,
+          Authorization: `Bearer ${getAuthToken() ?? ""}`,
+        },
+        body: file,
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? "업로드하지 못했습니다");
+      }
+      return (await res.json()) as { key: string };
+    },
     onSuccess: () => qc.invalidateQueries(),
   });
 }

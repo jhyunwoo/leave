@@ -1,3 +1,4 @@
+import { getHoliday } from "@leave/shared";
 import type { Calendar } from "../../api/queries";
 import { fmtDateK, fmtRange } from "../../lib/format";
 import { Avatar } from "../Avatar";
@@ -13,6 +14,7 @@ export function DayPanel(props: {
     (l) => l.startDate <= date && date <= l.endDate,
   );
   const exceeded = stat?.exceeded ?? false;
+  const holiday = getHoliday(date);
 
   return (
     <div
@@ -24,6 +26,14 @@ export function DayPanel(props: {
         <h2 className="display-xs" style={{ marginTop: 4 }}>
           {fmtDateK(date)}
         </h2>
+        {holiday && (
+          <p
+            className="caption"
+            style={{ marginTop: 4, color: "var(--negative)", fontWeight: 600 }}
+          >
+            {holiday}
+          </p>
+        )}
       </div>
 
       {stat && (

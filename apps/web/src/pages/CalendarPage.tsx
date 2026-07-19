@@ -1,22 +1,25 @@
-import { todayInSeoul } from "@leave/shared";
-import { useEffect, useState } from "react";
+import { effectiveMemberCount, maxAllowedOut, todayInSeoul } from "@leave/shared";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router";
 import type { Me } from "../api/queries";
 import { useCalendar } from "../api/queries";
+import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
+import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
-import { MonthCalendar } from "../components/calendar/MonthCalendar";
 import { LeaveFormModal } from "../components/LeaveFormModal";
-import { fmtDateShort, splitMonth, shiftMonth } from "../lib/format";
+import { fmtDateShort } from "../lib/format";
 
 export function CalendarPage(props: { me: Me }) {
   const unit = props.me.unit;
   const today = todayInSeoul();
-  const [month, setMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const scrollRef = useRef<CalendarScrollHandle>(null);
 
-  const calendar = useCalendar(unit?.id ?? null, month);
+  // 선택한 날짜가 속한 달의 달력(사이드 패널용). 스크롤 블록과 같은 캐시를 재사용한다.
+  const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : null;
+  const panelCalendar = useCalendar(unit?.id ?? null, selectedMonth ?? today.slice(0, 7));
 
   useEffect(() => {
     if (!toast) return;
@@ -26,7 +29,11 @@ export function CalendarPage(props: { me: Me }) {
 
   if (!unit) return <Navigate to="/units" replace />;
 
-  const { year, monthNum } = splitMonth(month);
+  const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
+  const allowed = maxAllowedOut(basis, {
+    numerator: unit.maxLeaveNumerator,
+    denominator: unit.maxLeaveDenominator,
+  });
 
   const onSaved = (exceededDates: string[]) => {
     if (exceededDates.length > 0) {
@@ -48,15 +55,13 @@ export function CalendarPage(props: { me: Me }) {
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: "var(--sp-lg)",
-          padding: "var(--sp-2xl) 0 var(--sp-xl)",
+          padding: "var(--sp-xl) 0 var(--sp-lg)",
         }}
       >
         <div>
-          <p className="eyebrow">
-            {unit.name} · {year}
-          </p>
-          <h1 className="display-xl" style={{ marginTop: 6 }}>
-            {monthNum}월
+          <p className="eyebrow">{unit.name}</p>
+          <h1 className="display-md" style={{ marginTop: 6 }}>
+            부대 달력
           </h1>
         </div>
         <div style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}>
@@ -64,45 +69,11 @@ export function CalendarPage(props: { me: Me }) {
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => {
-              setMonth(today.slice(0, 7));
               setSelectedDate(today);
+              scrollRef.current?.scrollToToday();
             }}
           >
             오늘
-          </button>
-          <button
-            type="button"
-            className="btn-icon"
-            aria-label="이전 달"
-            onClick={() => setMonth((m) => shiftMonth(m, -1))}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M10 3L5 8l5 5"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="btn-icon"
-            aria-label="다음 달"
-            onClick={() => setMonth((m) => shiftMonth(m, 1))}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M6 3l5 5-5 5"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
           </button>
           <button
             type="button"
@@ -123,61 +94,38 @@ export function CalendarPage(props: { me: Me }) {
         }}
         className="cal-layout"
       >
-        <div className="card">
-          {calendar.isPending ? (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                padding: "var(--sp-3xl)",
-              }}
-            >
-              <div className="spinner" aria-label="불러오는 중" />
-            </div>
-          ) : calendar.isError ? (
-            <p className="body-sm text-body" style={{ padding: "var(--sp-xl)" }}>
-              달력을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
-            </p>
-          ) : (
-            <>
-              <MonthCalendar
-                calendar={calendar.data}
-                selectedDate={selectedDate}
-                onSelectDate={(d) =>
-                  setSelectedDate((cur) => (cur === d ? null : d))
-                }
-              />
-              <div
-                style={{
-                  display: "flex",
-                  gap: "var(--sp-lg)",
-                  marginTop: "var(--sp-lg)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span className="caption text-mute">
-                  하루 최대 출타{" "}
-                  <strong style={{ color: "var(--ink)" }}>
-                    {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}
-                  </strong>{" "}
-                  (부대원 {unit.memberCount}명 기준{" "}
-                  {Math.floor(
-                    (unit.memberCount * unit.maxLeaveNumerator) /
-                      unit.maxLeaveDenominator,
-                  )}
-                  명)
-                </span>
-                <span className="caption" style={{ color: "var(--negative-deep)" }}>
-                  ● 빨간 날 = 출타율 초과
-                </span>
-              </div>
-            </>
-          )}
+        <div className="card" style={{ padding: "var(--sp-md)" }}>
+          <CalendarScroll
+            ref={scrollRef}
+            unitId={unit.id}
+            selectedDate={selectedDate}
+            onSelectDate={(d) => setSelectedDate((cur) => (cur === d ? null : d))}
+          />
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--sp-lg)",
+              marginTop: "var(--sp-md)",
+              padding: "0 var(--sp-sm)",
+              flexWrap: "wrap",
+            }}
+          >
+            <span className="caption text-mute">
+              하루 최대 출타{" "}
+              <strong style={{ color: "var(--ink)" }}>
+                {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}
+              </strong>{" "}
+              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준 {allowed}명)
+            </span>
+            <span className="caption" style={{ color: "var(--negative-deep)" }}>
+              ● 빨간 날 = 출타율 초과 · 공휴일은 빨간 날짜
+            </span>
+          </div>
         </div>
 
-        {selectedDate && calendar.data && (
+        {selectedDate && panelCalendar.data && (
           <DayPanel
-            calendar={calendar.data}
+            calendar={panelCalendar.data}
             date={selectedDate}
             onAddLeave={() => setFormOpen(true)}
           />

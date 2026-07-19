@@ -1,8 +1,16 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { computeDayStats, monthBounds, monthSchema, unitCreateSchema } from "@leave/shared";
-import { and, asc, eq, gte, inArray, like, lte, sql } from "drizzle-orm";
+import {
+  computeDayStats,
+  effectiveMemberCount,
+  monthBounds,
+  monthSchema,
+  unitCreateSchema,
+  unitTransferSchema,
+  unitUpdateSchema,
+} from "@leave/shared";
+import { and, asc, eq, gte, inArray, like, lte, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { leaves, units, users } from "../db/schema";
+import { leaves, unitJoinRequests, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import {
   bumpUnitVersion,
@@ -13,6 +21,7 @@ import {
   calendarSchema,
   errorResponse,
   jsonContent,
+  joinRequestSchema,
   memberSchema,
   okSchema,
   unitSchema,
@@ -21,6 +30,7 @@ import { serializeMember, serializeUnit } from "../lib/serialize";
 import { authMiddleware } from "../middleware/auth";
 
 const idParam = z.object({ id: z.string() });
+const memberParam = z.object({ id: z.string(), userId: z.string() });
 
 const listRoute = createRoute({
   method: "get",
@@ -39,7 +49,7 @@ const createUnitRoute = createRoute({
   method: "post",
   path: "/",
   tags: ["부대"],
-  summary: "부대 생성 (최대 출타율 비율 포함, 생성자는 자동 가입)",
+  summary: "부대 생성 (생성자는 자동 가입·관리자)",
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -69,16 +79,138 @@ const getUnitRoute = createRoute({
   },
 });
 
+const updateUnitRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["부대"],
+  summary: "부대 정보 수정 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: unitUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(z.object({ unit: unitSchema }), "수정된 부대"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 수정 가능"),
+    404: errorResponse("부대 없음"),
+    409: errorResponse("같은 이름의 부대가 이미 존재"),
+  },
+});
+
 const joinRoute = createRoute({
   method: "post",
   path: "/{id}/join",
   tags: ["부대"],
-  summary: "부대 가입 (기존 소속이 있으면 이동)",
+  summary: "부대 가입 신청 (관리자 승인 필요)",
   security: [{ Bearer: [] }],
   request: { params: idParam },
   responses: {
-    200: jsonContent(z.object({ unit: unitSchema }), "가입한 부대"),
+    200: jsonContent(z.object({ requested: z.literal(true) }), "가입 신청 완료"),
     401: errorResponse("인증 실패"),
+    404: errorResponse("부대 없음"),
+    409: errorResponse("이미 이 부대 소속"),
+  },
+});
+
+const cancelJoinRoute = createRoute({
+  method: "post",
+  path: "/join/cancel",
+  tags: ["부대"],
+  summary: "내 가입 신청 취소",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(okSchema, "취소 완료"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const requestsRoute = createRoute({
+  method: "get",
+  path: "/{id}/requests",
+  tags: ["부대"],
+  summary: "대기 중인 가입 신청 목록 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: { params: idParam },
+  responses: {
+    200: jsonContent(
+      z.object({ requests: z.array(joinRequestSchema) }),
+      "가입 신청 목록",
+    ),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 조회 가능"),
+    404: errorResponse("부대 없음"),
+  },
+});
+
+const approveRoute = createRoute({
+  method: "post",
+  path: "/{id}/requests/{userId}/approve",
+  tags: ["부대"],
+  summary: "가입 신청 승인 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: { params: memberParam },
+  responses: {
+    200: jsonContent(okSchema, "승인 완료"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 가능"),
+    404: errorResponse("신청 없음"),
+  },
+});
+
+const rejectRoute = createRoute({
+  method: "post",
+  path: "/{id}/requests/{userId}/reject",
+  tags: ["부대"],
+  summary: "가입 신청 거절 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: { params: memberParam },
+  responses: {
+    200: jsonContent(okSchema, "거절 완료"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 가능"),
+    404: errorResponse("신청 없음"),
+  },
+});
+
+const removeMemberRoute = createRoute({
+  method: "post",
+  path: "/{id}/members/{userId}/remove",
+  tags: ["부대"],
+  summary: "부대원 제거 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: { params: memberParam },
+  responses: {
+    200: jsonContent(okSchema, "제거 완료"),
+    400: errorResponse("자기 자신은 제거 불가"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 가능"),
+    404: errorResponse("부대원 없음"),
+  },
+});
+
+const transferRoute = createRoute({
+  method: "post",
+  path: "/{id}/transfer",
+  tags: ["부대"],
+  summary: "관리자 이관 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: unitTransferSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(z.object({ unit: unitSchema }), "이관 완료"),
+    400: errorResponse("대상이 부대원이 아님"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 가능"),
     404: errorResponse("부대 없음"),
   },
 });
@@ -92,6 +224,7 @@ const leaveUnitRoute = createRoute({
   responses: {
     200: jsonContent(okSchema, "탈퇴 완료"),
     401: errorResponse("인증 실패"),
+    409: errorResponse("관리자는 이관 후 나갈 수 있음"),
   },
 });
 
@@ -174,10 +307,17 @@ export const unitRoutes = app
       maxLeaveNumerator: input.maxLeaveNumerator,
       maxLeaveDenominator: input.maxLeaveDenominator,
       creatorId: user.id,
+      adminId: user.id,
+      headcount: input.headcount ?? null,
+      imageKey: null,
       createdAt: new Date().toISOString(),
     };
     await db.insert(units).values(unit);
     await db.update(users).set({ unitId: unit.id }).where(eq(users.id, user.id));
+    // 생성자는 바로 가입되므로 남아있던 다른 대기 신청은 정리한다.
+    await db
+      .delete(unitJoinRequests)
+      .where(eq(unitJoinRequests.userId, user.id));
     return c.json({ unit: serializeUnit(unit, 1) }, 201);
   })
   .openapi(getUnitRoute, async (c) => {
@@ -188,26 +328,234 @@ export const unitRoutes = app
     const memberCount = await db.$count(users, eq(users.unitId, id));
     return c.json({ unit: serializeUnit(unit, memberCount) }, 200);
   })
+  .openapi(updateUnitRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== user.id) {
+      return c.json({ error: "부대 관리자만 수정할 수 있습니다" }, 403);
+    }
+
+    if (input.name && input.name !== unit.name) {
+      const dup = await db
+        .select({ id: units.id })
+        .from(units)
+        .where(and(eq(units.name, input.name), ne(units.id, id)))
+        .get();
+      if (dup) return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
+    }
+
+    const patch: Partial<typeof units.$inferInsert> = {};
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.maxLeaveNumerator !== undefined) {
+      patch.maxLeaveNumerator = input.maxLeaveNumerator;
+    }
+    if (input.maxLeaveDenominator !== undefined) {
+      patch.maxLeaveDenominator = input.maxLeaveDenominator;
+    }
+    if (input.headcount !== undefined) patch.headcount = input.headcount;
+
+    if (Object.keys(patch).length > 0) {
+      await db.update(units).set(patch).where(eq(units.id, id));
+    }
+    // 출타율·인원 변경은 달력 통계를 바꾸므로 캐시를 무효화한다.
+    await bumpUnitVersion(c.env.CACHE, id);
+
+    const updated = await db.select().from(units).where(eq(units.id, id)).get();
+    const memberCount = await db.$count(users, eq(users.unitId, id));
+    return c.json({ unit: serializeUnit(updated!, memberCount) }, 200);
+  })
   .openapi(joinRoute, async (c) => {
     const { id } = c.req.valid("param");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    await db.update(users).set({ unitId: id }).where(eq(users.id, user.id));
-    // 부대원 변동은 새 부대(그리고 이전 부대)의 달력 통계를 바꾸므로 캐시를 무효화한다.
-    await bumpUnitVersion(c.env.CACHE, id);
-    if (user.unitId && user.unitId !== id) {
-      await bumpUnitVersion(c.env.CACHE, user.unitId);
+    if (user.unitId === id) {
+      return c.json({ error: "이미 이 부대의 부대원입니다" }, 409);
     }
+    // 사용자당 대기 신청은 하나만 유지 — 기존 신청을 교체한다.
+    await db
+      .delete(unitJoinRequests)
+      .where(eq(unitJoinRequests.userId, user.id));
+    await db.insert(unitJoinRequests).values({
+      id: crypto.randomUUID(),
+      unitId: id,
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+    });
+    return c.json({ requested: true as const }, 200);
+  })
+  .openapi(cancelJoinRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    await db
+      .delete(unitJoinRequests)
+      .where(eq(unitJoinRequests.userId, user.id));
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(requestsRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== user.id) {
+      return c.json({ error: "부대 관리자만 조회할 수 있습니다" }, 403);
+    }
+    const rows = await db
+      .select({ req: unitJoinRequests, user: users })
+      .from(unitJoinRequests)
+      .innerJoin(users, eq(users.id, unitJoinRequests.userId))
+      .where(eq(unitJoinRequests.unitId, id))
+      .orderBy(asc(unitJoinRequests.createdAt))
+      .all();
+    const requests = rows.map((r) => {
+      const m = serializeMember(r.user);
+      return {
+        userId: r.user.id,
+        name: m.name,
+        branch: m.branch,
+        branchLabel: m.branchLabel,
+        rank: m.rank,
+        rankLabel: m.rankLabel,
+        profileImageKey: m.profileImageKey,
+        createdAt: r.req.createdAt,
+      };
+    });
+    return c.json({ requests }, 200);
+  })
+  .openapi(approveRoute, async (c) => {
+    const { id, userId } = c.req.valid("param");
+    const admin = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== admin.id) {
+      return c.json({ error: "부대 관리자만 승인할 수 있습니다" }, 403);
+    }
+    const req = await db
+      .select()
+      .from(unitJoinRequests)
+      .where(
+        and(
+          eq(unitJoinRequests.unitId, id),
+          eq(unitJoinRequests.userId, userId),
+        ),
+      )
+      .get();
+    if (!req) return c.json({ error: "가입 신청을 찾을 수 없습니다" }, 404);
+
+    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    const previousUnitId = target?.unitId ?? null;
+    await db.update(users).set({ unitId: id }).where(eq(users.id, userId));
+    await db
+      .delete(unitJoinRequests)
+      .where(eq(unitJoinRequests.userId, userId));
+    await bumpUnitVersion(c.env.CACHE, id);
+    if (previousUnitId && previousUnitId !== id) {
+      await bumpUnitVersion(c.env.CACHE, previousUnitId);
+    }
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(rejectRoute, async (c) => {
+    const { id, userId } = c.req.valid("param");
+    const admin = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== admin.id) {
+      return c.json({ error: "부대 관리자만 거절할 수 있습니다" }, 403);
+    }
+    const res = await db
+      .delete(unitJoinRequests)
+      .where(
+        and(
+          eq(unitJoinRequests.unitId, id),
+          eq(unitJoinRequests.userId, userId),
+        ),
+      )
+      .run();
+    if (res.meta.changes === 0) {
+      return c.json({ error: "가입 신청을 찾을 수 없습니다" }, 404);
+    }
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(removeMemberRoute, async (c) => {
+    const { id, userId } = c.req.valid("param");
+    const admin = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== admin.id) {
+      return c.json({ error: "부대 관리자만 제거할 수 있습니다" }, 403);
+    }
+    if (userId === admin.id) {
+      return c.json({ error: "관리자 자신은 제거할 수 없습니다" }, 400);
+    }
+    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!target || target.unitId !== id) {
+      return c.json({ error: "해당 부대원을 찾을 수 없습니다" }, 404);
+    }
+    await db.update(users).set({ unitId: null }).where(eq(users.id, userId));
+    await bumpUnitVersion(c.env.CACHE, id);
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(transferRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const { userId } = c.req.valid("json");
+    const admin = c.get("user");
+    const db = drizzle(c.env.DB);
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    if (unit.adminId !== admin.id) {
+      return c.json({ error: "부대 관리자만 이관할 수 있습니다" }, 403);
+    }
+    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!target || target.unitId !== id) {
+      return c.json({ error: "대상이 이 부대의 부대원이 아닙니다" }, 400);
+    }
+    await db.update(units).set({ adminId: userId }).where(eq(units.id, id));
+    const updated = await db.select().from(units).where(eq(units.id, id)).get();
     const memberCount = await db.$count(users, eq(users.unitId, id));
-    return c.json({ unit: serializeUnit(unit, memberCount) }, 200);
+    return c.json({ unit: serializeUnit(updated!, memberCount) }, 200);
   })
   .openapi(leaveUnitRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
+    const unitId = user.unitId;
+    if (!unitId) return c.json({ ok: true as const }, 200);
+
+    const unit = await db.select().from(units).where(eq(units.id, unitId)).get();
+    if (unit && unit.adminId === user.id) {
+      const otherCount = await db.$count(
+        users,
+        and(eq(users.unitId, unitId), ne(users.id, user.id)),
+      );
+      if (otherCount > 0) {
+        return c.json(
+          { error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다" },
+          409,
+        );
+      }
+      // 혼자 남은 관리자가 나가면 빈 부대·대기 신청·이미지를 정리한다.
+      await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
+      await db.delete(unitJoinRequests).where(eq(unitJoinRequests.unitId, unitId));
+      await db.delete(units).where(eq(units.id, unitId));
+      if (unit.imageKey) {
+        c.executionCtx.waitUntil(c.env.BUCKET.delete(unit.imageKey));
+      }
+      await bumpUnitVersion(c.env.CACHE, unitId);
+      return c.json({ ok: true as const }, 200);
+    }
+
     await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
+    await bumpUnitVersion(c.env.CACHE, unitId);
     return c.json({ ok: true as const }, 200);
   })
   .openapi(membersRoute, async (c) => {
@@ -276,7 +624,7 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
       })),
-      memberCount: members.length,
+      memberCount: effectiveMemberCount(unit.headcount, members.length),
       ratio: {
         numerator: unit.maxLeaveNumerator,
         denominator: unit.maxLeaveDenominator,

@@ -54,6 +54,13 @@ test("출타율 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", as
   const u3 = await signup();
   await req("POST", `/units/${unitId}/join`, { token: u2.token });
   await req("POST", `/units/${unitId}/join`, { token: u3.token });
+  // 관리자(owner)가 두 신청을 승인해야 부대원으로 편입된다.
+  await req("POST", `/units/${unitId}/requests/${u2.data.user.id}/approve`, {
+    token: owner.token,
+  });
+  await req("POST", `/units/${unitId}/requests/${u3.data.user.id}/approve`, {
+    token: owner.token,
+  });
 
   // 같은 날짜에 3명이 휴가 → 1/3(=1명) 초과
   const range = { startDate: "2026-10-05", endDate: "2026-10-05" };

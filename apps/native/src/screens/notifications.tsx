@@ -30,7 +30,7 @@ export function NotificationsScreen() {
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.lg },
+        { paddingTop: insets.top + spacing.xs },
       ]}
     >
       <View style={styles.header}>

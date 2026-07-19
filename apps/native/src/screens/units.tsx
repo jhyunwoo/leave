@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import {
+  useCancelJoinRequest,
   useCreateUnit,
   useJoinUnit,
   useLeaveUnit,
@@ -46,18 +47,41 @@ export function UnitsScreen() {
   const search = useUnitSearch(debounced);
   const join = useJoinUnit();
   const leaveUnit = useLeaveUnit();
+  const cancelRequest = useCancelJoinRequest();
   const myUnit = me.data?.unit ?? null;
+  const joinRequest = me.data?.joinRequest ?? null;
+  const isAdmin = myUnit != null && me.data?.user.id === myUnit.adminId;
 
   const doJoin = async (unitId: string, unitName: string) => {
     try {
+      // 가입은 관리자 승인이 필요 — 신청만 하고 대기 상태로 전환된다.
       await join.mutateAsync(unitId);
-      router.back();
     } catch (err) {
       Alert.alert(
-        "가입 실패",
-        err instanceof Error ? err.message : `${unitName}에 가입하지 못했습니다`,
+        "가입 신청 실패",
+        err instanceof Error ? err.message : `${unitName}에 신청하지 못했습니다`,
       );
     }
+  };
+
+  const doLeave = () => {
+    if (!myUnit) return;
+    Alert.alert("부대 나가기", `${myUnit.name}에서 나갈까요?`, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "나가기",
+        style: "destructive",
+        onPress: () =>
+          void leaveUnit.mutateAsync().catch((err) =>
+            Alert.alert(
+              "나가기 실패",
+              err instanceof Error
+                ? err.message
+                : "관리자라면 먼저 다른 부대원에게 관리자를 넘겨주세요.",
+            ),
+          ),
+      },
+    ]);
   };
 
   return (
@@ -80,21 +104,39 @@ export function UnitsScreen() {
             부대원 {myUnit.memberCount}명 · 최대 출타율 {myUnit.maxLeaveNumerator}
             /{myUnit.maxLeaveDenominator}
           </Text>
+          <View style={styles.myUnitActions}>
+            {isAdmin && (
+              <Button
+                title="부대 관리"
+                variant="secondary"
+                size="sm"
+                onPress={() => router.push("/unit-manage")}
+              />
+            )}
+            <Button
+              title="부대 나가기"
+              variant="danger"
+              size="sm"
+              loading={leaveUnit.isPending}
+              onPress={doLeave}
+            />
+          </View>
+        </View>
+      )}
+
+      {!myUnit && joinRequest && (
+        <View style={styles.pendingCard}>
+          <Text style={styles.pendingEyebrow}>가입 신청 중</Text>
+          <Text style={styles.myUnitName}>{joinRequest.unitName}</Text>
+          <Text style={styles.myUnitMeta}>
+            관리자의 승인을 기다리고 있어요. 승인되면 바로 달력이 열려요.
+          </Text>
           <Button
-            title="부대 나가기"
-            variant="danger"
+            title="신청 취소"
+            variant="tertiary"
             size="sm"
-            loading={leaveUnit.isPending}
-            onPress={() =>
-              Alert.alert("부대 나가기", `${myUnit.name}에서 나갈까요?`, [
-                { text: "취소", style: "cancel" },
-                {
-                  text: "나가기",
-                  style: "destructive",
-                  onPress: () => void leaveUnit.mutateAsync(),
-                },
-              ])
-            }
+            loading={cancelRequest.isPending}
+            onPress={() => void cancelRequest.mutateAsync()}
             style={{ alignSelf: "flex-start", marginTop: spacing.sm }}
           />
         </View>
@@ -128,12 +170,14 @@ export function UnitsScreen() {
                 </View>
                 {myUnit?.id === u.id ? (
                   <Badge text="소속됨" kind="positive" />
+                ) : joinRequest?.unitId === u.id ? (
+                  <Badge text="신청 중" kind="neutral" />
                 ) : (
                   <Button
-                    title="가입"
+                    title="가입 신청"
                     variant="tertiary"
                     size="sm"
-                    disabled={join.isPending}
+                    disabled={join.isPending || myUnit != null}
                     onPress={() => void doJoin(u.id, u.name)}
                   />
                 )}
@@ -331,6 +375,21 @@ const styles = StyleSheet.create({
   myUnitEyebrow: { fontSize: 12, fontWeight: "600", color: colors.positiveDeep },
   myUnitName: { fontSize: 22, fontWeight: "600", color: colors.ink },
   myUnitMeta: { fontSize: 13, color: colors.body },
+  myUnitActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    flexWrap: "wrap",
+  },
+  pendingCard: {
+    backgroundColor: colors.canvas,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  pendingEyebrow: { fontSize: 12, fontWeight: "600", color: colors.warningContent },
   card: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
