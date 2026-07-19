@@ -16,7 +16,7 @@ export function NotificationsPage() {
       style={{
         maxWidth: 640,
         margin: "0 auto",
-        padding: "var(--sp-2xl) 0 var(--sp-3xl)",
+        padding: "var(--sp-lg) 0 var(--sp-3xl)",
         display: "flex",
         flexDirection: "column",
         gap: "var(--sp-xl)",
