@@ -1,5 +1,6 @@
 import {
   buildMonthGrid,
+  getHoliday,
   todayInSeoul,
   WEEKDAYS,
   type ISODate,
@@ -15,8 +16,10 @@ export function MonthCalendar(props: {
   selectedDate: ISODate | null;
   onSelectDate: (date: ISODate) => void;
   compact?: boolean;
+  /** 스크롤 달력처럼 요일 헤더를 위에서 한 번만 그릴 때 true. */
+  hideWeekdays?: boolean;
 }) {
-  const { calendar, selectedDate, onSelectDate, compact } = props;
+  const { calendar, selectedDate, onSelectDate, compact, hideWeekdays } = props;
   const today = todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
   const statByDate = useMemo(
@@ -28,16 +31,18 @@ export function MonthCalendar(props: {
 
   return (
     <View accessibilityLabel={`${calendar.month} 부대 휴가 달력`}>
-      <View style={styles.weekRow}>
-        {WEEKDAYS.map((w, i) => (
-          <Text
-            key={w}
-            style={[styles.weekday, i === 0 && { color: colors.negative }]}
-          >
-            {w}
-          </Text>
-        ))}
-      </View>
+      {!hideWeekdays && (
+        <View style={styles.weekRow}>
+          {WEEKDAYS.map((w, i) => (
+            <Text
+              key={w}
+              style={[styles.weekday, i === 0 && { color: colors.negative }]}
+            >
+              {w}
+            </Text>
+          ))}
+        </View>
+      )}
       {weeks.map((week, wi) => (
         <View key={wi} style={styles.weekRow}>
           {week.map((cell) => {
@@ -47,6 +52,7 @@ export function MonthCalendar(props: {
             const isSelected = cell.date === selectedDate;
             const dayNum = Number(cell.date.slice(8));
             const sunday = new Date(cell.date).getUTCDay() === 0;
+            const holiday = cell.inMonth ? getHoliday(cell.date) : null;
 
             return (
               <Pressable
@@ -55,7 +61,7 @@ export function MonthCalendar(props: {
                 accessibilityRole="button"
                 accessibilityLabel={
                   cell.inMonth
-                    ? `${dayNum}일, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
                     : undefined
                 }
                 onPress={() => onSelectDate(cell.date)}
@@ -75,7 +81,7 @@ export function MonthCalendar(props: {
                       <Text
                         style={[
                           styles.dayNum,
-                          sunday && { color: colors.negative },
+                          (sunday || holiday) && { color: colors.negative },
                           exceeded && { color: colors.negativeDeep },
                           isToday && { color: colors.onPrimary },
                         ]}
@@ -83,6 +89,15 @@ export function MonthCalendar(props: {
                         {dayNum}
                       </Text>
                     </View>
+                    {!compact && holiday && (
+                      <Text
+                        style={styles.holiday}
+                        numberOfLines={1}
+                        ellipsizeMode="clip"
+                      >
+                        {holiday}
+                      </Text>
+                    )}
                     {!compact && stat && stat.count > 0 && (
                       <View
                         style={[
@@ -142,6 +157,13 @@ const styles = StyleSheet.create({
   },
   todayWrap: { backgroundColor: colors.primary },
   dayNum: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  holiday: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: colors.negative,
+    maxWidth: "100%",
+    paddingHorizontal: 2,
+  },
   countPill: {
     paddingHorizontal: 6,
     paddingVertical: 1,

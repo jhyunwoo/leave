@@ -1,4 +1,4 @@
-import { fmtDateK, fmtRange, type ISODate } from "@leave/shared";
+import { fmtDateK, fmtRange, getHoliday, type ISODate } from "@leave/shared";
 import { StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
@@ -17,11 +17,13 @@ export function DayPanel(props: {
     (l) => l.startDate <= date && date <= l.endDate,
   );
   const exceeded = stat?.exceeded ?? false;
+  const holiday = getHoliday(date);
 
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>선택한 날짜</Text>
       <Text style={styles.date}>{fmtDateK(date)}</Text>
+      {holiday && <Text style={styles.holiday}>{holiday}</Text>}
 
       {stat && (
         <View style={styles.statusRow}>
@@ -79,6 +81,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   date: { fontSize: 24, fontWeight: "600", color: colors.ink, marginTop: -8 },
+  holiday: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.negative,
+    marginTop: -8,
+  },
   statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   exceededText: { fontSize: 12, fontWeight: "600", color: colors.negativeDeep },
   empty: {

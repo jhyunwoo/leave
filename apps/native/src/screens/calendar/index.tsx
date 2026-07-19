@@ -1,45 +1,47 @@
 import {
+  effectiveMemberCount,
   maxAllowedOut,
-  shiftMonth,
-  splitMonth,
   todayInSeoul,
   type ISODate,
 } from "@leave/shared";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCalendar, useMe, useRegisterPushToken } from "@/api/queries";
 import { Button } from "@/components/button";
+import {
+  CalendarScroll,
+  type CalendarScrollHandle,
+} from "@/components/calendar-scroll";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import { MonthCalendar } from "@/components/month-calendar";
 import { getPushToken } from "@/lib/notifications";
-import { colors, radius, spacing, WIDE_BREAKPOINT } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 import { DayPanel } from "./day-panel";
 
 export function CalendarScreen() {
   const me = useMe();
   const today = todayInSeoul();
-  const [month, setMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= WIDE_BREAKPOINT;
+  const scrollRef = useRef<CalendarScrollHandle>(null);
 
   const unit = me.data?.unit ?? null;
-  const calendar = useCalendar(unit?.id ?? null, month);
   const registerPush = useRegisterPushToken();
+
+  // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
+  const panelMonth = selectedDate ? selectedDate.slice(0, 7) : today.slice(0, 7);
+  const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
 
   // 로그인 후 한 번 푸시 토큰 등록 (권한 거부/시뮬레이터면 조용히 건너뜀)
   useEffect(() => {
@@ -77,119 +79,106 @@ export function CalendarScreen() {
     );
   }
 
-  const { year, monthNum } = splitMonth(month);
-  const allowed = maxAllowedOut(unit.memberCount, {
+  const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
+  const allowed = maxAllowedOut(basis, {
     numerator: unit.maxLeaveNumerator,
     denominator: unit.maxLeaveDenominator,
   });
 
   return (
     <>
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={{
-          paddingTop: insets.top + spacing.lg,
-          padding: spacing.lg,
-          paddingBottom: 120,
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={calendar.isRefetching}
-            onRefresh={() => void calendar.refetch()}
-          />
-        }
+      <View
+        style={[styles.root, { paddingTop: insets.top + spacing.lg }]}
       >
         <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>
-              {unit.name} · {year}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.eyebrow} numberOfLines={1}>
+              {unit.name}
             </Text>
-            <Text style={styles.monthTitle}>{monthNum}월</Text>
+            <Text style={styles.title}>부대 달력</Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
-                setMonth(today.slice(0, 7));
                 setSelectedDate(today);
+                scrollRef.current?.scrollToToday();
               }}
               style={styles.todayBtn}
             >
               <Text style={styles.todayBtnText}>오늘</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="이전 달"
-              onPress={() => setMonth((m) => shiftMonth(m, -1))}
-              style={styles.navBtn}
-            >
-              <Text style={styles.navBtnText}>‹</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="다음 달"
-              onPress={() => setMonth((m) => shiftMonth(m, 1))}
-              style={styles.navBtn}
-            >
-              <Text style={styles.navBtnText}>›</Text>
-            </Pressable>
           </View>
         </View>
 
-        <View style={[styles.body, isWide && { flexDirection: "row" }]}>
-          <View style={[styles.calCard, isWide && { flex: 3 }]}>
-            {calendar.isPending ? (
-              <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-                <ActivityIndicator color={colors.ink} />
-              </View>
-            ) : calendar.isError ? (
-              <Text style={styles.errorText}>
-                달력을 불러오지 못했습니다. 아래로 당겨 새로고침해보세요.
-              </Text>
-            ) : (
-              <>
-                <MonthCalendar
-                  calendar={calendar.data}
-                  selectedDate={selectedDate}
-                  onSelectDate={(d) =>
-                    setSelectedDate((cur) => (cur === d ? null : d))
-                  }
-                />
-                <View style={styles.legend}>
-                  <Text style={styles.legendText}>
-                    하루 최대 출타 {unit.maxLeaveNumerator}/
-                    {unit.maxLeaveDenominator} (부대원 {unit.memberCount}명 기준{" "}
-                    {allowed}명)
-                  </Text>
-                  <Text style={[styles.legendText, { color: colors.negativeDeep }]}>
-                    ● 빨간 날 = 출타율 초과
-                  </Text>
-                </View>
-              </>
-            )}
+        <View style={styles.calCard}>
+          <CalendarScroll
+            ref={scrollRef}
+            unitId={unit.id}
+            selectedDate={selectedDate}
+            onSelectDate={(d) =>
+              setSelectedDate((cur) => (cur === d ? null : d))
+            }
+          />
+          <View style={styles.legend}>
+            <Text style={styles.legendText}>
+              하루 최대 출타 {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator} (
+              {unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
+              {allowed}명)
+            </Text>
+            <Text style={[styles.legendText, { color: colors.negativeDeep }]}>
+              ● 빨간 날 = 출타율 초과 · 공휴일은 빨간 날짜
+            </Text>
           </View>
-
-          {selectedDate && calendar.data && (
-            <View style={isWide ? { flex: 2 } : undefined}>
-              <DayPanel
-                calendar={calendar.data}
-                date={selectedDate}
-                onAddLeave={() => setFormOpen(true)}
-              />
-            </View>
-          )}
         </View>
-      </ScrollView>
 
-      {/* 휴가 등록 FAB */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="휴가 등록"
-        onPress={() => setFormOpen(true)}
-        style={[styles.fab, { bottom: insets.bottom + 96 }]}
+        {/* 휴가 등록 FAB */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="휴가 등록"
+          onPress={() => setFormOpen(true)}
+          style={[styles.fab, { bottom: insets.bottom + 96 }]}
+        >
+          <Text style={styles.fabText}>＋ 휴가 등록</Text>
+        </Pressable>
+      </View>
+
+      {/* 선택 날짜 상세: 바텀시트 */}
+      <Modal
+        visible={selectedDate != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedDate(null)}
       >
-        <Text style={styles.fabText}>＋ 휴가 등록</Text>
-      </Pressable>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setSelectedDate(null)}
+        >
+          <Pressable
+            style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.sheetHandle} />
+            {selectedDate &&
+              (panelCalendar.data ? (
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
+                  <DayPanel
+                    calendar={panelCalendar.data}
+                    date={selectedDate}
+                    onAddLeave={() => setFormOpen(true)}
+                  />
+                </ScrollView>
+              ) : (
+                <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
+                  <ActivityIndicator color={colors.ink} />
+                </View>
+              ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {formOpen && (
         <LeaveFormModal
@@ -203,7 +192,7 @@ export function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.canvasSoft },
+  root: { flex: 1, backgroundColor: colors.canvasSoft, padding: spacing.lg },
   center: {
     flex: 1,
     backgroundColor: colors.canvasSoft,
@@ -225,16 +214,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     marginBottom: spacing.lg,
-    flexWrap: "wrap",
     gap: spacing.md,
   },
   eyebrow: { fontSize: 12, fontWeight: "600", color: colors.mute },
-  monthTitle: {
-    fontSize: 56,
+  title: {
+    fontSize: 34,
     fontWeight: "900",
     color: colors.ink,
-    lineHeight: 60,
-    letterSpacing: -1,
+    letterSpacing: -0.5,
+    marginTop: 2,
   },
   headerActions: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   todayBtn: {
@@ -244,25 +232,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
   },
   todayBtnText: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  navBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.canvas,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navBtnText: { fontSize: 22, color: colors.ink, lineHeight: 26 },
-  body: { gap: spacing.lg, alignItems: "flex-start" },
   calCard: {
+    flex: 1,
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    alignSelf: "stretch",
   },
   legend: { marginTop: spacing.md, gap: 4 },
   legendText: { fontSize: 12, color: colors.mute },
-  errorText: { fontSize: 14, color: colors.body, padding: spacing.lg },
   fab: {
     position: "absolute",
     right: spacing.xl,
@@ -277,4 +254,25 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { fontSize: 16, fontWeight: "600", color: colors.onPrimary },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(14, 15, 12, 0.35)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    maxHeight: "82%",
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.canvasSoft,
+    marginBottom: spacing.md,
+  },
 });
