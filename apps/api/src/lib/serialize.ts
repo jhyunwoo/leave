@@ -1,5 +1,10 @@
 import type { z } from "@hono/zod-openapi";
-import { BRANCH_LABELS, getRankInfo, todayInSeoul } from "@leave/shared";
+import {
+  BRANCH_LABELS,
+  getRankInfo,
+  normalizeLegacyDischargeDate,
+  todayInSeoul,
+} from "@leave/shared";
 import type { UnitRow, UserRow } from "../db/schema";
 import type { memberSchema, unitSchema, userSchema } from "./responses";
 
@@ -7,9 +12,14 @@ export function serializeUser(
   user: UserRow,
   on: string = todayInSeoul(),
 ): z.infer<typeof userSchema> {
+  const dischargeAt = normalizeLegacyDischargeDate(
+    user.enlistedAt,
+    user.branch,
+    user.dischargeAt,
+  );
   const info = getRankInfo({
     enlistedAt: user.enlistedAt,
-    dischargeAt: user.dischargeAt,
+    dischargeAt,
     signupRank: user.signupRank,
     on,
   });
@@ -20,7 +30,7 @@ export function serializeUser(
     branch: user.branch,
     branchLabel: BRANCH_LABELS[user.branch],
     enlistedAt: user.enlistedAt,
-    dischargeAt: user.dischargeAt,
+    dischargeAt,
     unitId: user.unitId,
     profileImageKey: user.profileImageKey,
     rank: info.rank,
@@ -35,9 +45,14 @@ export function serializeMember(
   user: UserRow,
   on: string = todayInSeoul(),
 ): z.infer<typeof memberSchema> {
+  const dischargeAt = normalizeLegacyDischargeDate(
+    user.enlistedAt,
+    user.branch,
+    user.dischargeAt,
+  );
   const info = getRankInfo({
     enlistedAt: user.enlistedAt,
-    dischargeAt: user.dischargeAt,
+    dischargeAt,
     signupRank: user.signupRank,
     on,
   });
@@ -50,7 +65,7 @@ export function serializeMember(
     rankLabel: info.rankLabel,
     profileImageKey: user.profileImageKey,
     enlistedAt: user.enlistedAt,
-    dischargeAt: user.dischargeAt,
+    dischargeAt,
   };
 }
 

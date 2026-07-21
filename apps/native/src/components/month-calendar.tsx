@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@/api/queries";
 import { colors, radius, spacing } from "@/theme";
 
-/** 부대 월 달력 그리드. 웹과 동일한 시각 언어(라임 오늘 표시, 빨간 초과일). */
+/** 부대 월 달력 그리드. 웹과 동일한 시각 언어(라임 선택, 빨간 초과일). */
 export function MonthCalendar(props: {
   calendar: Calendar;
   selectedDate: ISODate | null;
@@ -65,12 +65,12 @@ export function MonthCalendar(props: {
                     : undefined
                 }
                 onPress={() => onSelectDate(cell.date)}
-                style={[
+                style={({ pressed }) => [
                   styles.cell,
                   { minHeight: cellHeight },
                   exceeded && { backgroundColor: colors.negativeTint },
                   isSelected && styles.cellSelected,
-                  isSelected && exceeded && { borderColor: colors.negativeDeep },
+                  pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
                 {cell.inMonth && (
@@ -84,6 +84,7 @@ export function MonthCalendar(props: {
                           (sunday || holiday) && { color: colors.negative },
                           exceeded && { color: colors.negativeDeep },
                           isToday && { color: colors.onPrimary },
+                          isSelected && { color: colors.ink },
                         ]}
                       >
                         {dayNum}
@@ -109,6 +110,11 @@ export function MonthCalendar(props: {
                           style={[
                             styles.countText,
                             exceeded && { color: "#fff" },
+                            isSelected && {
+                              color: exceeded
+                                ? colors.negativeDeep
+                                : colors.inkDeep,
+                            },
                           ]}
                         >
                           {stat.count}/{stat.allowed}
@@ -142,11 +148,14 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     gap: 4,
     borderRadius: radius.sm,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "transparent",
     backgroundColor: "transparent",
   },
-  cellSelected: { borderColor: colors.ink },
+  cellSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
   dayNumWrap: {
     minWidth: 26,
     height: 26,
@@ -167,8 +176,8 @@ const styles = StyleSheet.create({
   countPill: {
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primaryPale,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceCard,
   },
   countText: { fontSize: 11, fontWeight: "600", color: colors.inkDeep },
 });

@@ -1,6 +1,6 @@
 import { imageUrl } from "../api/client";
 
-const PALETTE = ["#e2f6d5", "#c5edab", "#ffe08a", "#cde8ff", "#ffd6c2"];
+const PALETTE = ["#ffedd5", "#fce7f3", "#ede9fe", "#d1fae5", "#dbeafe"];
 
 export function Avatar(props: {
   name: string;

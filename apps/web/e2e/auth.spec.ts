@@ -6,6 +6,13 @@ import { expect, test } from "@playwright/test";
  * 선택자는 현재 UI의 문구/역할에 기반하므로 문구가 바뀌면 함께 갱신한다.
  */
 
+test.beforeEach(async ({ page }) => {
+  await page.route(
+    /^https:\/\/(cdn\.jsdelivr\.net|fonts\.googleapis\.com)\//,
+    (route) => route.fulfill({ contentType: "text/css", body: "" }),
+  );
+});
+
 test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
@@ -20,8 +27,13 @@ test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async
 test("회원가입: 개인정보 동의 전에는 완료 불가, 동의 후 가입되어 부대 화면으로 이동", async ({
   page,
 }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
   const email = `e2e-${Date.now()}@test.com`;
   await page.goto("/signup");
+  await expect(page).toHaveTitle(/리브/);
 
   // 1단계: 계정
   await page.getByPlaceholder("you@example.com").fill(email);
@@ -32,7 +44,12 @@ test("회원가입: 개인정보 동의 전에는 완료 불가, 동의 후 가�
   await page.getByRole("button", { name: "다음" }).click();
 
   // 2단계: 군 정보 (입대일 입력 시 전역일 자동 제안)
-  await page.locator('input[type="date"]').first().fill("2026-01-05");
+  await page.getByRole("button", { name: "공군", exact: true }).click();
+  const militaryDates = page.locator('input[type="date"]');
+  await militaryDates.first().fill("2026-03-23");
+  await expect(militaryDates.nth(1)).toHaveValue("2027-12-22");
+  await expect(page.getByText("표준 진급일은 매월 1일이에요")).toBeVisible();
+  expect(consoleErrors).toEqual([]);
   await page.getByRole("button", { name: "다음" }).click();
 
   // 3단계: 동의 전에는 "가입 완료" 비활성

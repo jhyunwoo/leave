@@ -14,36 +14,38 @@
   top: 0;
   z-index: 2;
   background: var(--canvas);
-  border-bottom: 1px solid var(--canvas-soft);
+  border-bottom: 1px solid var(--hairline);
 }
 .cal-scroll {
   max-height: min(70vh, 720px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-behavior: smooth;
+  scrollbar-color: var(--hairline) transparent;
 }
 .cal-month-block {
   padding-top: var(--sp-sm);
 }
 .cal-month-block + .cal-month-block {
-  border-top: 1px dashed var(--canvas-soft);
+  border-top: 1px solid var(--hairline);
 }
 .cal-month-label {
   position: sticky;
   top: 0;
   font-size: 15px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 900;
   color: var(--ink);
   padding: var(--sp-sm) 2px;
-  background: linear-gradient(var(--canvas) 70%, transparent);
+  background: var(--canvas);
 }
 .cal-sentinel {
   height: 1px;
 }
 .cal-month-loading {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: var(--sp-2xl);
+  min-height: 540px;
 }
 .cal-month-error {
   padding: var(--sp-lg);
@@ -55,7 +57,7 @@
 .cal-week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 0;
 }
 
 .cal-weekday {
@@ -78,35 +80,54 @@
   min-height: 92px;
   padding: 8px;
   background: var(--canvas);
-  border: none;
-  border-top: 1px solid var(--canvas-soft);
-  border-radius: var(--r-sm);
+  border: 0;
+  border-right: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline-soft);
+  border-radius: 0;
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   transition:
-    background-color 0.15s ease,
-    box-shadow 0.15s ease;
+    transform 140ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
 }
-.cal-cell:hover:not(:disabled) {
-  background: #f4f6f2;
+.cal-cell:last-child {
+  border-right: 0;
+}
+.cal-cell:active:not(:disabled) {
+  transform: scale(0.985);
 }
 .cal-cell.is-out {
   cursor: default;
   background: transparent;
-  border-top-color: transparent;
 }
 .cal-cell.is-exceeded {
   background: var(--negative-tint);
 }
-.cal-cell.is-exceeded:hover:not(:disabled) {
-  background: rgba(208, 50, 56, 0.14);
-}
 .cal-cell.is-selected {
-  box-shadow: inset 0 0 0 2px var(--ink);
+  color: var(--ink);
+  background: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px rgba(14, 15, 12, 0.12);
 }
 .cal-cell.is-selected.is-exceeded {
-  box-shadow: inset 0 0 0 2px var(--negative-deep);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.cal-cell.is-selected .cal-daynum,
+.cal-cell.is-selected .cal-daynum.is-sunday,
+.cal-cell.is-selected .cal-daynum.is-exceeded,
+.cal-cell.is-selected .cal-holiday,
+.cal-cell.is-selected .cal-count,
+.cal-cell.is-selected .cal-count.is-exceeded {
+  color: var(--ink);
+}
+.cal-cell.is-selected .cal-count.is-exceeded {
+  color: var(--negative-deep);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .cal-daynum {
@@ -127,8 +148,8 @@
   color: var(--negative-deep);
 }
 .cal-daynum.is-today {
-  background: var(--primary);
-  color: var(--on-primary);
+  color: var(--ink-deep);
+  background: var(--primary-pale);
 }
 
 .cal-holiday {
@@ -158,13 +179,13 @@
   white-space: nowrap;
   padding: 1px 8px;
   border-radius: var(--r-sm);
-  background: var(--primary-pale);
-  color: var(--ink-deep);
+  background: var(--canvas-soft);
+  color: var(--body);
   font-size: 12px;
   font-weight: 600;
 }
 .cal-chip.is-exceeded {
-  background: rgba(208, 50, 56, 0.14);
+  background: #fee2e2;
   color: var(--negative-deep);
 }
 .cal-chip.is-more {
@@ -183,10 +204,21 @@
 }
 .cal-count.is-exceeded {
   color: #fff;
-  background: var(--negative-bg);
+  background: var(--negative);
   padding: 1px 7px;
   border-radius: var(--r-pill);
   top: 8px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cal-cell:hover:not(:disabled):not(.is-selected) {
+    background: var(--canvas-soft);
+    border-color: var(--hairline);
+  }
+
+  .cal-cell.is-exceeded:hover:not(:disabled):not(.is-selected) {
+    background: #fee2e2;
+  }
 }
 
 @media (max-width: 720px) {

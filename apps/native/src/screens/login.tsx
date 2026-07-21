@@ -44,10 +44,7 @@ export function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.brand}>
-          <View style={styles.logoRow}>
-            <Text style={styles.logo}>리브</Text>
-            <View style={styles.logoDot} />
-          </View>
+          <Text style={styles.logo}>리브</Text>
           <Text style={styles.tagline}>부대 휴가, 겹치기 전에 미리 보기.</Text>
         </View>
 
@@ -95,20 +92,11 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: { padding: spacing.xl, gap: spacing.xxl },
   brand: { alignItems: "center", gap: spacing.md },
-  logoRow: { flexDirection: "row", alignItems: "flex-end" },
   logo: {
     fontSize: 56,
     fontWeight: "900",
     color: colors.ink,
     letterSpacing: -1,
-  },
-  logoDot: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: colors.primary,
-    marginBottom: 14,
-    marginLeft: 4,
   },
   tagline: { fontSize: 17, color: colors.body },
   card: {
@@ -120,7 +108,7 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignSelf: "center",
   },
-  cardTitle: { fontSize: 24, fontWeight: "600", color: colors.ink },
+  cardTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },
   link: { fontWeight: "600", color: colors.ink },

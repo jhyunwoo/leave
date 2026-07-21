@@ -26,6 +26,8 @@ export function ProfileScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
+  const topPadding =
+    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.lg;
   const [uploading, setUploading] = useState(false);
 
   if (me.isPending || !me.data) {
@@ -49,12 +51,16 @@ export function ProfileScreen() {
           text: "삭제",
           style: "destructive",
           onPress: () =>
-            void deleteAccount.mutateAsync().catch((err) =>
-              Alert.alert(
-                "삭제 실패",
-                err instanceof Error ? err.message : "잠시 후 다시 시도해주세요",
+            void deleteAccount
+              .mutateAsync()
+              .catch((err) =>
+                Alert.alert(
+                  "삭제 실패",
+                  err instanceof Error
+                    ? err.message
+                    : "잠시 후 다시 시도해주세요",
+                ),
               ),
-            ),
         },
       ],
     );
@@ -97,10 +103,12 @@ export function ProfileScreen() {
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.lg },
+        { paddingTop: topPadding },
       ]}
     >
-      {/* 계급/전역 — 브랜드 다크 카드 */}
+      <Text style={styles.pageTitle}>프로필</Text>
+
+      {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
       <View style={styles.darkCard}>
         <View style={styles.darkTop}>
           <View>
@@ -218,38 +226,45 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
+  pageTitle: {
+    fontSize: 36,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    color: colors.ink,
+    marginBottom: spacing.xs,
+  },
   darkCard: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,
     padding: spacing.xxl,
     gap: spacing.xl,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   darkTop: { flexDirection: "row", justifyContent: "space-between" },
   darkEyebrow: {
     fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 1,
-    color: "rgba(159, 232, 112, 0.7)",
-    textTransform: "uppercase",
+    fontWeight: "500",
+    color: colors.mute,
   },
   rank: {
     fontSize: 52,
     fontWeight: "900",
-    color: colors.primary,
+    color: colors.ink,
     lineHeight: 58,
     marginTop: 4,
   },
   dday: {
     fontSize: 34,
     fontWeight: "900",
-    color: colors.primary,
+    color: colors.ink,
     marginTop: 8,
   },
-  darkMeta: { fontSize: 14, color: "#fff", marginTop: spacing.sm },
+  darkMeta: { fontSize: 14, color: colors.body, marginTop: spacing.sm },
   progressTrack: {
     height: 10,
     borderRadius: radius.pill,
-    backgroundColor: "rgba(159, 232, 112, 0.18)",
+    backgroundColor: colors.hairline,
     overflow: "hidden",
   },
   progressFill: {
@@ -262,12 +277,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: -spacing.md,
   },
-  progressText: { fontSize: 12, color: "rgba(255,255,255,0.75)" },
+  progressText: { fontSize: 12, color: colors.mute },
   card: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   profileRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   name: { fontSize: 22, fontWeight: "600", color: colors.ink },
@@ -278,7 +295,12 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   infoLabel: { fontSize: 12, color: colors.mute },
-  infoValue: { fontSize: 14, fontWeight: "600", color: colors.ink, marginTop: 2 },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.ink,
+    marginTop: 2,
+  },
   deleteRow: {
     alignItems: "center",
     justifyContent: "center",

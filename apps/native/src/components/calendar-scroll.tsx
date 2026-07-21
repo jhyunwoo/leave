@@ -26,7 +26,8 @@ import { useCalendar } from "@/api/queries";
 import { MonthCalendar } from "@/components/month-calendar";
 import { colors, spacing } from "@/theme";
 
-const WINDOW = 12; // 한 방향으로 채우는 개월 수
+const INITIAL_SPAN = 2;
+const PAGE_SIZE = 6;
 const CELL_H = 72; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
@@ -63,7 +64,9 @@ export const CalendarScroll = forwardRef<
   }
 >(function CalendarScroll({ unitId, selectedDate, onSelectDate }, ref) {
   const currentMonth = todayInSeoul().slice(0, 7);
-  const [months, setMonths] = useState(() => monthRange(currentMonth, WINDOW));
+  const [months, setMonths] = useState(() =>
+    monthRange(currentMonth, INITIAL_SPAN),
+  );
   const listRef = useRef<FlatList<string>>(null);
   const prependLock = useRef(false);
 
@@ -72,27 +75,24 @@ export const CalendarScroll = forwardRef<
     prependLock.current = false;
   }, [months]);
 
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      if (y < ITEM_H && !prependLock.current) {
-        prependLock.current = true;
-        setMonths((ms) => {
-          const first = ms[0]!;
-          const older: string[] = [];
-          for (let i = WINDOW; i >= 1; i--) older.push(shiftMonth(first, -i));
-          return [...older, ...ms];
-        });
-      }
-    },
-    [],
-  );
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    if (y < ITEM_H && !prependLock.current) {
+      prependLock.current = true;
+      setMonths((ms) => {
+        const first = ms[0]!;
+        const older: string[] = [];
+        for (let i = PAGE_SIZE; i >= 1; i--) older.push(shiftMonth(first, -i));
+        return [...older, ...ms];
+      });
+    }
+  }, []);
 
   const onEndReached = useCallback(() => {
     setMonths((ms) => {
       const last = ms[ms.length - 1]!;
       const newer: string[] = [];
-      for (let i = 1; i <= WINDOW; i++) newer.push(shiftMonth(last, i));
+      for (let i = 1; i <= PAGE_SIZE; i++) newer.push(shiftMonth(last, i));
       return [...ms, ...newer];
     });
   }, []);
@@ -135,7 +135,7 @@ export const CalendarScroll = forwardRef<
           offset: ITEM_H * index,
           index,
         })}
-        initialScrollIndex={WINDOW}
+        initialScrollIndex={INITIAL_SPAN}
         initialNumToRender={3}
         windowSize={7}
         maxToRenderPerBatch={4}
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     height: LABEL_H,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.ink,
     paddingTop: spacing.sm,
   },

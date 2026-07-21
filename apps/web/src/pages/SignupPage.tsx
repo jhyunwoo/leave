@@ -1,11 +1,11 @@
 import {
-  addMonthsClamped,
   BRANCH_LABELS,
   BRANCHES,
   RANK_LABELS,
   RANKS,
   SERVICE_MONTHS,
   signupSchema,
+  standardDischargeDate,
   type Branch,
   type Rank,
 } from "@leave/shared";
@@ -40,8 +40,7 @@ export function SignupPage() {
 
   const suggestDischarge = (b: Branch, enlisted: string) => {
     if (enlisted && !dischargeTouched) {
-      // 전역 예정일 = 입대일 + 복무기간 - 1일에 근사한 입대일+개월 값 제안
-      setDischargeAt(addMonthsClamped(enlisted, SERVICE_MONTHS[b]));
+      setDischargeAt(standardDischargeDate(enlisted, b));
     }
   };
 
@@ -247,7 +246,7 @@ export function SignupPage() {
             </Field>
             <Field
               label="전역 예정일"
-              hint={`${BRANCH_LABELS[branch]} 복무기간 ${SERVICE_MONTHS[branch]}개월 기준으로 자동 입력돼요`}
+              hint={`${BRANCH_LABELS[branch]} 복무기간 ${SERVICE_MONTHS[branch]}개월의 마지막 날로 자동 입력돼요`}
             >
               <input
                 className="input"
@@ -259,7 +258,7 @@ export function SignupPage() {
                 }}
               />
             </Field>
-            <Field label="현재 계급" hint="복무기간에 따라 자동으로 진급돼요">
+            <Field label="현재 계급" hint="표준 진급일은 매월 1일이에요">
               <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
                 {RANKS.map((r) => (
                   <button

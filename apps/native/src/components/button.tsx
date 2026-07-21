@@ -33,18 +33,21 @@ export function Button(props: {
         styles.base,
         styles[variant],
         size === "sm" && styles.sm,
-        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+        pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
         disabled && { opacity: 0.45 },
         props.style,
       ]}
     >
       {props.loading ? (
-        <ActivityIndicator color={variant === "primary" ? colors.onPrimary : colors.ink} />
+        <ActivityIndicator
+          color={variant === "primary" ? colors.onPrimary : colors.ink}
+        />
       ) : typeof props.title === "string" ? (
         <Text
           style={[
             styles.label,
             size === "sm" && styles.labelSm,
+            variant === "primary" && { color: colors.onPrimary },
             variant === "danger" && { color: colors.negativeDeep },
           ]}
         >
@@ -67,14 +70,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: radius.xl,
     minHeight: 48,
+    borderCurve: "continuous",
   },
   sm: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
-    minHeight: 38,
+    minHeight: 42,
   },
   primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.canvasSoft },
+  secondary: {
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
   tertiary: {
     backgroundColor: colors.canvas,
     borderWidth: 1,

@@ -72,7 +72,14 @@ export function ProfilePage(props: { me: Me }) {
         gap: "var(--sp-lg)",
       }}
     >
-      {/* 계급/전역 — 브랜드 다크 카드 */}
+      <header style={{ padding: "var(--sp-lg) 0 var(--sp-sm)" }}>
+        <p className="eyebrow">내 정보</p>
+        <h1 className="display-md" style={{ marginTop: 6 }}>
+          프로필
+        </h1>
+      </header>
+
+      {/* 계급/전역 — DESIGN.md의 절제된 제품 UI 패널 */}
       <section className="card-dark" style={{ padding: "var(--sp-2xl)" }}>
         <div
           style={{
@@ -83,20 +90,19 @@ export function ProfilePage(props: { me: Me }) {
           }}
         >
           <div>
-            <p className="eyebrow" style={{ color: "rgba(159,232,112,0.7)" }}>
-              현재 계급
-            </p>
-            <p className="display-xl" style={{ marginTop: 6 }}>
+            <p className="eyebrow">현재 계급</p>
+            <p className="display-md" style={{ marginTop: 6 }}>
               {user.rankLabel}
             </p>
-            <p className="body-sm" style={{ color: "#fff", marginTop: "var(--sp-md)" }}>
+            <p
+              className="body-sm text-body"
+              style={{ marginTop: "var(--sp-md)" }}
+            >
               {user.branchLabel} · {user.name}
             </p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <p className="eyebrow" style={{ color: "rgba(159,232,112,0.7)" }}>
-              전역까지
-            </p>
+            <p className="eyebrow">전역까지</p>
             <p className="display-md" style={{ marginTop: 6 }}>
               D-{user.daysUntilDischarge}
             </p>
@@ -113,7 +119,7 @@ export function ProfilePage(props: { me: Me }) {
             style={{
               height: 10,
               borderRadius: "var(--r-pill)",
-              background: "rgba(159, 232, 112, 0.18)",
+              background: "var(--hairline)",
               overflow: "hidden",
             }}
           >
@@ -123,7 +129,7 @@ export function ProfilePage(props: { me: Me }) {
                 height: "100%",
                 borderRadius: "var(--r-pill)",
                 background: "var(--primary)",
-                transition: "width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1)",
+                transition: "width 240ms var(--ease-out)",
               }}
             />
           </div>
@@ -134,10 +140,8 @@ export function ProfilePage(props: { me: Me }) {
               marginTop: "var(--sp-sm)",
             }}
           >
-            <span className="caption" style={{ color: "rgba(255,255,255,0.75)" }}>
-              복무 {progress}%
-            </span>
-            <span className="caption" style={{ color: "rgba(255,255,255,0.75)" }}>
+            <span className="caption text-mute">복무 {progress}%</span>
+            <span className="caption text-mute">
               {user.nextPromotionDate
                 ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
                 : "최종 계급"}
@@ -147,8 +151,17 @@ export function ProfilePage(props: { me: Me }) {
       </section>
 
       {/* 프로필 정보 */}
-      <section className="card" style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-lg)" }}>
+      <section
+        className="card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-lg)",
+        }}
+      >
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "var(--sp-lg)" }}
+        >
           <Avatar name={user.name} imageKey={user.profileImageKey} size={64} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className="display-xs">{user.name}</p>

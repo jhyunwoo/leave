@@ -56,7 +56,11 @@ function HeroCalendar() {
               {m?.pill && (
                 <span
                   className={`lp-pill lp-num ${m.kind === "full" ? "is-full" : ""}`}
-                  style={delay ? ({ "--d": delay } as React.CSSProperties) : undefined}
+                  style={
+                    delay
+                      ? ({ "--d": delay } as React.CSSProperties)
+                      : undefined
+                  }
                 >
                   {m.pill}
                 </span>
@@ -64,22 +68,14 @@ function HeroCalendar() {
               {m?.flip && (
                 <>
                   <span className="lp-pill lp-num lp-flip-from">2/3</span>
-                  <span className="lp-pill lp-num is-over lp-flip-to">3/3 초과</span>
+                  <span className="lp-pill lp-num is-over lp-flip-to">
+                    3/3 초과
+                  </span>
                 </>
               )}
             </div>
           );
         })}
-      </div>
-      <div className="lp-chip">
-        <span className="lp-chip-dot">!</span>
-        <div>
-          <div className="lp-chip-t">
-            리브
-            <span className="lp-chip-meta lp-num">지금 · 7월 24일</span>
-          </div>
-          <p className="lp-chip-b">출타율 초과 — 3/3명이 나가요. 일정 조정이 필요해요.</p>
-        </div>
       </div>
     </div>
   );
@@ -90,7 +86,12 @@ const VALUES = [
     title: "출타율로 인원 관리",
     body: "부대 인원과 비율(예: 1/3)만 정하면, 하루에 몇 명까지 나갈 수 있는지 자동으로 계산해요.",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="#12300b" strokeWidth="2">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      >
         <path d="M4 20V10M12 20V4M20 20v-7" strokeLinecap="round" />
       </svg>
     ),
@@ -99,7 +100,12 @@ const VALUES = [
     title: "초과되면 자동 알림",
     body: "누군가 등록해 출타율이 넘으면, 그 날 휴가인 부대원 모두에게 앱·푸시 알림이 가요.",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="#12300b" strokeWidth="2">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      >
         <path
           d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"
           strokeLinejoin="round"
@@ -112,7 +118,12 @@ const VALUES = [
     title: "계급 자동 진급",
     body: "입대일만 넣으면 이병부터 병장까지, 진급일에 맞춰 계급이 저절로 올라가요.",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="#12300b" strokeWidth="2">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      >
         <path d="M12 3 4 7l8 4 8-4-8-4Z" strokeLinejoin="round" />
         <path d="M4 12l8 4 8-4M4 17l8 4 8-4" strokeLinejoin="round" />
       </svg>
@@ -122,7 +133,12 @@ const VALUES = [
     title: "한국 공휴일 표시",
     body: "설날·추석은 물론 대체공휴일까지 달력에 함께 보여줘, 휴가 계획이 한결 쉬워져요.",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="#12300b" strokeWidth="2">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      >
         <rect x="3" y="5" width="18" height="16" rx="3" />
         <path d="M3 9h18M8 3v4M16 3v4" strokeLinecap="round" />
       </svg>
@@ -188,7 +204,7 @@ export function LandingPage() {
       <nav className={`lp-nav ${stuck ? "is-stuck" : ""}`} aria-label="주 메뉴">
         <div className="lp-wrap lp-nav-in">
           <Link to="/" className="lp-brand">
-            리브<span className="lp-brand-dot" aria-hidden="true" />
+            리브
           </Link>
           <span className="lp-nav-spacer" />
           <Link to="/login" className="lp-nav-link is-hideable">
@@ -203,15 +219,14 @@ export function LandingPage() {
       <header className="lp-hero">
         <div className="lp-wrap lp-hero-grid">
           <div>
-            <span className="lp-eyebrow">부대 휴가 캘린더</span>
             <h1 className="lp-h1">
               부대 휴가,
               <br />
               <em>겹치지 않게.</em>
             </h1>
             <p className="lp-sub">
-              출타율에 맞춰 어떤 날이 비었는지 한눈에. 초과되는 날은 그 날 휴가인
-              부대원 모두에게 자동으로 알려드려요.
+              출타율에 맞춰 비어 있는 날을 한눈에 보고, 초과되는 날은 함께
+              조율하세요.
             </p>
             <div className="lp-cta-row">
               <Link to="/signup" className="lp-btn lp-btn--primary lp-btn--lg">
@@ -221,11 +236,6 @@ export function LandingPage() {
                 로그인
               </Link>
             </div>
-            <p className="lp-platform">
-              <b>웹에서 바로 사용</b>
-              <span>·</span>iOS 앱<span className="lp-soon">곧 출시</span>
-              Android 앱<span className="lp-soon">곧 출시</span>
-            </p>
           </div>
           <HeroCalendar />
         </div>
@@ -277,12 +287,12 @@ export function LandingPage() {
                 <p className="lp-band-eyebrow">실시간 출타율 알림</p>
                 <h2>
                   출타율이 넘는 순간,
-                  <br />
-                  그 날 휴가인 모두가 알아요.
+                  <br />그 날 휴가인 모두가 알아요.
                 </h2>
                 <p>
-                  한 명이 더 등록해 비율을 넘기면, 같은 날 휴가인 부대원 전원에게
-                  인앱·푸시 알림이 갑니다. 누가 일정을 조정해야 할지 바로 보여요.
+                  한 명이 더 등록해 비율을 넘기면, 같은 날 휴가인 부대원
+                  전원에게 인앱·푸시 알림이 갑니다. 누가 일정을 조정해야 할지
+                  바로 보여요.
                 </p>
               </div>
               <div className="lp-notif">
@@ -295,8 +305,9 @@ export function LandingPage() {
                 </div>
                 <p className="lp-notif-b">
                   <span className="lp-num">7월 24일</span> 출타 인원이{" "}
-                  <span className="lp-over-word lp-num">3/3명</span>으로 출타율을
-                  넘었어요. 휴가가 겹친 부대원끼리 일정을 조율해 주세요.
+                  <span className="lp-over-word lp-num">3/3명</span>으로
+                  출타율을 넘었어요. 휴가가 겹친 부대원끼리 일정을 조율해
+                  주세요.
                 </p>
               </div>
             </div>
@@ -309,7 +320,10 @@ export function LandingPage() {
           <div className="lp-delight-card lp-reveal">
             <div>
               <p className="lp-sec-eyebrow">계급 · 전역</p>
-              <h2 className="lp-sec-title" style={{ fontSize: "clamp(22px,3vw,30px)" }}>
+              <h2
+                className="lp-sec-title"
+                style={{ fontSize: "clamp(22px,3vw,30px)" }}
+              >
                 진급도, 전역 카운트도 자동으로.
               </h2>
               <div className="lp-ranks" style={{ marginTop: 18 }}>
@@ -352,7 +366,7 @@ export function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-in">
           <Link to="/" className="lp-brand" style={{ fontSize: 18 }}>
-            리브<span className="lp-brand-dot" aria-hidden="true" />
+            리브
           </Link>
           <div className="lp-footer-links">
             <Link to="/login">로그인</Link>

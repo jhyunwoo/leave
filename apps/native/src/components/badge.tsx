@@ -7,7 +7,12 @@ export function Badge(props: { text: string; kind?: Kind }) {
   const kind = props.kind ?? "neutral";
   return (
     <View style={[styles.base, styles[kind]]}>
-      <Text style={[styles.label, kind === "negative" && { color: "#fff" }]}>
+      <Text
+        style={[
+          styles.label,
+          kind === "negative" && { color: colors.negativeDeep },
+        ]}
+      >
         {props.text}
       </Text>
     </View>
@@ -22,7 +27,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   positive: { backgroundColor: colors.primaryPale },
-  negative: { backgroundColor: colors.negativeBg },
-  neutral: { backgroundColor: colors.canvasSoft },
+  negative: { backgroundColor: colors.negativeTint },
+  neutral: { backgroundColor: colors.surfaceCard },
   label: { fontSize: 13, fontWeight: "600", color: colors.inkDeep },
 });

@@ -75,10 +75,9 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 1,
+    fontWeight: "500",
+    letterSpacing: 0,
     color: colors.mute,
-    textTransform: "uppercase",
   },
   date: { fontSize: 24, fontWeight: "600", color: colors.ink, marginTop: -8 },
   holiday: {

@@ -34,13 +34,17 @@ export function CalendarScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topPadding =
+    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.lg;
   const scrollRef = useRef<CalendarScrollHandle>(null);
 
   const unit = me.data?.unit ?? null;
   const registerPush = useRegisterPushToken();
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
-  const panelMonth = selectedDate ? selectedDate.slice(0, 7) : today.slice(0, 7);
+  const panelMonth = selectedDate
+    ? selectedDate.slice(0, 7)
+    : today.slice(0, 7);
   const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
 
   // 로그인 후 한 번 푸시 토큰 등록 (권한 거부/시뮬레이터면 조용히 건너뜀)
@@ -70,8 +74,8 @@ export function CalendarScreen() {
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>아직 소속 부대가 없어요</Text>
           <Text style={styles.emptyBody}>
-            부대에 들어가면 부대원들의 휴가 달력이 열려요. 부대를 검색하거나 새로
-            만들 수 있어요.
+            부대에 들어가면 부대원들의 휴가 달력이 열려요. 부대를 검색하거나
+            새로 만들 수 있어요.
           </Text>
           <Button title="부대 찾기" onPress={() => router.push("/units")} />
         </View>
@@ -87,9 +91,7 @@ export function CalendarScreen() {
 
   return (
     <>
-      <View
-        style={[styles.root, { paddingTop: insets.top + spacing.lg }]}
-      >
+      <View style={[styles.root, { paddingTop: topPadding }]}>
         <View style={styles.header}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.eyebrow} numberOfLines={1}>
@@ -104,10 +106,18 @@ export function CalendarScreen() {
                 setSelectedDate(today);
                 scrollRef.current?.scrollToToday();
               }}
-              style={styles.todayBtn}
+              style={({ pressed }) => [
+                styles.todayBtn,
+                pressed && { transform: [{ scale: 0.97 }] },
+              ]}
             >
               <Text style={styles.todayBtnText}>오늘</Text>
             </Pressable>
+            <Button
+              title="휴가 등록"
+              size="sm"
+              onPress={() => setFormOpen(true)}
+            />
           </View>
         </View>
 
@@ -122,8 +132,8 @@ export function CalendarScreen() {
           />
           <View style={styles.legend}>
             <Text style={styles.legendText}>
-              하루 최대 출타 {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator} (
-              {unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
+              하루 최대 출타 {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}{" "}
+              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
               {allowed}명)
             </Text>
             <Text style={[styles.legendText, { color: colors.negativeDeep }]}>
@@ -131,16 +141,6 @@ export function CalendarScreen() {
             </Text>
           </View>
         </View>
-
-        {/* 휴가 등록 FAB */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="휴가 등록"
-          onPress={() => setFormOpen(true)}
-          style={[styles.fab, { bottom: insets.bottom + 96 }]}
-        >
-          <Text style={styles.fabText}>＋ 휴가 등록</Text>
-        </Pressable>
       </View>
 
       {/* 선택 날짜 상세: 바텀시트 */}
@@ -155,7 +155,10 @@ export function CalendarScreen() {
           onPress={() => setSelectedDate(null)}
         >
           <Pressable
-            style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
+            style={[
+              styles.sheet,
+              { paddingBottom: insets.bottom + spacing.lg },
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.sheetHandle} />
@@ -206,6 +209,9 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     maxWidth: 420,
     width: "100%",
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderCurve: "continuous",
   },
   emptyTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   emptyBody: { fontSize: 15, lineHeight: 22, color: colors.body },
@@ -224,12 +230,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginTop: 2,
   },
-  headerActions: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  headerActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "center",
+  },
   todayBtn: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.xl,
     backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderCurve: "continuous",
   },
   todayBtnText: { fontSize: 14, fontWeight: "600", color: colors.ink },
   calCard: {
@@ -237,26 +250,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
     padding: spacing.lg,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   legend: { marginTop: spacing.md, gap: 4 },
   legendText: { fontSize: 12, color: colors.mute },
-  fab: {
-    position: "absolute",
-    right: spacing.xl,
-    backgroundColor: colors.primary,
-    borderRadius: radius.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    shadowColor: colors.ink,
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  fabText: { fontSize: 16, fontWeight: "600", color: colors.onPrimary },
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(14, 15, 12, 0.35)",
+    backgroundColor: "rgba(17, 17, 17, 0.32)",
     justifyContent: "flex-end",
   },
   sheet: {
@@ -266,13 +267,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
     maxHeight: "82%",
+    borderCurve: "continuous",
   },
   sheetHandle: {
     alignSelf: "center",
     width: 40,
     height: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.canvasSoft,
+    backgroundColor: colors.hairline,
     marginBottom: spacing.md,
   },
 });

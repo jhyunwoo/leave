@@ -11,7 +11,8 @@ import { useCalendar } from "../../api/queries";
 import { MonthCalendar } from "./MonthCalendar";
 import "./calendar.css";
 
-const WINDOW = 12; // 초기·확장 시 한 방향으로 채우는 개월 수
+const INITIAL_SPAN = 2;
+const PAGE_SIZE = 6;
 
 function monthRange(center: string, span: number): string[] {
   const out: string[] = [];
@@ -41,7 +42,9 @@ export const CalendarScroll = forwardRef<
   }
 >(function CalendarScroll({ unitId, selectedDate, onSelectDate }, ref) {
   const currentMonth = todayInSeoul().slice(0, 7);
-  const [months, setMonths] = useState(() => monthRange(currentMonth, WINDOW));
+  const [months, setMonths] = useState(() =>
+    monthRange(currentMonth, INITIAL_SPAN),
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -90,14 +93,16 @@ export const CalendarScroll = forwardRef<
             setMonths((ms) => {
               const first = ms[0]!;
               const older: string[] = [];
-              for (let i = WINDOW; i >= 1; i--) older.push(shiftMonth(first, -i));
+              for (let i = PAGE_SIZE; i >= 1; i--)
+                older.push(shiftMonth(first, -i));
               return [...older, ...ms];
             });
           } else if (e.target === bottomSentinel.current) {
             setMonths((ms) => {
               const last = ms[ms.length - 1]!;
               const newer: string[] = [];
-              for (let i = 1; i <= WINDOW; i++) newer.push(shiftMonth(last, i));
+              for (let i = 1; i <= PAGE_SIZE; i++)
+                newer.push(shiftMonth(last, i));
               return [...ms, ...newer];
             });
           }
@@ -116,7 +121,11 @@ export const CalendarScroll = forwardRef<
 
   return (
     <div className="cal-scroll-shell">
-      <div className="cal-weekdays cal-weekdays-sticky" ref={headerRef} role="row">
+      <div
+        className="cal-weekdays cal-weekdays-sticky"
+        ref={headerRef}
+        role="row"
+      >
         {WEEKDAYS.map((w, i) => (
           <div
             key={w}

@@ -24,19 +24,23 @@ export function NotificationsScreen() {
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
   const insets = useSafeAreaInsets();
+  const topPadding =
+    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.xs;
 
   return (
     <ScrollView
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.xs },
+        { paddingTop: topPadding },
       ]}
     >
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>알림</Text>
-          <Text style={styles.subtitle}>출타율 초과 소식을 여기서 확인해요.</Text>
+          <Text style={styles.subtitle}>
+            출타율 초과 소식을 여기서 확인해요.
+          </Text>
         </View>
         {list.data && list.data.unreadCount > 0 && (
           <Button
@@ -66,7 +70,9 @@ export function NotificationsScreen() {
             <View
               style={[
                 styles.dot,
-                { backgroundColor: n.read ? colors.canvasSoft : colors.negative },
+                {
+                  backgroundColor: n.read ? colors.canvasSoft : colors.negative,
+                },
               ]}
             />
             <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
@@ -98,7 +104,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.md,
   },
-  title: { fontSize: 40, fontWeight: "900", color: colors.ink },
+  title: {
+    fontSize: 36,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
   subtitle: { fontSize: 14, color: colors.body, marginTop: 4 },
   empty: {
     backgroundColor: colors.canvas,
@@ -106,6 +117,8 @@ const styles = StyleSheet.create({
     padding: spacing.xxxl,
     alignItems: "center",
     gap: spacing.sm,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   emptyCaption: { fontSize: 13, color: colors.body },
@@ -115,6 +128,8 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     flexDirection: "row",
     gap: spacing.md,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
   cardTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },

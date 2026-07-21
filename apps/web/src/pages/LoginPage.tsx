@@ -33,23 +33,8 @@ export function LoginPage() {
       }}
     >
       <div className="anim-rise" style={{ textAlign: "center" }}>
-        <p
-          className="display-xl"
-          style={{ display: "flex", alignItems: "baseline", justifyContent: "center" }}
-          aria-label="리브"
-        >
+        <p className="display-xl" aria-label="리브">
           리브
-          <span
-            aria-hidden="true"
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              background: "var(--primary)",
-              display: "inline-block",
-              marginLeft: 6,
-            }}
-          />
         </p>
         <p className="body-lg text-body" style={{ marginTop: "var(--sp-md)" }}>
           부대 휴가, 겹치기 전에 미리 보기.

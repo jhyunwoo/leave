@@ -18,7 +18,12 @@ app.use("*", async (c, next) => {
   const origin = c.env.CORS_ORIGIN ?? "*";
   return cors({
     origin,
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Client-Platform",
+      "X-Client-Version",
+    ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })(c, next);
 });

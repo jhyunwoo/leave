@@ -3,15 +3,14 @@ import { useNotifications } from "@/api/queries";
 import { colors } from "@/theme";
 
 /**
- * 네이티브 시스템 탭바 — iOS 26에서는 Liquid Glass(글래스모피즘)가
- * 자동 적용되고, Android는 머티리얼 탭바로 렌더링된다.
+ * 네이티브 시스템 탭바 — 플랫폼 관례를 유지하고 선택 상태만 딥 그린으로 통일한다.
  */
 export default function TabLayout() {
   const notifications = useNotifications();
   const unread = notifications.data?.unreadCount ?? 0;
 
   return (
-    <NativeTabs tintColor={colors.inkDeep}>
+    <NativeTabs tintColor={colors.brand}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>달력</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

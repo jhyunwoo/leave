@@ -1,11 +1,11 @@
 import {
-  addMonthsClamped,
   BRANCH_LABELS,
   BRANCHES,
   RANK_LABELS,
   RANKS,
   SERVICE_MONTHS,
   signupSchema,
+  standardDischargeDate,
   type Branch,
   type Rank,
 } from "@leave/shared";
@@ -53,7 +53,7 @@ export function SignupScreen() {
 
   const suggestDischarge = (b: Branch, enlisted: string) => {
     if (enlisted && !dischargeTouched) {
-      setDischargeAt(addMonthsClamped(enlisted, SERVICE_MONTHS[b]));
+      setDischargeAt(standardDischargeDate(enlisted, b));
     }
   };
 
@@ -176,7 +176,11 @@ export function SignupScreen() {
                 />
               </Field>
               <Field label="비밀번호" hint="8자 이상">
-                <Input value={password} onChangeText={setPassword} secureTextEntry />
+                <Input
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
               </Field>
               <Field label="비밀번호 확인">
                 <Input
@@ -186,7 +190,11 @@ export function SignupScreen() {
                 />
               </Field>
               <Field label="이름">
-                <Input value={name} onChangeText={setName} placeholder="홍길동" />
+                <Input
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="홍길동"
+                />
               </Field>
             </>
           )}
@@ -237,10 +245,9 @@ export function SignupScreen() {
                 }}
               />
               <Text style={styles.hint}>
-                {BRANCH_LABELS[branch]} 복무기간 {SERVICE_MONTHS[branch]}개월
-                기준으로 전역일이 자동 입력돼요
+                {`${BRANCH_LABELS[branch]} 복무기간 ${SERVICE_MONTHS[branch]}개월의 마지막 날로 전역일이 자동 입력돼요`}
               </Text>
-              <Field label="현재 계급" hint="복무기간에 따라 자동으로 진급돼요">
+              <Field label="현재 계급" hint="표준 진급일은 매월 1일이에요">
                 <View style={styles.segment}>
                   {RANKS.map((r) => (
                     <Pressable
@@ -309,8 +316,8 @@ export function SignupScreen() {
                   {dataConsent && <Text style={styles.checkboxMark}>✓</Text>}
                 </View>
                 <Text style={styles.consentText}>
-                  서비스 운영·보안을 위해 접속 기록(접속 시각·기기 플랫폼·앱 버전
-                  등)과 이 앱의 푸시 알림 발송·수신 기록을 수집·이용하는 데
+                  서비스 운영·보안을 위해 접속 기록(접속 시각·기기 플랫폼·앱
+                  버전 등)과 이 앱의 푸시 알림 발송·수신 기록을 수집·이용하는 데
                   동의합니다. 수집된 내 기록은 앱에서 언제든 열람할 수 있습니다.
                 </Text>
               </Pressable>
@@ -356,7 +363,11 @@ export function SignupScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: {
+    padding: spacing.xl,
+    gap: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
   title: {
     fontSize: 40,
     fontWeight: "900",
@@ -435,7 +446,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxMark: { color: colors.onPrimary, fontSize: 14, fontWeight: "900" },
+  checkboxMark: { color: colors.onPrimary, fontSize: 14, fontWeight: "600" },
   consentText: { flex: 1, fontSize: 12, color: colors.body, lineHeight: 18 },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   actions: { flexDirection: "row", gap: spacing.md },

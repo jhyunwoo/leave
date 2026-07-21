@@ -51,8 +51,8 @@ function RootNavigator() {
             presentation: "modal",
             headerShown: true,
             title: "부대 찾기",
-            headerStyle: { backgroundColor: colors.canvasSoft },
-            headerTitleStyle: { fontWeight: "900", color: colors.ink },
+            headerStyle: { backgroundColor: colors.canvas },
+            headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
         <Stack.Screen
@@ -61,8 +61,8 @@ function RootNavigator() {
             presentation: "modal",
             headerShown: true,
             title: "부대 관리",
-            headerStyle: { backgroundColor: colors.canvasSoft },
-            headerTitleStyle: { fontWeight: "900", color: colors.ink },
+            headerStyle: { backgroundColor: colors.canvas },
+            headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
       </Stack.Protected>

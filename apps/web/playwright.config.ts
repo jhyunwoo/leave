@@ -26,7 +26,8 @@ export default defineConfig({
   // API(8787)와 웹(5173)을 함께 기동. 이미 떠 있으면 재사용.
   webServer: [
     {
-      command: "pnpm --filter @leave/api dev",
+      command:
+        "pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:5173",
       url: "http://localhost:8787/",
       reuseExistingServer: true,
       timeout: 60_000,

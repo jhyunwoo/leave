@@ -89,7 +89,9 @@ export function DatePickerRow(props: {
                     <Text
                       style={[
                         styles.dayText,
-                        disabled && { color: cell.inMonth ? "#c8cbc5" : "transparent" },
+                        disabled && {
+                          color: cell.inMonth ? "#c8cbc5" : "transparent",
+                        },
                         selected && { color: colors.onPrimary },
                       ]}
                     >

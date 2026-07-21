@@ -21,6 +21,8 @@ export function LeavesScreen() {
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
   const insets = useSafeAreaInsets();
+  const topPadding =
+    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.xs;
 
   const confirmDelete = (leave: MyLeave) => {
     Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [
@@ -38,13 +40,15 @@ export function LeavesScreen() {
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.xs },
+        { paddingTop: topPadding },
       ]}
     >
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>내 휴가</Text>
-          <Text style={styles.subtitle}>등록한 휴가를 고치거나 지울 수 있어요.</Text>
+          <Text style={styles.subtitle}>
+            등록한 휴가를 고치거나 지울 수 있어요.
+          </Text>
         </View>
         <Button title="휴가 등록" size="sm" onPress={() => setCreating(true)} />
       </View>
@@ -115,7 +119,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.md,
   },
-  title: { fontSize: 40, fontWeight: "900", color: colors.ink },
+  title: {
+    fontSize: 36,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
   subtitle: { fontSize: 14, color: colors.body, marginTop: 4 },
   empty: {
     backgroundColor: colors.canvas,
@@ -123,6 +132,8 @@ const styles = StyleSheet.create({
     padding: spacing.xxxl,
     alignItems: "center",
     gap: spacing.sm,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   emptyCaption: { fontSize: 13, color: colors.body },
@@ -133,6 +144,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.lg,
+    borderWidth: 0,
+    borderCurve: "continuous",
   },
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },

@@ -1,4 +1,8 @@
-import { effectiveMemberCount, maxAllowedOut, todayInSeoul } from "@leave/shared";
+import {
+  effectiveMemberCount,
+  maxAllowedOut,
+  todayInSeoul,
+} from "@leave/shared";
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router";
 import type { Me } from "../api/queries";
@@ -19,7 +23,10 @@ export function CalendarPage(props: { me: Me }) {
 
   // 선택한 날짜가 속한 달의 달력(사이드 패널용). 스크롤 블록과 같은 캐시를 재사용한다.
   const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : null;
-  const panelCalendar = useCalendar(unit?.id ?? null, selectedMonth ?? today.slice(0, 7));
+  const panelCalendar = useCalendar(
+    unit?.id ?? null,
+    selectedMonth ?? today.slice(0, 7),
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -64,7 +71,9 @@ export function CalendarPage(props: { me: Me }) {
             부대 달력
           </h1>
         </div>
-        <div style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}>
+        <div
+          style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}
+        >
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -99,7 +108,9 @@ export function CalendarPage(props: { me: Me }) {
             ref={scrollRef}
             unitId={unit.id}
             selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate((cur) => (cur === d ? null : d))}
+            onSelectDate={(d) =>
+              setSelectedDate((cur) => (cur === d ? null : d))
+            }
           />
           <div
             style={{
@@ -115,7 +126,8 @@ export function CalendarPage(props: { me: Me }) {
               <strong style={{ color: "var(--ink)" }}>
                 {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}
               </strong>{" "}
-              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준 {allowed}명)
+              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
+              {allowed}명)
             </span>
             <span className="caption" style={{ color: "var(--negative-deep)" }}>
               ● 빨간 날 = 출타율 초과 · 공휴일은 빨간 날짜
@@ -158,7 +170,7 @@ export function CalendarPage(props: { me: Me }) {
             display: "flex",
             gap: "var(--sp-md)",
             alignItems: "flex-start",
-            animation: "pop-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both",
+            animation: "toast-in 240ms var(--ease-out) both",
             zIndex: 60,
           }}
         >
@@ -179,7 +191,15 @@ export function CalendarPage(props: { me: Me }) {
               lineHeight: 1,
             }}
           >
-            ✕
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M3 3l10 10M13 3 3 13"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+              />
+            </svg>
           </button>
         </div>
       )}

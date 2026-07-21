@@ -137,7 +137,9 @@ export function LeaveFormModal(props: {
           {error && <Text style={styles.error}>{error}</Text>}
 
           <Button
-            title={pending ? "저장 중…" : editing ? "변경사항 저장" : "휴가 등록"}
+            title={
+              pending ? "저장 중…" : editing ? "변경사항 저장" : "휴가 등록"
+            }
             onPress={() => void submit()}
             loading={pending}
           />
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  title: { fontSize: 24, fontWeight: "900", color: colors.ink },
+  title: { fontSize: 24, fontWeight: "600", color: colors.ink },
   closeBtn: {
     width: 36,
     height: 36,

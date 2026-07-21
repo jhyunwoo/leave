@@ -4,42 +4,41 @@
     "slug": "leave",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon-v3.png",
     "scheme": "leave",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.leave.mobile",
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/app-icon-v3.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#9fe870",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false,
       "package": "app.leave.mobile",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "permissions": ["android.permission.RECORD_AUDIO"],
+      "icon": "./assets/images/app-icon-v3.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground-v3.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome-v2.png",
+        "backgroundColor": "#0e0f0c"
+      }
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/app-icon-v3.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#e8ebe6",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 96
+          "backgroundColor": "#ffffff",
+          "image": "./assets/images/splash-mark-v3.png",
+          "imageWidth": 128,
+          "resizeMode": "contain"
         }
       ],
       "expo-secure-store",

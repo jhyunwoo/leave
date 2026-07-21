@@ -59,7 +59,9 @@ export function UnitsScreen() {
     } catch (err) {
       Alert.alert(
         "가입 신청 실패",
-        err instanceof Error ? err.message : `${unitName}에 신청하지 못했습니다`,
+        err instanceof Error
+          ? err.message
+          : `${unitName}에 신청하지 못했습니다`,
       );
     }
   };
@@ -72,14 +74,16 @@ export function UnitsScreen() {
         text: "나가기",
         style: "destructive",
         onPress: () =>
-          void leaveUnit.mutateAsync().catch((err) =>
-            Alert.alert(
-              "나가기 실패",
-              err instanceof Error
-                ? err.message
-                : "관리자라면 먼저 다른 부대원에게 관리자를 넘겨주세요.",
+          void leaveUnit
+            .mutateAsync()
+            .catch((err) =>
+              Alert.alert(
+                "나가기 실패",
+                err instanceof Error
+                  ? err.message
+                  : "관리자라면 먼저 다른 부대원에게 관리자를 넘겨주세요.",
+              ),
             ),
-          ),
       },
     ]);
   };
@@ -101,8 +105,8 @@ export function UnitsScreen() {
           <Text style={styles.myUnitEyebrow}>내 부대</Text>
           <Text style={styles.myUnitName}>{myUnit.name}</Text>
           <Text style={styles.myUnitMeta}>
-            부대원 {myUnit.memberCount}명 · 최대 출타율 {myUnit.maxLeaveNumerator}
-            /{myUnit.maxLeaveDenominator}
+            부대원 {myUnit.memberCount}명 · 최대 출타율{" "}
+            {myUnit.maxLeaveNumerator}/{myUnit.maxLeaveDenominator}
           </Text>
           <View style={styles.myUnitActions}>
             {isAdmin && (
@@ -161,8 +165,8 @@ export function UnitsScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.unitName}>{u.name}</Text>
                   <Text style={styles.unitMeta}>
-                    부대원 {u.memberCount}명 · 최대 출타율 {u.maxLeaveNumerator}/
-                    {u.maxLeaveDenominator}
+                    부대원 {u.memberCount}명 · 최대 출타율 {u.maxLeaveNumerator}
+                    /{u.maxLeaveDenominator}
                   </Text>
                   {u.description ? (
                     <Text style={styles.unitMeta}>{u.description}</Text>
@@ -301,7 +305,13 @@ function CreateUnitModal(props: {
             label="최대 출타율"
             hint={`예: 부대원 30명이면 하루 최대 ${example}명까지 출타할 수 있어요`}
           >
-            <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: spacing.sm,
+                alignItems: "center",
+              }}
+            >
               {RATIO_PRESETS.map((p) => {
                 const active = num === p.n && den === p.d;
                 return (
@@ -312,7 +322,10 @@ function CreateUnitModal(props: {
                       setNum(p.n);
                       setDen(p.d);
                     }}
-                    style={[styles.ratioBtn, active && { backgroundColor: colors.primary }]}
+                    style={[
+                      styles.ratioBtn,
+                      active && { backgroundColor: colors.primary },
+                    ]}
                   >
                     <Text
                       style={[
@@ -346,7 +359,13 @@ function CreateUnitModal(props: {
           </Field>
 
           {error && (
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.negativeDeep }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: colors.negativeDeep,
+              }}
+            >
               {error}
             </Text>
           )}
@@ -364,7 +383,11 @@ function CreateUnitModal(props: {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: {
+    padding: spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
   subtitle: { fontSize: 16, color: colors.body },
   myUnitCard: {
     backgroundColor: colors.primaryPale,
@@ -372,7 +395,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: 4,
   },
-  myUnitEyebrow: { fontSize: 12, fontWeight: "600", color: colors.positiveDeep },
+  myUnitEyebrow: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.positiveDeep,
+  },
   myUnitName: { fontSize: 22, fontWeight: "600", color: colors.ink },
   myUnitMeta: { fontSize: 13, color: colors.body },
   myUnitActions: {
@@ -389,7 +416,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.warning,
   },
-  pendingEyebrow: { fontSize: 12, fontWeight: "600", color: colors.warningContent },
+  pendingEyebrow: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.warningContent,
+  },
   card: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
@@ -420,7 +451,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  modalTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
+  modalTitle: { fontSize: 24, fontWeight: "600", color: colors.ink },
   closeBtn: {
     width: 36,
     height: 36,

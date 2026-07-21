@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.canvas,
     borderWidth: 1,
-    borderColor: "rgba(14, 15, 12, 0.35)",
+    borderColor: colors.ink,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,

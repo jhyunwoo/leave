@@ -53,7 +53,7 @@ export function UnitManageScreen() {
     );
   }
 
-  if (!unit || !isAdmin) {
+  if (!me.data || !unit || !isAdmin) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
         <Text style={styles.forbidden}>관리자만 볼 수 있는 화면이에요.</Text>
@@ -71,7 +71,9 @@ export function UnitManageScreen() {
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.lead}>{unit.name} · 관리자만 이 화면을 볼 수 있어요.</Text>
+      <Text style={styles.lead}>
+        {unit.name} · 관리자만 이 화면을 볼 수 있어요.
+      </Text>
       <EditUnitSection unit={unit} />
       <JoinRequestsSection unitId={unit.id} />
       <MembersSection me={me.data} unit={unit} />
@@ -107,7 +109,10 @@ function EditUnitSection(props: { unit: Unit }) {
     if (result.canceled || !asset) return;
     setError(null);
     try {
-      await uploadImage.mutateAsync({ uri: asset.uri, mimeType: asset.mimeType });
+      await uploadImage.mutateAsync({
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지를 올리지 못했어요");
     }
@@ -180,7 +185,13 @@ function EditUnitSection(props: { unit: Unit }) {
         label="최대 출타율"
         hint={`부대 인원 ${basis}명 기준 하루 최대 ${example}명까지 출타할 수 있어요`}
       >
-        <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
+        <View
+          style={{
+            flexDirection: "row",
+            gap: spacing.sm,
+            alignItems: "center",
+          }}
+        >
           {RATIO_PRESETS.map((p) => {
             const active = num === p.n && den === p.d;
             return (
@@ -191,10 +202,16 @@ function EditUnitSection(props: { unit: Unit }) {
                   setNum(p.n);
                   setDen(p.d);
                 }}
-                style={[styles.ratioBtn, active && { backgroundColor: colors.primary }]}
+                style={[
+                  styles.ratioBtn,
+                  active && { backgroundColor: colors.primary },
+                ]}
               >
                 <Text
-                  style={[styles.ratioText, active && { color: colors.onPrimary }]}
+                  style={[
+                    styles.ratioText,
+                    active && { color: colors.onPrimary },
+                  ]}
                 >
                   {p.n}/{p.d}
                 </Text>
@@ -258,7 +275,9 @@ function JoinRequestsSection(props: { unitId: string }) {
     <View style={styles.card}>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>가입 신청</Text>
-        {list.length > 0 && <Badge text={String(list.length)} kind="negative" />}
+        {list.length > 0 && (
+          <Badge text={String(list.length)} kind="negative" />
+        )}
       </View>
 
       {requests.isPending ? (
@@ -405,7 +424,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
   },
-  sectionTitle: { fontSize: 20, fontWeight: "900", color: colors.ink },
+  sectionTitle: { fontSize: 20, fontWeight: "600", color: colors.ink },
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",

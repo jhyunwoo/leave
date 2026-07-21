@@ -8,7 +8,10 @@ import {
   isValidISODate,
   monthBounds,
   nextPromotionDate,
+  normalizeLegacyDischargeDate,
   scheduledRank,
+  standardDischargeDate,
+  standardPromotionDate,
 } from "../src";
 
 describe("dates", () => {
@@ -51,23 +54,62 @@ describe("dates", () => {
   });
 });
 
+describe("standardDischargeDate", () => {
+  it("ends service on the day before the corresponding date", () => {
+    expect(standardDischargeDate("2026-03-23", "air_force")).toBe("2027-12-22");
+    expect(standardDischargeDate("2026-03-23", "army")).toBe("2027-09-22");
+    expect(standardDischargeDate("2026-03-23", "navy")).toBe("2027-11-22");
+    expect(standardDischargeDate("2026-03-01", "air_force")).toBe("2027-11-30");
+  });
+
+  it("uses the last day when the final month has no corresponding date", () => {
+    expect(standardDischargeDate("2025-08-31", "army")).toBe("2027-02-28");
+    expect(standardDischargeDate("2026-08-31", "army")).toBe("2028-02-29");
+  });
+
+  it("corrects only the previous automatic default for existing accounts", () => {
+    expect(
+      normalizeLegacyDischargeDate("2026-03-23", "air_force", "2027-12-23"),
+    ).toBe("2027-12-22");
+    expect(
+      normalizeLegacyDischargeDate("2026-03-23", "air_force", "2027-12-30"),
+    ).toBe("2027-12-30");
+  });
+});
+
+describe("standardPromotionDate", () => {
+  it("uses the first of the month after the minimum period is met", () => {
+    expect(standardPromotionDate("2026-01-10", "private_first")).toBe(
+      "2026-04-01",
+    );
+    expect(standardPromotionDate("2026-01-10", "corporal")).toBe("2026-10-01");
+    expect(standardPromotionDate("2026-01-10", "sergeant")).toBe("2027-04-01");
+  });
+
+  it("keeps the first when the minimum period is met on the first", () => {
+    expect(standardPromotionDate("2026-01-01", "private_first")).toBe(
+      "2026-03-01",
+    );
+  });
+});
+
 describe("scheduledRank", () => {
   const enlisted = "2026-01-10";
 
-  it("promotes 이병→일병 at 2 months", () => {
+  it("promotes 이병→일병 on the first after 2 months", () => {
     expect(scheduledRank(enlisted, "2026-01-10")).toBe("private");
-    expect(scheduledRank(enlisted, "2026-03-09")).toBe("private");
-    expect(scheduledRank(enlisted, "2026-03-10")).toBe("private_first");
+    expect(scheduledRank(enlisted, "2026-03-31")).toBe("private");
+    expect(scheduledRank(enlisted, "2026-04-01")).toBe("private_first");
   });
 
-  it("promotes 일병→상병 at 8 months", () => {
-    expect(scheduledRank(enlisted, "2026-09-09")).toBe("private_first");
-    expect(scheduledRank(enlisted, "2026-09-10")).toBe("corporal");
+  it("promotes 일병→상병 on the first after 8 months", () => {
+    expect(scheduledRank(enlisted, "2026-09-30")).toBe("private_first");
+    expect(scheduledRank(enlisted, "2026-10-01")).toBe("corporal");
   });
 
-  it("promotes 상병→병장 at 14 months", () => {
-    expect(scheduledRank(enlisted, "2027-03-09")).toBe("corporal");
-    expect(scheduledRank(enlisted, "2027-03-10")).toBe("sergeant");
+  it("promotes 상병→병장 on the first after 14 months", () => {
+    expect(scheduledRank(enlisted, "2027-03-31")).toBe("corporal");
+    expect(scheduledRank(enlisted, "2027-04-01")).toBe("sergeant");
     expect(scheduledRank(enlisted, "2030-01-01")).toBe("sergeant");
   });
 });
@@ -77,11 +119,19 @@ describe("currentRank with signup rank floor", () => {
     const enlisted = "2026-01-10";
     // 표준 일정상 이병이지만 가입 시 상병으로 등록한 경우
     expect(
-      currentRank({ enlistedAt: enlisted, signupRank: "corporal", on: "2026-02-01" }),
+      currentRank({
+        enlistedAt: enlisted,
+        signupRank: "corporal",
+        on: "2026-02-01",
+      }),
     ).toBe("corporal");
     // 일정이 병장에 도달하면 병장으로 진급
     expect(
-      currentRank({ enlistedAt: enlisted, signupRank: "corporal", on: "2027-03-10" }),
+      currentRank({
+        enlistedAt: enlisted,
+        signupRank: "corporal",
+        on: "2027-04-01",
+      }),
     ).toBe("sergeant");
   });
 
@@ -104,7 +154,7 @@ describe("nextPromotionDate", () => {
         signupRank: "private",
         on: "2026-02-01",
       }),
-    ).toBe("2026-03-10");
+    ).toBe("2026-04-01");
   });
 
   it("returns null for 병장", () => {

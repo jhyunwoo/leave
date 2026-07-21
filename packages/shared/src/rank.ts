@@ -1,7 +1,9 @@
 import {
+  addDays,
   addMonthsClamped,
   diffDays,
-  fullMonthsBetween,
+  parseISODate,
+  toISODate,
   type ISODate,
 } from "./dates";
 
@@ -21,7 +23,47 @@ export const SERVICE_MONTHS: Record<Branch, number> = {
   air_force: 21,
 };
 
-export const RANKS = ["private", "private_first", "corporal", "sergeant"] as const;
+/**
+ * 표준 의무복무 만료일.
+ *
+ * 월 단위 기간은 입대일에 해당하는 날의 전날에 끝나며, 마지막 달에
+ * 해당일이 없으면 그 달의 말일에 끝난다(예: 8/31 + 18개월 → 2/28 또는 2/29).
+ * 실제 전역일은 군기교육ㆍ복무이탈ㆍ전역보류 등에 따라 달라질 수 있다.
+ */
+export function standardDischargeDate(
+  enlistedAt: ISODate,
+  branch: Branch,
+): ISODate {
+  const correspondingDate = addMonthsClamped(
+    enlistedAt,
+    SERVICE_MONTHS[branch],
+  );
+  const enlistedDay = Number(enlistedAt.slice(8, 10));
+  const correspondingDay = Number(correspondingDate.slice(8, 10));
+
+  return correspondingDay < enlistedDay
+    ? correspondingDate
+    : addDays(correspondingDate, -1);
+}
+
+/** 이전 자동 계산값(+복무 개월)을 저장한 계정만 올바른 만료일로 보정한다. */
+export function normalizeLegacyDischargeDate(
+  enlistedAt: ISODate,
+  branch: Branch,
+  dischargeAt: ISODate,
+): ISODate {
+  const legacyDefault = addMonthsClamped(enlistedAt, SERVICE_MONTHS[branch]);
+  return dischargeAt === legacyDefault
+    ? standardDischargeDate(enlistedAt, branch)
+    : dischargeAt;
+}
+
+export const RANKS = [
+  "private",
+  "private_first",
+  "corporal",
+  "sergeant",
+] as const;
 export type Rank = (typeof RANKS)[number];
 
 export const RANK_LABELS: Record<Rank, string> = {
@@ -42,16 +84,33 @@ export const PROMOTION_MONTHS: Record<Rank, number> = {
   sergeant: 14,
 };
 
+/** 진급 최저복무기간이 지난 뒤 처음 도래하는 정기 진급일(매월 1일). */
+export function standardPromotionDate(
+  enlistedAt: ISODate,
+  rank: Rank,
+): ISODate {
+  if (rank === "private") return enlistedAt;
+
+  const eligibleAt = addMonthsClamped(enlistedAt, PROMOTION_MONTHS[rank]);
+  const eligible = parseISODate(eligibleAt);
+  if (eligible.getUTCDate() === 1) return eligibleAt;
+
+  return toISODate(
+    new Date(
+      Date.UTC(eligible.getUTCFullYear(), eligible.getUTCMonth() + 1, 1),
+    ),
+  );
+}
+
 export function rankIndex(rank: Rank): number {
   return RANKS.indexOf(rank);
 }
 
 /** 표준 진급 일정만으로 계산한 계급. */
 export function scheduledRank(enlistedAt: ISODate, on: ISODate): Rank {
-  const months = fullMonthsBetween(enlistedAt, on);
   let rank: Rank = "private";
   for (const r of RANKS) {
-    if (months >= PROMOTION_MONTHS[r]) rank = r;
+    if (on >= standardPromotionDate(enlistedAt, r)) rank = r;
   }
   return rank;
 }
@@ -81,7 +140,7 @@ export function nextPromotionDate(params: {
   const idx = rankIndex(current);
   const next = RANKS[idx + 1];
   if (!next) return null;
-  const date = addMonthsClamped(params.enlistedAt, PROMOTION_MONTHS[next]);
+  const date = standardPromotionDate(params.enlistedAt, next);
   return date > params.on ? date : null;
 }
 
