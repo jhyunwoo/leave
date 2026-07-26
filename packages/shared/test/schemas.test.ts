@@ -40,9 +40,13 @@ describe("signupSchema", () => {
 
 describe("pushEventSchema", () => {
   it("receipt/open만 허용", () => {
-    expect(pushEventSchema.safeParse({ direction: "receipt" }).success).toBe(true);
+    expect(pushEventSchema.safeParse({ direction: "receipt" }).success).toBe(
+      true,
+    );
     expect(pushEventSchema.safeParse({ direction: "open" }).success).toBe(true);
-    expect(pushEventSchema.safeParse({ direction: "send" }).success).toBe(false);
+    expect(pushEventSchema.safeParse({ direction: "send" }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -53,6 +57,41 @@ describe("leaveCreateSchema", () => {
         title: "휴가",
         startDate: "2026-08-10",
         endDate: "2026-08-01",
+        allocations: [{ category: "annual", days: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("여러 휴가 재원의 합계가 포함 기간과 같으면 통과", () => {
+    expect(
+      leaveCreateSchema.safeParse({
+        title: "가족여행",
+        startDate: "2026-08-01",
+        endDate: "2026-08-05",
+        allocations: [
+          { category: "annual", days: 2 },
+          { category: "award", days: 1 },
+          { category: "overnight", overnightKind: "regular", days: 2 },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("재원 합계가 기간과 다르거나 외박 종류가 없으면 실패", () => {
+    expect(
+      leaveCreateSchema.safeParse({
+        title: "합계 오류",
+        startDate: "2026-08-01",
+        endDate: "2026-08-03",
+        allocations: [{ category: "annual", days: 2 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      leaveCreateSchema.safeParse({
+        title: "외박 종류 오류",
+        startDate: "2026-08-01",
+        endDate: "2026-08-01",
+        allocations: [{ category: "overnight", days: 1 }],
       }).success,
     ).toBe(false);
   });

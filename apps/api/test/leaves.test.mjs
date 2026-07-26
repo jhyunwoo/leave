@@ -6,7 +6,12 @@ test("휴가 등록에는 소속 부대가 필요하다", async () => {
   const { token } = await signup();
   const res = await req("POST", "/leaves", {
     token,
-    body: { title: "휴가", startDate: "2026-08-01", endDate: "2026-08-03" },
+    body: {
+      title: "휴가",
+      startDate: "2026-08-01",
+      endDate: "2026-08-03",
+      allocations: [{ category: "annual", days: 3 }],
+    },
   });
   assert.equal(res.status, 400);
   assert.match(res.data.error, /부대/);
@@ -18,7 +23,12 @@ test("내 휴가 목록 CRUD", async () => {
 
   const created = await req("POST", "/leaves", {
     token,
-    body: { title: "정기휴가", startDate: "2026-08-01", endDate: "2026-08-03" },
+    body: {
+      title: "정기휴가",
+      startDate: "2026-08-01",
+      endDate: "2026-08-03",
+      allocations: [{ category: "annual", days: 3 }],
+    },
   });
   assert.equal(created.status, 201);
   const id = created.data.leave.id;
@@ -28,7 +38,12 @@ test("내 휴가 목록 CRUD", async () => {
 
   const updated = await req("PATCH", `/leaves/${id}`, {
     token,
-    body: { title: "수정휴가", startDate: "2026-08-02", endDate: "2026-08-04" },
+    body: {
+      title: "수정휴가",
+      startDate: "2026-08-02",
+      endDate: "2026-08-04",
+      allocations: [{ category: "annual", days: 3 }],
+    },
   });
   assert.equal(updated.status, 200);
   assert.equal(updated.data.leave.title, "수정휴가");
@@ -38,6 +53,101 @@ test("내 휴가 목록 CRUD", async () => {
 
   const after = await req("GET", "/leaves/mine", { token });
   assert.equal(after.data.leaves.length, 0);
+});
+
+test("군별 기본 연가를 제안하고 모든 총량을 수정해 복합 휴가에서 차감한다", async () => {
+  const { token } = await signup({ branch: "air_force" });
+  await createUnit(token, { name: uniq("재원부대-") });
+
+  const initial = await req("GET", "/leaves/balances", { token });
+  assert.equal(initial.status, 200);
+  const totals = Object.fromEntries(
+    initial.data.balances.map((item) => [item.key, item.totalDays]),
+  );
+  assert.equal(totals.annual, 28);
+  totals.annual = 30;
+  totals.award = 7;
+  totals.compensation = 4;
+
+  const changed = await req("PUT", "/leaves/balances", {
+    token,
+    body: { totals },
+  });
+  assert.equal(changed.status, 200);
+  assert.equal(
+    changed.data.balances.find((item) => item.key === "annual").totalDays,
+    30,
+  );
+  assert.equal(
+    changed.data.balances.find((item) => item.key === "award").totalDays,
+    7,
+  );
+
+  const created = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "복합 휴가",
+      startDate: "2026-09-01",
+      endDate: "2026-09-05",
+      allocations: [
+        { category: "annual", days: 3 },
+        { category: "award", days: 2 },
+      ],
+    },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.leave.allocations.length, 2);
+
+  const after = await req("GET", "/leaves/balances", { token });
+  assert.equal(
+    after.data.balances.find((item) => item.key === "annual").remainingDays,
+    27,
+  );
+  assert.equal(
+    after.data.balances.find((item) => item.key === "award").remainingDays,
+    5,
+  );
+
+  totals.annual = 2;
+  const belowUsed = await req("PUT", "/leaves/balances", {
+    token,
+    body: { totals },
+  });
+  assert.equal(belowUsed.status, 400);
+  assert.match(belowUsed.data.error, /이미 3일/);
+});
+
+test("해군·공군 정기외박은 사용자가 주기와 회당 일수를 정하고 중복 없이 적립한다", async () => {
+  const { token } = await signup({ branch: "navy" });
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const configured = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      nextGrantDate: today,
+      intervalDays: 42,
+      daysPerGrant: 4,
+    },
+  });
+  assert.equal(configured.status, 200);
+  const first = configured.data.balances.find(
+    (item) => item.key === "regular_overnight",
+  );
+  assert.equal(first.automaticDays, 4);
+
+  const repeated = await req("GET", "/leaves/balances", { token });
+  const second = repeated.data.balances.find(
+    (item) => item.key === "regular_overnight",
+  );
+  assert.equal(second.automaticDays, 4, "같은 도래일은 한 번만 적립해야 함");
+  assert.equal(repeated.data.regularOvernight.intervalDays, 42);
+  assert.equal(repeated.data.regularOvernight.daysPerGrant, 4);
 });
 
 test("출타율 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
@@ -66,15 +176,27 @@ test("출타율 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", as
   const range = { startDate: "2026-10-05", endDate: "2026-10-05" };
   await req("POST", "/leaves", {
     token: owner.token,
-    body: { title: "휴가1", ...range },
+    body: {
+      title: "휴가1",
+      ...range,
+      allocations: [{ category: "annual", days: 1 }],
+    },
   });
   await req("POST", "/leaves", {
     token: u2.token,
-    body: { title: "휴가2", ...range },
+    body: {
+      title: "휴가2",
+      ...range,
+      allocations: [{ category: "annual", days: 1 }],
+    },
   });
   const third = await req("POST", "/leaves", {
     token: u3.token,
-    body: { title: "휴가3", ...range },
+    body: {
+      title: "휴가3",
+      ...range,
+      allocations: [{ category: "annual", days: 1 }],
+    },
   });
 
   assert.equal(third.status, 201);

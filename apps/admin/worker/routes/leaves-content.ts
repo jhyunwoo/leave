@@ -1,6 +1,10 @@
 import {
+  allocationsForLeaves,
+  assertAllocationsAvailable,
   bumpUnitVersion,
   checkOverageAndNotify,
+  insertLeaveAllocations,
+  leaveAllocations,
   leaves,
   notifications,
   pushLogs,
@@ -9,7 +13,11 @@ import {
   units,
   users,
 } from "@leave/api/server";
-import { isoDateSchema } from "@leave/shared";
+import {
+  inclusiveDays,
+  isoDateSchema,
+  leaveAllocationSchema,
+} from "@leave/shared";
 import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
@@ -25,11 +33,26 @@ const leaveSchema = z
     startDate: isoDateSchema,
     endDate: isoDateSchema,
     reason: z.string().trim().max(500).nullable().optional(),
+    allocations: z.array(leaveAllocationSchema).min(1).max(10),
     sendNotifications: z.boolean().optional().default(false),
   })
-  .refine((value) => value.startDate <= value.endDate, {
-    path: ["endDate"],
-    message: "종료일은 시작일과 같거나 뒤여야 합니다",
+  .superRefine((value, ctx) => {
+    if (value.startDate > value.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "종료일은 시작일과 같거나 뒤여야 합니다",
+      });
+      return;
+    }
+    const sum = value.allocations.reduce((total, item) => total + item.days, 0);
+    if (sum !== inclusiveDays(value.startDate, value.endDate)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["allocations"],
+        message: "휴가 기간과 재원 일수 합계가 일치해야 합니다",
+      });
+    }
   });
 
 const notificationCreateSchema = z.object({
@@ -120,7 +143,17 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         .get()
         .then((row) => row?.count ?? 0),
     ]);
-    return c.json({ items, meta: listMeta(page, pageSize, total) });
+    const allocationMap = await allocationsForLeaves(
+      db,
+      items.map((item) => item.id),
+    );
+    return c.json({
+      items: items.map((item) => ({
+        ...item,
+        allocations: allocationMap.get(item.id) ?? [],
+      })),
+      meta: listMeta(page, pageSize, total),
+    });
   })
   .post("/leaves", async (c) => {
     const input = leaveSchema.safeParse(await c.req.json().catch(() => null));
@@ -133,6 +166,16 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
     const db = drizzle(c.env.DB);
     const user = await getUser(db, input.data.userId);
     if (!user) return c.json({ error: "사용자를 찾을 수 없습니다" }, 400);
+    try {
+      await assertAllocationsAvailable(db, user, input.data.allocations);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
+        },
+        400,
+      );
+    }
     const leave: typeof leaves.$inferInsert = {
       id: crypto.randomUUID(),
       userId: user.id,
@@ -143,6 +186,7 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       createdAt: nowIso(),
     };
     await db.insert(leaves).values(leave);
+    await insertLeaveAllocations(db, leave.id, input.data.allocations);
     if (user.unitId) {
       await bumpUnitVersion(c.env.CACHE, user.unitId);
       if (input.data.sendNotifications) {
@@ -163,7 +207,10 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       entityId: leave.id,
       after: { ...leave, sendNotifications: input.data.sendNotifications },
     });
-    return c.json({ item: leave }, 201);
+    return c.json(
+      { item: { ...leave, allocations: input.data.allocations } },
+      201,
+    );
   })
   .patch("/leaves/:id", async (c) => {
     const input = leaveSchema.safeParse(await c.req.json().catch(() => null));
@@ -186,6 +233,21 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       getUser(db, input.data.userId),
     ]);
     if (!newUser) return c.json({ error: "사용자를 찾을 수 없습니다" }, 400);
+    try {
+      await assertAllocationsAvailable(
+        db,
+        newUser,
+        input.data.allocations,
+        newUser.id === before.userId ? id : undefined,
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
+        },
+        400,
+      );
+    }
     const patch = {
       userId: newUser.id,
       title: input.data.title,
@@ -193,7 +255,19 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       endDate: input.data.endDate,
       reason: input.data.reason ?? null,
     };
-    await db.update(leaves).set(patch).where(eq(leaves.id, id));
+    await db.batch([
+      db.update(leaves).set(patch).where(eq(leaves.id, id)),
+      db.delete(leaveAllocations).where(eq(leaveAllocations.leaveId, id)),
+      db.insert(leaveAllocations).values(
+        input.data.allocations.map((allocation) => ({
+          id: crypto.randomUUID(),
+          leaveId: id,
+          category: allocation.category,
+          days: allocation.days,
+          overnightKind: allocation.overnightKind ?? null,
+        })),
+      ),
+    ]);
     if (oldUser?.unitId) await bumpUnitVersion(c.env.CACHE, oldUser.unitId);
     if (newUser.unitId) {
       await bumpUnitVersion(c.env.CACHE, newUser.unitId);
@@ -209,7 +283,7 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         );
       }
     }
-    const after = { ...before, ...patch };
+    const after = { ...before, ...patch, allocations: input.data.allocations };
     await writeAudit(c, {
       action: "update",
       entityType: "leave",

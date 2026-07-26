@@ -11,5 +11,10 @@ export {
   verifyPassword,
 } from "./lib/crypto";
 export { checkOverageAndNotify } from "./lib/overage";
+export {
+  allocationsForLeaves,
+  assertAllocationsAvailable,
+  insertLeaveAllocations,
+} from "./lib/leave-balances";
 export { sendExpoPush } from "./lib/push";
 export type { PushMessage, PushSendResult } from "./lib/push";

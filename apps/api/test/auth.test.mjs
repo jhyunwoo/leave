@@ -94,7 +94,12 @@ test("계정 삭제: 계정·휴가·부대 소속이 모두 사라진다", asyn
   await createUnit(token);
   const leaveRes = await req("POST", "/leaves", {
     token,
-    body: { title: "정기휴가", startDate: "2026-08-01", endDate: "2026-08-03" },
+    body: {
+      title: "정기휴가",
+      startDate: "2026-08-01",
+      endDate: "2026-08-03",
+      allocations: [{ category: "annual", days: 3 }],
+    },
   });
   assert.equal(leaveRes.status, 201);
 

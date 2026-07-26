@@ -5,6 +5,7 @@ import type { Me } from "../api/queries";
 import { useDeleteAccount, useLogout } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "../components/Avatar";
+import { LeaveBalanceSettings } from "../components/LeaveBalanceSettings";
 import { fmtDateShort } from "../lib/format";
 
 export function ProfilePage(props: { me: Me }) {
@@ -206,6 +207,8 @@ export function ProfilePage(props: { me: Me }) {
           <InfoItem label="전역 예정일" value={user.dischargeAt} />
         </dl>
       </section>
+
+      <LeaveBalanceSettings branch={user.branch} />
 
       <section
         className="card"

@@ -17,6 +17,7 @@ import { API_URL, getAuthToken } from "@/api/client";
 import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
+import { LeaveBalanceSettings } from "@/components/leave-balance-settings";
 import { colors, radius, spacing } from "@/theme";
 
 export function ProfileScreen() {
@@ -101,10 +102,7 @@ export function ProfileScreen() {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPadding },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
     >
       <Text style={styles.pageTitle}>프로필</Text>
 
@@ -165,6 +163,8 @@ export function ProfileScreen() {
           <InfoItem label="전역 예정일" value={user.dischargeAt} />
         </View>
       </View>
+
+      <LeaveBalanceSettings branch={user.branch} />
 
       <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
         <Button

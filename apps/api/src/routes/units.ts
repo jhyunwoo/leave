@@ -17,6 +17,7 @@ import {
   getCachedCalendar,
   putCachedCalendar,
 } from "../lib/cache";
+import { allocationsForLeaves } from "../lib/leave-balances";
 import {
   calendarSchema,
   errorResponse,
@@ -318,7 +319,10 @@ export const unitRoutes = app
       createdAt: new Date().toISOString(),
     };
     await db.insert(units).values(unit);
-    await db.update(users).set({ unitId: unit.id }).where(eq(users.id, user.id));
+    await db
+      .update(users)
+      .set({ unitId: unit.id })
+      .where(eq(users.id, user.id));
     // 생성자는 바로 가입되므로 남아있던 다른 대기 신청은 정리한다.
     await db
       .delete(unitJoinRequests)
@@ -351,7 +355,8 @@ export const unitRoutes = app
         .from(units)
         .where(and(eq(units.name, input.name), ne(units.id, id)))
         .get();
-      if (dup) return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
+      if (dup)
+        return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
     }
 
     const patch: Partial<typeof units.$inferInsert> = {};
@@ -476,7 +481,11 @@ export const unitRoutes = app
       .get();
     if (!req) return c.json({ error: "가입 신청을 찾을 수 없습니다" }, 404);
 
-    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    const target = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
     const previousUnitId = target?.unitId ?? null;
     await db.update(users).set({ unitId: id }).where(eq(users.id, userId));
     await db
@@ -523,7 +532,11 @@ export const unitRoutes = app
     if (userId === admin.id) {
       return c.json({ error: "관리자 자신은 제거할 수 없습니다" }, 400);
     }
-    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    const target = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
     if (!target || target.unitId !== id) {
       return c.json({ error: "해당 부대원을 찾을 수 없습니다" }, 404);
     }
@@ -541,7 +554,11 @@ export const unitRoutes = app
     if (unit.adminId !== admin.id) {
       return c.json({ error: "부대 관리자만 이관할 수 있습니다" }, 403);
     }
-    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    const target = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
     if (!target || target.unitId !== id) {
       return c.json({ error: "대상이 이 부대의 부대원이 아닙니다" }, 400);
     }
@@ -556,7 +573,11 @@ export const unitRoutes = app
     const unitId = user.unitId;
     if (!unitId) return c.json({ ok: true as const }, 200);
 
-    const unit = await db.select().from(units).where(eq(units.id, unitId)).get();
+    const unit = await db
+      .select()
+      .from(units)
+      .where(eq(units.id, unitId))
+      .get();
     if (unit && unit.adminId === user.id) {
       const otherCount = await db.$count(
         users,
@@ -564,13 +585,17 @@ export const unitRoutes = app
       );
       if (otherCount > 0) {
         return c.json(
-          { error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다" },
+          {
+            error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다",
+          },
           409,
         );
       }
       // 혼자 남은 관리자가 나가면 빈 부대·대기 신청·이미지를 정리한다.
       await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
-      await db.delete(unitJoinRequests).where(eq(unitJoinRequests.unitId, unitId));
+      await db
+        .delete(unitJoinRequests)
+        .where(eq(unitJoinRequests.unitId, unitId));
       await db.delete(units).where(eq(units.id, unitId));
       if (unit.imageKey) {
         c.executionCtx.waitUntil(c.env.BUCKET.delete(unit.imageKey));
@@ -657,6 +682,10 @@ export const unitRoutes = app
       rangeStart: start,
       rangeEnd: end,
     });
+    const allocationMap = await allocationsForLeaves(
+      db,
+      rows.map((row) => row.id),
+    );
 
     const calendarLeaves = rows.map((l) => {
       const owner = membersById.get(l.userId);
@@ -671,6 +700,7 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
         reason: l.reason,
+        allocations: allocationMap.get(l.id) ?? [],
       };
     });
 
@@ -681,6 +711,8 @@ export const unitRoutes = app
       leaves: calendarLeaves,
     };
     // 계산 결과를 캐싱(응답을 막지 않도록 백그라운드로).
-    c.executionCtx.waitUntil(putCachedCalendar(c.env.CACHE, id, month, payload));
+    c.executionCtx.waitUntil(
+      putCachedCalendar(c.env.CACHE, id, month, payload),
+    );
     return c.json(payload, 200);
   });

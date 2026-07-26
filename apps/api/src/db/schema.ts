@@ -1,5 +1,17 @@
-import { BRANCHES, RANKS } from "@leave/shared";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  BALANCE_KEYS,
+  BRANCHES,
+  LEAVE_CATEGORIES,
+  OVERNIGHT_KINDS,
+  RANKS,
+} from "@leave/shared";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -86,6 +98,88 @@ export const leaves = sqliteTable(
     index("leaves_user_idx").on(t.userId),
     index("leaves_dates_idx").on(t.startDate, t.endDate),
   ],
+);
+
+export const leaveAllocations = sqliteTable(
+  "leave_allocations",
+  {
+    id: text("id").primaryKey(),
+    leaveId: text("leave_id")
+      .notNull()
+      .references(() => leaves.id, { onDelete: "cascade" }),
+    category: text("category", { enum: LEAVE_CATEGORIES }).notNull(),
+    days: integer("days").notNull(),
+    overnightKind: text("overnight_kind", { enum: OVERNIGHT_KINDS }),
+  },
+  (t) => [
+    index("leave_allocations_leave_idx").on(t.leaveId),
+    uniqueIndex("leave_allocations_source_unique").on(
+      t.leaveId,
+      t.category,
+      t.overnightKind,
+    ),
+  ],
+);
+
+/**
+ * 사용자가 직접 수정하는 휴가 총량 조정값.
+ * 정기외박 자동 적립분과 합산한 값이 화면에 보이는 총 보유일수다.
+ */
+export const userLeaveBalances = sqliteTable(
+  "user_leave_balances",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    balanceKey: text("balance_key", { enum: BALANCE_KEYS }).notNull(),
+    adjustmentDays: integer("adjustment_days").notNull().default(0),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("user_leave_balances_user_key_unique").on(
+      t.userId,
+      t.balanceKey,
+    ),
+    index("user_leave_balances_user_idx").on(t.userId),
+  ],
+);
+
+/** 정기외박 주기 도래로 자동 생성된 적립 원장. */
+export const leaveBalanceGrants = sqliteTable(
+  "leave_balance_grants",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    balanceKey: text("balance_key", { enum: BALANCE_KEYS }).notNull(),
+    days: integer("days").notNull(),
+    effectiveDate: text("effective_date").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("leave_balance_grants_due_unique").on(
+      t.userId,
+      t.balanceKey,
+      t.effectiveDate,
+    ),
+    index("leave_balance_grants_user_idx").on(t.userId),
+  ],
+);
+
+export const regularOvernightConfigs = sqliteTable(
+  "regular_overnight_configs",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+    nextGrantDate: text("next_grant_date"),
+    intervalDays: integer("interval_days"),
+    daysPerGrant: integer("days_per_grant"),
+    updatedAt: text("updated_at").notNull(),
+  },
 );
 
 export const notifications = sqliteTable(
@@ -230,6 +324,11 @@ export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
+export type LeaveAllocationRow = typeof leaveAllocations.$inferSelect;
+export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;
+export type LeaveBalanceGrantRow = typeof leaveBalanceGrants.$inferSelect;
+export type RegularOvernightConfigRow =
+  typeof regularOvernightConfigs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type AccessLogRow = typeof accessLogs.$inferSelect;
 export type PushLogRow = typeof pushLogs.$inferSelect;

@@ -1,17 +1,15 @@
 import type {
+  LeaveBalanceUpdateInput,
   LeaveCreateInput,
   LoginInput,
+  RegularOvernightConfigInput,
   SignupInput,
   UnitCreateInput,
   UnitTransferInput,
   UnitUpdateInput,
 } from "@leave/shared";
 import type { InferResponseType } from "hono/client";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAtom } from "jotai";
 import { tokenAtom } from "../state/auth";
 import { api, API_URL, ApiError, getAuthToken, unwrap } from "./client";
@@ -44,6 +42,10 @@ export type JoinRequest = InferResponseType<
   200
 >["requests"][number];
 export type AuthResponse = InferResponseType<typeof api.auth.login.$post, 200>;
+export type LeaveBalanceSummary = InferResponseType<
+  typeof api.leaves.balances.$get,
+  200
+>;
 
 export function useMe(enabled: boolean) {
   const [, setToken] = useAtom(tokenAtom);
@@ -295,6 +297,36 @@ export function useMyLeaves() {
   });
 }
 
+export function useLeaveBalances() {
+  return useQuery({
+    queryKey: ["leaveBalances"],
+    queryFn: async () =>
+      unwrap<LeaveBalanceSummary>(await api.leaves.balances.$get()),
+  });
+}
+
+export function useUpdateLeaveBalances() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: LeaveBalanceUpdateInput) =>
+      unwrap<LeaveBalanceSummary>(
+        await api.leaves.balances.$put({ json: input }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leaveBalances"] }),
+  });
+}
+
+export function useUpdateRegularOvernight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: RegularOvernightConfigInput) =>
+      unwrap<LeaveBalanceSummary>(
+        await api.leaves["regular-overnight"].$put({ json: input }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leaveBalances"] }),
+  });
+}
+
 export type LeaveResult = { leave: MyLeave; exceededDates: string[] };
 
 export function useCreateLeave() {
@@ -306,6 +338,7 @@ export function useCreateLeave() {
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["leaveBalances"] });
     },
   });
 }
@@ -324,6 +357,7 @@ export function useUpdateLeave() {
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["leaveBalances"] });
     },
   });
 }
@@ -336,6 +370,7 @@ export function useDeleteLeave() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
+      qc.invalidateQueries({ queryKey: ["leaveBalances"] });
     },
   });
 }

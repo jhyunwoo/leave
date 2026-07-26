@@ -64,3 +64,68 @@ test("회원가입: 개인정보 동의 전에는 완료 불가, 동의 후 가�
   // 가입 후 부대 찾기 화면으로 이동
   await expect(page).toHaveURL(/\/units/, { timeout: 15_000 });
 });
+
+test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
+  page,
+  request,
+}) => {
+  const email = `leave-e2e-${Date.now()}@test.com`;
+  const signup = await request.post("http://localhost:8787/auth/signup", {
+    data: {
+      email,
+      password: "password123",
+      name: "휴가테스터",
+      branch: "air_force",
+      enlistedAt: "2026-03-23",
+      dischargeAt: "2027-12-22",
+      rank: "private",
+      dataConsent: true,
+    },
+  });
+  expect(signup.ok()).toBeTruthy();
+  const auth = (await signup.json()) as { token: string };
+  const unit = await request.post("http://localhost:8787/units", {
+    headers: { Authorization: `Bearer ${auth.token}` },
+    data: {
+      name: `E2E부대-${Date.now()}`,
+      maxLeaveNumerator: 1,
+      maxLeaveDenominator: 3,
+    },
+  });
+  expect(unit.ok()).toBeTruthy();
+
+  await page.addInitScript((token) => {
+    localStorage.setItem("leave.token", token);
+  }, auth.token);
+  await page.goto("/profile");
+  await expect(
+    page.getByRole("heading", { name: "보유 휴가 일수" }),
+  ).toBeVisible();
+
+  await page
+    .locator("label")
+    .filter({ hasText: /^연가/ })
+    .locator("input")
+    .fill("32");
+  await page
+    .locator("label")
+    .filter({ hasText: /^포상휴가/ })
+    .locator("input")
+    .fill("5");
+  await page.getByRole("button", { name: "휴가 일수 저장" }).click();
+  await expect(page.getByText("휴가 총량을 저장했습니다.")).toBeVisible();
+
+  await page.goto("/leaves");
+  await page.getByRole("button", { name: "휴가 등록" }).click();
+  await page.getByPlaceholder("예: 제주도 가족여행").fill("복합 휴가");
+  const dates = page.locator('input[type="date"]');
+  await dates.nth(0).fill("2026-09-01");
+  await dates.nth(1).fill("2026-09-05");
+  await page.getByLabel("연가 사용 일수").fill("3");
+  await page.getByLabel("포상휴가 사용 일수").fill("2");
+  await page.getByRole("button", { name: "휴가 등록" }).last().click();
+
+  await expect(page.getByText("복합 휴가")).toBeVisible();
+  await expect(page.getByText("연가 3일")).toBeVisible();
+  await expect(page.getByText("포상휴가 2일")).toBeVisible();
+});

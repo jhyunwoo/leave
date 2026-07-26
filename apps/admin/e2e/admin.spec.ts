@@ -58,8 +58,24 @@ test("로그인부터 대시보드, 사용자 관리, 감사 로그까지 동작
   await expect(
     page.getByRole("button", { name: "전체 로그 보기" }),
   ).toBeInViewport();
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar).toHaveCSS("box-shadow", "none");
+  await page.locator(".mobile-section-menu").click();
+  await expect(sidebar).toHaveClass(/is-open/);
+  await expect(page.locator(".sidebar-scrim")).toBeVisible();
+  await expect(sidebar).not.toHaveCSS("box-shadow", "none");
+  await page.locator(".sidebar-scrim").click({ position: { x: 320, y: 400 } });
+  await expect(sidebar).not.toHaveClass(/is-open/);
+  await expect(page.locator(".sidebar-scrim")).toHaveCount(0);
+  await page.waitForTimeout(250);
+  await expect(sidebar).toHaveCSS("box-shadow", "none");
+  const sidebarBox = await sidebar.boundingBox();
+  expect(sidebarBox).not.toBeNull();
+  expect((sidebarBox?.x ?? 0) + (sidebarBox?.width ?? 0)).toBeLessThanOrEqual(
+    1,
+  );
   await page.screenshot({
-    path: "/tmp/leave-admin-mobile.png",
+    path: "/tmp/leave-admin-mobile-sidebar-closed.png",
     fullPage: false,
   });
   await page.setViewportSize({ width: 1440, height: 1024 });

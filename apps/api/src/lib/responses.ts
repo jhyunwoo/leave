@@ -1,5 +1,11 @@
 import { z } from "@hono/zod-openapi";
-import { BRANCHES, RANKS } from "@leave/shared";
+import {
+  BALANCE_KEYS,
+  BRANCHES,
+  LEAVE_CATEGORIES,
+  OVERNIGHT_KINDS,
+  RANKS,
+} from "@leave/shared";
 
 export const errorSchema = z
   .object({ error: z.string() })
@@ -82,6 +88,12 @@ export const myJoinRequestSchema = z
   })
   .openapi("MyJoinRequest");
 
+export const leaveAllocationResponseSchema = z.object({
+  category: z.enum(LEAVE_CATEGORIES),
+  days: z.number(),
+  overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+});
+
 export const leaveSchema = z
   .object({
     id: z.string(),
@@ -90,6 +102,7 @@ export const leaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    allocations: z.array(leaveAllocationResponseSchema),
     createdAt: z.string(),
   })
   .openapi("Leave");
@@ -105,6 +118,7 @@ export const calendarLeaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    allocations: z.array(leaveAllocationResponseSchema),
   })
   .openapi("CalendarLeave");
 
@@ -138,6 +152,27 @@ export const notificationSchema = z
     createdAt: z.string(),
   })
   .openapi("Notification");
+
+export const leaveBalanceItemSchema = z.object({
+  key: z.enum(BALANCE_KEYS),
+  label: z.string(),
+  totalDays: z.number(),
+  usedDays: z.number(),
+  remainingDays: z.number(),
+  automaticDays: z.number(),
+});
+
+export const leaveBalanceSummarySchema = z
+  .object({
+    balances: z.array(leaveBalanceItemSchema),
+    regularOvernight: z.object({
+      enabled: z.boolean(),
+      nextGrantDate: z.string().nullable(),
+      intervalDays: z.number().nullable(),
+      daysPerGrant: z.number().nullable(),
+    }),
+  })
+  .openapi("LeaveBalanceSummary");
 
 export const authResponseSchema = z
   .object({

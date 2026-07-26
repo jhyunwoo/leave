@@ -444,6 +444,7 @@ test("달력 캐시: 휴가 등록 후 즉시 달력에 반영된다 (무효화 
       title: "9월 휴가",
       startDate: "2026-09-10",
       endDate: "2026-09-12",
+      allocations: [{ category: "annual", days: 3 }],
     },
   });
   assert.equal(created.status, 201);

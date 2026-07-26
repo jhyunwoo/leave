@@ -1366,12 +1366,13 @@ textarea:hover {
   .sidebar {
     width: 218px;
     transform: translateX(-100%);
-    box-shadow: 24px 0 60px rgba(14, 15, 12, 0.16);
+    box-shadow: none;
     transition: transform 220ms var(--ease);
   }
 
   .sidebar.is-open {
     transform: translateX(0);
+    box-shadow: 24px 0 60px rgba(14, 15, 12, 0.16);
   }
 
   .icon-button.sidebar-close {

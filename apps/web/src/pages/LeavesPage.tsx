@@ -1,11 +1,13 @@
+import { allocationBalanceKey, BALANCE_LABELS } from "@leave/shared";
 import { useState } from "react";
 import type { MyLeave } from "../api/queries";
-import { useDeleteLeave, useMyLeaves } from "../api/queries";
+import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "../api/queries";
 import { LeaveFormModal } from "../components/LeaveFormModal";
 import { fmtRange } from "../lib/format";
 
 export function LeavesPage() {
   const leaves = useMyLeaves();
+  const balances = useLeaveBalances();
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
@@ -32,7 +34,10 @@ export function LeavesPage() {
       >
         <div>
           <h1 className="display-md">내 휴가</h1>
-          <p className="body-lg text-body" style={{ marginTop: "var(--sp-sm)" }}>
+          <p
+            className="body-lg text-body"
+            style={{ marginTop: "var(--sp-sm)" }}
+          >
             등록한 휴가를 고치거나 지울 수 있어요.
           </p>
         </div>
@@ -45,14 +50,53 @@ export function LeavesPage() {
         </button>
       </header>
 
+      {balances.data && (
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "var(--sp-sm)",
+          }}
+          aria-label="휴가 잔여량"
+        >
+          {balances.data.balances.map((item) => (
+            <div
+              key={item.key}
+              className="card-sage"
+              style={{ padding: "var(--sp-md)" }}
+            >
+              <p className="caption text-mute">{item.label}</p>
+              <p className="display-xs" style={{ marginTop: 2 }}>
+                {item.remainingDays}일
+              </p>
+              <p className="caption text-mute">
+                총 {item.totalDays} · 사용 {item.usedDays}
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
+
       {leaves.isPending ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-3xl)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "var(--sp-3xl)",
+          }}
+        >
           <div className="spinner" aria-label="불러오는 중" />
         </div>
       ) : !leaves.data || leaves.data.leaves.length === 0 ? (
-        <div className="card-sage" style={{ textAlign: "center", padding: "var(--sp-3xl)" }}>
+        <div
+          className="card-sage"
+          style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
+        >
           <p className="body-lg strong">아직 등록한 휴가가 없어요</p>
-          <p className="body-sm text-body" style={{ marginTop: "var(--sp-sm)" }}>
+          <p
+            className="body-sm text-body"
+            style={{ marginTop: "var(--sp-sm)" }}
+          >
             휴가를 등록하면 부대 달력에 함께 표시돼요.
           </p>
         </div>
@@ -89,6 +133,23 @@ export function LeavesPage() {
                     {l.reason}
                   </p>
                 )}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    marginTop: 8,
+                  }}
+                >
+                  {l.allocations.map((allocation) => {
+                    const key = allocationBalanceKey(allocation);
+                    return (
+                      <span key={key} className="badge">
+                        {BALANCE_LABELS[key]} {allocation.days}일
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
               <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
                 <button

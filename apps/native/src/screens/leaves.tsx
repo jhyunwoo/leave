@@ -1,4 +1,4 @@
-import { fmtRange } from "@leave/shared";
+import { allocationBalanceKey, BALANCE_LABELS, fmtRange } from "@leave/shared";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -10,13 +10,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MyLeave } from "@/api/queries";
-import { useDeleteLeave, useMyLeaves } from "@/api/queries";
+import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@/api/queries";
 import { Button } from "@/components/button";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { colors, radius, spacing } from "@/theme";
 
 export function LeavesScreen() {
   const leaves = useMyLeaves();
+  const balances = useLeaveBalances();
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
@@ -38,10 +39,7 @@ export function LeavesScreen() {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPadding },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
     >
       <View style={styles.header}>
         <View>
@@ -52,6 +50,24 @@ export function LeavesScreen() {
         </View>
         <Button title="휴가 등록" size="sm" onPress={() => setCreating(true)} />
       </View>
+
+      {balances.data ? (
+        <View style={styles.balanceGrid}>
+          {balances.data.balances.map((item) => (
+            <View key={item.key} style={styles.balanceCard}>
+              <Text style={styles.balanceLabel} selectable>
+                {item.label}
+              </Text>
+              <Text style={styles.balanceValue} selectable>
+                {item.remainingDays}일
+              </Text>
+              <Text style={styles.balanceMeta} selectable>
+                총 {item.totalDays} · 사용 {item.usedDays}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {leaves.isPending ? (
         <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
@@ -75,6 +91,18 @@ export function LeavesScreen() {
               {l.reason ? (
                 <Text style={styles.leaveReason}>{l.reason}</Text>
               ) : null}
+              <View style={styles.allocationBadges}>
+                {l.allocations.map((allocation) => {
+                  const key = allocationBalanceKey(allocation);
+                  return (
+                    <View key={key} style={styles.badge}>
+                      <Text style={styles.badgeText} selectable>
+                        {BALANCE_LABELS[key]} {allocation.days}일
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
             <View style={styles.actions}>
               <Button
@@ -126,6 +154,28 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   subtitle: { fontSize: 14, color: colors.body, marginTop: 4 },
+  balanceGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  balanceCard: {
+    width: "31%",
+    minWidth: 96,
+    backgroundColor: colors.primaryPale,
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
+    padding: spacing.md,
+  },
+  balanceLabel: { fontSize: 11, color: colors.mute },
+  balanceValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.ink,
+    fontVariant: ["tabular-nums"],
+    paddingTop: 2,
+  },
+  balanceMeta: { fontSize: 10, color: colors.mute, paddingTop: 2 },
   empty: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
@@ -150,5 +200,18 @@ const styles = StyleSheet.create({
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
   leaveReason: { fontSize: 12, color: colors.mute, marginTop: 4 },
+  allocationBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  badge: {
+    backgroundColor: colors.primaryPale,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  badgeText: { fontSize: 11, fontWeight: "600", color: colors.ink },
   actions: { gap: spacing.sm },
 });

@@ -1,14 +1,28 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { leaveCreateSchema, leaveUpdateSchema } from "@leave/shared";
+import {
+  leaveBalanceUpdateSchema,
+  leaveCreateSchema,
+  leaveUpdateSchema,
+  regularOvernightConfigSchema,
+} from "@leave/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { leaves, type LeaveRow } from "../db/schema";
+import { leaveAllocations, leaves, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
+import {
+  allocationsForLeaves,
+  assertAllocationsAvailable,
+  getLeaveBalanceSummary,
+  insertLeaveAllocations,
+  saveRegularOvernightConfig,
+  updateLeaveBalanceTotals,
+} from "../lib/leave-balances";
 import { checkOverageAndNotify } from "../lib/overage";
 import {
   errorResponse,
   jsonContent,
+  leaveBalanceSummarySchema,
   leaveSchema,
   okSchema,
 } from "../lib/responses";
@@ -30,6 +44,58 @@ const mineRoute = createRoute({
   security: [{ Bearer: [] }],
   responses: {
     200: jsonContent(z.object({ leaves: z.array(leaveSchema) }), "내 휴가"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const balancesRoute = createRoute({
+  method: "get",
+  path: "/balances",
+  tags: ["휴가"],
+  summary: "내 휴가 재원 총량·사용량·잔여량",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(leaveBalanceSummarySchema, "휴가 재원 현황"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const updateBalancesRoute = createRoute({
+  method: "put",
+  path: "/balances",
+  tags: ["휴가"],
+  summary: "내 휴가 재원 총량 수정",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: leaveBalanceUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveBalanceSummarySchema, "수정된 휴가 재원 현황"),
+    400: errorResponse("이미 사용한 일수보다 작게 설정"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const regularOvernightRoute = createRoute({
+  method: "put",
+  path: "/regular-overnight",
+  tags: ["휴가"],
+  summary: "정기외박 자동 적립 설정",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: regularOvernightConfigSchema },
+      },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveBalanceSummarySchema, "정기외박 설정"),
+    400: errorResponse("입력값 오류 또는 지원하지 않는 군종"),
     401: errorResponse("인증 실패"),
   },
 });
@@ -90,7 +156,10 @@ const deleteLeaveRoute = createRoute({
   },
 });
 
-function serializeLeave(row: LeaveRow) {
+function serializeLeave(
+  row: LeaveRow,
+  allocations: Awaited<ReturnType<typeof allocationsForLeaves>>,
+) {
   return {
     id: row.id,
     userId: row.userId,
@@ -98,6 +167,7 @@ function serializeLeave(row: LeaveRow) {
     startDate: row.startDate,
     endDate: row.endDate,
     reason: row.reason,
+    allocations: allocations.get(row.id) ?? [],
     createdAt: row.createdAt,
   };
 }
@@ -106,6 +176,45 @@ const app = createApp();
 app.use("*", authMiddleware);
 
 export const leaveRoutes = app
+  .openapi(balancesRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    return c.json(await getLeaveBalanceSummary(db, user), 200);
+  })
+  .openapi(updateBalancesRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    try {
+      return c.json(
+        await updateLeaveBalanceTotals(db, user, c.req.valid("json").totals),
+        200,
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "수정하지 못했습니다",
+        },
+        400,
+      );
+    }
+  })
+  .openapi(regularOvernightRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    try {
+      return c.json(
+        await saveRegularOvernightConfig(db, user, c.req.valid("json")),
+        200,
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "설정하지 못했습니다",
+        },
+        400,
+      );
+    }
+  })
   .openapi(mineRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
@@ -115,7 +224,14 @@ export const leaveRoutes = app
       .where(eq(leaves.userId, user.id))
       .orderBy(desc(leaves.startDate))
       .all();
-    return c.json({ leaves: rows.map(serializeLeave) }, 200);
+    const allocations = await allocationsForLeaves(
+      db,
+      rows.map((row) => row.id),
+    );
+    return c.json(
+      { leaves: rows.map((row) => serializeLeave(row, allocations)) },
+      200,
+    );
   })
   .openapi(createLeaveRoute, async (c) => {
     const input = c.req.valid("json");
@@ -124,6 +240,16 @@ export const leaveRoutes = app
       return c.json({ error: "먼저 부대에 가입해주세요" }, 400);
     }
     const db = drizzle(c.env.DB);
+    try {
+      await assertAllocationsAvailable(db, user, input.allocations);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
+        },
+        400,
+      );
+    }
 
     const leave: LeaveRow = {
       id: crypto.randomUUID(),
@@ -135,6 +261,7 @@ export const leaveRoutes = app
       createdAt: new Date().toISOString(),
     };
     await db.insert(leaves).values(leave);
+    await insertLeaveAllocations(db, leave.id, input.allocations);
     // 휴가가 추가되면 부대 달력이 바뀌므로 캐시를 무효화한다.
     await bumpUnitVersion(c.env.CACHE, user.unitId);
 
@@ -144,7 +271,11 @@ export const leaveRoutes = app
       changedLeave: leave,
       waitUntil: (p) => c.executionCtx.waitUntil(p),
     });
-    return c.json({ leave: serializeLeave(leave), exceededDates }, 201);
+    const allocationMap = new Map([[leave.id, input.allocations]]);
+    return c.json(
+      { leave: serializeLeave(leave, allocationMap), exceededDates },
+      201,
+    );
   })
   .openapi(updateLeaveRoute, async (c) => {
     const { id } = c.req.valid("param");
@@ -160,6 +291,16 @@ export const leaveRoutes = app
     if (!existing) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
+    try {
+      await assertAllocationsAvailable(db, user, input.allocations, id);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
+        },
+        400,
+      );
+    }
 
     const updated: LeaveRow = {
       ...existing,
@@ -168,15 +309,27 @@ export const leaveRoutes = app
       endDate: input.endDate,
       reason: input.reason ?? null,
     };
-    await db
-      .update(leaves)
-      .set({
-        title: updated.title,
-        startDate: updated.startDate,
-        endDate: updated.endDate,
-        reason: updated.reason,
-      })
-      .where(eq(leaves.id, id));
+    await db.batch([
+      db
+        .update(leaves)
+        .set({
+          title: updated.title,
+          startDate: updated.startDate,
+          endDate: updated.endDate,
+          reason: updated.reason,
+        })
+        .where(eq(leaves.id, id)),
+      db.delete(leaveAllocations).where(eq(leaveAllocations.leaveId, id)),
+      db.insert(leaveAllocations).values(
+        input.allocations.map((allocation) => ({
+          id: crypto.randomUUID(),
+          leaveId: id,
+          category: allocation.category,
+          days: allocation.days,
+          overnightKind: allocation.overnightKind ?? null,
+        })),
+      ),
+    ]);
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
     const exceededDates = user.unitId
@@ -187,7 +340,11 @@ export const leaveRoutes = app
           waitUntil: (p) => c.executionCtx.waitUntil(p),
         })
       : [];
-    return c.json({ leave: serializeLeave(updated), exceededDates }, 200);
+    const allocationMap = new Map([[id, input.allocations]]);
+    return c.json(
+      { leave: serializeLeave(updated, allocationMap), exceededDates },
+      200,
+    );
   })
   .openapi(deleteLeaveRoute, async (c) => {
     const { id } = c.req.valid("param");

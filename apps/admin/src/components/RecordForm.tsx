@@ -1,3 +1,10 @@
+import {
+  allocationBalanceKey,
+  BALANCE_KEYS,
+  BALANCE_LABELS,
+  type BalanceKey,
+  type LeaveAllocation,
+} from "@leave/shared";
 import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
@@ -33,6 +40,29 @@ function value(form: FormData, key: string): string {
 
 function nullable(form: FormData, key: string): string | null {
   return value(form, key) || null;
+}
+
+function allocationForKey(key: BalanceKey, days: number): LeaveAllocation {
+  if (key === "regular_overnight") {
+    return { category: "overnight", overnightKind: "regular", days };
+  }
+  if (key === "other_overnight") {
+    return { category: "overnight", overnightKind: "other", days };
+  }
+  return { category: key, days };
+}
+
+function initialAllocationDays(
+  initial: Record<string, unknown> | undefined,
+  key: BalanceKey,
+): number {
+  const allocations = Array.isArray(initial?.allocations)
+    ? (initial.allocations as LeaveAllocation[])
+    : [];
+  return (
+    allocations.find((allocation) => allocationBalanceKey(allocation) === key)
+      ?.days ?? 0
+  );
 }
 
 export function RecordForm({
@@ -87,6 +117,12 @@ export function RecordForm({
           startDate: value(form, "startDate"),
           endDate: value(form, "endDate"),
           reason: nullable(form, "reason"),
+          allocations: BALANCE_KEYS.map((key) =>
+            allocationForKey(
+              key,
+              Number(value(form, `allocation_${key}`)) || 0,
+            ),
+          ).filter((allocation) => allocation.days > 0),
           sendNotifications: sendChecked,
         });
         break;
@@ -268,6 +304,17 @@ export function RecordForm({
                 defaultValue={stringValue(initial, "reason")}
               />
             </label>
+            {BALANCE_KEYS.map((key) => (
+              <label key={key} className="field">
+                <span>{BALANCE_LABELS[key]} 사용 일수</span>
+                <input
+                  name={`allocation_${key}`}
+                  type="number"
+                  min={0}
+                  defaultValue={initialAllocationDays(initial, key)}
+                />
+              </label>
+            ))}
           </div>
           <label className="check-field">
             <input
