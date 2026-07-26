@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { BrandLockup } from "../components/BrandLockup";
 import "./landing.css";
 
 /** 히어로 달력에 표시할 날짜별 상태. 1일 = 수요일 기준. */
@@ -204,7 +205,7 @@ export function LandingPage() {
       <nav className={`lp-nav ${stuck ? "is-stuck" : ""}`} aria-label="주 메뉴">
         <div className="lp-wrap lp-nav-in">
           <Link to="/" className="lp-brand">
-            리브
+            <BrandLockup iconSize={30} />
           </Link>
           <span className="lp-nav-spacer" />
           <Link to="/login" className="lp-nav-link is-hideable">
@@ -366,7 +367,7 @@ export function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-in">
           <Link to="/" className="lp-brand" style={{ fontSize: 18 }}>
-            리브
+            <BrandLockup iconSize={26} />
           </Link>
           <div className="lp-footer-links">
             <Link to="/login">로그인</Link>

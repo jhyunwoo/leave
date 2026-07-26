@@ -467,6 +467,27 @@ textarea.input {
   padding: 0 var(--sp-xl);
 }
 
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  font-family: inherit;
+  letter-spacing: inherit;
+  line-height: 1;
+}
+
+.brand-lockup--stacked {
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.brand-lockup__mark {
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 24%;
+}
+
 /* 인증 후 앱 셸 */
 .app-shell {
   min-height: 100vh;

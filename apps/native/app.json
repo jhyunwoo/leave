@@ -4,13 +4,13 @@
     "slug": "leave",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/app-icon-v3.png",
+    "icon": "./assets/images/leave-icon.png",
     "scheme": "leave",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.leave.mobile",
-      "icon": "./assets/images/app-icon-v3.png",
+      "icon": "./assets/images/leave-icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -19,16 +19,16 @@
       "predictiveBackGestureEnabled": false,
       "package": "app.leave.mobile",
       "permissions": ["android.permission.RECORD_AUDIO"],
-      "icon": "./assets/images/app-icon-v3.png",
+      "icon": "./assets/images/leave-icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground-v3.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome-v2.png",
-        "backgroundColor": "#0e0f0c"
+        "foregroundImage": "./assets/images/leave-adaptive-foreground.png",
+        "monochromeImage": "./assets/images/leave-monochrome.png",
+        "backgroundColor": "#9fe870"
       }
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/app-icon-v3.png"
+      "favicon": "./assets/images/leave-icon.png"
     },
     "plugins": [
       "expo-router",
@@ -36,7 +36,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/splash-mark-v3.png",
+          "image": "./assets/images/leave-splash.png",
           "imageWidth": 128,
           "resizeMode": "contain"
         }
@@ -45,6 +45,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/images/leave-notification.png",
           "color": "#9fe870"
         }
       ],

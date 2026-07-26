@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router";
 import type { Me } from "../api/queries";
 import { useNotifications } from "../api/queries";
 import { Avatar } from "../components/Avatar";
+import { BrandLockup } from "../components/BrandLockup";
 
 const navClassName = ({ isActive }: { isActive: boolean }) =>
   `app-nav-item${isActive ? " is-active" : ""}`;
@@ -15,7 +16,7 @@ export function AppLayout(props: { me: Me }) {
       <nav className="app-nav" aria-label="주 메뉴">
         <div className="container app-nav-inner">
           <NavLink to="/" className="app-wordmark" aria-label="리브 홈">
-            리브
+            <BrandLockup iconSize={30} />
           </NavLink>
 
           <div className="app-nav-links">

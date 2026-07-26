@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useLogin } from "../api/queries";
+import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
 
 export function LoginPage() {
@@ -33,9 +34,7 @@ export function LoginPage() {
       }}
     >
       <div className="anim-rise" style={{ textAlign: "center" }}>
-        <p className="display-xl" aria-label="리브">
-          리브
-        </p>
+        <BrandLockup className="display-xl" iconSize={76} stacked />
         <p className="body-lg text-body" style={{ marginTop: "var(--sp-md)" }}>
           부대 휴가, 겹치기 전에 미리 보기.
         </p>

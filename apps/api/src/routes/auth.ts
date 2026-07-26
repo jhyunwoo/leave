@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { loginSchema, signupSchema } from "@leave/shared";
-import { desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import {
   accessLogs,
@@ -307,8 +307,43 @@ export const authRoutes = app
       await c.env.BUCKET.delete(user.profileImageKey).catch(() => {});
     }
 
+    // 탈퇴자가 관리자면 부대가 관리자 없이 남지 않도록 먼저 정리한다.
+    // (남은 부대원이 있으면 이관, 혼자였다면 빈 부대를 삭제)
+    if (user.unitId) {
+      const unit = await db
+        .select()
+        .from(units)
+        .where(eq(units.id, user.unitId))
+        .get();
+      if (unit && unit.adminId === user.id) {
+        const heir = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.unitId, user.unitId), ne(users.id, user.id)))
+          .orderBy(asc(users.createdAt))
+          .get();
+        if (heir) {
+          await db
+            .update(units)
+            .set({ adminId: heir.id })
+            .where(eq(units.id, user.unitId));
+        } else {
+          await db
+            .delete(unitJoinRequests)
+            .where(eq(unitJoinRequests.unitId, user.unitId));
+          await db.delete(units).where(eq(units.id, user.unitId));
+          if (unit.imageKey) {
+            await c.env.BUCKET.delete(unit.imageKey).catch(() => {});
+          }
+        }
+      }
+    }
+
     // 관련 데이터를 명시적으로 모두 삭제한다.
     // (Cloudflare D1은 외래키 ON DELETE CASCADE 적용을 보장하지 않으므로 직접 지운다.)
+    await db
+      .delete(unitJoinRequests)
+      .where(eq(unitJoinRequests.userId, user.id));
     await db.delete(leaves).where(eq(leaves.userId, user.id));
     await db.delete(notifications).where(eq(notifications.userId, user.id));
     await db.delete(sessions).where(eq(sessions.userId, user.id));

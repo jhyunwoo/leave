@@ -14,7 +14,9 @@ const { chromium } = require("@playwright/test");
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
 const OUT = path.resolve(__dirname, "..", "images");
-const iconB64 = fs.readFileSync(path.join(ROOT, "apps/native/assets/images/icon.png")).toString("base64");
+const iconB64 = fs
+  .readFileSync(path.join(ROOT, "apps/native/assets/images/leave-icon.png"))
+  .toString("base64");
 const ICON_URI = `data:image/png;base64,${iconB64}`;
 
 // ── PNG utils: 알파 제거(흰 배경 합성) → RGB PNG ────────────────
@@ -184,6 +186,7 @@ async function shoot(page, html, W, H, file, { noAlpha = true } = {}) {
 }
 
 const run = async () => {
+  const brandOnly = process.argv.includes("--brand-only");
   const browser = await chromium.launch({ args: ["--force-color-profile=srgb"] });
   const page = await browser.newPage({ deviceScaleFactor: 1 });
 
@@ -192,6 +195,11 @@ const run = async () => {
   await shoot(page, iconHTML(512), 512, 512, path.join(OUT, "googleplay/icon/icon-512.png"));
   // 피처 그래픽
   await shoot(page, featureHTML(1024, 500), 1024, 500, path.join(OUT, "googleplay/feature-graphic/feature-1024x500.png"));
+  if (brandOnly) {
+    await browser.close();
+    console.log("\n완료: 스토어 아이콘과 피처 그래픽을 갱신했습니다.");
+    return;
+  }
 
   // iPhone 6.9" (1320x2868)
   for (const s of phoneShots) {

@@ -45,6 +45,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "eas:build": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build",
+    "eas:submit": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas submit",
     "check-types": "tsc --noEmit",
     "test:e2e": "maestro test .maestro"
   },

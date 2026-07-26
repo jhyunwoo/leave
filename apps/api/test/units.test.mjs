@@ -82,6 +82,159 @@ test("가입 신청 → 관리자 승인 → 부대원 편입", async () => {
   assert.equal(members.data.members.length, 2);
 });
 
+/**
+ * 부대원이 0명인 부대를 만든다.
+ * 부대를 만든 사람이 다른 부대로 승인·편입되면 원래 부대는 부대원 없이 남는다.
+ * (승인은 users.unitId만 옮기므로 이전 부대의 adminId는 떠난 사람을 가리킨 채 남는다.)
+ */
+async function makeEmptyUnit(name) {
+  const founder = await signup();
+  const empty = await createUnit(founder.token, { name });
+
+  const elsewhere = await signup();
+  const other = await createUnit(elsewhere.token, { name: uniq("타부대-") });
+  await req("POST", `/units/${other.data.unit.id}/join`, {
+    token: founder.token,
+  });
+  await req(
+    "POST",
+    `/units/${other.data.unit.id}/requests/${founder.data.user.id}/approve`,
+    { token: elsewhere.token },
+  );
+  return empty.data.unit;
+}
+
+test("검색 목록에 부대원 0명 부대도 나온다 (키워드 없이 조회)", async () => {
+  const name = uniq("빈부대-");
+  await makeEmptyUnit(name);
+
+  const { token } = await signup();
+  const all = await req("GET", "/units", { token });
+  assert.equal(all.status, 200);
+  const found = all.data.units.find((u) => u.name === name);
+  assert.ok(found, "키워드 없는 검색 결과에 빈 부대가 포함되어야 한다");
+  assert.equal(found.memberCount, 0);
+});
+
+test("부대원 0명 부대에 가입하면 즉시 가입되고 관리자가 된다", async () => {
+  const name = uniq("무주공산-");
+  const emptyUnit = await makeEmptyUnit(name);
+
+  const newcomer = await signup();
+  const join = await req("POST", `/units/${emptyUnit.id}/join`, {
+    token: newcomer.token,
+  });
+  assert.equal(join.status, 200);
+  // 승인해 줄 관리자가 없으므로 대기 없이 바로 들어간다.
+  assert.equal(join.data.joined, true);
+  assert.equal(join.data.requested, false);
+
+  const me = await req("GET", "/auth/me", { token: newcomer.token });
+  assert.equal(me.data.unit.id, emptyUnit.id);
+  assert.equal(me.data.joinRequest, null);
+  // 첫 부대원이 관리자를 맡는다.
+  assert.equal(me.data.unit.adminId, newcomer.data.user.id);
+
+  // 관리자 권한이 실제로 동작한다.
+  const patch = await req("PATCH", `/units/${emptyUnit.id}`, {
+    token: newcomer.token,
+    body: { description: "첫 부대원이 관리자" },
+  });
+  assert.equal(patch.status, 200);
+});
+
+test("다른 부대 소속이면 빈 부대에 즉시 가입되지 않는다 (409)", async () => {
+  const emptyUnit = await makeEmptyUnit(uniq("빈부대이동-"));
+
+  // 이미 자기 부대의 관리자인 사람이 빈 부대로 곧바로 옮겨가면
+  // 원래 부대가 관리자 없이 남는다 — 먼저 나가도록 막는다.
+  const owner = await signup();
+  await createUnit(owner.token, { name: uniq("내부대-") });
+
+  const res = await req("POST", `/units/${emptyUnit.id}/join`, {
+    token: owner.token,
+  });
+  assert.equal(res.status, 409);
+
+  const me = await req("GET", "/auth/me", { token: owner.token });
+  assert.notEqual(me.data.unit.id, emptyUnit.id);
+});
+
+test("부대원이 있으면 기존대로 승인 대기 상태가 된다", async () => {
+  const owner = await signup();
+  const unit = await createUnit(owner.token, { name: uniq("대기부대-") });
+  const joiner = await signup();
+
+  const join = await req("POST", `/units/${unit.data.unit.id}/join`, {
+    token: joiner.token,
+  });
+  assert.equal(join.data.joined, false);
+  assert.equal(join.data.requested, true);
+
+  const me = await req("GET", "/auth/me", { token: joiner.token });
+  assert.equal(me.data.unit, null);
+});
+
+test("관리자가 계정을 지우면 남은 부대원에게 관리자가 이관된다", async () => {
+  const owner = await signup();
+  const unit = await createUnit(owner.token, { name: uniq("이관탈퇴-") });
+  const unitId = unit.data.unit.id;
+  const member = await signup();
+  await req("POST", `/units/${unitId}/join`, { token: member.token });
+  await req(
+    "POST",
+    `/units/${unitId}/requests/${member.data.user.id}/approve`,
+    { token: owner.token },
+  );
+
+  const del = await req("DELETE", "/auth/account", { token: owner.token });
+  assert.equal(del.status, 200);
+
+  const me = await req("GET", "/auth/me", { token: member.token });
+  assert.equal(me.data.unit.id, unitId);
+  assert.equal(me.data.unit.adminId, member.data.user.id);
+
+  // 새 관리자로서 수정할 수 있어야 한다.
+  const patch = await req("PATCH", `/units/${unitId}`, {
+    token: member.token,
+    body: { description: "승계된 관리자" },
+  });
+  assert.equal(patch.status, 200);
+});
+
+test("혼자인 관리자가 계정을 지우면 빈 부대도 함께 삭제된다", async () => {
+  const owner = await signup();
+  const unit = await createUnit(owner.token, { name: uniq("혼자탈퇴-") });
+  const unitId = unit.data.unit.id;
+
+  const del = await req("DELETE", "/auth/account", { token: owner.token });
+  assert.equal(del.status, 200);
+
+  const outsider = await signup();
+  const found = await req("GET", `/units/${unitId}`, { token: outsider.token });
+  assert.equal(found.status, 404);
+});
+
+test("가입 신청 중에 계정을 지우면 신청도 함께 사라진다", async () => {
+  const owner = await signup();
+  const unit = await createUnit(owner.token, { name: uniq("신청정리-") });
+  const unitId = unit.data.unit.id;
+  const joiner = await signup();
+  await req("POST", `/units/${unitId}/join`, { token: joiner.token });
+
+  const before = await req("GET", `/units/${unitId}/requests`, {
+    token: owner.token,
+  });
+  assert.equal(before.data.requests.length, 1);
+
+  await req("DELETE", "/auth/account", { token: joiner.token });
+
+  const after = await req("GET", `/units/${unitId}/requests`, {
+    token: owner.token,
+  });
+  assert.equal(after.data.requests.length, 0);
+});
+
 test("비관리자는 승인 불가 (403)", async () => {
   const owner = await signup();
   const unit = await createUnit(owner.token, { name: uniq("권한부대-") });

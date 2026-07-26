@@ -134,12 +134,12 @@ export function useCreateUnit() {
   });
 }
 
-/** 부대 가입 신청 (관리자 승인 필요). */
+/** 부대 가입 신청 (관리자 승인 필요). 빈 부대면 즉시 가입되고 관리자가 된다. */
 export function useJoinUnit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (unitId: string) =>
-      unwrap<{ requested: true }>(
+      unwrap<{ requested: boolean; joined: boolean }>(
         await api.units[":id"].join.$post({ param: { id: unitId } }),
       ),
     onSuccess: () => qc.invalidateQueries(),

@@ -55,7 +55,14 @@ export function UnitsScreen() {
   const doJoin = async (unitId: string, unitName: string) => {
     try {
       // 가입은 관리자 승인이 필요 — 신청만 하고 대기 상태로 전환된다.
-      await join.mutateAsync(unitId);
+      // 단, 부대원이 아무도 없는 부대는 승인해 줄 사람이 없어 즉시 가입·관리자가 된다.
+      const res = await join.mutateAsync(unitId);
+      if (res.joined) {
+        Alert.alert(
+          "부대에 들어왔어요",
+          `${unitName}에 첫 부대원으로 가입했어요. 부대 관리자를 맡게 됩니다.`,
+        );
+      }
     } catch (err) {
       Alert.alert(
         "가입 신청 실패",
@@ -157,6 +164,23 @@ export function UnitsScreen() {
         {search.isPending ? (
           <View style={{ padding: spacing.xl, alignItems: "center" }}>
             <ActivityIndicator color={colors.ink} />
+          </View>
+        ) : search.isError ? (
+          // 오류를 "검색 결과 없음"으로 감추면 원인을 알 수 없다 — 따로 알린다.
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>
+              부대 목록을 불러오지 못했어요.{"\n"}
+              {search.error instanceof Error
+                ? search.error.message
+                : "잠시 후 다시 시도해주세요."}
+            </Text>
+            <Button
+              title="다시 시도"
+              variant="secondary"
+              size="sm"
+              loading={search.isFetching}
+              onPress={() => void search.refetch()}
+            />
           </View>
         ) : search.data && search.data.units.length > 0 ? (
           <View>
@@ -446,6 +470,21 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 14, color: colors.body, textAlign: "center" },
   emptyCaption: { fontSize: 12, color: colors.mute },
+  errorBox: {
+    backgroundColor: colors.canvasSoft,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    alignItems: "center",
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.negative,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.negativeDeep,
+    textAlign: "center",
+    lineHeight: 20,
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -106,11 +106,16 @@ const joinRoute = createRoute({
   method: "post",
   path: "/{id}/join",
   tags: ["부대"],
-  summary: "부대 가입 신청 (관리자 승인 필요)",
+  summary: "부대 가입 신청 (관리자 승인 필요, 빈 부대는 즉시 가입)",
+  description:
+    "부대원이 아무도 없는 부대에는 승인해 줄 관리자가 없으므로, 처음 들어온 사람이 즉시 가입되고 관리자가 됩니다.",
   security: [{ Bearer: [] }],
   request: { params: idParam },
   responses: {
-    200: jsonContent(z.object({ requested: z.literal(true) }), "가입 신청 완료"),
+    200: jsonContent(
+      z.object({ requested: z.boolean(), joined: z.boolean() }),
+      "가입 신청 완료(requested) 또는 즉시 가입·관리자 등극(joined)",
+    ),
     401: errorResponse("인증 실패"),
     404: errorResponse("부대 없음"),
     409: errorResponse("이미 이 부대 소속"),
@@ -379,17 +384,37 @@ export const unitRoutes = app
     if (user.unitId === id) {
       return c.json({ error: "이미 이 부대의 부대원입니다" }, 409);
     }
+
     // 사용자당 대기 신청은 하나만 유지 — 기존 신청을 교체한다.
     await db
       .delete(unitJoinRequests)
       .where(eq(unitJoinRequests.userId, user.id));
+
+    // 부대원이 아무도 없으면 승인해 줄 관리자가 없다.
+    // 이 경우 처음 들어온 사람이 바로 가입되고 관리자를 맡는다.
+    const memberCount = await db.$count(users, eq(users.unitId, id));
+    if (memberCount === 0) {
+      // 이미 다른 부대 소속이면 즉시 옮기지 않는다.
+      // (관리자였다면 원래 부대가 관리자 없이 남게 되므로 먼저 정리하도록 안내)
+      if (user.unitId) {
+        return c.json(
+          { error: "지금 부대에서 나간 뒤에 가입할 수 있습니다" },
+          409,
+        );
+      }
+      await db.update(users).set({ unitId: id }).where(eq(users.id, user.id));
+      await db.update(units).set({ adminId: user.id }).where(eq(units.id, id));
+      await bumpUnitVersion(c.env.CACHE, id);
+      return c.json({ requested: false, joined: true }, 200);
+    }
+
     await db.insert(unitJoinRequests).values({
       id: crypto.randomUUID(),
       unitId: id,
       userId: user.id,
       createdAt: new Date().toISOString(),
     });
-    return c.json({ requested: true as const }, 200);
+    return c.json({ requested: true, joined: false }, 200);
   })
   .openapi(cancelJoinRoute, async (c) => {
     const user = c.get("user");

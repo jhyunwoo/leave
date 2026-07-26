@@ -42,6 +42,7 @@ export function UnitsPage(props: { me: Me }) {
     setError(null);
     try {
       // 가입은 관리자 승인이 필요 — 신청만 하고 대기 상태로 전환된다.
+      // 단, 부대원이 아무도 없는 부대는 승인해 줄 사람이 없어 즉시 가입·관리자가 된다.
       await join.mutateAsync(unitId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "가입 신청에 실패했어요");
@@ -188,6 +189,35 @@ export function UnitsPage(props: { me: Me }) {
         {search.isPending ? (
           <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-xl)" }}>
             <div className="spinner" aria-label="검색 중" />
+          </div>
+        ) : search.isError ? (
+          // 오류를 "검색 결과 없음"으로 감추면 원인을 알 수 없다 — 따로 알린다.
+          <div
+            className="card-sage"
+            style={{
+              textAlign: "center",
+              padding: "var(--sp-2xl)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-md)",
+              alignItems: "center",
+            }}
+            role="alert"
+          >
+            <p className="body-sm" style={{ color: "var(--negative-deep)" }}>
+              부대 목록을 불러오지 못했어요.{" "}
+              {search.error instanceof Error
+                ? search.error.message
+                : "잠시 후 다시 시도해주세요."}
+            </p>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={search.isFetching}
+              onClick={() => void search.refetch()}
+            >
+              다시 시도
+            </button>
           </div>
         ) : search.data && search.data.units.length > 0 ? (
           <ul

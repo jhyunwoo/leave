@@ -1,0 +1,22 @@
+{
+  "name": "리브 — 부대 휴가 캘린더",
+  "short_name": "리브",
+  "description": "부대원의 휴가와 출타율을 한눈에 관리하는 캘린더",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e8ebe6",
+  "theme_color": "#9fe870",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

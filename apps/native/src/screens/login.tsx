@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -44,7 +45,12 @@ export function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.brand}>
-          <Text style={styles.logo}>리브</Text>
+          <Image
+            accessibilityIgnoresInvertColors
+            source={require("../../assets/images/leave-icon.png")}
+            style={styles.logoMark}
+          />
+          <Text style={styles.logoText}>리브</Text>
           <Text style={styles.tagline}>부대 휴가, 겹치기 전에 미리 보기.</Text>
         </View>
 
@@ -91,8 +97,14 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: { padding: spacing.xl, gap: spacing.xxl },
-  brand: { alignItems: "center", gap: spacing.md },
-  logo: {
+  brand: { alignItems: "center", gap: spacing.sm },
+  logoMark: {
+    width: 76,
+    height: 76,
+    borderRadius: 18,
+    marginBottom: spacing.xs,
+  },
+  logoText: {
     fontSize: 56,
     fontWeight: "900",
     color: colors.ink,

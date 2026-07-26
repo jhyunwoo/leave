@@ -84,8 +84,10 @@ VITE_API_URL=https://leave-api.<계정>.workers.dev pnpm deploy
 ```bash
 cd apps/native
 npx eas init                          # projectId 발급 (푸시 토큰 발급에 필요)
-npx eas build --platform all
+pnpm eas:build --platform all         # = EAS_BUILD_NO_EXPO_GO_WARNING=true eas build
 ```
+
+`eas` 를 직접 부르면 production 프로파일에서 "Detected that your app uses Expo Go for development" 경고가 뜹니다. 위 스크립트가 `EAS_BUILD_NO_EXPO_GO_WARNING=true` 를 붙여 이를 억제합니다(`eas.json` 의 `env` 로는 억제되지 않음 — 그 값은 빌드 서버로만 전달되고 경고는 로컬 CLI가 출력).
 
 푸시 알림은 실기기 + EAS projectId가 있어야 동작합니다. 시뮬레이터/권한 거부 시 앱은 푸시 없이 정상 동작하며, 인앱 알림 목록은 항상 제공됩니다.
 

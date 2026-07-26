@@ -163,6 +163,69 @@ export const pushLogs = sqliteTable(
   ],
 );
 
+/** 일반 사용자 계정과 분리된 전역 관리자 계정. */
+export const adminAccounts = sqliteTable("admin_accounts", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  role: text("role", { enum: ["owner", "admin"] }).notNull(),
+  passwordHash: text("password_hash").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  mustChangePassword: integer("must_change_password", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** 관리자 브라우저 세션. 원문 토큰은 저장하지 않고 SHA-256 해시만 저장한다. */
+export const adminSessions = sqliteTable(
+  "admin_sessions",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("admin_id")
+      .notNull()
+      .references(() => adminAccounts.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: text("expires_at").notNull(),
+    lastSeenAt: text("last_seen_at").notNull(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("admin_sessions_admin_idx").on(t.adminId),
+    index("admin_sessions_expires_idx").on(t.expiresAt),
+  ],
+);
+
+/**
+ * 관리자 감사 로그 — 관리자 계정을 비활성화하거나 삭제해도 운영 이력이 남도록
+ * 관리자 이메일 스냅샷을 함께 저장하고 레코드 수정/삭제 API는 제공하지 않는다.
+ */
+export const adminAuditLogs = sqliteTable(
+  "admin_audit_logs",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("admin_id"),
+    adminEmail: text("admin_email").notNull(),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    beforeJson: text("before_json"),
+    afterJson: text("after_json"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("admin_audit_logs_admin_idx").on(t.adminId),
+    index("admin_audit_logs_entity_idx").on(t.entityType, t.entityId),
+    index("admin_audit_logs_created_idx").on(t.createdAt),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
@@ -170,3 +233,6 @@ export type LeaveRow = typeof leaves.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type AccessLogRow = typeof accessLogs.$inferSelect;
 export type PushLogRow = typeof pushLogs.$inferSelect;
+export type AdminAccountRow = typeof adminAccounts.$inferSelect;
+export type AdminSessionRow = typeof adminSessions.$inferSelect;
+export type AdminAuditLogRow = typeof adminAuditLogs.$inferSelect;
