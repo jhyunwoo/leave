@@ -1,0 +1,1 @@
+ALTER TABLE `units` ADD `max_leave_count` integer;

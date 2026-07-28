@@ -25,7 +25,11 @@ export function MonthCalendar(props: {
   }, [calendar.leaves]);
 
   return (
-    <div className="cal" role="grid" aria-label={`${calendar.month} 부대 휴가 달력`}>
+    <div
+      className="cal"
+      role="grid"
+      aria-label={`${calendar.month} 부대 휴가 달력`}
+    >
       {!hideWeekdays && (
         <div className="cal-weekdays" role="row">
           {WEEKDAYS.map((w, i) => (
@@ -62,7 +66,7 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 최대 출타 인원 초과" : ""}`
                     : undefined
                 }
                 className={[

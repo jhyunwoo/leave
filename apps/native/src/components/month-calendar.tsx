@@ -61,7 +61,7 @@ export function MonthCalendar(props: {
                 accessibilityRole="button"
                 accessibilityLabel={
                   cell.inMonth
-                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 출타율 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 최대 출타 인원 초과" : ""}`
                     : undefined
                 }
                 onPress={() => onSelectDate(cell.date)}
@@ -69,22 +69,26 @@ export function MonthCalendar(props: {
                   styles.cell,
                   { minHeight: cellHeight },
                   exceeded && { backgroundColor: colors.negativeTint },
-                  isSelected && styles.cellSelected,
                   pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
                 {cell.inMonth && (
                   <>
                     <View
-                      style={[styles.dayNumWrap, isToday && styles.todayWrap]}
+                      style={[
+                        styles.dayNumWrap,
+                        isToday && styles.todayWrap,
+                        isSelected && styles.selectedWrap,
+                      ]}
                     >
                       <Text
                         style={[
                           styles.dayNum,
                           (sunday || holiday) && { color: colors.negative },
                           exceeded && { color: colors.negativeDeep },
-                          isToday && { color: colors.onPrimary },
-                          isSelected && { color: colors.ink },
+                          (isToday || isSelected) && {
+                            color: colors.onPrimary,
+                          },
                         ]}
                       >
                         {dayNum}
@@ -152,10 +156,6 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     backgroundColor: "transparent",
   },
-  cellSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-  },
   dayNumWrap: {
     minWidth: 26,
     height: 26,
@@ -165,6 +165,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   todayWrap: { backgroundColor: colors.primary },
+  selectedWrap: { backgroundColor: colors.ink },
   dayNum: { fontSize: 14, fontWeight: "600", color: colors.ink },
   holiday: {
     fontSize: 9,

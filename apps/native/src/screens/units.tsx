@@ -24,13 +24,11 @@ import {
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { Field, Input } from "@/components/field";
+import {
+  LeaveLimitFields,
+  type LeaveLimitMode,
+} from "@/components/leave-limit-fields";
 import { colors, radius, spacing } from "@/theme";
-
-const RATIO_PRESETS = [
-  { n: 1, d: 3 },
-  { n: 1, d: 4 },
-  { n: 1, d: 5 },
-] as const;
 
 export function UnitsScreen() {
   const me = useMe();
@@ -112,8 +110,10 @@ export function UnitsScreen() {
           <Text style={styles.myUnitEyebrow}>내 부대</Text>
           <Text style={styles.myUnitName}>{myUnit.name}</Text>
           <Text style={styles.myUnitMeta}>
-            부대원 {myUnit.memberCount}명 · 최대 출타율{" "}
-            {myUnit.maxLeaveNumerator}/{myUnit.maxLeaveDenominator}
+            부대원 {myUnit.memberCount}명 · 최대 출타{" "}
+            {myUnit.maxLeaveCount != null
+              ? `${myUnit.maxLeaveCount}명`
+              : `${myUnit.maxLeaveNumerator}/${myUnit.maxLeaveDenominator}`}
           </Text>
           <View style={styles.myUnitActions}>
             {isAdmin && (
@@ -189,8 +189,10 @@ export function UnitsScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.unitName}>{u.name}</Text>
                   <Text style={styles.unitMeta}>
-                    부대원 {u.memberCount}명 · 최대 출타율 {u.maxLeaveNumerator}
-                    /{u.maxLeaveDenominator}
+                    부대원 {u.memberCount}명 · 최대 출타{" "}
+                    {u.maxLeaveCount != null
+                      ? `${u.maxLeaveCount}명`
+                      : `${u.maxLeaveNumerator}/${u.maxLeaveDenominator}`}
                   </Text>
                   {u.description ? (
                     <Text style={styles.unitMeta}>{u.description}</Text>
@@ -255,6 +257,8 @@ function CreateUnitModal(props: {
   const [description, setDescription] = useState("");
   const [num, setNum] = useState(1);
   const [den, setDen] = useState(3);
+  const [limitMode, setLimitMode] = useState<LeaveLimitMode>("ratio");
+  const [maxCount, setMaxCount] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
 
@@ -268,6 +272,12 @@ function CreateUnitModal(props: {
       ...(description.trim() ? { description: description.trim() } : {}),
       maxLeaveNumerator: num,
       maxLeaveDenominator: den,
+      maxLeaveCount:
+        limitMode === "count"
+          ? maxCount.trim() === ""
+            ? Number.NaN
+            : Number(maxCount)
+          : null,
     };
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -281,8 +291,6 @@ function CreateUnitModal(props: {
       setError(err instanceof Error ? err.message : "부대를 만들지 못했습니다");
     }
   };
-
-  const example = Math.floor((30 * num) / den);
 
   return (
     <Modal
@@ -325,62 +333,18 @@ function CreateUnitModal(props: {
               placeholder="부대를 알아볼 수 있는 한 줄"
             />
           </Field>
-          <Field
-            label="최대 출타율"
-            hint={`예: 부대원 30명이면 하루 최대 ${example}명까지 출타할 수 있어요`}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                gap: spacing.sm,
-                alignItems: "center",
-              }}
-            >
-              {RATIO_PRESETS.map((p) => {
-                const active = num === p.n && den === p.d;
-                return (
-                  <Pressable
-                    key={`${p.n}/${p.d}`}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setNum(p.n);
-                      setDen(p.d);
-                    }}
-                    style={[
-                      styles.ratioBtn,
-                      active && { backgroundColor: colors.primary },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.ratioText,
-                        active && { color: colors.onPrimary },
-                      ]}
-                    >
-                      {p.n}/{p.d}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              <View style={styles.ratioInputs}>
-                <Input
-                  value={String(num)}
-                  onChangeText={(v) => setNum(Number(v) || 0)}
-                  keyboardType="number-pad"
-                  style={styles.ratioInput}
-                  accessibilityLabel="출타율 분자"
-                />
-                <Text style={{ fontWeight: "600" }}>/</Text>
-                <Input
-                  value={String(den)}
-                  onChangeText={(v) => setDen(Number(v) || 0)}
-                  keyboardType="number-pad"
-                  style={styles.ratioInput}
-                  accessibilityLabel="출타율 분모"
-                />
-              </View>
-            </View>
-          </Field>
+          <LeaveLimitFields
+            mode={limitMode}
+            onModeChange={setLimitMode}
+            numerator={num}
+            denominator={den}
+            onNumeratorChange={setNum}
+            onDenominatorChange={setDen}
+            count={maxCount}
+            onCountChange={setMaxCount}
+            basis={30}
+            basisLabel="부대원 30명"
+          />
 
           {error && (
             <Text
@@ -498,24 +462,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvasSoft,
     alignItems: "center",
     justifyContent: "center",
-  },
-  ratioBtn: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.xl,
-    backgroundColor: colors.canvasSoft,
-  },
-  ratioText: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  ratioInputs: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: "auto",
-  },
-  ratioInput: {
-    width: 56,
-    textAlign: "center",
-    paddingHorizontal: spacing.sm,
-    minHeight: 42,
   },
 });

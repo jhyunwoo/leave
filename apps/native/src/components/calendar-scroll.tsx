@@ -2,9 +2,9 @@ import {
   shiftMonth,
   splitMonth,
   todayInSeoul,
-  WEEKDAYS,
   type ISODate,
 } from "@leave/shared";
+import * as Haptics from "expo-haptics";
 import {
   forwardRef,
   useCallback,
@@ -32,7 +32,7 @@ const CELL_H = 72; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
 const GRID_H = ROWS * (CELL_H + ROW_GAP); // 6주 고정 높이 (짧은 달은 하단 여백)
-const LABEL_H = 44;
+const LABEL_H = 64;
 const ITEM_H = LABEL_H + GRID_H; // getItemLayout용 고정 높이
 
 function monthRange(center: string, span: number): string[] {
@@ -53,7 +53,7 @@ export interface CalendarScrollHandle {
 /**
  * iOS 기본 캘린더식 세로 무한 스크롤. 여러 달을 FlatList로 쌓아 자유롭게
  * 스크롤하며, 위·아래 끝에 가까워지면 이전/다음 달을 이어 붙인다.
- * 요일 헤더는 상단에 고정.
+ * 손을 놓으면 가까운 월 시작점으로 부드럽게 스냅한다.
  */
 export const CalendarScroll = forwardRef<
   CalendarScrollHandle,
@@ -61,14 +61,20 @@ export const CalendarScroll = forwardRef<
     unitId: string;
     selectedDate: ISODate | null;
     onSelectDate: (date: ISODate) => void;
+    contentTopInset: number;
+    limitSummary: string;
   }
->(function CalendarScroll({ unitId, selectedDate, onSelectDate }, ref) {
+>(function CalendarScroll(
+  { unitId, selectedDate, onSelectDate, contentTopInset, limitSummary },
+  ref,
+) {
   const currentMonth = todayInSeoul().slice(0, 7);
   const [months, setMonths] = useState(() =>
     monthRange(currentMonth, INITIAL_SPAN),
   );
   const listRef = useRef<FlatList<string>>(null);
   const prependLock = useRef(false);
+  const settledMonth = useRef(currentMonth);
 
   // prepend 후 락 해제 (렌더 커밋 이후).
   useEffect(() => {
@@ -101,23 +107,35 @@ export const CalendarScroll = forwardRef<
     scrollToToday: () => {
       const idx = months.indexOf(currentMonth);
       if (idx >= 0) {
-        listRef.current?.scrollToIndex({ index: idx, animated: true });
+        listRef.current?.scrollToOffset({
+          offset: ITEM_H * idx,
+          animated: true,
+        });
       }
     },
   }));
 
+  const onMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.max(
+        0,
+        Math.min(
+          months.length - 1,
+          Math.round(event.nativeEvent.contentOffset.y / ITEM_H),
+        ),
+      );
+      const month = months[index];
+      if (!month || month === settledMonth.current) return;
+      settledMonth.current = month;
+      if (process.env.EXPO_OS === "ios") {
+        void Haptics.selectionAsync();
+      }
+    },
+    [months],
+  );
+
   return (
-    <View>
-      <View style={styles.weekRow}>
-        {WEEKDAYS.map((w, i) => (
-          <Text
-            key={w}
-            style={[styles.weekday, i === 0 && { color: colors.negative }]}
-          >
-            {w}
-          </Text>
-        ))}
-      </View>
+    <View style={styles.root}>
       <FlatList
         ref={listRef}
         data={months}
@@ -128,6 +146,7 @@ export const CalendarScroll = forwardRef<
             month={item}
             selectedDate={selectedDate}
             onSelectDate={onSelectDate}
+            limitSummary={item === currentMonth ? limitSummary : undefined}
           />
         )}
         getItemLayout={(_, index) => ({
@@ -135,7 +154,13 @@ export const CalendarScroll = forwardRef<
           offset: ITEM_H * index,
           index,
         })}
-        initialScrollIndex={INITIAL_SPAN}
+        contentOffset={{ x: 0, y: ITEM_H * INITIAL_SPAN }}
+        contentContainerStyle={{
+          paddingTop: contentTopInset,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl,
+        }}
+        contentInsetAdjustmentBehavior="never"
         initialNumToRender={3}
         windowSize={7}
         maxToRenderPerBatch={4}
@@ -144,14 +169,10 @@ export const CalendarScroll = forwardRef<
         scrollEventThrottle={16}
         onEndReached={onEndReached}
         onEndReachedThreshold={1.5}
-        onScrollToIndexFailed={({ index }) => {
-          setTimeout(() => {
-            listRef.current?.scrollToOffset({
-              offset: ITEM_H * index,
-              animated: true,
-            });
-          }, 60);
-        }}
+        snapToInterval={ITEM_H}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        onMomentumScrollEnd={onMomentumScrollEnd}
         showsVerticalScrollIndicator={false}
         style={styles.list}
       />
@@ -164,11 +185,19 @@ function MonthBlock(props: {
   month: string;
   selectedDate: ISODate | null;
   onSelectDate: (date: ISODate) => void;
+  limitSummary?: string;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
   return (
     <View style={styles.monthBlock}>
-      <Text style={styles.monthLabel}>{monthLabel(props.month)}</Text>
+      <View style={styles.monthHeading}>
+        <Text style={styles.monthLabel}>{monthLabel(props.month)}</Text>
+        {props.limitSummary ? (
+          <Text style={styles.limitSummary} numberOfLines={1}>
+            {props.limitSummary}
+          </Text>
+        ) : null}
+      </View>
       {calendar.isPending ? (
         <View style={styles.monthLoading}>
           <ActivityIndicator color={colors.ink} />
@@ -188,30 +217,23 @@ function MonthBlock(props: {
 }
 
 const styles = StyleSheet.create({
-  list: { height: GRID_H * 1.05, maxHeight: 560 },
-  weekRow: {
-    flexDirection: "row",
+  root: { flex: 1 },
+  list: { flex: 1 },
+  monthBlock: { height: ITEM_H },
+  monthHeading: {
+    height: LABEL_H,
+    justifyContent: "center",
     gap: 2,
-    marginBottom: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.canvasSoft,
-    paddingBottom: spacing.xs,
   },
-  weekday: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.mute,
-  },
-  monthBlock: { height: ITEM_H },
   monthLabel: {
-    height: LABEL_H,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "900",
     color: colors.ink,
-    paddingTop: spacing.sm,
+    letterSpacing: -0.4,
   },
+  limitSummary: { fontSize: 11, color: colors.mute },
   monthLoading: { paddingVertical: spacing.xxxl, alignItems: "center" },
   monthError: { fontSize: 14, color: colors.body, paddingVertical: spacing.lg },
 });

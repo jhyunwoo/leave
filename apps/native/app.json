@@ -3,6 +3,12 @@
     "name": "리브",
     "slug": "leave",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d1159900-97c5-4f49-beb7-1298d0d776ab"
+    },
     "orientation": "default",
     "icon": "./assets/images/leave-icon.png",
     "scheme": "leave",
@@ -36,7 +42,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/leave-splash.png",
+          "image": "./assets/images/leave-splash-rounded.png",
           "imageWidth": 128,
           "resizeMode": "contain"
         }

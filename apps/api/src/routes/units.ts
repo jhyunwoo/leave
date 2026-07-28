@@ -312,6 +312,7 @@ export const unitRoutes = app
       description: input.description ?? null,
       maxLeaveNumerator: input.maxLeaveNumerator,
       maxLeaveDenominator: input.maxLeaveDenominator,
+      maxLeaveCount: input.maxLeaveCount ?? null,
       creatorId: user.id,
       adminId: user.id,
       headcount: input.headcount ?? null,
@@ -367,6 +368,9 @@ export const unitRoutes = app
     }
     if (input.maxLeaveDenominator !== undefined) {
       patch.maxLeaveDenominator = input.maxLeaveDenominator;
+    }
+    if (input.maxLeaveCount !== undefined) {
+      patch.maxLeaveCount = input.maxLeaveCount;
     }
     if (input.headcount !== undefined) patch.headcount = input.headcount;
 
@@ -679,6 +683,7 @@ export const unitRoutes = app
         numerator: unit.maxLeaveNumerator,
         denominator: unit.maxLeaveDenominator,
       },
+      maxCount: unit.maxLeaveCount,
       rangeStart: start,
       rangeEnd: end,
     });

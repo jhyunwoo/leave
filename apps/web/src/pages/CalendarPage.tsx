@@ -37,16 +37,20 @@ export function CalendarPage(props: { me: Me }) {
   if (!unit) return <Navigate to="/units" replace />;
 
   const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
-  const allowed = maxAllowedOut(basis, {
-    numerator: unit.maxLeaveNumerator,
-    denominator: unit.maxLeaveDenominator,
-  });
+  const allowed = maxAllowedOut(
+    basis,
+    {
+      numerator: unit.maxLeaveNumerator,
+      denominator: unit.maxLeaveDenominator,
+    },
+    unit.maxLeaveCount,
+  );
 
   const onSaved = (exceededDates: string[]) => {
     if (exceededDates.length > 0) {
       const list = exceededDates.map(fmtDateShort).join(", ");
       setToast(
-        `등록은 완료됐지만 ${list}에 출타율이 초과돼요. 해당 날짜의 부대원들에게 알림을 보냈어요.`,
+        `등록은 완료됐지만 ${list}에 최대 출타 인원을 초과해요. 해당 날짜의 부대원들에게 알림을 보냈어요.`,
       );
     } else {
       setToast(null);
@@ -124,13 +128,16 @@ export function CalendarPage(props: { me: Me }) {
             <span className="caption text-mute">
               하루 최대 출타{" "}
               <strong style={{ color: "var(--ink)" }}>
-                {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}
+                {unit.maxLeaveCount != null
+                  ? `${unit.maxLeaveCount}명 직접 지정`
+                  : `${unit.maxLeaveNumerator}/${unit.maxLeaveDenominator}`}
               </strong>{" "}
-              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
-              {allowed}명)
+              {unit.maxLeaveCount == null
+                ? `(${unit.headcount != null ? "부대 인원" : "가입자"} ${basis}명 기준 ${allowed}명)`
+                : null}
             </span>
             <span className="caption" style={{ color: "var(--negative-deep)" }}>
-              ● 빨간 날 = 출타율 초과 · 공휴일은 빨간 날짜
+              ● 빨간 날 = 최대 출타 인원 초과 · 공휴일은 빨간 날짜
             </span>
           </div>
         </div>

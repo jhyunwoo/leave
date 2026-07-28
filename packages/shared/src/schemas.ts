@@ -52,6 +52,13 @@ export const unitCreateSchema = z
     description: z.string().trim().max(200).optional(),
     maxLeaveNumerator: z.int().min(1, "분자는 1 이상이어야 합니다"),
     maxLeaveDenominator: z.int().min(1, "분모는 1 이상이어야 합니다"),
+    // 직접 지정한 하루 최대 출타 인원. null/미설정이면 비율로 계산한다.
+    maxLeaveCount: z
+      .int()
+      .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
+      .max(100000)
+      .nullable()
+      .optional(),
     // 부대 인원(출타율 계산 기준). 미설정 시 앱 가입자 수로 대체한다.
     headcount: z
       .int()
@@ -78,6 +85,12 @@ export const unitUpdateSchema = z
     maxLeaveDenominator: z
       .int()
       .min(1, "분모는 1 이상이어야 합니다")
+      .optional(),
+    maxLeaveCount: z
+      .int()
+      .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
+      .max(100000)
+      .nullable()
       .optional(),
     headcount: z
       .int()

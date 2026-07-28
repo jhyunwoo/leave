@@ -30,16 +30,13 @@ export function NotificationsScreen() {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPadding },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
     >
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>알림</Text>
           <Text style={styles.subtitle}>
-            출타율 초과 소식을 여기서 확인해요.
+            최대 출타 인원 초과 소식을 여기서 확인해요.
           </Text>
         </View>
         {list.data && list.data.unreadCount > 0 && (

@@ -150,13 +150,14 @@ test("해군·공군 정기외박은 사용자가 주기와 회당 일수를 정
   assert.equal(repeated.data.regularOvernight.daysPerGrant, 4);
 });
 
-test("출타율 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
-  // 출타율 1/3 부대에 3명 → 2명 이상 겹치면 초과
+test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
+  // 비율상 전원 출타 가능하지만 직접 지정 최대 인원은 2명
   const owner = await signup();
   const unit = await createUnit(owner.token, {
     name: uniq("초과부대-"),
     maxLeaveNumerator: 1,
-    maxLeaveDenominator: 3,
+    maxLeaveDenominator: 1,
+    maxLeaveCount: 2,
   });
   const unitId = unit.data.unit.id;
 
@@ -172,7 +173,7 @@ test("출타율 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", as
     token: owner.token,
   });
 
-  // 같은 날짜에 3명이 휴가 → 1/3(=1명) 초과
+  // 같은 날짜에 3명이 휴가 → 직접 지정한 2명 초과
   const range = { startDate: "2026-10-05", endDate: "2026-10-05" };
   await req("POST", "/leaves", {
     token: owner.token,

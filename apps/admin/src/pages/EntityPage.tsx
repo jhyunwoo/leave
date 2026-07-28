@@ -119,7 +119,7 @@ const configs: Record<EntityResource, ResourceConfig> = {
   },
   units: {
     title: "부대",
-    description: "모든 부대와 관리자, 인원 및 최대 출타율을 관리합니다.",
+    description: "모든 부대와 관리자, 인원 및 최대 출타 기준을 관리합니다.",
     createLabel: "부대 추가",
     editable: true,
     deletable: true,
@@ -151,9 +151,11 @@ const configs: Record<EntityResource, ResourceConfig> = {
       },
       {
         key: "ratio",
-        label: "최대 출타율",
+        label: "최대 출타 기준",
         render: (item) =>
-          `${text(item.maxLeaveNumerator)} / ${text(item.maxLeaveDenominator)}`,
+          item.maxLeaveCount !== null && item.maxLeaveCount !== undefined
+            ? `${text(item.maxLeaveCount)}명`
+            : `${text(item.maxLeaveNumerator)} / ${text(item.maxLeaveDenominator)}`,
       },
       {
         key: "created",

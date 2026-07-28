@@ -2,8 +2,10 @@ import {
   effectiveMemberCount,
   maxAllowedOut,
   todayInSeoul,
+  WEEKDAYS,
   type ISODate,
 } from "@leave/shared";
+import { BlurTargetView, BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -34,9 +36,10 @@ export function CalendarScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const topPadding =
-    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.lg;
+  const topInset = process.env.EXPO_OS === "web" ? spacing.lg : insets.top;
+  const headerHeight = topInset + 92;
   const scrollRef = useRef<CalendarScrollHandle>(null);
+  const blurTargetRef = useRef<View>(null);
 
   const unit = me.data?.unit ?? null;
   const registerPush = useRegisterPushToken();
@@ -84,63 +87,91 @@ export function CalendarScreen() {
   }
 
   const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
-  const allowed = maxAllowedOut(basis, {
-    numerator: unit.maxLeaveNumerator,
-    denominator: unit.maxLeaveDenominator,
-  });
+  const allowed = maxAllowedOut(
+    basis,
+    {
+      numerator: unit.maxLeaveNumerator,
+      denominator: unit.maxLeaveDenominator,
+    },
+    unit.maxLeaveCount,
+  );
+  const limitSummary =
+    unit.maxLeaveCount != null
+      ? `하루 최대 ${unit.maxLeaveCount}명 직접 지정 · 빨간 배경은 초과`
+      : `하루 최대 ${allowed}명 (${unit.maxLeaveNumerator}/${unit.maxLeaveDenominator}) · 빨간 배경은 초과`;
 
   return (
     <>
-      <View style={[styles.root, { paddingTop: topPadding }]}>
-        <View style={styles.header}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.eyebrow} numberOfLines={1}>
-              {unit.name}
-            </Text>
-            <Text style={styles.title}>부대 달력</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                setSelectedDate(today);
-                scrollRef.current?.scrollToToday();
-              }}
-              style={({ pressed }) => [
-                styles.todayBtn,
-                pressed && { transform: [{ scale: 0.97 }] },
-              ]}
-            >
-              <Text style={styles.todayBtnText}>오늘</Text>
-            </Pressable>
-            <Button
-              title="휴가 등록"
-              size="sm"
-              onPress={() => setFormOpen(true)}
-            />
-          </View>
-        </View>
-
-        <View style={styles.calCard}>
+      <View style={styles.root}>
+        <BlurTargetView ref={blurTargetRef} style={styles.calendarLayer}>
           <CalendarScroll
             ref={scrollRef}
             unitId={unit.id}
             selectedDate={selectedDate}
+            contentTopInset={headerHeight}
+            limitSummary={limitSummary}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
             }
           />
-          <View style={styles.legend}>
-            <Text style={styles.legendText}>
-              하루 최대 출타 {unit.maxLeaveNumerator}/{unit.maxLeaveDenominator}{" "}
-              ({unit.headcount != null ? "부대 인원" : "가입자"} {basis}명 기준{" "}
-              {allowed}명)
-            </Text>
-            <Text style={[styles.legendText, { color: colors.negativeDeep }]}>
-              ● 빨간 날 = 출타율 초과 · 공휴일은 빨간 날짜
-            </Text>
+        </BlurTargetView>
+
+        <BlurView
+          blurTarget={blurTargetRef}
+          blurMethod={
+            process.env.EXPO_OS === "android"
+              ? "dimezisBlurViewSdk31Plus"
+              : undefined
+          }
+          tint="systemChromeMaterialLight"
+          intensity={82}
+          style={[
+            styles.header,
+            { height: headerHeight, paddingTop: topInset },
+          ]}
+        >
+          <View style={styles.headerMain}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.eyebrow} numberOfLines={1}>
+                {unit.name}
+              </Text>
+              <Text style={styles.title}>부대 달력</Text>
+            </View>
+            <View style={styles.headerActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setSelectedDate(today);
+                  scrollRef.current?.scrollToToday();
+                }}
+                style={({ pressed }) => [
+                  styles.todayBtn,
+                  pressed && { transform: [{ scale: 0.96 }] },
+                ]}
+              >
+                <Text style={styles.todayBtnText}>오늘</Text>
+              </Pressable>
+              <Button
+                title="휴가 등록"
+                size="sm"
+                onPress={() => setFormOpen(true)}
+              />
+            </View>
           </View>
-        </View>
+          <View style={styles.weekRow}>
+            {WEEKDAYS.map((weekday, index) => (
+              <Text
+                key={weekday}
+                style={[
+                  styles.weekday,
+                  index === 0 && { color: colors.negative },
+                ]}
+              >
+                {weekday}
+              </Text>
+            ))}
+          </View>
+        </BlurView>
       </View>
 
       {/* 선택 날짜 상세: 바텀시트 */}
@@ -195,7 +226,15 @@ export function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.canvasSoft, padding: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.canvas },
+  calendarLayer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: colors.canvas,
+  },
   center: {
     flex: 1,
     backgroundColor: colors.canvasSoft,
@@ -216,19 +255,29 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   emptyBody: { fontSize: 15, lineHeight: 22, color: colors.body },
   header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(14, 15, 12, 0.14)",
+    overflow: "hidden",
+  },
+  headerMain: {
+    height: 60,
+    paddingHorizontal: spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: spacing.lg,
-    gap: spacing.md,
+    alignItems: "center",
+    gap: spacing.sm,
   },
   eyebrow: { fontSize: 12, fontWeight: "600", color: colors.mute },
   title: {
-    fontSize: 34,
+    fontSize: 24,
     fontWeight: "900",
     color: colors.ink,
-    letterSpacing: -0.5,
-    marginTop: 2,
+    letterSpacing: -0.4,
   },
   headerActions: {
     flexDirection: "row",
@@ -236,25 +285,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   todayBtn: {
-    paddingVertical: spacing.sm,
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  todayBtnText: { fontSize: 14, fontWeight: "700", color: colors.brand },
+  weekRow: {
+    height: 32,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.xl,
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderCurve: "continuous",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
-  todayBtnText: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  calCard: {
+  weekday: {
     flex: 1,
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    borderWidth: 0,
-    borderCurve: "continuous",
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.mute,
   },
-  legend: { marginTop: spacing.md, gap: 4 },
-  legendText: { fontSize: 12, color: colors.mute },
   sheetBackdrop: {
     flex: 1,
     backgroundColor: "rgba(17, 17, 17, 0.32)",

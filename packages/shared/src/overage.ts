@@ -13,8 +13,16 @@ export interface LeaveRatio {
   denominator: number;
 }
 
-/** 하루에 허용되는 최대 출타 인원 = floor(부대원 수 × 비율). */
-export function maxAllowedOut(memberCount: number, ratio: LeaveRatio): number {
+/**
+ * 하루에 허용되는 최대 출타 인원.
+ * 직접 지정값이 있으면 이를 우선하고, 없으면 floor(부대원 수 × 비율)로 계산한다.
+ */
+export function maxAllowedOut(
+  memberCount: number,
+  ratio: LeaveRatio,
+  maxCount?: number | null,
+): number {
+  if (maxCount != null) return Math.max(0, Math.floor(maxCount));
   if (ratio.denominator <= 0) return 0;
   return Math.floor((memberCount * ratio.numerator) / ratio.denominator);
 }
@@ -47,11 +55,12 @@ export function computeDayStats(params: {
   leaves: LeaveSpan[];
   memberCount: number;
   ratio: LeaveRatio;
+  maxCount?: number | null;
   rangeStart: ISODate;
   rangeEnd: ISODate;
 }): DayStat[] {
-  const { leaves, memberCount, ratio, rangeStart, rangeEnd } = params;
-  const allowed = maxAllowedOut(memberCount, ratio);
+  const { leaves, memberCount, ratio, maxCount, rangeStart, rangeEnd } = params;
+  const allowed = maxAllowedOut(memberCount, ratio, maxCount);
   const byDate = new Map<ISODate, Set<string>>();
   for (const date of eachDate(rangeStart, rangeEnd)) {
     byDate.set(date, new Set());
@@ -85,11 +94,13 @@ export function findExceededDates(params: {
   newLeave: { startDate: ISODate; endDate: ISODate };
   memberCount: number;
   ratio: LeaveRatio;
+  maxCount?: number | null;
 }): ISODate[] {
   return computeDayStats({
     leaves: params.leaves,
     memberCount: params.memberCount,
     ratio: params.ratio,
+    maxCount: params.maxCount,
     rangeStart: params.newLeave.startDate,
     rangeEnd: params.newLeave.endDate,
   })

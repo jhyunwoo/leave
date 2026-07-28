@@ -85,11 +85,15 @@ VITE_API_URL=https://leave-api.<계정>.workers.dev pnpm deploy
 cd apps/native
 npx eas init                          # projectId 발급 (푸시 토큰 발급에 필요)
 pnpm eas:build --platform all         # = EAS_BUILD_NO_EXPO_GO_WARNING=true eas build
+pnpm eas:update:preview --message "변경 내용"
+pnpm eas:update:production --message "변경 내용"
 ```
 
 `eas` 를 직접 부르면 production 프로파일에서 "Detected that your app uses Expo Go for development" 경고가 뜹니다. 위 스크립트가 `EAS_BUILD_NO_EXPO_GO_WARNING=true` 를 붙여 이를 억제합니다(`eas.json` 의 `env` 로는 억제되지 않음 — 그 값은 빌드 서버로만 전달되고 경고는 로컬 CLI가 출력).
 
 푸시 알림은 실기기 + EAS projectId가 있어야 동작합니다. 시뮬레이터/권한 거부 시 앱은 푸시 없이 정상 동작하며, 인앱 알림 목록은 항상 제공됩니다.
+
+Expo Insights는 새 네이티브 빌드부터 앱 콜드 스타트 사용량을 자동 집계합니다. OTA 업데이트는 먼저 `preview` 채널에서 검증한 뒤 같은 커밋을 `production` 채널에 발행합니다. 네이티브 모듈·권한·Expo SDK가 바뀌면 OTA 대신 새 스토어 빌드가 필요하며, 업데이트는 앱 실행 시 내려받아 다음 재시작부터 적용됩니다.
 
 ## 동작 규칙 요약
 

@@ -79,6 +79,7 @@ export function serializeUnit(
     description: unit.description,
     maxLeaveNumerator: unit.maxLeaveNumerator,
     maxLeaveDenominator: unit.maxLeaveDenominator,
+    maxLeaveCount: unit.maxLeaveCount,
     memberCount,
     adminId: unit.adminId,
     headcount: unit.headcount,

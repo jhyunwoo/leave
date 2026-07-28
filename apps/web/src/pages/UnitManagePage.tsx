@@ -15,12 +15,10 @@ import {
 } from "../api/queries";
 import { Avatar } from "../components/Avatar";
 import { Field } from "../components/Field";
-
-const RATIO_PRESETS = [
-  { n: 1, d: 3 },
-  { n: 1, d: 4 },
-  { n: 1, d: 5 },
-] as const;
+import {
+  LeaveLimitFields,
+  type LeaveLimitMode,
+} from "../components/LeaveLimitFields";
 
 export function UnitManagePage(props: { me: Me }) {
   const unit = props.me.unit;
@@ -75,6 +73,10 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
   const [description, setDescription] = useState(unit.description ?? "");
   const [num, setNum] = useState(unit.maxLeaveNumerator);
   const [den, setDen] = useState(unit.maxLeaveDenominator);
+  const [limitMode, setLimitMode] = useState<LeaveLimitMode>(
+    unit.maxLeaveCount != null ? "count" : "ratio",
+  );
+  const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount ?? 1));
   const [headcount, setHeadcount] = useState(
     unit.headcount != null ? String(unit.headcount) : "",
   );
@@ -104,6 +106,12 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
       description: description.trim() ? description.trim() : null,
       maxLeaveNumerator: num,
       maxLeaveDenominator: den,
+      maxLeaveCount:
+        limitMode === "count"
+          ? maxCount.trim() === ""
+            ? Number.NaN
+            : Number(maxCount)
+          : null,
       headcount: hc === "" ? null : Number(hc),
     };
     const parsed = unitUpdateSchema.safeParse(input);
@@ -120,8 +128,6 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
   };
 
   const basis = headcount.trim() ? Number(headcount) : unit.memberCount;
-  const example = den > 0 ? Math.floor((basis * num) / den) : 0;
-
   return (
     <section
       className="card"
@@ -129,7 +135,9 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
     >
       <h2 className="display-xs">부대 정보</h2>
 
-      <div style={{ display: "flex", gap: "var(--sp-lg)", alignItems: "center" }}>
+      <div
+        style={{ display: "flex", gap: "var(--sp-lg)", alignItems: "center" }}
+      >
         <div
           style={{
             width: 72,
@@ -192,55 +200,18 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
         />
       </Field>
 
-      <Field
-        label="최대 출타율"
-        hint={`부대 인원 ${basis}명 기준 하루 최대 ${example}명까지 출타할 수 있어요`}
-      >
-        <div style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}>
-          {RATIO_PRESETS.map((p) => (
-            <button
-              key={`${p.n}/${p.d}`}
-              type="button"
-              className={`btn btn-sm ${num === p.n && den === p.d ? "btn-primary" : "btn-secondary"}`}
-              aria-pressed={num === p.n && den === p.d}
-              onClick={() => {
-                setNum(p.n);
-                setDen(p.d);
-              }}
-            >
-              {p.n}/{p.d}
-            </button>
-          ))}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginLeft: "auto",
-            }}
-          >
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={num}
-              onChange={(e) => setNum(Number(e.target.value))}
-              style={{ width: 64, textAlign: "center" }}
-              aria-label="출타율 분자"
-            />
-            <span className="strong">/</span>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={den}
-              onChange={(e) => setDen(Number(e.target.value))}
-              style={{ width: 64, textAlign: "center" }}
-              aria-label="출타율 분모"
-            />
-          </div>
-        </div>
-      </Field>
+      <LeaveLimitFields
+        mode={limitMode}
+        onModeChange={setLimitMode}
+        numerator={num}
+        denominator={den}
+        onNumeratorChange={setNum}
+        onDenominatorChange={setDen}
+        count={maxCount}
+        onCountChange={setMaxCount}
+        basis={basis}
+        basisLabel={`부대 인원 ${basis}명`}
+      />
 
       <Field
         label="부대 인원 (선택)"
@@ -264,7 +235,10 @@ function EditUnitSection(props: { unit: NonNullable<Me["unit"]> }) {
         </p>
       )}
       {saved && (
-        <p className="caption" style={{ color: "var(--positive-deep)", fontWeight: 600 }}>
+        <p
+          className="caption"
+          style={{ color: "var(--positive-deep)", fontWeight: 600 }}
+        >
           저장했어요.
         </p>
       )}
@@ -294,7 +268,9 @@ function JoinRequestsSection(props: { unitId: string }) {
       className="card"
       style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-sm)" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: "var(--sp-sm)" }}
+      >
         <h2 className="display-xs">가입 신청</h2>
         {list.length > 0 && (
           <span className="badge badge-negative">{list.length}</span>
@@ -302,11 +278,20 @@ function JoinRequestsSection(props: { unitId: string }) {
       </div>
 
       {requests.isPending ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-xl)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "var(--sp-xl)",
+          }}
+        >
           <div className="spinner" aria-label="불러오는 중" />
         </div>
       ) : list.length === 0 ? (
-        <div className="card-sage" style={{ textAlign: "center", padding: "var(--sp-xl)" }}>
+        <div
+          className="card-sage"
+          style={{ textAlign: "center", padding: "var(--sp-xl)" }}
+        >
           <p className="body-sm text-body">대기 중인 가입 신청이 없어요.</p>
         </div>
       ) : (
@@ -363,10 +348,7 @@ function JoinRequestsSection(props: { unitId: string }) {
 }
 
 /** 부대원 목록: 관리자 위임·내보내기. */
-function MembersSection(props: {
-  me: Me;
-  unit: NonNullable<Me["unit"]>;
-}) {
+function MembersSection(props: { me: Me; unit: NonNullable<Me["unit"]> }) {
   const { me, unit } = props;
   const members = useUnitMembers(unit.id);
   const transfer = useTransferAdmin(unit.id);
@@ -393,13 +375,21 @@ function MembersSection(props: {
       className="card"
       style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-sm)" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: "var(--sp-sm)" }}
+      >
         <h2 className="display-xs">부대원</h2>
         <span className="caption text-mute">{list.length}명</span>
       </div>
 
       {members.isPending ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-xl)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "var(--sp-xl)",
+          }}
+        >
           <div className="spinner" aria-label="불러오는 중" />
         </div>
       ) : (
@@ -429,9 +419,7 @@ function MembersSection(props: {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p className="body-sm strong">
                     {m.rankLabel} {m.name}
-                    {isSelf && (
-                      <span className="caption text-mute"> (나)</span>
-                    )}
+                    {isSelf && <span className="caption text-mute"> (나)</span>}
                   </p>
                   <p className="caption text-mute">{m.branchLabel}</p>
                 </div>

@@ -20,6 +20,12 @@ describe("maxAllowedOut", () => {
   it("guards against a zero denominator", () => {
     expect(maxAllowedOut(10, { numerator: 1, denominator: 0 })).toBe(0);
   });
+
+  it("prefers a manually configured count, including zero", () => {
+    expect(maxAllowedOut(30, ratio13, 4)).toBe(4);
+    expect(maxAllowedOut(30, ratio13, 0)).toBe(0);
+    expect(maxAllowedOut(30, ratio13, null)).toBe(10);
+  });
 });
 
 describe("computeDayStats", () => {
@@ -69,6 +75,19 @@ describe("computeDayStats", () => {
     });
     expect(stats.every((s) => s.count === 1)).toBe(true);
   });
+
+  it("uses the manually configured count for overage", () => {
+    const stats = computeDayStats({
+      leaves,
+      memberCount: 30,
+      ratio: ratio13,
+      maxCount: 1,
+      rangeStart: "2026-08-01",
+      rangeEnd: "2026-08-02",
+    });
+    expect(stats[0]).toMatchObject({ count: 1, allowed: 1, exceeded: false });
+    expect(stats[1]).toMatchObject({ count: 2, allowed: 1, exceeded: true });
+  });
 });
 
 describe("findExceededDates", () => {
@@ -77,7 +96,11 @@ describe("findExceededDates", () => {
       { userId: "a", startDate: "2026-08-01", endDate: "2026-08-03" },
       { userId: "b", startDate: "2026-08-03", endDate: "2026-08-05" },
     ];
-    const newLeave = { userId: "c", startDate: "2026-08-02", endDate: "2026-08-04" };
+    const newLeave = {
+      userId: "c",
+      startDate: "2026-08-02",
+      endDate: "2026-08-04",
+    };
     const dates = findExceededDates({
       leaves: [...existing, newLeave],
       newLeave,
@@ -88,7 +111,11 @@ describe("findExceededDates", () => {
   });
 
   it("returns empty when nothing exceeds", () => {
-    const newLeave = { userId: "a", startDate: "2026-08-01", endDate: "2026-08-02" };
+    const newLeave = {
+      userId: "a",
+      startDate: "2026-08-01",
+      endDate: "2026-08-02",
+    };
     expect(
       findExceededDates({
         leaves: [newLeave],
@@ -107,7 +134,10 @@ describe("usersOnLeaveDuring", () => {
       { userId: "b", startDate: "2026-08-05", endDate: "2026-08-06" },
       { userId: "c", startDate: "2026-08-03", endDate: "2026-08-03" },
     ];
-    expect(usersOnLeaveDuring(leaves, ["2026-08-03"]).sort()).toEqual(["a", "c"]);
+    expect(usersOnLeaveDuring(leaves, ["2026-08-03"]).sort()).toEqual([
+      "a",
+      "c",
+    ]);
     expect(usersOnLeaveDuring(leaves, ["2026-08-04"])).toEqual([]);
   });
 });

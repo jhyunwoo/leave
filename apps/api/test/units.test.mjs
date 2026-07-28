@@ -300,6 +300,36 @@ test("부대 정보 수정은 관리자만 (headcount로 출타율 계산)", asy
   });
   assert.equal(cal.status, 200);
   assert.equal(cal.data.days[0].allowed, 10);
+
+  // 직접 인원을 지정하면 비율보다 우선한다.
+  const direct = await req("PATCH", `/units/${unitId}`, {
+    token: owner.token,
+    body: { maxLeaveCount: 2 },
+  });
+  assert.equal(direct.status, 200);
+  assert.equal(direct.data.unit.maxLeaveCount, 2);
+
+  const directCal = await req(
+    "GET",
+    `/units/${unitId}/calendar?month=2026-08`,
+    { token: owner.token },
+  );
+  assert.equal(directCal.status, 200);
+  assert.equal(directCal.data.days[0].allowed, 2);
+
+  // null로 해제하면 보존된 비율 설정으로 돌아간다.
+  const ratioAgain = await req("PATCH", `/units/${unitId}`, {
+    token: owner.token,
+    body: { maxLeaveCount: null },
+  });
+  assert.equal(ratioAgain.status, 200);
+  assert.equal(ratioAgain.data.unit.maxLeaveCount, null);
+
+  const ratioCal = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
+    token: owner.token,
+  });
+  assert.equal(ratioCal.status, 200);
+  assert.equal(ratioCal.data.days[0].allowed, 10);
 });
 
 test("관리자 이관 후 새 관리자만 수정 가능", async () => {

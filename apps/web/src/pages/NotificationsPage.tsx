@@ -32,8 +32,11 @@ export function NotificationsPage() {
       >
         <div>
           <h1 className="display-md">알림</h1>
-          <p className="body-lg text-body" style={{ marginTop: "var(--sp-sm)" }}>
-            출타율 초과 소식을 여기서 확인해요.
+          <p
+            className="body-lg text-body"
+            style={{ marginTop: "var(--sp-sm)" }}
+          >
+            최대 출타 인원 초과 소식을 여기서 확인해요.
           </p>
         </div>
         {list.data && list.data.unreadCount > 0 && (
@@ -49,13 +52,25 @@ export function NotificationsPage() {
       </header>
 
       {list.isPending ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-3xl)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "var(--sp-3xl)",
+          }}
+        >
           <div className="spinner" aria-label="불러오는 중" />
         </div>
       ) : !list.data || list.data.notifications.length === 0 ? (
-        <div className="card-sage" style={{ textAlign: "center", padding: "var(--sp-3xl)" }}>
+        <div
+          className="card-sage"
+          style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
+        >
           <p className="body-lg strong">아직 알림이 없어요</p>
-          <p className="body-sm text-body" style={{ marginTop: "var(--sp-sm)" }}>
+          <p
+            className="body-sm text-body"
+            style={{ marginTop: "var(--sp-sm)" }}
+          >
             내 휴가 기간에 출타율이 초과되면 알려드릴게요.
           </p>
         </div>
@@ -112,7 +127,10 @@ export function NotificationsPage() {
                     ))}
                   </div>
                 )}
-                <p className="caption text-mute" style={{ marginTop: "var(--sp-sm)" }}>
+                <p
+                  className="caption text-mute"
+                  style={{ marginTop: "var(--sp-sm)" }}
+                >
                   {fmtTime(n.createdAt)}
                 </p>
               </div>

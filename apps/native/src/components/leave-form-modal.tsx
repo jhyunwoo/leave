@@ -117,8 +117,8 @@ export function LeaveFormModal(props: {
       if (result.exceededDates.length > 0) {
         const list = result.exceededDates.map(fmtDateShort).join(", ");
         Alert.alert(
-          "출타율 초과",
-          `등록은 완료됐지만 ${list}에 부대 출타율이 초과돼요. 해당 날짜의 부대원들에게 알림을 보냈어요.`,
+          "최대 출타 인원 초과",
+          `등록은 완료됐지만 ${list}에 최대 출타 인원을 초과해요. 해당 날짜의 부대원들에게 알림을 보냈어요.`,
         );
       }
     } catch (caught) {

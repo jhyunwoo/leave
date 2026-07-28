@@ -53,6 +53,8 @@ export const unitSchema = z
     description: z.string().nullable(),
     maxLeaveNumerator: z.number(),
     maxLeaveDenominator: z.number(),
+    // 직접 지정한 하루 최대 출타 인원. null이면 출타율로 계산.
+    maxLeaveCount: z.number().nullable(),
     // 앱 가입자 수.
     memberCount: z.number(),
     // 부대 관리자 사용자 id.

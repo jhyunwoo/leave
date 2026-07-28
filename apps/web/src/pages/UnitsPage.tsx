@@ -10,13 +10,11 @@ import {
   useUnitSearch,
 } from "../api/queries";
 import { Field } from "../components/Field";
+import {
+  LeaveLimitFields,
+  type LeaveLimitMode,
+} from "../components/LeaveLimitFields";
 import { Modal } from "../components/Modal";
-
-const RATIO_PRESETS = [
-  { n: 1, d: 3 },
-  { n: 1, d: 4 },
-  { n: 1, d: 5 },
-] as const;
 
 export function UnitsPage(props: { me: Me }) {
   const myUnit = props.me.unit;
@@ -104,11 +102,15 @@ export function UnitsPage(props: { me: Me }) {
               {myUnit.name}
             </p>
             <p className="caption text-body" style={{ marginTop: 4 }}>
-              부대원 {myUnit.memberCount}명 · 최대 출타율{" "}
-              {myUnit.maxLeaveNumerator}/{myUnit.maxLeaveDenominator}
+              부대원 {myUnit.memberCount}명 · 최대 출타{" "}
+              {myUnit.maxLeaveCount != null
+                ? `${myUnit.maxLeaveCount}명`
+                : `${myUnit.maxLeaveNumerator}/${myUnit.maxLeaveDenominator}`}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}>
+          <div
+            style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}
+          >
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -177,7 +179,14 @@ export function UnitsPage(props: { me: Me }) {
         </p>
       )}
 
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}>
+      <div
+        className="card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-lg)",
+        }}
+      >
         <input
           className="input"
           value={query}
@@ -187,7 +196,13 @@ export function UnitsPage(props: { me: Me }) {
         />
 
         {search.isPending ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-xl)" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              padding: "var(--sp-xl)",
+            }}
+          >
             <div className="spinner" aria-label="검색 중" />
           </div>
         ) : search.isError ? (
@@ -244,8 +259,10 @@ export function UnitsPage(props: { me: Me }) {
                 <div style={{ minWidth: 0 }}>
                   <p className="body-sm strong">{u.name}</p>
                   <p className="caption text-mute">
-                    부대원 {u.memberCount}명 · 최대 출타율 {u.maxLeaveNumerator}/
-                    {u.maxLeaveDenominator}
+                    부대원 {u.memberCount}명 · 최대 출타{" "}
+                    {u.maxLeaveCount != null
+                      ? `${u.maxLeaveCount}명`
+                      : `${u.maxLeaveNumerator}/${u.maxLeaveDenominator}`}
                     {u.description ? ` · ${u.description}` : ""}
                   </p>
                 </div>
@@ -258,7 +275,11 @@ export function UnitsPage(props: { me: Me }) {
                     type="button"
                     className="btn btn-tertiary btn-sm"
                     disabled={join.isPending || myUnit != null}
-                    title={myUnit != null ? "옮기려면 먼저 부대를 나가세요" : undefined}
+                    title={
+                      myUnit != null
+                        ? "옮기려면 먼저 부대를 나가세요"
+                        : undefined
+                    }
                     onClick={() => void doJoin(u.id)}
                   >
                     가입 신청
@@ -312,6 +333,8 @@ function CreateUnitModal(props: {
   const [description, setDescription] = useState("");
   const [num, setNum] = useState(1);
   const [den, setDen] = useState(3);
+  const [limitMode, setLimitMode] = useState<LeaveLimitMode>("ratio");
+  const [maxCount, setMaxCount] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
 
@@ -321,6 +344,12 @@ function CreateUnitModal(props: {
       ...(description.trim() ? { description: description.trim() } : {}),
       maxLeaveNumerator: num,
       maxLeaveDenominator: den,
+      maxLeaveCount:
+        limitMode === "count"
+          ? maxCount.trim() === ""
+            ? Number.NaN
+            : Number(maxCount)
+          : null,
     };
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -335,8 +364,6 @@ function CreateUnitModal(props: {
     }
   };
 
-  const example = Math.floor((30 * num) / den);
-
   return (
     <Modal title="새 부대 만들기" onClose={props.onClose}>
       <form
@@ -344,7 +371,11 @@ function CreateUnitModal(props: {
           e.preventDefault();
           void submit();
         }}
-        style={{ display: "flex", flexDirection: "column", gap: "var(--sp-lg)" }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-lg)",
+        }}
       >
         <Field label="부대 이름">
           <input
@@ -363,61 +394,28 @@ function CreateUnitModal(props: {
             placeholder="부대를 알아볼 수 있는 한 줄"
           />
         </Field>
-        <Field
-          label="최대 출타율"
-          hint={`예: 부대원 30명이면 하루 최대 ${example}명까지 출타할 수 있어요`}
-        >
-          <div style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}>
-            {RATIO_PRESETS.map((p) => (
-              <button
-                key={`${p.n}/${p.d}`}
-                type="button"
-                className={`btn btn-sm ${num === p.n && den === p.d ? "btn-primary" : "btn-secondary"}`}
-                aria-pressed={num === p.n && den === p.d}
-                onClick={() => {
-                  setNum(p.n);
-                  setDen(p.d);
-                }}
-              >
-                {p.n}/{p.d}
-              </button>
-            ))}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginLeft: "auto",
-              }}
-            >
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={num}
-                onChange={(e) => setNum(Number(e.target.value))}
-                style={{ width: 64, textAlign: "center" }}
-                aria-label="출타율 분자"
-              />
-              <span className="strong">/</span>
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={den}
-                onChange={(e) => setDen(Number(e.target.value))}
-                style={{ width: 64, textAlign: "center" }}
-                aria-label="출타율 분모"
-              />
-            </div>
-          </div>
-        </Field>
+        <LeaveLimitFields
+          mode={limitMode}
+          onModeChange={setLimitMode}
+          numerator={num}
+          denominator={den}
+          onNumeratorChange={setNum}
+          onDenominatorChange={setDen}
+          count={maxCount}
+          onCountChange={setMaxCount}
+          basis={30}
+          basisLabel="부대원 30명"
+        />
         {error && (
           <p className="field-error" role="alert">
             {error}
           </p>
         )}
-        <button type="submit" className="btn btn-primary" disabled={create.isPending}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={create.isPending}
+        >
           {create.isPending ? "만드는 중…" : "부대 만들고 가입하기"}
         </button>
       </form>

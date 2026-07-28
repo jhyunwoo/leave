@@ -58,7 +58,7 @@ app.doc("/openapi.json", {
     title: "Leave API",
     version: "1.0.0",
     description:
-      "군 휴가 계획/공유 서비스 API. 부대별 휴가 등록과 일별 출타율 초과 확인을 제공합니다.",
+      "군 휴가 계획/공유 서비스 API. 부대별 휴가 등록과 일별 최대 출타 인원 초과 확인을 제공합니다.",
   },
 });
 

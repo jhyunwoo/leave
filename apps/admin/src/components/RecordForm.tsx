@@ -103,6 +103,9 @@ export function RecordForm({
           description: nullable(form, "description"),
           maxLeaveNumerator: Number(value(form, "maxLeaveNumerator")),
           maxLeaveDenominator: Number(value(form, "maxLeaveDenominator")),
+          maxLeaveCount: value(form, "maxLeaveCount")
+            ? Number(value(form, "maxLeaveCount"))
+            : null,
           ...(mode === "create" ? { creatorId: value(form, "creatorId") } : {}),
           adminId: value(form, "adminId"),
           headcount: value(form, "headcount")
@@ -253,6 +256,13 @@ export function RecordForm({
             required
             initial={initial}
           />
+          <Field
+            label="직접 지정 최대 인원 (선택)"
+            name="maxLeaveCount"
+            type="number"
+            min={0}
+            initial={initial}
+          />
           {mode === "create" ? (
             <Field
               label="생성자 사용자 ID"
@@ -322,7 +332,7 @@ export function RecordForm({
               checked={sendChecked}
               onChange={(event) => setSendChecked(event.target.checked)}
             />
-            <span>변경 후 출타율 초과 알림을 발송합니다</span>
+            <span>변경 후 최대 출타 인원 초과 알림을 발송합니다</span>
           </label>
         </>
       ) : null}

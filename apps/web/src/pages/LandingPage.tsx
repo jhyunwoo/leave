@@ -84,7 +84,7 @@ function HeroCalendar() {
 
 const VALUES = [
   {
-    title: "출타율로 인원 관리",
+    title: "비율 또는 인원으로 관리",
     body: "부대 인원과 비율(예: 1/3)만 정하면, 하루에 몇 명까지 나갈 수 있는지 자동으로 계산해요.",
     icon: (
       <svg
@@ -285,7 +285,7 @@ export function LandingPage() {
           <div className="lp-band lp-reveal">
             <div className="lp-band-grid">
               <div>
-                <p className="lp-band-eyebrow">실시간 출타율 알림</p>
+                <p className="lp-band-eyebrow">실시간 출타 초과 알림</p>
                 <h2>
                   출타율이 넘는 순간,
                   <br />그 날 휴가인 모두가 알아요.
@@ -300,14 +300,14 @@ export function LandingPage() {
                 <div className="lp-notif-row">
                   <span className="lp-notif-ic">!</span>
                   <div>
-                    <div className="lp-notif-t">출타율 초과 안내</div>
+                    <div className="lp-notif-t">최대 출타 인원 초과 안내</div>
                     <div className="lp-notif-meta lp-num">리브 · 7월 24일</div>
                   </div>
                 </div>
                 <p className="lp-notif-b">
                   <span className="lp-num">7월 24일</span> 출타 인원이{" "}
-                  <span className="lp-over-word lp-num">3/3명</span>으로
-                  출타율을 넘었어요. 휴가가 겹친 부대원끼리 일정을 조율해
+                  <span className="lp-over-word lp-num">3/3명</span>으로 최대
+                  출타 인원을 넘었어요. 휴가가 겹친 부대원끼리 일정을 조율해
                   주세요.
                 </p>
               </div>

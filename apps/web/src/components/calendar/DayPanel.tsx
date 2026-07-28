@@ -45,12 +45,17 @@ export function DayPanel(props: {
             flexWrap: "wrap",
           }}
         >
-          <span className={`badge ${exceeded ? "badge-negative" : "badge-positive"}`}>
+          <span
+            className={`badge ${exceeded ? "badge-negative" : "badge-positive"}`}
+          >
             출타 {stat.count}명 / 허용 {stat.allowed}명
           </span>
           {exceeded && (
-            <span className="caption" style={{ color: "var(--negative-deep)", fontWeight: 600 }}>
-              출타율 초과
+            <span
+              className="caption"
+              style={{ color: "var(--negative-deep)", fontWeight: 600 }}
+            >
+              최대 출타 인원 초과
             </span>
           )}
         </div>
@@ -86,7 +91,11 @@ export function DayPanel(props: {
                 alignItems: "center",
               }}
             >
-              <Avatar name={l.userName} imageKey={l.userProfileImageKey} size={40} />
+              <Avatar
+                name={l.userName}
+                imageKey={l.userProfileImageKey}
+                size={40}
+              />
               <div style={{ minWidth: 0 }}>
                 <p className="body-sm strong">
                   {l.userRankLabel} {l.userName}
@@ -105,7 +114,11 @@ export function DayPanel(props: {
         </ul>
       )}
 
-      <button type="button" className="btn btn-primary" onClick={props.onAddLeave}>
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={props.onAddLeave}
+      >
         이 날부터 휴가 등록
       </button>
     </div>

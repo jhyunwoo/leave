@@ -107,4 +107,18 @@ describe("unitCreateSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("직접 지정 최대 출타 인원은 0명 이상이어야 한다", () => {
+    const base = {
+      name: "테스트대대",
+      maxLeaveNumerator: 1,
+      maxLeaveDenominator: 3,
+    };
+    expect(
+      unitCreateSchema.safeParse({ ...base, maxLeaveCount: 0 }).success,
+    ).toBe(true);
+    expect(
+      unitCreateSchema.safeParse({ ...base, maxLeaveCount: -1 }).success,
+    ).toBe(false);
+  });
 });

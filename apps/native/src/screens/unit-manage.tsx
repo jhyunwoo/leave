@@ -29,13 +29,11 @@ import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { Field, Input } from "@/components/field";
+import {
+  LeaveLimitFields,
+  type LeaveLimitMode,
+} from "@/components/leave-limit-fields";
 import { colors, radius, spacing } from "@/theme";
-
-const RATIO_PRESETS = [
-  { n: 1, d: 3 },
-  { n: 1, d: 4 },
-  { n: 1, d: 5 },
-] as const;
 
 type Unit = NonNullable<Me["unit"]>;
 
@@ -90,6 +88,10 @@ function EditUnitSection(props: { unit: Unit }) {
   const [description, setDescription] = useState(unit.description ?? "");
   const [num, setNum] = useState(unit.maxLeaveNumerator);
   const [den, setDen] = useState(unit.maxLeaveDenominator);
+  const [limitMode, setLimitMode] = useState<LeaveLimitMode>(
+    unit.maxLeaveCount != null ? "count" : "ratio",
+  );
+  const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount ?? 1));
   const [headcount, setHeadcount] = useState(
     unit.headcount != null ? String(unit.headcount) : "",
   );
@@ -127,6 +129,12 @@ function EditUnitSection(props: { unit: Unit }) {
       description: description.trim() ? description.trim() : null,
       maxLeaveNumerator: num,
       maxLeaveDenominator: den,
+      maxLeaveCount:
+        limitMode === "count"
+          ? maxCount.trim() === ""
+            ? Number.NaN
+            : Number(maxCount)
+          : null,
       headcount: hc === "" ? null : Number(hc),
     } satisfies UnitUpdateInput;
     const parsed = unitUpdateSchema.safeParse(input);
@@ -143,8 +151,6 @@ function EditUnitSection(props: { unit: Unit }) {
   };
 
   const basis = headcount.trim() ? Number(headcount) : unit.memberCount;
-  const example = den > 0 ? Math.floor((basis * num) / den) : 0;
-
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>부대 정보</Text>
@@ -181,62 +187,18 @@ function EditUnitSection(props: { unit: Unit }) {
         />
       </Field>
 
-      <Field
-        label="최대 출타율"
-        hint={`부대 인원 ${basis}명 기준 하루 최대 ${example}명까지 출타할 수 있어요`}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            gap: spacing.sm,
-            alignItems: "center",
-          }}
-        >
-          {RATIO_PRESETS.map((p) => {
-            const active = num === p.n && den === p.d;
-            return (
-              <Pressable
-                key={`${p.n}/${p.d}`}
-                accessibilityRole="button"
-                onPress={() => {
-                  setNum(p.n);
-                  setDen(p.d);
-                }}
-                style={[
-                  styles.ratioBtn,
-                  active && { backgroundColor: colors.primary },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.ratioText,
-                    active && { color: colors.onPrimary },
-                  ]}
-                >
-                  {p.n}/{p.d}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <View style={styles.ratioInputs}>
-            <Input
-              value={String(num)}
-              onChangeText={(v) => setNum(Number(v) || 0)}
-              keyboardType="number-pad"
-              style={styles.ratioInput}
-              accessibilityLabel="출타율 분자"
-            />
-            <Text style={{ fontWeight: "600" }}>/</Text>
-            <Input
-              value={String(den)}
-              onChangeText={(v) => setDen(Number(v) || 0)}
-              keyboardType="number-pad"
-              style={styles.ratioInput}
-              accessibilityLabel="출타율 분모"
-            />
-          </View>
-        </View>
-      </Field>
+      <LeaveLimitFields
+        mode={limitMode}
+        onModeChange={setLimitMode}
+        numerator={num}
+        denominator={den}
+        onNumeratorChange={setNum}
+        onDenominatorChange={setDen}
+        count={maxCount}
+        onCountChange={setMaxCount}
+        basis={basis}
+        basisLabel={`부대 인원 ${basis}명`}
+      />
 
       <Field
         label="부대 인원 (선택)"

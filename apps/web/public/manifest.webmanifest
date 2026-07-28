@@ -1,7 +1,7 @@
 {
   "name": "리브 — 부대 휴가 캘린더",
   "short_name": "리브",
-  "description": "부대원의 휴가와 출타율을 한눈에 관리하는 캘린더",
+  "description": "부대원의 휴가와 최대 출타 인원을 한눈에 관리하는 캘린더",
   "lang": "ko",
   "start_url": "/",
   "display": "standalone",

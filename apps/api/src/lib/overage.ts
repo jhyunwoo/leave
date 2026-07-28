@@ -77,13 +77,14 @@ export async function checkOverageAndNotify(params: {
       numerator: unit.maxLeaveNumerator,
       denominator: unit.maxLeaveDenominator,
     },
+    maxCount: unit.maxLeaveCount,
   });
   if (exceededDates.length === 0) return [];
 
   const affectedIds = usersOnLeaveDuring(spans, exceededDates);
   if (affectedIds.length > 0) {
     const now = new Date().toISOString();
-    const title = "출타율 초과 알림";
+    const title = "최대 출타 인원 초과 알림";
     const body = `${unit.name}에서 ${formatDateList(exceededDates)}에 최대 출타 인원을 초과했습니다. 휴가 일정을 확인해주세요.`;
 
     // 사용자별 인앱 알림 id를 미리 만들어 두면 푸시 발송 로그와 연결할 수 있다.

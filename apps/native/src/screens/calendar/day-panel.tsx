@@ -31,7 +31,9 @@ export function DayPanel(props: {
             text={`출타 ${stat.count}명 / 허용 ${stat.allowed}명`}
             kind={exceeded ? "negative" : "positive"}
           />
-          {exceeded && <Text style={styles.exceededText}>출타율 초과</Text>}
+          {exceeded && (
+            <Text style={styles.exceededText}>최대 출타 인원 초과</Text>
+          )}
         </View>
       )}
 

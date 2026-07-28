@@ -55,6 +55,8 @@ export const units = sqliteTable("units", {
   description: text("description"),
   maxLeaveNumerator: integer("max_leave_numerator").notNull(),
   maxLeaveDenominator: integer("max_leave_denominator").notNull(),
+  // 직접 지정한 하루 최대 출타 인원. null이면 기존 비율을 사용한다.
+  maxLeaveCount: integer("max_leave_count"),
   creatorId: text("creator_id").notNull(),
   // 부대 관리자. 생성 시 생성자로 초기화되며 이관으로 바뀔 수 있다.
   adminId: text("admin_id").notNull(),
