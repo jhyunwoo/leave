@@ -12,9 +12,10 @@ export {
 } from "./lib/crypto";
 export { checkOverageAndNotify } from "./lib/overage";
 export {
-  allocationsForLeaves,
-  assertAllocationsAvailable,
-  insertLeaveAllocations,
+  assertSegmentsAvailable,
+  insertLeaveSegments,
+  segmentRowsFor,
+  segmentsForLeaves,
 } from "./lib/leave-balances";
 export { sendExpoPush } from "./lib/push";
 export type { PushMessage, PushSendResult } from "./lib/push";

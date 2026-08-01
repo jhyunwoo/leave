@@ -1,11 +1,12 @@
 import {
-  allocationsForLeaves,
-  assertAllocationsAvailable,
+  assertSegmentsAvailable,
   bumpUnitVersion,
   checkOverageAndNotify,
-  insertLeaveAllocations,
-  leaveAllocations,
+  insertLeaveSegments,
   leaves,
+  leaveSegments,
+  segmentRowsFor,
+  segmentsForLeaves,
   notifications,
   pushLogs,
   sendExpoPush,
@@ -14,9 +15,14 @@ import {
   users,
 } from "@leave/api/server";
 import {
+  addDays,
   inclusiveDays,
   isoDateSchema,
-  leaveAllocationSchema,
+  leaveSegmentSchema,
+  segmentsRange,
+  segmentsToAllocations,
+  sortSegments,
+  type LeaveSegment,
 } from "@leave/shared";
 import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -30,30 +36,44 @@ const leaveSchema = z
   .object({
     userId: z.string().min(1),
     title: z.string().trim().min(1).max(80),
-    startDate: isoDateSchema,
-    endDate: isoDateSchema,
     reason: z.string().trim().max(500).nullable().optional(),
-    allocations: z.array(leaveAllocationSchema).min(1).max(10),
+    segments: z.array(leaveSegmentSchema).min(1).max(30),
     sendNotifications: z.boolean().optional().default(false),
   })
   .superRefine((value, ctx) => {
-    if (value.startDate > value.endDate) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["endDate"],
-        message: "종료일은 시작일과 같거나 뒤여야 합니다",
-      });
-      return;
-    }
-    const sum = value.allocations.reduce((total, item) => total + item.days, 0);
-    if (sum !== inclusiveDays(value.startDate, value.endDate)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["allocations"],
-        message: "휴가 기간과 재원 일수 합계가 일치해야 합니다",
-      });
+    // 구간들은 겹치지 않고 빈틈없이 이어져야 한다(앱과 같은 규칙).
+    const sorted = sortSegments(value.segments);
+    for (let i = 1; i < sorted.length; i += 1) {
+      const previous = sorted[i - 1]!;
+      const current = sorted[i]!;
+      if (current.startDate <= previous.endDate) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["segments"],
+          message: "휴가 구간끼리 겹칠 수 없습니다",
+        });
+        return;
+      }
+      if (current.startDate !== addDays(previous.endDate, 1)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["segments"],
+          message: "휴가 구간 사이에 빈 날이 있을 수 없습니다",
+        });
+        return;
+      }
     }
   });
+
+/** 입력 구간에 일수를 채워 정렬한다. 일수는 항상 날짜에서 파생한다. */
+function toSegments(
+  input: z.infer<typeof leaveSchema>["segments"],
+): LeaveSegment[] {
+  return sortSegments(input).map((segment) => ({
+    ...segment,
+    days: inclusiveDays(segment.startDate, segment.endDate),
+  }));
+}
 
 const notificationCreateSchema = z.object({
   userId: z.string().min(1),
@@ -143,15 +163,19 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         .get()
         .then((row) => row?.count ?? 0),
     ]);
-    const allocationMap = await allocationsForLeaves(
+    const segmentMap = await segmentsForLeaves(
       db,
       items.map((item) => item.id),
     );
     return c.json({
-      items: items.map((item) => ({
-        ...item,
-        allocations: allocationMap.get(item.id) ?? [],
-      })),
+      items: items.map((item) => {
+        const segments = segmentMap.get(item.id) ?? [];
+        return {
+          ...item,
+          segments,
+          allocations: segmentsToAllocations(segments),
+        };
+      }),
       meta: listMeta(page, pageSize, total),
     });
   })
@@ -166,8 +190,10 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
     const db = drizzle(c.env.DB);
     const user = await getUser(db, input.data.userId);
     if (!user) return c.json({ error: "사용자를 찾을 수 없습니다" }, 400);
+    const segments = toSegments(input.data.segments);
+    const range = segmentsRange(segments)!;
     try {
-      await assertAllocationsAvailable(db, user, input.data.allocations);
+      await assertSegmentsAvailable(db, user, segments);
     } catch (error) {
       return c.json(
         {
@@ -180,13 +206,13 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       id: crypto.randomUUID(),
       userId: user.id,
       title: input.data.title,
-      startDate: input.data.startDate,
-      endDate: input.data.endDate,
+      startDate: range.startDate,
+      endDate: range.endDate,
       reason: input.data.reason ?? null,
       createdAt: nowIso(),
     };
     await db.insert(leaves).values(leave);
-    await insertLeaveAllocations(db, leave.id, input.data.allocations);
+    await insertLeaveSegments(db, leave.id, segments);
     if (user.unitId) {
       await bumpUnitVersion(c.env.CACHE, user.unitId);
       if (input.data.sendNotifications) {
@@ -208,7 +234,13 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       after: { ...leave, sendNotifications: input.data.sendNotifications },
     });
     return c.json(
-      { item: { ...leave, allocations: input.data.allocations } },
+      {
+        item: {
+          ...leave,
+          segments,
+          allocations: segmentsToAllocations(segments),
+        },
+      },
       201,
     );
   })
@@ -233,11 +265,13 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       getUser(db, input.data.userId),
     ]);
     if (!newUser) return c.json({ error: "사용자를 찾을 수 없습니다" }, 400);
+    const segments = toSegments(input.data.segments);
+    const range = segmentsRange(segments)!;
     try {
-      await assertAllocationsAvailable(
+      await assertSegmentsAvailable(
         db,
         newUser,
-        input.data.allocations,
+        segments,
         newUser.id === before.userId ? id : undefined,
       );
     } catch (error) {
@@ -251,22 +285,14 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
     const patch = {
       userId: newUser.id,
       title: input.data.title,
-      startDate: input.data.startDate,
-      endDate: input.data.endDate,
+      startDate: range.startDate,
+      endDate: range.endDate,
       reason: input.data.reason ?? null,
     };
     await db.batch([
       db.update(leaves).set(patch).where(eq(leaves.id, id)),
-      db.delete(leaveAllocations).where(eq(leaveAllocations.leaveId, id)),
-      db.insert(leaveAllocations).values(
-        input.data.allocations.map((allocation) => ({
-          id: crypto.randomUUID(),
-          leaveId: id,
-          category: allocation.category,
-          days: allocation.days,
-          overnightKind: allocation.overnightKind ?? null,
-        })),
-      ),
+      db.delete(leaveSegments).where(eq(leaveSegments.leaveId, id)),
+      db.insert(leaveSegments).values(segmentRowsFor(id, segments)),
     ]);
     if (oldUser?.unitId) await bumpUnitVersion(c.env.CACHE, oldUser.unitId);
     if (newUser.unitId) {
@@ -283,7 +309,12 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         );
       }
     }
-    const after = { ...before, ...patch, allocations: input.data.allocations };
+    const after = {
+      ...before,
+      ...patch,
+      segments,
+      allocations: segmentsToAllocations(segments),
+    };
     await writeAudit(c, {
       action: "update",
       entityType: "leave",

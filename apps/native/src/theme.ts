@@ -25,6 +25,8 @@ export const colors = {
   negativeDeep: "#a72027",
   negativeBg: "#320707",
   negativeTint: "#fff0f0",
+  /** 달력에서 현재 정기외박 주기 범위를 아주 옅게 깔아주는 배경. */
+  cycleTint: "#f5f8fb",
 } as const;
 
 export const radius = {
@@ -51,6 +53,33 @@ export const type = {
   titleWeight: "600" as const,
   bodyWeight: "400" as const,
   displayTracking: -1.1,
+  /** 탭 화면 제목. 네 탭이 ScreenHeader를 통해 공유한다. */
+  screenTitle: {
+    fontSize: 32,
+    fontWeight: "900" as const,
+    letterSpacing: -0.7,
+  },
+  screenSubtitle: {
+    fontSize: 14,
+    fontWeight: "400" as const,
+  },
+} as const;
+
+/**
+ * 휴가 재원별 색. 달력에서 내 휴가가 어떤 재원인지 한눈에 구분하는 용도라
+ * 서로 충분히 다른 색조를 쓴다. bg는 칩 배경, fg는 그 위의 글자색.
+ */
+export const BALANCE_COLORS = {
+  annual: { fg: "#1f5e10", bg: "#d8f3c4" },
+  award: { fg: "#8a4b00", bg: "#ffe8c7" },
+  compensation: { fg: "#4c2c9c", bg: "#e6ddff" },
+  consolation: { fg: "#9c1d55", bg: "#ffdcea" },
+  petition: { fg: "#0b5c55", bg: "#c9efeb" },
+  sick: { fg: "#a72027", bg: "#ffdcdd" },
+  regular_overnight: { fg: "#12439c", bg: "#d8e6ff" },
+  other_overnight: { fg: "#065b7a", bg: "#cdeaf6" },
+  outing: { fg: "#454745", bg: "#e4e7e2" },
+  other: { fg: "#5a5c59", bg: "#eceee9" },
 } as const;
 
 export const motion = {

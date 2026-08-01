@@ -102,24 +102,27 @@ export const leaves = sqliteTable(
   ],
 );
 
-export const leaveAllocations = sqliteTable(
-  "leave_allocations",
+/**
+ * 휴가를 이루는 구간. "8/2~8/5는 연가, 8/6~8/9는 정기외박"처럼 날짜별 재원을 담는다.
+ * 한 휴가 안에서 같은 재원이 여러 번 나올 수 있어 유일 제약을 두지 않는다.
+ * days는 날짜에서 파생되지만 잔여량 집계 쿼리를 단순하게 유지하려고 함께 저장한다.
+ */
+export const leaveSegments = sqliteTable(
+  "leave_segments",
   {
     id: text("id").primaryKey(),
     leaveId: text("leave_id")
       .notNull()
       .references(() => leaves.id, { onDelete: "cascade" }),
     category: text("category", { enum: LEAVE_CATEGORIES }).notNull(),
-    days: integer("days").notNull(),
     overnightKind: text("overnight_kind", { enum: OVERNIGHT_KINDS }),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    days: integer("days").notNull(),
   },
   (t) => [
-    index("leave_allocations_leave_idx").on(t.leaveId),
-    uniqueIndex("leave_allocations_source_unique").on(
-      t.leaveId,
-      t.category,
-      t.overnightKind,
-    ),
+    index("leave_segments_leave_idx").on(t.leaveId),
+    index("leave_segments_dates_idx").on(t.startDate, t.endDate),
   ],
 );
 
@@ -326,7 +329,7 @@ export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
-export type LeaveAllocationRow = typeof leaveAllocations.$inferSelect;
+export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;
 export type LeaveBalanceGrantRow = typeof leaveBalanceGrants.$inferSelect;
 export type RegularOvernightConfigRow =

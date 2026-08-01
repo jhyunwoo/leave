@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { colors, radius, spacing } from "@/theme";
 
-type Variant = "primary" | "secondary" | "tertiary" | "danger";
+type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
 
 export function Button(props: {
   title: string | ReactNode;
@@ -49,6 +49,7 @@ export function Button(props: {
             size === "sm" && styles.labelSm,
             variant === "primary" && { color: colors.onPrimary },
             variant === "danger" && { color: colors.negativeDeep },
+            variant === "ghost" && { color: colors.brand, fontWeight: "700" },
           ]}
         >
           {props.title}
@@ -93,6 +94,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.negative,
   },
+  /** 배경·테두리 없는 텍스트 버튼. 헤더의 보조 액션("오늘")용. */
+  ghost: { backgroundColor: "transparent", paddingHorizontal: spacing.sm },
   label: {
     fontSize: 16,
     fontWeight: "600",

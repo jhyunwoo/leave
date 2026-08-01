@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  allocationBalanceKey,
-  DEFAULT_ANNUAL_DAYS,
-  inclusiveDays,
-} from "../src";
+import { segmentBalanceKey, DEFAULT_ANNUAL_DAYS, inclusiveDays } from "../src";
 
 describe("휴가 재원", () => {
   it("군별 연가 규정값은 수정 가능한 초기 제안값으로 제공", () => {
@@ -20,13 +16,13 @@ describe("휴가 재원", () => {
 
   it("정기외박과 기타 외박 잔여량을 분리", () => {
     expect(
-      allocationBalanceKey({
+      segmentBalanceKey({
         category: "overnight",
         overnightKind: "regular",
       }),
     ).toBe("regular_overnight");
     expect(
-      allocationBalanceKey({
+      segmentBalanceKey({
         category: "overnight",
         overnightKind: "other",
       }),

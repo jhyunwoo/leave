@@ -1,17 +1,21 @@
 import {
+  cycleFor,
+  cycleUsedDays,
   effectiveMemberCount,
+  fmtRangeTiny,
   maxAllowedOut,
   todayInSeoul,
 } from "@leave/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router";
 import type { Me } from "../api/queries";
-import { useCalendar } from "../api/queries";
+import { useCalendar, useLeaveBalances, useMyLeaves } from "../api/queries";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
 import { LeaveFormModal } from "../components/LeaveFormModal";
 import { fmtDateShort } from "../lib/format";
+import { buildMyLeaveDayMap } from "../lib/my-leave-days";
 
 export function CalendarPage(props: { me: Me }) {
   const unit = props.me.unit;
@@ -20,6 +24,31 @@ export function CalendarPage(props: { me: Me }) {
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<CalendarScrollHandle>(null);
+  const myLeaves = useMyLeaves();
+  const balances = useLeaveBalances();
+
+  const myLeaveDays = useMemo(
+    () => buildMyLeaveDayMap(myLeaves.data?.leaves),
+    [myLeaves.data],
+  );
+
+  // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
+  const regularOvernight = balances.data?.regularOvernight ?? null;
+  const enlistedAt = props.me.user.enlistedAt;
+  const currentCycle = useMemo(
+    () => cycleFor(regularOvernight, today, enlistedAt),
+    [regularOvernight, today, enlistedAt],
+  );
+  const cycleUsage = useMemo(
+    () =>
+      currentCycle
+        ? cycleUsedDays(
+            currentCycle,
+            (myLeaves.data?.leaves ?? []).flatMap((leave) => leave.segments),
+          )
+        : 0,
+    [currentCycle, myLeaves.data],
+  );
 
   // 선택한 날짜가 속한 달의 달력(사이드 패널용). 스크롤 블록과 같은 캐시를 재사용한다.
   const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : null;
@@ -108,10 +137,22 @@ export function CalendarPage(props: { me: Me }) {
         className="cal-layout"
       >
         <div className="card" style={{ padding: "var(--sp-md)" }}>
+          {currentCycle && (
+            <p className="cal-cycle-banner">
+              정기외박 {currentCycle.index}주기{" "}
+              {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
+              {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
+              {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+            </p>
+          )}
           <CalendarScroll
             ref={scrollRef}
             unitId={unit.id}
             selectedDate={selectedDate}
+            myLeaveDays={myLeaveDays}
+            regularOvernight={regularOvernight}
+            enlistedAt={enlistedAt}
+            currentCycle={currentCycle}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
             }
@@ -146,6 +187,8 @@ export function CalendarPage(props: { me: Me }) {
           <DayPanel
             calendar={panelCalendar.data}
             date={selectedDate}
+            myUserId={props.me.user.id}
+            cycle={cycleFor(regularOvernight, selectedDate, enlistedAt)}
             onAddLeave={() => setFormOpen(true)}
           />
         )}

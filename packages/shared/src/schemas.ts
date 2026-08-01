@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { isValidISODate } from "./dates";
+import { addDays, isValidISODate } from "./dates";
 import {
-  allocationBalanceKey,
+  allocationsToSegments,
   BALANCE_KEYS,
   inclusiveDays,
   LEAVE_CATEGORIES,
   OVERNIGHT_KINDS,
+  sortSegments,
 } from "./leave";
 import { BRANCHES, RANKS } from "./rank";
 
@@ -115,41 +116,106 @@ export const unitTransferSchema = z.object({
   userId: z.string().min(1, "대상을 선택해주세요"),
 });
 
+const overnightKindRefine = (
+  value: { category: string; overnightKind?: string },
+  ctx: z.RefinementCtx,
+) => {
+  if (value.category === "overnight" && !value.overnightKind) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["overnightKind"],
+      message: "외박 종류를 선택해주세요",
+    });
+  }
+  if (value.category !== "overnight" && value.overnightKind) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["overnightKind"],
+      message: "외박에만 외박 종류를 지정할 수 있습니다",
+    });
+  }
+};
+
+/** 재원별 일수 합계. 구버전 클라이언트 요청을 받아줄 때만 쓴다. */
 export const leaveAllocationSchema = z
   .object({
     category: z.enum(LEAVE_CATEGORIES),
     days: z.int().min(1, "휴가 일수는 1일 이상이어야 합니다").max(365),
     overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
   })
+  .superRefine(overnightKindRefine);
+
+/** 휴가 한 구간: "8/2~8/5는 연가". 일수는 날짜에서 파생되므로 입력받지 않는다. */
+export const leaveSegmentSchema = z
+  .object({
+    category: z.enum(LEAVE_CATEGORIES),
+    overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+  })
   .superRefine((value, ctx) => {
-    if (value.category === "overnight" && !value.overnightKind) {
+    overnightKindRefine(value, ctx);
+    if (value.startDate > value.endDate) {
       ctx.addIssue({
         code: "custom",
-        path: ["overnightKind"],
-        message: "외박 종류를 선택해주세요",
-      });
-    }
-    if (value.category !== "overnight" && value.overnightKind) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["overnightKind"],
-        message: "외박에만 외박 종류를 지정할 수 있습니다",
+        path: ["endDate"],
+        message: "구간 종료일은 시작일과 같거나 뒤여야 합니다",
       });
     }
   });
 
+export type LeaveSegmentInput = z.infer<typeof leaveSegmentSchema>;
+
+/**
+ * 휴가 등록/수정 본문.
+ *
+ * 정식 형식은 `segments`다. `startDate`/`endDate`/`allocations`는 구간 개념이 없던
+ * 구버전 클라이언트를 위한 호환 입력이고, 받으면 BALANCE_KEYS 순서로 구간을 자동 배정한다.
+ * TODO(구간 모델 안정화 후): 호환 필드와 leaveAllocationSchema를 삭제한다.
+ */
 export const leaveCreateSchema = z
   .object({
     title: z.string().trim().min(1, "휴가 제목을 입력해주세요").max(80),
-    startDate: isoDateSchema,
-    endDate: isoDateSchema,
     reason: z.string().trim().max(500).optional(),
-    allocations: z
-      .array(leaveAllocationSchema)
-      .min(1, "휴가 재원을 하나 이상 선택해주세요")
-      .max(10),
+    segments: z.array(leaveSegmentSchema).max(30).optional(),
+    startDate: isoDateSchema.optional(),
+    endDate: isoDateSchema.optional(),
+    allocations: z.array(leaveAllocationSchema).max(10).optional(),
   })
   .superRefine((value, ctx) => {
+    if (value.segments?.length) {
+      const sorted = sortSegments(value.segments);
+      for (let i = 1; i < sorted.length; i += 1) {
+        const previous = sorted[i - 1]!;
+        const current = sorted[i]!;
+        if (current.startDate <= previous.endDate) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["segments"],
+            message: "휴가 구간끼리 겹칠 수 없습니다",
+          });
+          return;
+        }
+        if (current.startDate !== addDays(previous.endDate, 1)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["segments"],
+            message: "휴가 구간 사이에 빈 날이 있을 수 없습니다",
+          });
+          return;
+        }
+      }
+      return;
+    }
+
+    if (!value.startDate || !value.endDate || !value.allocations?.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["segments"],
+        message: "휴가 구간을 하나 이상 입력해주세요",
+      });
+      return;
+    }
     if (value.startDate > value.endDate) {
       ctx.addIssue({
         code: "custom",
@@ -157,14 +223,6 @@ export const leaveCreateSchema = z
         message: "종료일은 시작일과 같거나 뒤여야 합니다",
       });
       return;
-    }
-    const keys = value.allocations.map(allocationBalanceKey);
-    if (new Set(keys).size !== keys.length) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["allocations"],
-        message: "같은 휴가 재원은 한 번만 입력할 수 있습니다",
-      });
     }
     const allocated = value.allocations.reduce(
       (sum, item) => sum + item.days,
@@ -178,7 +236,16 @@ export const leaveCreateSchema = z
         message: `휴가 기간 ${duration}일과 재원 합계 ${allocated}일이 일치해야 합니다`,
       });
     }
-  });
+  })
+  .transform((value) => ({
+    title: value.title,
+    ...(value.reason ? { reason: value.reason } : {}),
+    segments: value.segments?.length
+      ? value.segments
+      : allocationsToSegments(value.startDate!, value.allocations!).map(
+          ({ days: _days, ...segment }) => segment as LeaveSegmentInput,
+        ),
+  }));
 
 export const leaveUpdateSchema = leaveCreateSchema;
 
@@ -226,6 +293,8 @@ export type UnitCreateInput = z.infer<typeof unitCreateSchema>;
 export type UnitUpdateInput = z.infer<typeof unitUpdateSchema>;
 export type UnitTransferInput = z.infer<typeof unitTransferSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
+/** 검증 전 폼이 들고 있는 값. 서버로 보내는 형태이기도 하다. */
+export type LeaveCreateBody = z.input<typeof leaveCreateSchema>;
 export type LeaveAllocationInput = z.infer<typeof leaveAllocationSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
 export type RegularOvernightConfigInput = z.infer<

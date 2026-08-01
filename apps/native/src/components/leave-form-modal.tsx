@@ -1,13 +1,21 @@
 import {
-  allocationBalanceKey,
-  BALANCE_KEYS,
+  addDays,
   BALANCE_LABELS,
+  draftDaysByKey,
+  draftsToSegments,
+  fitDrafts,
   fmtDateShort,
   inclusiveDays,
   leaveCreateSchema,
+  removeDraft,
+  resolveDrafts,
+  segmentBalanceKey,
+  segmentsToDrafts,
+  setDraftEnd,
+  splitLastDraft,
   type BalanceKey,
-  type LeaveAllocationInput,
-  type LeaveCreateInput,
+  type LeaveCreateBody,
+  type SegmentDraft,
 } from "@leave/shared";
 import { useMemo, useState } from "react";
 import {
@@ -29,27 +37,8 @@ import {
 import { Button } from "./button";
 import { DatePickerRow } from "./date-picker";
 import { Field, Input } from "./field";
+import { SegmentRow } from "./segment-row";
 import { colors, radius, spacing } from "@/theme";
-
-function allocationForKey(key: BalanceKey, days: number): LeaveAllocationInput {
-  if (key === "regular_overnight") {
-    return { category: "overnight", overnightKind: "regular", days };
-  }
-  if (key === "other_overnight") {
-    return { category: "overnight", overnightKind: "other", days };
-  }
-  return { category: key, days };
-}
-
-function initialAmounts(editing: MyLeave | null): Record<BalanceKey, number> {
-  const result = Object.fromEntries(
-    BALANCE_KEYS.map((key) => [key, 0]),
-  ) as Record<BalanceKey, number>;
-  for (const allocation of editing?.allocations ?? []) {
-    result[allocationBalanceKey(allocation)] = allocation.days;
-  }
-  return result;
-}
 
 export function LeaveFormModal(props: {
   visible: boolean;
@@ -67,40 +56,72 @@ export function LeaveFormModal(props: {
     editing?.endDate ?? props.initialDate ?? "",
   );
   const [reason, setReason] = useState(editing?.reason ?? "");
-  const [amounts, setAmounts] = useState(() => initialAmounts(editing));
+  const [drafts, setDrafts] = useState<SegmentDraft[]>(() =>
+    editing?.segments.length
+      ? segmentsToDrafts(editing.segments)
+      : fitDrafts(
+          [],
+          editing?.startDate ?? props.initialDate ?? "",
+          editing?.endDate ?? props.initialDate ?? "",
+        ),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const create = useCreateLeave();
   const update = useUpdateLeave();
   const pending = create.isPending || update.isPending;
-  const duration =
-    startDate && endDate && startDate <= endDate
-      ? inclusiveDays(startDate, endDate)
-      : 0;
-  const allocated = Object.values(amounts).reduce((sum, days) => sum + days, 0);
+  const validRange = Boolean(startDate && endDate && startDate <= endDate);
+  const duration = validRange ? inclusiveDays(startDate, endDate) : 0;
+  const resolved = useMemo(
+    () => (validRange ? resolveDrafts(startDate, drafts) : []),
+    [validRange, startDate, drafts],
+  );
+
+  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
+  const applyRange = (nextStart: string, nextEnd: string) => {
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    setDrafts((current) => fitDrafts(current, nextStart, nextEnd));
+  };
+
+  // 남은 잔여량: 수정 중이면 이 휴가가 이미 쓰고 있던 몫을 되돌려준다.
   const remainingByKey = useMemo(() => {
-    const result = new Map(
+    const result = new Map<BalanceKey, number>(
       (balances.data?.balances ?? []).map((item) => [
         item.key,
         item.remainingDays,
       ]),
     );
-    for (const allocation of editing?.allocations ?? []) {
-      const key = allocationBalanceKey(allocation);
-      result.set(key, (result.get(key) ?? 0) + allocation.days);
+    for (const segment of editing?.segments ?? []) {
+      const key = segmentBalanceKey(segment);
+      result.set(key, (result.get(key) ?? 0) + segment.days);
     }
     return result;
   }, [balances.data, editing]);
 
+  // 폼에서 이미 배정한 몫까지 뺀 실제 남은 일수(재원 선택 칩에 보여준다).
+  const availableByKey = useMemo(() => {
+    const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
+    const result = new Map(remainingByKey);
+    for (const [key, days] of used) {
+      result.set(key, (result.get(key) ?? 0) - days);
+    }
+    return result;
+  }, [remainingByKey, validRange, startDate, drafts]);
+
+  const overused = [...availableByKey.entries()].filter(
+    ([, remaining]) => remaining < 0,
+  );
+  const canSubmit =
+    validRange &&
+    drafts.length > 0 &&
+    !overused.length &&
+    title.trim().length > 0;
+
   const submit = async () => {
-    const allocations = BALANCE_KEYS.filter((key) => amounts[key] > 0).map(
-      (key) => allocationForKey(key, amounts[key]),
-    );
-    const input: LeaveCreateInput = {
+    const input: LeaveCreateBody = {
       title: title.trim(),
-      startDate,
-      endDate,
-      allocations,
+      segments: draftsToSegments(startDate, drafts),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
     };
     const parsed = leaveCreateSchema.safeParse(input);
@@ -168,65 +189,102 @@ export function LeaveFormModal(props: {
           <DatePickerRow
             label="시작일"
             value={startDate}
-            onChange={(date) => {
-              setStartDate(date);
-              if (!endDate || endDate < date) setEndDate(date);
-            }}
+            onChange={(date) =>
+              applyRange(date, !endDate || endDate < date ? date : endDate)
+            }
           />
           <DatePickerRow
             label="종료일"
             value={endDate}
             min={startDate || undefined}
-            onChange={setEndDate}
+            onChange={(date) => applyRange(startDate, date)}
           />
 
-          <View style={styles.allocationCard}>
-            <View style={styles.allocationHeader}>
+          <View style={styles.segmentCard}>
+            <View style={styles.segmentHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.allocationTitle} selectable>
-                  휴가 재원 배분
+                <Text style={styles.segmentTitle} selectable>
+                  휴가 구간
                 </Text>
-                <Text style={styles.allocationHint} selectable>
-                  기간과 재원 합계가 같아야 해요.
+                <Text style={styles.segmentHint} selectable>
+                  언제부터 언제까지가 어떤 휴가인지 나눠서 지정해요.
                 </Text>
               </View>
-              <Text
-                selectable
-                style={[
-                  styles.allocationTotal,
-                  allocated === duration && duration > 0
-                    ? styles.totalValid
-                    : styles.totalInvalid,
-                ]}
-              >
-                {allocated} / {duration}일
+              <Text style={styles.segmentTotal} selectable>
+                {duration}일
               </Text>
             </View>
-            {BALANCE_KEYS.map((key) => (
-              <View key={key} style={styles.allocationRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.allocationLabel} selectable>
-                    {BALANCE_LABELS[key]}
-                  </Text>
-                  <Text style={styles.allocationRemaining} selectable>
-                    사용 가능 {remainingByKey.get(key) ?? 0}일
-                  </Text>
-                </View>
-                <Input
-                  value={String(amounts[key])}
-                  onChangeText={(value) =>
-                    setAmounts((current) => ({
-                      ...current,
-                      [key]: Math.max(0, Number(value) || 0),
-                    }))
-                  }
-                  keyboardType="number-pad"
-                  accessibilityLabel={`${BALANCE_LABELS[key]} 사용 일수`}
-                  style={styles.dayInput}
-                />
-              </View>
-            ))}
+
+            {validRange ? (
+              resolved.map((draft, index) => {
+                const isLast = index === resolved.length - 1;
+                // 뒤에 남은 구간 수만큼 최소 하루씩 남겨둬야 한다.
+                const maxEnd = addDays(endDate, -(resolved.length - 1 - index));
+                return (
+                  <SegmentRow
+                    key={index}
+                    draft={draft}
+                    isLast={isLast}
+                    removable={resolved.length > 1}
+                    maxEnd={maxEnd}
+                    remainingByKey={availableByKey}
+                    onChangeKey={(key) =>
+                      setDrafts((current) =>
+                        current.map((item, i) =>
+                          i === index ? { ...item, key } : item,
+                        ),
+                      )
+                    }
+                    onChangeEnd={(date) =>
+                      setDrafts((current) =>
+                        setDraftEnd(current, index, date, startDate, endDate),
+                      )
+                    }
+                    onRemove={() =>
+                      setDrafts((current) =>
+                        removeDraft(current, index, startDate, endDate),
+                      )
+                    }
+                  />
+                );
+              })
+            ) : (
+              <Text style={styles.segmentHint}>
+                시작일과 종료일을 먼저 골라주세요.
+              </Text>
+            )}
+
+            {validRange && (
+              <Button
+                title="구간 추가"
+                variant="secondary"
+                size="sm"
+                disabled={duration <= drafts.length}
+                onPress={() =>
+                  setDrafts((current) => {
+                    const next = splitLastDraft(
+                      current,
+                      startDate,
+                      endDate,
+                      "regular_overnight",
+                    );
+                    return next ?? current;
+                  })
+                }
+              />
+            )}
           </View>
+
+          {overused.length > 0 && (
+            <Text selectable style={styles.error}>
+              {overused
+                .map(
+                  ([key, remaining]) =>
+                    `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
+                )
+                .join(", ")}
+            </Text>
+          )}
 
           <Field label="사유 (선택)">
             <Input
@@ -251,7 +309,7 @@ export function LeaveFormModal(props: {
             }
             onPress={() => void submit()}
             loading={pending}
-            disabled={allocated !== duration || duration === 0}
+            disabled={!canSubmit}
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -281,39 +339,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   closeText: { fontSize: 15, color: colors.ink },
-  allocationCard: {
+  segmentCard: {
     backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,
     borderCurve: "continuous",
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  allocationHeader: {
+  segmentHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.md,
   },
-  allocationTitle: { fontSize: 16, fontWeight: "600", color: colors.ink },
-  allocationHint: { fontSize: 12, color: colors.mute, paddingTop: 2 },
-  allocationTotal: {
+  segmentTitle: { fontSize: 16, fontWeight: "600", color: colors.ink },
+  segmentHint: { fontSize: 12, color: colors.mute, paddingTop: 2 },
+  segmentTotal: {
     fontSize: 15,
     fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  totalValid: { color: colors.positiveDeep },
-  totalInvalid: { color: colors.negativeDeep },
-  allocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  allocationLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  allocationRemaining: { fontSize: 11, color: colors.mute, paddingTop: 2 },
-  dayInput: {
-    width: 84,
-    minHeight: 42,
-    paddingVertical: spacing.sm,
-    textAlign: "center",
+    color: colors.ink,
     fontVariant: ["tabular-nums"],
   },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },

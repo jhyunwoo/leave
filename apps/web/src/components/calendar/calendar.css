@@ -239,3 +239,79 @@
     font-size: 13px;
   }
 }
+
+/* --- 내 휴가 / 정기외박 주기 --- */
+
+/* 재원별 색. 네이티브 theme.ts의 BALANCE_COLORS와 같은 값을 쓴다. */
+.cal-mine {
+  display: block;
+  width: calc(100% + 4px);
+  margin: 0 -2px;
+  min-height: 18px;
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  background: #eceee9;
+  color: #5a5c59;
+}
+/* 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다. */
+.cal-mine.is-joined-left {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.cal-mine.is-joined-right {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cal-mine[data-balance="annual"] { background: #d8f3c4; color: #1f5e10; }
+.cal-mine[data-balance="award"] { background: #ffe8c7; color: #8a4b00; }
+.cal-mine[data-balance="compensation"] { background: #e6ddff; color: #4c2c9c; }
+.cal-mine[data-balance="consolation"] { background: #ffdcea; color: #9c1d55; }
+.cal-mine[data-balance="petition"] { background: #c9efeb; color: #0b5c55; }
+.cal-mine[data-balance="sick"] { background: #ffdcdd; color: #a72027; }
+.cal-mine[data-balance="regular_overnight"] { background: #d8e6ff; color: #12439c; }
+.cal-mine[data-balance="other_overnight"] { background: #cdeaf6; color: #065b7a; }
+.cal-mine[data-balance="outing"] { background: #e4e7e2; color: #454745; }
+
+.cal-cell.is-in-cycle {
+  background: #f5f8fb;
+}
+.cal-cell.is-in-cycle.is-exceeded,
+.cal-cell.is-in-cycle.is-selected {
+  background: unset;
+}
+
+.cal-cycle-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 2px 0;
+}
+.cal-cycle-divider::before,
+.cal-cycle-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+.cal-cycle-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--mute);
+  white-space: nowrap;
+}
+
+.cal-cycle-banner {
+  margin: 0 0 var(--sp-sm);
+  padding: 6px var(--sp-md);
+  border-radius: var(--r-sm);
+  background: #d8e6ff;
+  color: #12439c;
+  font-size: 12px;
+  font-weight: 600;
+}

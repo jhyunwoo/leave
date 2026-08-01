@@ -1,4 +1,9 @@
-import { allocationBalanceKey, BALANCE_LABELS, fmtRange } from "@leave/shared";
+import {
+  BALANCE_LABELS,
+  fmtRange,
+  fmtRangeTiny,
+  segmentBalanceKey,
+} from "@leave/shared";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -8,12 +13,15 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MyLeave } from "@/api/queries";
 import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@/api/queries";
 import { Button } from "@/components/button";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import { colors, radius, spacing } from "@/theme";
+import {
+  ScreenHeader,
+  useScreenHeaderHeight,
+} from "@/components/screen-header";
+import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
 export function LeavesScreen() {
   const leaves = useMyLeaves();
@@ -21,9 +29,7 @@ export function LeavesScreen() {
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
-  const insets = useSafeAreaInsets();
-  const topPadding =
-    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.xs;
+  const headerHeight = useScreenHeaderHeight({ subtitle: true });
 
   const confirmDelete = (leave: MyLeave) => {
     Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [
@@ -37,91 +43,103 @@ export function LeavesScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
-    >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>내 휴가</Text>
-          <Text style={styles.subtitle}>
-            등록한 휴가를 고치거나 지울 수 있어요.
-          </Text>
-        </View>
-        <Button title="휴가 등록" size="sm" onPress={() => setCreating(true)} />
-      </View>
+    <>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+      >
+        {balances.data ? (
+          <View style={styles.balanceGrid}>
+            {balances.data.balances.map((item) => (
+              <View key={item.key} style={styles.balanceCard}>
+                <Text style={styles.balanceLabel} selectable>
+                  {item.label}
+                </Text>
+                <Text style={styles.balanceValue} selectable>
+                  {item.remainingDays}일
+                </Text>
+                <Text style={styles.balanceMeta} selectable>
+                  총 {item.totalDays} · 사용 {item.usedDays}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
-      {balances.data ? (
-        <View style={styles.balanceGrid}>
-          {balances.data.balances.map((item) => (
-            <View key={item.key} style={styles.balanceCard}>
-              <Text style={styles.balanceLabel} selectable>
-                {item.label}
-              </Text>
-              <Text style={styles.balanceValue} selectable>
-                {item.remainingDays}일
-              </Text>
-              <Text style={styles.balanceMeta} selectable>
-                총 {item.totalDays} · 사용 {item.usedDays}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {leaves.isPending ? (
-        <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-          <ActivityIndicator color={colors.ink} />
-        </View>
-      ) : !leaves.data || leaves.data.leaves.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
-          <Text style={styles.emptyCaption}>
-            휴가를 등록하면 부대 달력에 함께 표시돼요.
-          </Text>
-        </View>
-      ) : (
-        leaves.data.leaves.map((l) => (
-          <View key={l.id} style={styles.leaveCard}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.leaveTitle}>{l.title}</Text>
-              <Text style={styles.leaveDates}>
-                {fmtRange(l.startDate, l.endDate)}
-              </Text>
-              {l.reason ? (
-                <Text style={styles.leaveReason}>{l.reason}</Text>
-              ) : null}
-              <View style={styles.allocationBadges}>
-                {l.allocations.map((allocation) => {
-                  const key = allocationBalanceKey(allocation);
-                  return (
-                    <View key={key} style={styles.badge}>
-                      <Text style={styles.badgeText} selectable>
-                        {BALANCE_LABELS[key]} {allocation.days}일
-                      </Text>
-                    </View>
-                  );
-                })}
+        {leaves.isPending ? (
+          <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
+            <ActivityIndicator color={colors.ink} />
+          </View>
+        ) : !leaves.data || leaves.data.leaves.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
+            <Text style={styles.emptyCaption}>
+              휴가를 등록하면 부대 달력에 함께 표시돼요.
+            </Text>
+          </View>
+        ) : (
+          leaves.data.leaves.map((l) => (
+            <View key={l.id} style={styles.leaveCard}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.leaveTitle}>{l.title}</Text>
+                <Text style={styles.leaveDates}>
+                  {fmtRange(l.startDate, l.endDate)}
+                </Text>
+                {l.reason ? (
+                  <Text style={styles.leaveReason}>{l.reason}</Text>
+                ) : null}
+                <View style={styles.segmentBadges}>
+                  {l.segments.map((segment) => {
+                    const key = segmentBalanceKey(segment);
+                    const tone = BALANCE_COLORS[key];
+                    return (
+                      <View
+                        key={`${key}-${segment.startDate}`}
+                        style={[styles.badge, { backgroundColor: tone.bg }]}
+                      >
+                        <Text
+                          style={[styles.badgeText, { color: tone.fg }]}
+                          selectable
+                        >
+                          {BALANCE_LABELS[key]}{" "}
+                          {fmtRangeTiny(segment.startDate, segment.endDate)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={styles.actions}>
+                <Button
+                  title="수정"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => setEditing(l)}
+                />
+                <Button
+                  title="삭제"
+                  variant="danger"
+                  size="sm"
+                  disabled={del.isPending}
+                  onPress={() => confirmDelete(l)}
+                />
               </View>
             </View>
-            <View style={styles.actions}>
-              <Button
-                title="수정"
-                variant="secondary"
-                size="sm"
-                onPress={() => setEditing(l)}
-              />
-              <Button
-                title="삭제"
-                variant="danger"
-                size="sm"
-                disabled={del.isPending}
-                onPress={() => confirmDelete(l)}
-              />
-            </View>
-          </View>
-        ))
-      )}
+          ))
+        )}
+      </ScrollView>
+
+      <ScreenHeader
+        title="내 휴가"
+        subtitle="등록한 휴가를 고치거나 지울 수 있어요."
+        actions={
+          <Button
+            title="휴가 등록"
+            size="sm"
+            onPress={() => setCreating(true)}
+          />
+        }
+      />
 
       {(creating || editing) && (
         <LeaveFormModal
@@ -133,27 +151,13 @@ export function LeavesScreen() {
           }}
         />
       )}
-    </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: spacing.sm,
-    gap: spacing.md,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -0.8,
-    color: colors.ink,
-  },
-  subtitle: { fontSize: 14, color: colors.body, marginTop: 4 },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
   balanceGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -200,18 +204,17 @@ const styles = StyleSheet.create({
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
   leaveReason: { fontSize: 12, color: colors.mute, marginTop: 4 },
-  allocationBadges: {
+  segmentBadges: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs,
     paddingTop: spacing.sm,
   },
   badge: {
-    backgroundColor: colors.primaryPale,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  badgeText: { fontSize: 11, fontWeight: "600", color: colors.ink },
+  badgeText: { fontSize: 11, fontWeight: "600" },
   actions: { gap: spacing.sm },
 });

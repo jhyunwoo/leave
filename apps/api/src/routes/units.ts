@@ -4,6 +4,7 @@ import {
   effectiveMemberCount,
   monthBounds,
   monthSchema,
+  segmentsToAllocations,
   unitCreateSchema,
   unitTransferSchema,
   unitUpdateSchema,
@@ -17,7 +18,7 @@ import {
   getCachedCalendar,
   putCachedCalendar,
 } from "../lib/cache";
-import { allocationsForLeaves } from "../lib/leave-balances";
+import { segmentsForLeaves } from "../lib/leave-balances";
 import {
   calendarSchema,
   errorResponse,
@@ -687,7 +688,7 @@ export const unitRoutes = app
       rangeStart: start,
       rangeEnd: end,
     });
-    const allocationMap = await allocationsForLeaves(
+    const segmentMap = await segmentsForLeaves(
       db,
       rows.map((row) => row.id),
     );
@@ -695,6 +696,7 @@ export const unitRoutes = app
     const calendarLeaves = rows.map((l) => {
       const owner = membersById.get(l.userId);
       const member = owner ? serializeMember(owner) : null;
+      const segments = segmentMap.get(l.id) ?? [];
       return {
         id: l.id,
         userId: l.userId,
@@ -705,7 +707,8 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
         reason: l.reason,
-        allocations: allocationMap.get(l.id) ?? [],
+        segments,
+        allocations: segmentsToAllocations(segments),
       };
     });
 

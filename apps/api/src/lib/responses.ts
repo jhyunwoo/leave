@@ -90,10 +90,24 @@ export const myJoinRequestSchema = z
   })
   .openapi("MyJoinRequest");
 
+/**
+ * 재원별 일수 합계. 구간(segments)에서 파생하며, 구간 개념이 없던 구버전 앱을 위해
+ * 당분간 함께 내려준다.
+ * TODO(구간 모델 안정화 후): allocations 필드를 응답에서 제거한다.
+ */
 export const leaveAllocationResponseSchema = z.object({
   category: z.enum(LEAVE_CATEGORIES),
   days: z.number(),
   overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+});
+
+/** 어느 날이 어떤 재원인지 알려주는 구간. */
+export const leaveSegmentResponseSchema = z.object({
+  category: z.enum(LEAVE_CATEGORIES),
+  overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+  startDate: z.string(),
+  endDate: z.string(),
+  days: z.number(),
 });
 
 export const leaveSchema = z
@@ -104,6 +118,7 @@ export const leaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    segments: z.array(leaveSegmentResponseSchema),
     allocations: z.array(leaveAllocationResponseSchema),
     createdAt: z.string(),
   })
@@ -120,6 +135,7 @@ export const calendarLeaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    segments: z.array(leaveSegmentResponseSchema),
     allocations: z.array(leaveAllocationResponseSchema),
   })
   .openapi("CalendarLeave");

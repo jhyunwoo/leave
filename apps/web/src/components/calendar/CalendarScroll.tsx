@@ -1,13 +1,24 @@
-import { shiftMonth, splitMonth, todayInSeoul, WEEKDAYS } from "@leave/shared";
+import {
+  cyclesInRange,
+  monthBounds,
+  shiftMonth,
+  splitMonth,
+  todayInSeoul,
+  WEEKDAYS,
+  type RegularOvernightConfig,
+  type RegularOvernightCycle,
+} from "@leave/shared";
 import {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { useCalendar } from "../../api/queries";
+import type { MyLeaveDay } from "../../lib/my-leave-days";
 import { MonthCalendar } from "./MonthCalendar";
 import "./calendar.css";
 
@@ -39,8 +50,23 @@ export const CalendarScroll = forwardRef<
     unitId: string;
     selectedDate: string | null;
     onSelectDate: (date: string) => void;
+    myLeaveDays: Map<string, MyLeaveDay>;
+    regularOvernight: RegularOvernightConfig | null;
+    enlistedAt: string;
+    currentCycle: RegularOvernightCycle | null;
   }
->(function CalendarScroll({ unitId, selectedDate, onSelectDate }, ref) {
+>(function CalendarScroll(
+  {
+    unitId,
+    selectedDate,
+    onSelectDate,
+    myLeaveDays,
+    regularOvernight,
+    enlistedAt,
+    currentCycle,
+  },
+  ref,
+) {
   const currentMonth = todayInSeoul().slice(0, 7);
   const [months, setMonths] = useState(() =>
     monthRange(currentMonth, INITIAL_SPAN),
@@ -153,6 +179,10 @@ export const CalendarScroll = forwardRef<
               month={m}
               selectedDate={selectedDate}
               onSelectDate={onSelectDate}
+              myLeaveDays={myLeaveDays}
+              regularOvernight={regularOvernight}
+              enlistedAt={enlistedAt}
+              currentCycle={currentCycle}
             />
           </section>
         ))}
@@ -167,8 +197,17 @@ function MonthBlock(props: {
   month: string;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
+  myLeaveDays: Map<string, MyLeaveDay>;
+  regularOvernight: RegularOvernightConfig | null;
+  enlistedAt: string;
+  currentCycle: RegularOvernightCycle | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
+  const cycles = useMemo(() => {
+    const { start, end } = monthBounds(props.month);
+    return cyclesInRange(props.regularOvernight, start, end, props.enlistedAt);
+  }, [props.month, props.regularOvernight, props.enlistedAt]);
+
   if (calendar.isPending) {
     return (
       <div className="cal-month-loading">
@@ -185,6 +224,9 @@ function MonthBlock(props: {
       selectedDate={props.selectedDate}
       onSelectDate={props.onSelectDate}
       hideWeekdays
+      myLeaveDays={props.myLeaveDays}
+      cycles={cycles}
+      currentCycle={props.currentCycle}
     />
   );
 }

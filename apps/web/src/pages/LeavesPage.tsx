@@ -1,4 +1,4 @@
-import { allocationBalanceKey, BALANCE_LABELS } from "@leave/shared";
+import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
 import { useState } from "react";
 import type { MyLeave } from "../api/queries";
 import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "../api/queries";
@@ -141,11 +141,15 @@ export function LeavesPage() {
                     marginTop: 8,
                   }}
                 >
-                  {l.allocations.map((allocation) => {
-                    const key = allocationBalanceKey(allocation);
+                  {l.segments.map((segment) => {
+                    const key = segmentBalanceKey(segment);
                     return (
-                      <span key={key} className="badge">
-                        {BALANCE_LABELS[key]} {allocation.days}일
+                      <span
+                        key={`${key}-${segment.startDate}`}
+                        className="badge"
+                      >
+                        {BALANCE_LABELS[key]}{" "}
+                        {fmtRangeTiny(segment.startDate, segment.endDate)}
                       </span>
                     );
                   })}

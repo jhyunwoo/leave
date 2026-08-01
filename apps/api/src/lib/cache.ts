@@ -17,12 +17,17 @@ function versionKey(unitId: string): string {
   return `unitver:${unitId}`;
 }
 
+// 접두사의 숫자는 캐시 페이로드 형식 버전이다. 응답 형태가 바뀌면 올려서
+// 배포 직후 TTL이 남은 구형 캐시가 나가지 않게 한다.
 function calendarKey(unitId: string, version: string, month: string): string {
-  return `calendar:${unitId}:${version}:${month}`;
+  return `calendar2:${unitId}:${version}:${month}`;
 }
 
 /** 현재 부대 캐시 버전 토큰(없으면 초기값). */
-async function unitVersion(cache: KVNamespace, unitId: string): Promise<string> {
+async function unitVersion(
+  cache: KVNamespace,
+  unitId: string,
+): Promise<string> {
   return (await cache.get(versionKey(unitId))) ?? "init";
 }
 
@@ -65,9 +70,13 @@ export async function putCachedCalendar(
 ): Promise<void> {
   try {
     const version = await unitVersion(cache, unitId);
-    await cache.put(calendarKey(unitId, version, month), JSON.stringify(payload), {
-      expirationTtl: CALENDAR_TTL_SECONDS,
-    });
+    await cache.put(
+      calendarKey(unitId, version, month),
+      JSON.stringify(payload),
+      {
+        expirationTtl: CALENDAR_TTL_SECONDS,
+      },
+    );
   } catch (err) {
     console.error("달력 캐시 저장 실패", err);
   }
