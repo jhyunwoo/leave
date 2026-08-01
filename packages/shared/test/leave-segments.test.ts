@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  allocationsToSegments,
   leaveCreateSchema,
   segmentOnDate,
   segmentsRange,
-  segmentsToAllocations,
   type LeaveSegment,
 } from "../src";
 
@@ -33,56 +31,12 @@ describe("휴가 구간", () => {
     expect(segmentOnDate(segments, "2026-08-10")).toBeUndefined();
   });
 
-  it("구간을 재원별 합계로 접는다", () => {
-    expect(segmentsToAllocations(segments)).toEqual([
-      { category: "annual", days: 4 },
-      { category: "overnight", days: 4, overnightKind: "regular" },
-    ]);
-  });
-
-  it("같은 재원이 여러 번 나오면 합쳐서 센다", () => {
-    const sandwich: LeaveSegment[] = [
-      {
-        category: "annual",
-        startDate: "2026-10-01",
-        endDate: "2026-10-01",
-        days: 1,
-      },
-      {
-        category: "overnight",
-        overnightKind: "regular",
-        startDate: "2026-10-02",
-        endDate: "2026-10-02",
-        days: 1,
-      },
-      {
-        category: "annual",
-        startDate: "2026-10-03",
-        endDate: "2026-10-03",
-        days: 1,
-      },
-    ];
-    expect(segmentsToAllocations(sandwich)).toEqual([
-      { category: "annual", days: 2 },
-      { category: "overnight", days: 1, overnightKind: "regular" },
-    ]);
-  });
-
   it("전체 기간은 구간에서 파생된다", () => {
     expect(segmentsRange(segments)).toEqual({
       startDate: "2026-08-02",
       endDate: "2026-08-09",
     });
     expect(segmentsRange([])).toBe(null);
-  });
-
-  it("재원별 일수만 있는 옛 형식을 BALANCE_KEYS 순서로 편다", () => {
-    expect(
-      allocationsToSegments("2026-08-02", [
-        { category: "overnight", days: 4, overnightKind: "regular" },
-        { category: "annual", days: 4 },
-      ]),
-    ).toEqual(segments);
   });
 });
 
@@ -131,32 +85,6 @@ describe("휴가 등록 검증", () => {
           endDate: "2026-09-01",
         },
       ],
-    });
-    expect(parsed.success).toBe(false);
-  });
-
-  it("구간을 모르는 구버전 요청은 구간으로 변환한다", () => {
-    const parsed = leaveCreateSchema.safeParse({
-      ...base,
-      startDate: "2026-08-02",
-      endDate: "2026-08-09",
-      allocations: [
-        { category: "overnight", days: 4, overnightKind: "regular" },
-        { category: "annual", days: 4 },
-      ],
-    });
-    expect(parsed.success).toBe(true);
-    expect(parsed.data?.segments).toEqual(
-      segments.map(({ days: _days, ...rest }) => rest),
-    );
-  });
-
-  it("구버전 요청도 기간과 재원 합계가 맞아야 한다", () => {
-    const parsed = leaveCreateSchema.safeParse({
-      ...base,
-      startDate: "2026-08-02",
-      endDate: "2026-08-09",
-      allocations: [{ category: "annual", days: 3 }],
     });
     expect(parsed.success).toBe(false);
   });

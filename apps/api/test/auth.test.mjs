@@ -96,9 +96,9 @@ test("계정 삭제: 계정·휴가·부대 소속이 모두 사라진다", asyn
     token,
     body: {
       title: "정기휴가",
-      startDate: "2026-08-01",
-      endDate: "2026-08-03",
-      allocations: [{ category: "annual", days: 3 }],
+      segments: [
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-03" },
+      ],
     },
   });
   assert.equal(leaveRes.status, 201);

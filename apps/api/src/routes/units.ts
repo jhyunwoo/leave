@@ -4,7 +4,6 @@ import {
   effectiveMemberCount,
   monthBounds,
   monthSchema,
-  segmentsToAllocations,
   unitCreateSchema,
   unitTransferSchema,
   unitUpdateSchema,
@@ -696,7 +695,6 @@ export const unitRoutes = app
     const calendarLeaves = rows.map((l) => {
       const owner = membersById.get(l.userId);
       const member = owner ? serializeMember(owner) : null;
-      const segments = segmentMap.get(l.id) ?? [];
       return {
         id: l.id,
         userId: l.userId,
@@ -707,8 +705,7 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
         reason: l.reason,
-        segments,
-        allocations: segmentsToAllocations(segments),
+        segments: segmentMap.get(l.id) ?? [],
       };
     });
 

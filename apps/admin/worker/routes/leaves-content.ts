@@ -20,7 +20,6 @@ import {
   isoDateSchema,
   leaveSegmentSchema,
   segmentsRange,
-  segmentsToAllocations,
   sortSegments,
   type LeaveSegment,
 } from "@leave/shared";
@@ -168,14 +167,10 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       items.map((item) => item.id),
     );
     return c.json({
-      items: items.map((item) => {
-        const segments = segmentMap.get(item.id) ?? [];
-        return {
-          ...item,
-          segments,
-          allocations: segmentsToAllocations(segments),
-        };
-      }),
+      items: items.map((item) => ({
+        ...item,
+        segments: segmentMap.get(item.id) ?? [],
+      })),
       meta: listMeta(page, pageSize, total),
     });
   })
@@ -233,16 +228,7 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       entityId: leave.id,
       after: { ...leave, sendNotifications: input.data.sendNotifications },
     });
-    return c.json(
-      {
-        item: {
-          ...leave,
-          segments,
-          allocations: segmentsToAllocations(segments),
-        },
-      },
-      201,
-    );
+    return c.json({ item: { ...leave, segments } }, 201);
   })
   .patch("/leaves/:id", async (c) => {
     const input = leaveSchema.safeParse(await c.req.json().catch(() => null));
@@ -309,12 +295,7 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         );
       }
     }
-    const after = {
-      ...before,
-      ...patch,
-      segments,
-      allocations: segmentsToAllocations(segments),
-    };
+    const after = { ...before, ...patch, segments };
     await writeAudit(c, {
       action: "update",
       entityType: "leave",

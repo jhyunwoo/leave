@@ -15,7 +15,7 @@ import {
   setDraftEnd,
   splitLastDraft,
   type BalanceKey,
-  type LeaveCreateBody,
+  type LeaveCreateInput,
   type SegmentDraft,
 } from "@leave/shared";
 import { useMemo, useState } from "react";
@@ -106,7 +106,7 @@ export function LeaveFormModal(props: {
     title.trim().length > 0;
 
   const submit = async () => {
-    const input: LeaveCreateBody = {
+    const input: LeaveCreateInput = {
       title: title.trim(),
       segments: draftsToSegments(startDate, drafts),
       ...(reason.trim() ? { reason: reason.trim() } : {}),

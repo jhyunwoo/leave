@@ -51,47 +51,56 @@ describe("pushEventSchema", () => {
 });
 
 describe("leaveCreateSchema", () => {
-  it("종료일이 시작일보다 앞서면 실패", () => {
-    expect(
-      leaveCreateSchema.safeParse({
-        title: "휴가",
-        startDate: "2026-08-10",
-        endDate: "2026-08-01",
-        allocations: [{ category: "annual", days: 1 }],
-      }).success,
-    ).toBe(false);
-  });
-
-  it("여러 휴가 재원의 합계가 포함 기간과 같으면 통과", () => {
+  it("구간이 빈틈없이 이어지면 통과", () => {
     expect(
       leaveCreateSchema.safeParse({
         title: "가족여행",
-        startDate: "2026-08-01",
-        endDate: "2026-08-05",
-        allocations: [
-          { category: "annual", days: 2 },
-          { category: "award", days: 1 },
-          { category: "overnight", overnightKind: "regular", days: 2 },
+        segments: [
+          {
+            category: "annual",
+            startDate: "2026-08-01",
+            endDate: "2026-08-03",
+          },
+          {
+            category: "overnight",
+            overnightKind: "regular",
+            startDate: "2026-08-04",
+            endDate: "2026-08-05",
+          },
         ],
       }).success,
     ).toBe(true);
   });
 
-  it("재원 합계가 기간과 다르거나 외박 종류가 없으면 실패", () => {
+  it("구간 종료일이 시작일보다 앞서면 실패", () => {
     expect(
       leaveCreateSchema.safeParse({
-        title: "합계 오류",
-        startDate: "2026-08-01",
-        endDate: "2026-08-03",
-        allocations: [{ category: "annual", days: 2 }],
+        title: "휴가",
+        segments: [
+          {
+            category: "annual",
+            startDate: "2026-08-10",
+            endDate: "2026-08-01",
+          },
+        ],
       }).success,
+    ).toBe(false);
+  });
+
+  it("구간이 없거나 외박 종류가 없으면 실패", () => {
+    expect(
+      leaveCreateSchema.safeParse({ title: "구간 없음", segments: [] }).success,
     ).toBe(false);
     expect(
       leaveCreateSchema.safeParse({
         title: "외박 종류 오류",
-        startDate: "2026-08-01",
-        endDate: "2026-08-01",
-        allocations: [{ category: "overnight", days: 1 }],
+        segments: [
+          {
+            category: "overnight",
+            startDate: "2026-08-01",
+            endDate: "2026-08-01",
+          },
+        ],
       }).success,
     ).toBe(false);
   });

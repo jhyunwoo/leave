@@ -6,7 +6,6 @@ import {
   leaveUpdateSchema,
   regularOvernightConfigSchema,
   segmentsRange,
-  segmentsToAllocations,
   sortSegments,
   type LeaveCreateInput,
   type LeaveSegment,
@@ -175,7 +174,6 @@ function serializeLeave(
   row: LeaveRow,
   segmentsByLeave: Map<string, LeaveSegment[]>,
 ) {
-  const segments = segmentsByLeave.get(row.id) ?? [];
   return {
     id: row.id,
     userId: row.userId,
@@ -183,8 +181,7 @@ function serializeLeave(
     startDate: row.startDate,
     endDate: row.endDate,
     reason: row.reason,
-    segments,
-    allocations: segmentsToAllocations(segments),
+    segments: segmentsByLeave.get(row.id) ?? [],
     createdAt: row.createdAt,
   };
 }
