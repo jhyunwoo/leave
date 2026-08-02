@@ -118,6 +118,27 @@ export function CalendarScreen() {
     );
   }
 
+  // 통신 실패를 "부대 없음"으로 보여주면 데이터가 사라진 것처럼 보인다. 따로 알린다.
+  if (me.isError || balances.isError) {
+    return (
+      <View style={[styles.center, { padding: spacing.xl }]}>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>불러오지 못했어요</Text>
+          <Text style={styles.emptyBody}>
+            서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해주세요.
+          </Text>
+          <Button
+            title="다시 시도"
+            onPress={() => {
+              void me.refetch();
+              void balances.refetch();
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (!unit) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
