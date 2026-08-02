@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  checkRegularOvernight,
   cycleColor,
   cycleFor,
   cycleState,
@@ -10,8 +11,10 @@ import {
   firstGrantDate,
   grantDatesThrough,
   nextGrantDateAfter,
+  regularOvernightBlockMessage,
   regularOvernightUsageByCycle,
   type RegularOvernightConfig,
+  type SegmentLike,
 } from "../src";
 
 // 42일 주기, 회당 4일. 주기 시작일은 2026-03-30 → 첫 적립(=1주기 첫날)은 6주 뒤인 2026-05-11.
@@ -308,5 +311,134 @@ describe("주기 진행 상태", () => {
     expect(cycleState(cycle, cycle.end)).toBe("current");
     expect(cycleState(cycle, addDays(cycle.start, -1))).toBe("future");
     expect(cycleState(cycle, addDays(cycle.end, 1))).toBe("past");
+  });
+});
+
+describe("정기외박 사용 가능 여부", () => {
+  const discharge = "2027-06-30";
+  const regular = (startDate: string, endDate: string): SegmentLike => ({
+    category: "overnight",
+    overnightKind: "regular",
+    startDate,
+    endDate,
+  });
+
+  it("설정이 꺼져 있으면 주기로 막지 않는다", () => {
+    expect(
+      checkRegularOvernight({
+        config: { ...config, enabled: false },
+        existing: [],
+        requested: [regular("2026-08-05", "2026-08-06")],
+        dischargeAt: discharge,
+      }),
+    ).toBe(null);
+  });
+
+  it("아직 오지 않은 주기라도 그 주기 몫 안이면 쓸 수 있다", () => {
+    // 3주기(2026-08-03~09-13)를 오늘보다 한참 뒤로 두고 4일 중 3일만 쓴다.
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: [regular("2026-08-20", "2026-08-22")],
+        dischargeAt: discharge,
+      }),
+    ).toBe(null);
+  });
+
+  it("미래 주기라도 그 주기 몫을 넘기면 막는다", () => {
+    const block = checkRegularOvernight({
+      config,
+      existing: [regular("2026-08-05", "2026-08-07")],
+      requested: [regular("2026-08-20", "2026-08-21")],
+      dischargeAt: discharge,
+    });
+    expect(block).toEqual({
+      kind: "over_cycle",
+      cycle: {
+        index: 3,
+        start: "2026-08-03",
+        end: "2026-09-13",
+        grantDays: 4,
+      },
+      usedDays: 5,
+    });
+    expect(regularOvernightBlockMessage(block!)).toBe(
+      "정기외박 3주기(8/3–9/13) 몫 4일을 1일 초과했어요",
+    );
+  });
+
+  it("다른 주기의 사용량은 섞지 않는다", () => {
+    // 2주기를 꽉 채워도 3주기 몫은 그대로다.
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [regular("2026-06-22", "2026-06-25")],
+        requested: [regular("2026-08-20", "2026-08-23")],
+        dischargeAt: discharge,
+      }),
+    ).toBe(null);
+  });
+
+  it("첫 적립 전 날짜는 막는다", () => {
+    const block = checkRegularOvernight({
+      config,
+      existing: [],
+      requested: [regular("2026-05-09", "2026-05-10")],
+      dischargeAt: discharge,
+    });
+    expect(block).toEqual({
+      kind: "before_first_grant",
+      firstGrantDate: "2026-05-11",
+    });
+    expect(regularOvernightBlockMessage(block!)).toBe(
+      "정기외박은 첫 적립일(5월 11일) 이후부터 사용할 수 있습니다",
+    );
+  });
+
+  it("적립일이 전역일 뒤인 주기는 막는다", () => {
+    // 4주기는 2026-09-14에 적립된다. 전역이 그 전이면 그 몫을 받지 못한다.
+    const block = checkRegularOvernight({
+      config,
+      existing: [],
+      requested: [regular("2026-09-20", "2026-09-21")],
+      dischargeAt: "2026-09-13",
+    });
+    expect(block).toEqual({
+      kind: "after_discharge",
+      cycle: {
+        index: 4,
+        start: "2026-09-14",
+        end: "2026-10-25",
+        grantDays: 4,
+      },
+    });
+    expect(regularOvernightBlockMessage(block!)).toBe(
+      "정기외박 4주기(9/14–10/25)는 적립일이 전역일 뒤라 쓸 수 없어요",
+    );
+  });
+
+  it("적립일이 전역일 당일인 주기는 쓸 수 있다", () => {
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: [regular("2026-09-20", "2026-09-21")],
+        dischargeAt: "2026-09-14",
+      }),
+    ).toBe(null);
+  });
+
+  it("정기외박이 아닌 구간은 보지 않는다", () => {
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: [
+          { category: "annual", startDate: "2026-05-09", endDate: "2026-05-10" },
+        ],
+        dischargeAt: discharge,
+      }),
+    ).toBe(null);
   });
 });
