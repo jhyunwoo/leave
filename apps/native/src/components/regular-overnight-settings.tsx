@@ -66,8 +66,9 @@ export function RegularOvernightSettings(props: {
             onChange={setStartDate}
           />
           <Text style={styles.hint} selectable>
-            이 날부터 {intervalDays}일이 지나면 {daysPerGrant}일이 처음 적립되고,
-            이후 {intervalDays}일마다 반복돼요.
+            이 날부터 {intervalDays}일이 지난 날 {daysPerGrant}일이 처음
+            적립되면서 1주기가 시작돼요. 한 주기 몫은 다음 적립 전날까지 쓰고
+            남으면 사라져요.
             {props.config.nextGrantDate
               ? ` 다음 적립일은 ${props.config.nextGrantDate}이에요.`
               : ""}

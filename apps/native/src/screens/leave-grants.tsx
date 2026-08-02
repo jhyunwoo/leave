@@ -340,25 +340,17 @@ function CycleList(props: {
             </Text>
           </View>
           <View style={{ alignItems: "flex-end", gap: 2 }}>
-            {cycle.grantDays === 0 ? (
-              <Text style={styles.cycleWaiting} selectable>
-                첫 적립 대기
+            <Text style={styles.cycleCount} selectable>
+              {cycle.usedDays}/{cycle.grantDays}일
+            </Text>
+            {cycle.state === "past" && cycle.remainingDays > 0 ? (
+              <Text style={styles.cycleLost} selectable>
+                소멸 {cycle.remainingDays}일
               </Text>
             ) : (
-              <>
-                <Text style={styles.cycleCount} selectable>
-                  {cycle.usedDays}/{cycle.grantDays}일
-                </Text>
-                {cycle.state === "past" && cycle.remainingDays > 0 ? (
-                  <Text style={styles.cycleLost} selectable>
-                    소멸 {cycle.remainingDays}일
-                  </Text>
-                ) : (
-                  <Text style={styles.cycleRemaining} selectable>
-                    잔여 {cycle.remainingDays}일
-                  </Text>
-                )}
-              </>
+              <Text style={styles.cycleRemaining} selectable>
+                잔여 {cycle.remainingDays}일
+              </Text>
             )}
           </View>
           {cycle.state === "current" && <Badge text="이번 주기" kind="positive" />}
@@ -492,5 +484,4 @@ const styles = StyleSheet.create({
   },
   cycleRemaining: { fontSize: 11, color: colors.mute },
   cycleLost: { fontSize: 11, fontWeight: "600", color: colors.negativeDeep },
-  cycleWaiting: { fontSize: 12, color: colors.mute },
 });

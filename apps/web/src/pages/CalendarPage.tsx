@@ -3,6 +3,7 @@ import {
   cycleUsedDays,
   diffDays,
   effectiveMemberCount,
+  firstGrantDate,
   fmtRangeTiny,
   maxAllowedOut,
   todayInSeoul,
@@ -49,6 +50,11 @@ export function CalendarPage(props: { me: Me }) {
         : 0,
     [currentCycle, myLeaves.data],
   );
+  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다.
+  const pendingFirstGrant = useMemo(() => {
+    const first = firstGrantDate(regularOvernight);
+    return first && today < first ? first : null;
+  }, [regularOvernight, today]);
 
   // 선택한 날짜가 속한 달의 달력(사이드 패널용). 스크롤 블록과 같은 캐시를 재사용한다.
   const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : null;
@@ -137,21 +143,22 @@ export function CalendarPage(props: { me: Me }) {
         className="cal-layout"
       >
         <div className="card" style={{ padding: "var(--sp-md)" }}>
-          {currentCycle && (
+          {currentCycle ? (
             <p className="cal-cycle-banner">
               정기외박 {currentCycle.index}주기{" "}
               {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
-              {/* 1주기는 첫 적립을 기다리는 구간이라 소진 현황 대신 남은 날을 센다. */}
-              {currentCycle.grantDays === 0 ? (
-                <>첫 적립까지 D-{diffDays(today, currentCycle.end) + 1}</>
-              ) : (
-                <>
-                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
-                  {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
-                </>
-              )}
+              {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
+              {Math.max(currentCycle.grantDays - cycleUsage, 0)}일 · 마감 D-
+              {Math.max(diffDays(today, currentCycle.end), 0)}
             </p>
-          )}
+          ) : pendingFirstGrant ? (
+            // 첫 적립 전에는 주기가 없다. 언제 1주기가 시작하는지만 알려준다.
+            <p className="cal-cycle-banner is-pending">
+              정기외박 첫 적립 {fmtDateShort(pendingFirstGrant)} · D-
+              {Math.max(diffDays(today, pendingFirstGrant), 0)} · 그전에는 쓸 수
+              있는 정기외박이 없어요
+            </p>
+          ) : null}
           <CalendarScroll
             ref={scrollRef}
             unitId={unit.id}
