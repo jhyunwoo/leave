@@ -293,6 +293,8 @@
   width: calc(100% + 17px);
   margin: auto -8px 0 -8px;
   height: 3px;
+  /* 주기 경계만 알아보면 되는 보조 표시라, 날짜·재원 칩보다 뒤로 물린다. */
+  opacity: 0.35;
 }
 .cal-cycle-bar.is-cycle-start {
   width: calc(100% + 14px);

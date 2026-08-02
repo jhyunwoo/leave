@@ -280,6 +280,8 @@ const styles = StyleSheet.create({
     marginTop: "auto",
     marginBottom: 4,
     height: 3,
+    // 주기 경계만 알아보면 되는 보조 표시라, 날짜·재원 칩보다 뒤로 물린다.
+    opacity: 0.35,
   },
   cycleBarStart: {
     marginLeft: 2,

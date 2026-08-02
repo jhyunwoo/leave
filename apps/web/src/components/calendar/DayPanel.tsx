@@ -28,6 +28,8 @@ export function DayPanel(props: {
     );
   const exceeded = stat?.exceeded ?? false;
   const holiday = getHoliday(date);
+  // 이 날 더 나갈 수 있는 인원. 초과한 날은 음수가 되므로 0에서 끊는다.
+  const remaining = stat ? Math.max(stat.allowed - stat.count, 0) : 0;
 
   return (
     <div
@@ -62,6 +64,9 @@ export function DayPanel(props: {
             className={`badge ${exceeded ? "badge-negative" : "badge-positive"}`}
           >
             출타 {stat.count}명 / 허용 {stat.allowed}명
+          </span>
+          <span className="badge badge-neutral">
+            {remaining > 0 ? `잔여 ${remaining}명` : "잔여 없음"}
           </span>
           {exceeded && (
             <span
