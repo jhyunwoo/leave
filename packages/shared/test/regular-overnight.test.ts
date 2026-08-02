@@ -11,6 +11,7 @@ import {
   firstGrantDate,
   grantDatesThrough,
   nextGrantDateAfter,
+  regularOvernightAvailableIn,
   regularOvernightBlockMessage,
   regularOvernightUsageByCycle,
   type RegularOvernightConfig,
@@ -440,5 +441,109 @@ describe("정기외박 사용 가능 여부", () => {
         dischargeAt: discharge,
       }),
     ).toBe(null);
+  });
+});
+
+describe("구간 범위 기준 정기외박 잔여", () => {
+  const discharge = "2027-06-30";
+  const regular = (startDate: string, endDate: string): SegmentLike => ({
+    category: "overnight",
+    overnightKind: "regular",
+    startDate,
+    endDate,
+  });
+
+  it("아직 오지 않은 주기의 잔여도 그대로 준다", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [],
+        dischargeAt: discharge,
+        from: "2026-08-20",
+        to: "2026-08-21",
+      }),
+    ).toBe(4);
+  });
+
+  it("그 주기에 이미 쓴 만큼 뺀다", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [regular("2026-08-05", "2026-08-07")],
+        dischargeAt: discharge,
+        from: "2026-08-20",
+        to: "2026-08-21",
+      }),
+    ).toBe(1);
+  });
+
+  it("여러 주기에 걸치면 가장 빡빡한 주기를 따른다", () => {
+    // 2주기는 3일 썼고(잔여 1) 3주기는 안 썼다(잔여 4). 경계를 걸치면 1.
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [regular("2026-06-22", "2026-06-24")],
+        dischargeAt: discharge,
+        from: "2026-08-01",
+        to: "2026-08-05",
+      }),
+    ).toBe(1);
+  });
+
+  it("초과 상태면 음수를 준다 — 칩 숫자와 오류가 어긋나지 않도록", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [regular("2026-08-05", "2026-08-09")],
+        dischargeAt: discharge,
+        from: "2026-08-20",
+        to: "2026-08-21",
+      }),
+    ).toBe(-1);
+  });
+
+  it("첫 적립 전이 끼거나 주기가 없으면 0", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [],
+        dischargeAt: discharge,
+        from: "2026-05-09",
+        to: "2026-05-12",
+      }),
+    ).toBe(0);
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [],
+        dischargeAt: discharge,
+        from: "2026-04-01",
+        to: "2026-04-02",
+      }),
+    ).toBe(0);
+  });
+
+  it("적립일이 전역일 뒤인 주기가 끼면 0", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [],
+        dischargeAt: "2026-09-13",
+        from: "2026-09-20",
+        to: "2026-09-21",
+      }),
+    ).toBe(0);
+  });
+
+  it("설정이 꺼져 있으면 0", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config: { ...config, enabled: false },
+        used: [],
+        dischargeAt: discharge,
+        from: "2026-08-20",
+        to: "2026-08-21",
+      }),
+    ).toBe(0);
   });
 });

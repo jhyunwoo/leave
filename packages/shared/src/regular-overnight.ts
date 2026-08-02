@@ -366,3 +366,36 @@ export function regularOvernightBlockMessage(
   }
   return `${label} 몫 ${cycle.grantDays}일을 ${block.usedDays - cycle.grantDays}일 초과했어요`;
 }
+
+/**
+ * [from, to]가 걸친 주기들 기준으로 쓸 수 있는 정기외박 일수. 여러 주기에 걸치면
+ * 가장 빡빡한 주기를 따른다(그 주기가 먼저 막히므로).
+ *
+ * 폼의 재원 칩 숫자에 쓴다. 초과분은 음수로 그대로 내보내서 "칩 숫자 < 0"과
+ * checkRegularOvernight이 막는 순간이 어긋나지 않게 한다.
+ * 쓸 수 있는 주기가 하나도 없으면(설정이 꺼졌거나, 첫 적립 전이 끼었거나,
+ * 적립일이 전역 뒤인 주기가 끼었거나) 0.
+ */
+export function regularOvernightAvailableIn(input: {
+  config: RegularOvernightConfig | null | undefined;
+  used: readonly SegmentLike[];
+  dischargeAt: ISODate;
+  from: ISODate;
+  to: ISODate;
+}): number {
+  const active = activeConfig(input.config);
+  if (!active) return 0;
+  // cyclesInRange는 첫 적립 전을 잘라내므로, 범위가 그 앞에서 시작하면 따로 막는다.
+  if (input.from < firstGrantOf(active)) return 0;
+
+  const cycles = cyclesInRange(input.config, input.from, input.to);
+  if (!cycles.length) return 0;
+
+  let available = Infinity;
+  for (const cycle of cycles) {
+    if (cycle.start > input.dischargeAt) return 0;
+    const remaining = cycleRemainingDays(cycle, input.used);
+    if (remaining < available) available = remaining;
+  }
+  return available;
+}
