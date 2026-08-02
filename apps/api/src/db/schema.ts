@@ -150,29 +150,6 @@ export const userLeaveBalances = sqliteTable(
   ],
 );
 
-/** 정기외박 주기 도래로 자동 생성된 적립 원장. */
-export const leaveBalanceGrants = sqliteTable(
-  "leave_balance_grants",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    balanceKey: text("balance_key", { enum: BALANCE_KEYS }).notNull(),
-    days: integer("days").notNull(),
-    effectiveDate: text("effective_date").notNull(),
-    createdAt: text("created_at").notNull(),
-  },
-  (t) => [
-    uniqueIndex("leave_balance_grants_due_unique").on(
-      t.userId,
-      t.balanceKey,
-      t.effectiveDate,
-    ),
-    index("leave_balance_grants_user_idx").on(t.userId),
-  ],
-);
-
 export const regularOvernightConfigs = sqliteTable(
   "regular_overnight_configs",
   {
@@ -180,7 +157,7 @@ export const regularOvernightConfigs = sqliteTable(
       .primaryKey()
       .references(() => users.id, { onDelete: "cascade" }),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
-    // 적립 시작일. 이 날 첫 적립이 이뤄지고 이후 주기마다 반복된다.
+    // 주기 시작일. 1주기가 시작하는 날이며, 첫 적립은 한 주기 뒤에 이뤄진다.
     startDate: text("start_date"),
     intervalDays: integer("interval_days"),
     daysPerGrant: integer("days_per_grant"),
@@ -332,7 +309,6 @@ export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;
-export type LeaveBalanceGrantRow = typeof leaveBalanceGrants.$inferSelect;
 export type RegularOvernightConfigRow =
   typeof regularOvernightConfigs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

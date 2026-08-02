@@ -33,12 +33,7 @@ export function LeaveBalanceSettings(props: { branch: Branch }) {
       </View>
     );
   }
-  return (
-    <SettingsForm
-      branch={props.branch}
-      summary={query.data}
-    />
-  );
+  return <SettingsForm branch={props.branch} summary={query.data} />;
 }
 
 function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
@@ -103,6 +98,24 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
           const balance = props.summary.balances.find(
             (item) => item.key === key,
           );
+          // 주기에서 파생하는 재원은 총량을 직접 고칠 수 없다(주기마다 새로 쌓인다).
+          if (balance?.cycleScoped) {
+            return (
+              <View key={key} style={styles.balanceField}>
+                <Text style={styles.balanceLabel} selectable>
+                  {BALANCE_LABELS[key]}
+                </Text>
+                <Text style={styles.usedLabel} selectable>
+                  이번 주기 사용 {balance.usedDays}일
+                </Text>
+                <View style={styles.derivedValue}>
+                  <Text style={styles.derivedText} selectable>
+                    {balance.totalDays}일
+                  </Text>
+                </View>
+              </View>
+            );
+          }
           return (
             <View key={key} style={styles.balanceField}>
               <Text style={styles.balanceLabel} selectable>
@@ -142,7 +155,7 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
                 정기외박 자동 적립
               </Text>
               <Text style={styles.usedLabel} selectable>
-                적립 시작일부터 주기마다 자동으로 쌓여요
+                한 주기를 채울 때마다 자동으로 쌓여요
               </Text>
             </View>
             <Switch
@@ -154,13 +167,13 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
           {regularEnabled && (
             <>
               <DatePickerRow
-                label="적립 시작일"
+                label="주기 시작일"
                 value={startDate}
                 onChange={setStartDate}
               />
               <Text style={styles.usedLabel} selectable>
-                이 날 처음 적립되고, 이후 {intervalDays}일마다 {daysPerGrant}
-                일씩 반복해서 쌓여요.
+                이 날부터 {intervalDays}일이 지나면 {daysPerGrant}일이 처음
+                적립되고, 이후 {intervalDays}일마다 반복돼요.
                 {config.nextGrantDate
                   ? ` 다음 적립일은 ${config.nextGrantDate}이에요.`
                   : ""}
@@ -228,6 +241,19 @@ const styles = StyleSheet.create({
   balanceInput: {
     minHeight: 42,
     paddingVertical: spacing.sm,
+    fontVariant: ["tabular-nums"],
+  },
+  derivedValue: {
+    minHeight: 42,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceCard,
+  },
+  derivedText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.body,
     fontVariant: ["tabular-nums"],
   },
   regularCard: {

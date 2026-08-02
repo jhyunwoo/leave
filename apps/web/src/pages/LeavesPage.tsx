@@ -69,8 +69,10 @@ export function LeavesPage() {
               <p className="display-xs" style={{ marginTop: 2 }}>
                 {item.remainingDays}일
               </p>
+              {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
               <p className="caption text-mute">
-                총 {item.totalDays} · 사용 {item.usedDays}
+                {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} · 사용{" "}
+                {item.usedDays}
               </p>
             </div>
           ))}

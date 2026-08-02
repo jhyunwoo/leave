@@ -165,6 +165,8 @@ export const leaveBalanceItemSchema = z.object({
   usedDays: z.number(),
   remainingDays: z.number(),
   automaticDays: z.number(),
+  /** 총량·사용량이 이번 주기 기준인지 (정기외박 자동 적립). */
+  cycleScoped: z.boolean(),
 });
 
 export const leaveBalanceSummarySchema = z

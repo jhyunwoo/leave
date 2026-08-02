@@ -201,75 +201,155 @@ test("군별 기본 연가를 제안하고 모든 총량을 수정해 복합 휴
   assert.match(belowUsed.data.error, /이미 3일/);
 });
 
-test("해군·공군 정기외박은 적립 시작일부터 주기마다 적립되고 중복 적립되지 않는다", async () => {
-  const { token } = await signup({ branch: "navy" });
+test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 않는다", async () => {
+  const owner = await signup({ branch: "navy" });
+  const unit = await createUnit(owner.token, { name: uniq("정기외박부대-") });
+  const token = owner.token;
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const daysAgo = (n) => {
-    const date = new Date(`${today}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() - n);
-    return date.toISOString().slice(0, 10);
+  const shift = (from, days) => {
+    const d = new Date(`${from}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
   };
-  const automatic = (data) =>
-    data.balances.find((item) => item.key === "regular_overnight")
-      .automaticDays;
+  const daysAgo = (n) => shift(today, -n);
+  const regular = (data) =>
+    data.balances.find((item) => item.key === "regular_overnight");
+  assert.ok(unit.data.unit.id);
 
-  // 적립 시작일이 오늘이면 첫 주기 한 번만 적립된다.
-  const configured = await req("PUT", "/leaves/regular-overnight", {
+  // 주기 시작일이 오늘이면 1주기는 대기 구간이라 쓸 수 있는 정기외박이 0일이다.
+  const waiting = await req("PUT", "/leaves/regular-overnight", {
     token,
     body: {
       enabled: true,
       startDate: today,
       intervalDays: 42,
-      daysPerGrant: 4,
+      daysPerGrant: 3,
     },
   });
-  assert.equal(configured.status, 200);
-  assert.equal(automatic(configured.data), 4);
-
-  const repeated = await req("GET", "/leaves/balances", { token });
-  assert.equal(automatic(repeated.data), 4, "같은 적립일은 한 번만 적립해야 함");
-  assert.equal(repeated.data.regularOvernight.startDate, today);
-  assert.equal(repeated.data.regularOvernight.intervalDays, 42);
-  assert.equal(repeated.data.regularOvernight.daysPerGrant, 4);
-
-  // 적립 시작일을 84일 전으로 바꾸면 그 사이 도래한 3주기(오늘 포함)가 적립된다.
-  const backdated = await req("PUT", "/leaves/regular-overnight", {
-    token,
-    body: {
-      enabled: true,
-      startDate: daysAgo(84),
-      intervalDays: 42,
-      daysPerGrant: 4,
+  assert.equal(waiting.status, 200);
+  assert.deepEqual(
+    {
+      total: regular(waiting.data).totalDays,
+      remaining: regular(waiting.data).remainingDays,
+      cycleScoped: regular(waiting.data).cycleScoped,
     },
-  });
-  assert.equal(backdated.status, 200);
-  assert.equal(automatic(backdated.data), 12, "도래한 주기 수만큼 적립해야 함");
-  // 다음 적립일은 설정에서 파생돼 내려온다.
-  assert.equal(
-    backdated.data.regularOvernight.nextGrantDate,
-    (() => {
-      const date = new Date(`${daysAgo(84)}T00:00:00Z`);
-      date.setUTCDate(date.getUTCDate() + 126);
-      return date.toISOString().slice(0, 10);
-    })(),
+    { total: 0, remaining: 0, cycleScoped: true },
   );
 
-  // 일정을 앞당기면 예전 일정으로 쌓인 적립분은 새 일정 기준으로 다시 계산된다.
-  const rescheduled = await req("PUT", "/leaves/regular-overnight", {
+  // 1주기에는 정기외박을 쓸 수 없다.
+  const tooEarly = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "1주기 정기외박",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: today,
+          endDate: today,
+        },
+      ],
+    },
+  });
+  assert.equal(tooEarly.status, 400);
+  assert.match(tooEarly.data.error, /첫 적립 전/);
+
+  // 주기 시작일을 126일(3주기) 전으로 옮긴다.
+  // 2주기는 daysAgo(84)~daysAgo(43), 3주기는 daysAgo(42)~daysAgo(1), 4주기가 오늘 시작.
+  await req("PUT", "/leaves/regular-overnight", {
     token,
     body: {
       enabled: true,
-      startDate: daysAgo(10),
+      startDate: daysAgo(126),
       intervalDays: 42,
-      daysPerGrant: 4,
+      daysPerGrant: 3,
     },
   });
-  assert.equal(automatic(rescheduled.data), 4, "예전 일정 적립분은 남지 않음");
+
+  // 지난 2주기·3주기를 한 번도 쓰지 않았지만 쌓이지 않는다 — 이번 주기 몫은 3일뿐.
+  const current = await req("GET", "/leaves/balances", { token });
+  assert.equal(regular(current.data).totalDays, 3, "이월되면 안 됨");
+  assert.equal(regular(current.data).remainingDays, 3);
+  assert.equal(regular(current.data).usedDays, 0);
+
+  // 이번 주기에 2박 3일을 쓰면 잔여가 0이 된다.
+  const used = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "이번 주기 정기외박",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: today,
+          endDate: shift(today, 2),
+        },
+      ],
+    },
+  });
+  assert.equal(used.status, 201);
+  const afterUse = await req("GET", "/leaves/balances", { token });
+  assert.equal(regular(afterUse.data).usedDays, 3);
+  assert.equal(regular(afterUse.data).remainingDays, 0);
+
+  // 같은 주기에 하루 더 쓰려 하면 그 주기 몫을 넘어 거절된다.
+  const over = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "초과 정기외박",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 4),
+          endDate: shift(today, 4),
+        },
+      ],
+    },
+  });
+  assert.equal(over.status, 400);
+  assert.match(over.data.error, /주기.*3일보다 많이/);
+
+  // 지난 주기(3주기)에는 아직 몫이 남아 있어 그 주기 날짜로는 등록된다.
+  const past = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "지난 주기 정기외박",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: daysAgo(10),
+          endDate: daysAgo(8),
+        },
+      ],
+    },
+  });
+  assert.equal(past.status, 201, "지난 주기 몫은 그 주기 날짜로 쓸 수 있어야 함");
+  // 지난 주기에 쓴 건 이번 주기 사용량에 섞이지 않는다.
+  const mixed = await req("GET", "/leaves/balances", { token });
+  assert.equal(regular(mixed.data).usedDays, 3, "이번 주기 사용량만 세야 함");
+
+  // 주기 재원은 총량을 직접 고칠 수 없다 — 다른 재원 저장은 그대로 동작한다.
+  // 클라이언트는 늘 전 재원을 한 번에 보내므로 그대로 흉내낸다.
+  const body = Object.fromEntries(
+    mixed.data.balances.map((item) => [item.key, item.totalDays]),
+  );
+  const totals = await req("PUT", "/leaves/balances", {
+    token,
+    body: { totals: { ...body, regular_overnight: 99, award: 7 } },
+  });
+  assert.equal(totals.status, 200);
+  assert.equal(regular(totals.data).totalDays, 3, "주기 재원 총량은 무시해야 함");
+  assert.equal(
+    totals.data.balances.find((item) => item.key === "award").totalDays,
+    7,
+  );
 });
 
 test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {

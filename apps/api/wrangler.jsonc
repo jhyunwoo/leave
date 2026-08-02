@@ -29,9 +29,6 @@
 		// 웹 오리진으로 제한 (네이티브 앱은 브라우저 CORS 대상이 아니므로 영향 없음)
 		"CORS_ORIGIN": "https://leave-web.moveto.workers.dev"
 	},
-	"triggers": {
-		"crons": ["15 15 * * *"]
-	},
 	"observability": {
 		"enabled": true
 	}

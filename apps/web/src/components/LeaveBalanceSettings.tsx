@@ -22,10 +22,7 @@ export function LeaveBalanceSettings(props: { branch: Branch }) {
     );
   }
   return (
-    <LeaveBalanceSettingsForm
-      branch={props.branch}
-      summary={query.data}
-    />
+    <LeaveBalanceSettingsForm branch={props.branch} summary={query.data} />
   );
 }
 
@@ -102,6 +99,26 @@ function LeaveBalanceSettingsForm(props: {
           const balance = props.summary.balances.find(
             (item) => item.key === key,
           );
+          // 주기에서 파생하는 재원은 총량을 직접 고칠 수 없다(주기마다 새로 쌓인다).
+          if (balance?.cycleScoped) {
+            return (
+              <label key={key} className="field">
+                <span>
+                  {BALANCE_LABELS[key]}
+                  <span className="caption text-mute" style={{ marginLeft: 6 }}>
+                    이번 주기 사용 {balance.usedDays}일
+                  </span>
+                </span>
+                <input
+                  className="input"
+                  type="number"
+                  value={balance.totalDays}
+                  readOnly
+                  disabled
+                />
+              </label>
+            );
+          }
           return (
             <label key={key} className="field">
               <span>
@@ -154,7 +171,7 @@ function LeaveBalanceSettingsForm(props: {
             <span>
               <strong>정기외박 자동 적립</strong>
               <small>
-                적립 시작일부터 주기마다 자동으로 쌓여요 · 현재 자동 적립{" "}
+                한 주기를 채울 때마다 자동으로 쌓여요 · 현재 자동 적립{" "}
                 {props.summary.balances.find(
                   (item) => item.key === "regular_overnight",
                 )?.automaticDays ?? 0}
@@ -174,7 +191,7 @@ function LeaveBalanceSettingsForm(props: {
               }}
             >
               <label className="field">
-                <span>적립 시작일</span>
+                <span>주기 시작일</span>
                 <input
                   className="input"
                   type="date"

@@ -1,6 +1,7 @@
 import {
   cycleFor,
   cycleUsedDays,
+  diffDays,
   effectiveMemberCount,
   fmtRangeTiny,
   maxAllowedOut,
@@ -140,8 +141,15 @@ export function CalendarPage(props: { me: Me }) {
             <p className="cal-cycle-banner">
               정기외박 {currentCycle.index}주기{" "}
               {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
-              {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
-              {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+              {/* 1주기는 첫 적립을 기다리는 구간이라 소진 현황 대신 남은 날을 센다. */}
+              {currentCycle.grantDays === 0 ? (
+                <>첫 적립까지 D-{diffDays(today, currentCycle.end) + 1}</>
+              ) : (
+                <>
+                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
+                  {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+                </>
+              )}
             </p>
           )}
           <CalendarScroll
