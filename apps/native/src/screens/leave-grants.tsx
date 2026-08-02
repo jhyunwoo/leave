@@ -49,6 +49,10 @@ export function LeaveGrantsScreen() {
 
   const { totals, funds, regularOvernight } = page.data;
   const cycleKey = funds.find((fund) => fund.cycleScoped)?.key ?? null;
+  // 앞으로 받을 주기 몫도 남은 휴가에 들어가 있다. 지금 쓸 수 있는 양과 다르므로 밝혀 둔다.
+  const upcomingCycleDays = regularOvernight.cycles
+    .filter((cycle) => cycle.state === "future")
+    .reduce((sum, cycle) => sum + cycle.remainingDays, 0);
   // 적립분이 있거나 이미 쓴 재원만 카드로 편다. 나머지는 아래 칩으로 둔다.
   const active = funds.filter(
     (fund) => !fund.cycleScoped && (fund.grants.length > 0 || fund.usedDays > 0),
@@ -105,6 +109,13 @@ export function LeaveGrantsScreen() {
             <Text style={styles.warning} selectable>
               적립분으로 설명되지 않는 사용 {totals.unattributedDays}일이 있어요.
               적립분을 확인해주세요.
+            </Text>
+          )}
+
+          {upcomingCycleDays > 0 && (
+            <Text style={styles.rule} selectable>
+              전역까지 받을 정기외박 {upcomingCycleDays}일이 남은 휴가에 들어
+              있어요.
             </Text>
           )}
 

@@ -677,8 +677,69 @@ test("주기 목록은 첫 적립일부터 전역일까지 이어진다", async 
   assert.ok(cycles.every((c) => c.grantDays === 3));
   assert.ok(cycles[cycles.length - 1].end >= "2027-07-04");
   assert.equal(cycles.filter((c) => c.state === "current").length, 1);
-  // 주기 재원은 총합 대시보드에서 빠진다.
+  // 주기 재원은 적립분 원장이 아니라 주기 목록에서 셈한다.
   assert.equal(fundOf(page.data, "regular_overnight").cycleScoped, true);
+  assert.equal(fundOf(page.data, "regular_overnight").grants.length, 0);
+});
+
+test("남은 휴가에 앞으로 받을 주기 몫까지 들어간다", async () => {
+  const { token } = await signup({
+    branch: "navy",
+    enlistedAt: "2026-01-05",
+    dischargeAt: "2027-07-04",
+  });
+  await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: "2026-01-05",
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+
+  const page = await req("GET", "/leaves/grants", { token });
+  const { totals, regularOvernight } = page.data;
+  const cycles = regularOvernight.cycles;
+  const sumOf = (state) =>
+    cycles
+      .filter((c) => c.state === state)
+      .reduce((sum, c) => sum + c.remainingDays, 0);
+
+  // 지난 주기 몫은 소멸, 이번·앞으로의 주기 몫은 남은 휴가.
+  const ahead = sumOf("current") + sumOf("future");
+  assert.ok(ahead > 0, "앞으로 받을 주기 몫이 있어야 한다");
+  const funds = page.data.funds.filter((fund) => !fund.cycleScoped);
+  const manual = funds.reduce((sum, fund) => sum + fund.remainingDays, 0);
+  assert.equal(totals.remainingDays, manual + ahead);
+  assert.equal(
+    totals.totalDays,
+    funds.reduce((sum, fund) => sum + fund.totalDays, 0) +
+      cycles.reduce((sum, c) => sum + c.grantDays, 0),
+  );
+  // 소멸에는 지나간 주기의 미사용분이 함께 잡힌다.
+  assert.equal(
+    totals.expiredDays,
+    funds.reduce((sum, fund) => sum + fund.expiredDays, 0) + sumOf("past"),
+  );
+  // 총량 = 사용 + 남은 + 소멸 + 적립 예정 (막대와 부제가 어긋나지 않도록).
+  // 미귀속 사용분이 있으면 이 항등식이 깨지므로 그것부터 확인한다.
+  assert.equal(totals.unattributedDays, 0);
+  assert.equal(
+    totals.totalDays,
+    totals.usedDays +
+      totals.remainingDays +
+      totals.expiredDays +
+      totals.upcomingDays,
+  );
+
+  // 내 휴가 탭이 같은 수를 낼 수 있어야 한다: 이번 주기 잔여 + 앞으로 받을 몫.
+  const balances = await req("GET", "/leaves/balances", { token });
+  const regularItem = balances.data.balances.find(
+    (item) => item.key === "regular_overnight",
+  );
+  assert.equal(regularItem.cycleScoped, true);
+  assert.equal(regularItem.remainingDays + regularItem.upcomingDays, ahead);
 });
 
 test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", async () => {

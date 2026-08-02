@@ -28,7 +28,12 @@ import {
   regularOvernightConfigs,
   type RegularOvernightConfigRow,
 } from "../db/schema";
-import { listGrants, toLeaveGrant, userSegments } from "./leave-grants";
+import {
+  listGrants,
+  regularOvernightSummary,
+  toLeaveGrant,
+  userSegments,
+} from "./leave-grants";
 
 type Db = DrizzleD1Database;
 
@@ -87,7 +92,7 @@ async function regularOvernightSegments(
 
 export async function getLeaveBalanceSummary(
   db: Db,
-  user: { id: string; branch: Branch },
+  user: { id: string; branch: Branch; dischargeAt: string },
 ) {
   const [grantRows, segments, config, regularSegments] = await Promise.all([
     listGrants(db, user.id),
@@ -111,6 +116,13 @@ export async function getLeaveBalanceSummary(
   // 그래서 누적 총량이 아니라 "이번 주기 몫과 그 주기 안 사용량"만 보여준다.
   const cycleBased = isRegularOvernightCycleBased(config);
   const currentCycle = cycleFor(config, today);
+  // 전역까지 앞으로 받을 주기 몫 — 지금 쓸 수는 없지만 보유한 휴가에는 들어간다.
+  const cycles = regularOvernightSummary(
+    config,
+    regularSegments,
+    user.dischargeAt,
+    today,
+  );
 
   const balances: LeaveBalanceItem[] = BALANCE_KEYS.map((key) => {
     if (key === "regular_overnight" && cycleBased) {
@@ -126,8 +138,9 @@ export async function getLeaveBalanceSummary(
         remainingDays: grantDays - usedDays,
         automaticDays: grantDays,
         cycleScoped: true,
+        // 지난 주기에서 날린 몫은 주기별로 봐야 뜻이 통해 보유 휴가 화면에만 둔다.
         expiredDays: 0,
-        upcomingDays: 0,
+        upcomingDays: cycles.totals.upcomingDays,
         unattributedDays: 0,
         grantCount: 0,
         expiringSoonDays: 0,
@@ -183,7 +196,7 @@ export async function getLeaveBalanceSummary(
  */
 export async function updateLeaveBalanceTotals(
   db: Db,
-  user: { id: string; branch: Branch },
+  user: { id: string; branch: Branch; dischargeAt: string },
   totals: Partial<Record<BalanceKey, number>>,
 ) {
   const [grantRows, segments, config] = await Promise.all([
@@ -260,7 +273,7 @@ export async function updateLeaveBalanceTotals(
 
 export async function saveRegularOvernightConfig(
   db: Db,
-  user: { id: string; branch: Branch },
+  user: { id: string; branch: Branch; dischargeAt: string },
   input: RegularOvernightConfigInput,
 ) {
   if (user.branch === "army" && input.enabled) {

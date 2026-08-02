@@ -165,14 +165,8 @@ export function ProfileScreen() {
           </View>
         </View>
 
+        {/* 보유 휴가는 내 휴가 탭에서만 들어간다 — 입구를 하나로 둬야 뒤로가기가 헷갈리지 않는다. */}
         <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
-          {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
-          <Button
-            title="보유 휴가"
-            variant="secondary"
-            onPress={() => router.push("/leave-grants")}
-            style={{ flex: 1 }}
-          />
           <Button
             title="부대 관리"
             variant="secondary"
