@@ -47,12 +47,16 @@ export function checkRegularOvernight(input: {
 /** 세 화면이 같은 문구를 쓰도록 메시지도 여기서 만든다. */
 export function regularOvernightBlockMessage(block: RegularOvernightBlock): string;
 
-/** on 날짜가 속한 주기 기준 잔여. 주기 밖(첫 적립 전·전역 후)이면 0. 재원 칩 숫자용. */
-export function regularOvernightAvailableOn(input: {
+/**
+ * [from, to]가 걸친 주기 기준 잔여(여러 주기면 가장 빡빡한 쪽). 재원 칩 숫자용.
+ * 쓸 수 있는 주기가 없으면(설정 꺼짐·첫 적립 전·전역 후) 0.
+ */
+export function regularOvernightAvailableIn(input: {
   config: RegularOvernightConfig | null | undefined;
-  existing: readonly SegmentLike[];
+  used: readonly SegmentLike[];
   dischargeAt: ISODate;
-  on: ISODate;
+  from: ISODate;
+  to: ISODate;
 }): number;
 ```
 
@@ -120,7 +124,7 @@ export function regularOvernightAvailableOn(input: {
   - 첫 적립 전이면 `before_first_grant`.
   - 적립일이 전역 뒤인 주기는 `after_discharge`.
   - 설정이 꺼져 있으면 항상 `null`.
-  - `regularOvernightAvailableOn`이 주기 밖에서 0, 주기 안에서 잔여를 준다.
+  - `regularOvernightAvailableIn`이 주기 밖에서 0, 주기 안에서 잔여를, 초과 상태에서 음수를 준다.
 - `apps/api/test/leaves.test.mjs` — 기존 "해군·공군 정기외박은 주기 안에서만 쓰이고
   이월되지 않는다" 테스트에 이어서:
   - 미래 주기 날짜로 등록이 201로 성공한다.
