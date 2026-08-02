@@ -55,7 +55,11 @@ export function CalendarScreen() {
   const me = useMe();
   const today = todayInSeoul();
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  // 폼을 열었는지와 폼의 시작일을 한 값으로 둔다. 날짜 시트를 닫으면서 열어야
+  // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
+  const [formDate, setFormDate] = useState<ISODate | null>(null);
+  // 시트가 닫히기를 기다리는 폼 시작일. 아래 openForm 주석 참고.
+  const pendingFormDate = useRef<ISODate | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
@@ -177,6 +181,29 @@ export function CalendarScreen() {
       ? `하루 최대 ${unit.maxLeaveCount}명 직접 지정 · 빨간 배경은 초과`
       : `하루 최대 ${allowed}명 (${unit.maxLeaveNumerator}/${unit.maxLeaveDenominator}) · 빨간 배경은 초과`;
 
+  /**
+   * 휴가 등록 폼을 연다. 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌 뒤에 연다.
+   *
+   * iOS는 한 화면에 모달을 하나만 띄울 수 있다. 시트가 떠 있는 채로 폼을 열면
+   * UIKit이 표시를 거부하는데, RN은 거부되기 전에 이미 "표시됨"으로 표시해둬서
+   * 그 상태가 그대로 굳는다. 그러면 폼은 영영 뜨지 않고, 굳은 모달이 화면을
+   * 덮은 채 남아 달력의 스크롤·날짜 탭까지 먹통이 된다.
+   */
+  const openForm = (date: ISODate) => {
+    if (selectedDate == null) {
+      setFormDate(date);
+      return;
+    }
+    setSelectedDate(null);
+    if (process.env.EXPO_OS === "ios") {
+      // 시트의 onDismiss(닫힘 애니메이션까지 끝난 시점)에서 이어서 연다.
+      pendingFormDate.current = date;
+    } else {
+      // 안드로이드 모달은 Dialog라 겹쳐도 되고, onDismiss도 오지 않는다.
+      setFormDate(date);
+    }
+  };
+
   return (
     <>
       <View style={styles.root}>
@@ -190,9 +217,11 @@ export function CalendarScreen() {
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
-            onSelectDate={(d) =>
-              setSelectedDate((cur) => (cur === d ? null : d))
-            }
+            onSelectDate={(d) => {
+              // 새 날짜를 고르면 대기 중이던 폼 요청은 무효로 본다.
+              pendingFormDate.current = null;
+              setSelectedDate((cur) => (cur === d ? null : d));
+            }}
           />
         </BlurTargetView>
 
@@ -215,7 +244,7 @@ export function CalendarScreen() {
               <Button
                 title="휴가 등록"
                 size="sm"
-                onPress={() => setFormOpen(true)}
+                onPress={() => openForm(selectedDate ?? today)}
               />
             </>
           }
@@ -250,6 +279,13 @@ export function CalendarScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setSelectedDate(null)}
+        // iOS에서만 온다. 시트가 완전히 닫힌 뒤라야 폼을 띄울 수 있다.
+        onDismiss={() => {
+          const pending = pendingFormDate.current;
+          if (!pending) return;
+          pendingFormDate.current = null;
+          setFormDate(pending);
+        }}
       >
         <Pressable
           style={styles.sheetBackdrop}
@@ -274,7 +310,7 @@ export function CalendarScreen() {
                     date={selectedDate}
                     myUserId={me.data?.user.id}
                     cycle={cycleFor(regularOvernight, selectedDate)}
-                    onAddLeave={() => setFormOpen(true)}
+                    onAddLeave={() => openForm(selectedDate)}
                   />
                 </ScrollView>
               ) : (
@@ -286,11 +322,11 @@ export function CalendarScreen() {
         </Pressable>
       </Modal>
 
-      {formOpen && (
+      {formDate && (
         <LeaveFormModal
-          visible={formOpen}
-          initialDate={selectedDate ?? today}
-          onClose={() => setFormOpen(false)}
+          visible
+          initialDate={formDate}
+          onClose={() => setFormDate(null)}
         />
       )}
     </>

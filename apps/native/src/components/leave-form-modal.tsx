@@ -1,12 +1,17 @@
 import {
   addDays,
   BALANCE_LABELS,
+  balanceKeyToCategory,
+  checkRegularOvernight,
   draftDaysByKey,
   draftsToSegments,
   fitDrafts,
   fmtDateShort,
   inclusiveDays,
+  isRegularOvernightCycleBased,
   leaveCreateSchema,
+  regularOvernightAvailableIn,
+  regularOvernightBlockMessage,
   removeDraft,
   resolveDrafts,
   segmentBalanceKey,
@@ -16,6 +21,7 @@ import {
   type BalanceKey,
   type LeaveCreateInput,
   type SegmentDraft,
+  type SegmentLike,
 } from "@leave/shared";
 import { useMemo, useState } from "react";
 import {
@@ -32,6 +38,8 @@ import type { MyLeave } from "@/api/queries";
 import {
   useCreateLeave,
   useLeaveBalances,
+  useMe,
+  useMyLeaves,
   useUpdateLeave,
 } from "@/api/queries";
 import { Button } from "./button";
@@ -48,6 +56,8 @@ export function LeaveFormModal(props: {
 }) {
   const editing = props.editing ?? null;
   const balances = useLeaveBalances();
+  const me = useMe();
+  const myLeaves = useMyLeaves();
   const [title, setTitle] = useState(editing?.title ?? "");
   const [startDate, setStartDate] = useState(
     editing?.startDate ?? props.initialDate ?? "",
@@ -99,6 +109,43 @@ export function LeaveFormModal(props: {
     return result;
   }, [balances.data, editing]);
 
+  const regularConfig = balances.data?.regularOvernight ?? null;
+  const cycleBased = isRegularOvernightCycleBased(regularConfig);
+  const dischargeAt = me.data?.user.dischargeAt ?? "";
+
+  // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+  const savedRegular = useMemo<SegmentLike[]>(
+    () =>
+      (myLeaves.data?.leaves ?? [])
+        .filter((leave) => leave.id !== editing?.id)
+        .flatMap((leave) => leave.segments),
+    [myLeaves.data, editing],
+  );
+
+  // 폼이 이번에 정기외박으로 잡아둔 구간.
+  const draftRegular = useMemo<SegmentLike[]>(
+    () =>
+      resolved
+        .filter((draft) => draft.key === "regular_overnight")
+        .map((draft) => ({
+          ...balanceKeyToCategory(draft.key),
+          startDate: draft.startDate,
+          endDate: draft.endDate,
+        })),
+    [resolved],
+  );
+
+  // 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
+  const regularBlock = useMemo(() => {
+    if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
+    return checkRegularOvernight({
+      config: regularConfig,
+      existing: savedRegular,
+      requested: draftRegular,
+      dischargeAt,
+    });
+  }, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
+
   // 폼에서 이미 배정한 몫까지 뺀 실제 남은 일수(재원 선택 칩에 보여준다).
   const availableByKey = useMemo(() => {
     const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
@@ -106,8 +153,26 @@ export function LeaveFormModal(props: {
     for (const [key, days] of used) {
       result.set(key, (result.get(key) ?? 0) - days);
     }
+    // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
+    // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
+    if (cycleBased) result.delete("regular_overnight");
     return result;
-  }, [remainingByKey, validRange, startDate, drafts]);
+  }, [remainingByKey, validRange, startDate, drafts, cycleBased]);
+
+  /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
+  const rowAvailable = (from: string, to: string) => {
+    if (!cycleBased) return availableByKey;
+    return new Map(availableByKey).set(
+      "regular_overnight",
+      regularOvernightAvailableIn({
+        config: regularConfig,
+        used: [...savedRegular, ...draftRegular],
+        dischargeAt,
+        from,
+        to,
+      }),
+    );
+  };
 
   const overused = [...availableByKey.entries()].filter(
     ([, remaining]) => remaining < 0,
@@ -116,6 +181,7 @@ export function LeaveFormModal(props: {
     validRange &&
     drafts.length > 0 &&
     !overused.length &&
+    !regularBlock &&
     title.trim().length > 0;
 
   const submit = async () => {
@@ -227,7 +293,10 @@ export function LeaveFormModal(props: {
                     isLast={isLast}
                     removable={resolved.length > 1}
                     maxEnd={maxEnd}
-                    remainingByKey={availableByKey}
+                    remainingByKey={rowAvailable(
+                      draft.startDate,
+                      draft.endDate,
+                    )}
                     onChangeKey={(key) =>
                       setDrafts((current) =>
                         current.map((item, i) =>
@@ -275,14 +344,17 @@ export function LeaveFormModal(props: {
             )}
           </View>
 
-          {overused.length > 0 && (
+          {(overused.length > 0 || regularBlock) && (
             <Text selectable style={styles.error}>
-              {overused
-                .map(
+              {[
+                ...overused.map(
                   ([key, remaining]) =>
                     `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
-                )
-                .join(", ")}
+                ),
+                ...(regularBlock
+                  ? [regularOvernightBlockMessage(regularBlock)]
+                  : []),
+              ].join(", ")}
             </Text>
           )}
 

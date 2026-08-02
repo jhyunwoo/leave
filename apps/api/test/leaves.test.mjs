@@ -313,7 +313,7 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     },
   });
   assert.equal(over.status, 400);
-  assert.match(over.data.error, /주기.*3일보다 많이/);
+  assert.match(over.data.error, /주기.*몫 3일을 1일 초과/);
 
   // 지난 주기(2주기)에는 아직 몫이 남아 있어 그 주기 날짜로는 등록된다.
   const past = await req("POST", "/leaves", {
@@ -350,6 +350,133 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     totals.data.balances.find((item) => item.key === "award").totalDays,
     7,
   );
+});
+
+test("아직 오지 않은 정기외박 주기도 그 몫 안에서 미리 쓸 수 있다", async () => {
+  const owner = await signup({ branch: "navy" });
+  await createUnit(owner.token, { name: uniq("미래주기부대-") });
+  const token = owner.token;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const shift = (from, days) => {
+    const d = new Date(`${from}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // 주기 시작일이 42일 전이면 첫 적립이 오늘이다. 1주기는 오늘~오늘+41,
+  // 2주기는 오늘+42~오늘+83, 3주기는 오늘+84부터.
+  const saved = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: shift(today, -42),
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+  assert.equal(saved.status, 200);
+
+  // 이번 주기 몫을 다 써도 다음 주기에는 영향이 없다.
+  const thisCycle = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "이번 주기",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: today,
+          endDate: shift(today, 2),
+        },
+      ],
+    },
+  });
+  assert.equal(thisCycle.status, 201);
+
+  // 아직 오지 않은 2주기 날짜로 등록된다 — 이게 이번 변경의 핵심.
+  const nextCycle = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "다음 주기 미리 등록",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 50),
+          endDate: shift(today, 52),
+        },
+      ],
+    },
+  });
+  assert.equal(
+    nextCycle.status,
+    201,
+    `미래 주기는 허용해야 함: ${JSON.stringify(nextCycle.data)}`,
+  );
+
+  // 그 미래 주기 몫을 넘기면 여전히 막는다.
+  const tooMuch = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "다음 주기 초과",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 60),
+          endDate: shift(today, 60),
+        },
+      ],
+    },
+  });
+  assert.equal(tooMuch.status, 400);
+  assert.match(tooMuch.data.error, /몫 3일을 1일 초과/);
+});
+
+test("적립일이 전역일 뒤인 정기외박 주기는 미리 쓸 수 없다", async () => {
+  // 전역이 2026-12-31이고 주기 시작일이 2026-01-01, 주기 42일이면
+  // 첫 적립은 2026-02-12, 이후 42일마다. 2027년 날짜가 속한 주기는
+  // 적립일이 전역 뒤라 몫을 받지 못한다.
+  const owner = await signup({
+    branch: "air_force",
+    enlistedAt: "2026-01-05",
+    dischargeAt: "2026-12-31",
+  });
+  await createUnit(owner.token, { name: uniq("전역후부대-") });
+  const token = owner.token;
+
+  const saved = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: "2026-01-01",
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+  assert.equal(saved.status, 200);
+
+  const afterDischarge = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "전역 후 주기",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2027-03-01",
+          endDate: "2027-03-02",
+        },
+      ],
+    },
+  });
+  assert.equal(afterDischarge.status, 400);
+  assert.match(afterDischarge.data.error, /전역일 뒤/);
 });
 
 test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
@@ -677,8 +804,69 @@ test("주기 목록은 첫 적립일부터 전역일까지 이어진다", async 
   assert.ok(cycles.every((c) => c.grantDays === 3));
   assert.ok(cycles[cycles.length - 1].end >= "2027-07-04");
   assert.equal(cycles.filter((c) => c.state === "current").length, 1);
-  // 주기 재원은 총합 대시보드에서 빠진다.
+  // 주기 재원은 적립분 원장이 아니라 주기 목록에서 셈한다.
   assert.equal(fundOf(page.data, "regular_overnight").cycleScoped, true);
+  assert.equal(fundOf(page.data, "regular_overnight").grants.length, 0);
+});
+
+test("남은 휴가에 앞으로 받을 주기 몫까지 들어간다", async () => {
+  const { token } = await signup({
+    branch: "navy",
+    enlistedAt: "2026-01-05",
+    dischargeAt: "2027-07-04",
+  });
+  await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: "2026-01-05",
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+
+  const page = await req("GET", "/leaves/grants", { token });
+  const { totals, regularOvernight } = page.data;
+  const cycles = regularOvernight.cycles;
+  const sumOf = (state) =>
+    cycles
+      .filter((c) => c.state === state)
+      .reduce((sum, c) => sum + c.remainingDays, 0);
+
+  // 지난 주기 몫은 소멸, 이번·앞으로의 주기 몫은 남은 휴가.
+  const ahead = sumOf("current") + sumOf("future");
+  assert.ok(ahead > 0, "앞으로 받을 주기 몫이 있어야 한다");
+  const funds = page.data.funds.filter((fund) => !fund.cycleScoped);
+  const manual = funds.reduce((sum, fund) => sum + fund.remainingDays, 0);
+  assert.equal(totals.remainingDays, manual + ahead);
+  assert.equal(
+    totals.totalDays,
+    funds.reduce((sum, fund) => sum + fund.totalDays, 0) +
+      cycles.reduce((sum, c) => sum + c.grantDays, 0),
+  );
+  // 소멸에는 지나간 주기의 미사용분이 함께 잡힌다.
+  assert.equal(
+    totals.expiredDays,
+    funds.reduce((sum, fund) => sum + fund.expiredDays, 0) + sumOf("past"),
+  );
+  // 총량 = 사용 + 남은 + 소멸 + 적립 예정 (막대와 부제가 어긋나지 않도록).
+  // 미귀속 사용분이 있으면 이 항등식이 깨지므로 그것부터 확인한다.
+  assert.equal(totals.unattributedDays, 0);
+  assert.equal(
+    totals.totalDays,
+    totals.usedDays +
+      totals.remainingDays +
+      totals.expiredDays +
+      totals.upcomingDays,
+  );
+
+  // 내 휴가 탭이 같은 수를 낼 수 있어야 한다: 이번 주기 잔여 + 앞으로 받을 몫.
+  const balances = await req("GET", "/leaves/balances", { token });
+  const regularItem = balances.data.balances.find(
+    (item) => item.key === "regular_overnight",
+  );
+  assert.equal(regularItem.cycleScoped, true);
+  assert.equal(regularItem.remainingDays + regularItem.upcomingDays, ahead);
 });
 
 test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", async () => {

@@ -34,17 +34,19 @@ export function LeavesScreen() {
   const headerHeight = useScreenHeaderHeight({ subtitle: true });
   const router = useRouter();
 
-  // 주기 재원은 이월되지 않아 총량 개념이 달라 요약에서 뺀다.
-  const holdings = (balances.data?.balances ?? [])
-    .filter((item) => !item.cycleScoped)
-    .reduce(
-      (sum, item) => ({
-        remaining: sum.remaining + item.remainingDays,
-        expiringSoon: sum.expiringSoon + item.expiringSoonDays,
-        expired: sum.expired + item.expiredDays,
-      }),
-      { remaining: 0, expiringSoon: 0, expired: 0 },
-    );
+  // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫(upcomingDays)까지
+  // 더한다. 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
+  const holdings = (balances.data?.balances ?? []).reduce(
+    (sum, item) => ({
+      remaining:
+        sum.remaining +
+        item.remainingDays +
+        (item.cycleScoped ? item.upcomingDays : 0),
+      expiringSoon: sum.expiringSoon + item.expiringSoonDays,
+      expired: sum.expired + item.expiredDays,
+    }),
+    { remaining: 0, expiringSoon: 0, expired: 0 },
+  );
 
   const confirmDelete = (leave: MyLeave) => {
     Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [

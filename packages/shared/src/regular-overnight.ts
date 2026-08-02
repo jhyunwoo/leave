@@ -14,6 +14,7 @@
  * 구간이라 어떤 주기에도 속하지 않고, 그 사이에는 쓸 수 있는 정기외박도 없다.
  */
 
+import { fmtDateShort, fmtRangeTiny } from "./calendar";
 import { addDays, diffDays, type ISODate } from "./dates";
 import { segmentBalanceKey, type LeaveSegment } from "./leave";
 
@@ -287,4 +288,114 @@ export function cycleState(
   if (today < cycle.start) return "future";
   if (today > cycle.end) return "past";
   return "current";
+}
+
+/** 정기외박을 쓸 수 없는 이유. 없으면 null이 온다. */
+export type RegularOvernightBlock =
+  /** 첫 적립 전이라 아직 받은 몫이 없다. */
+  | { kind: "before_first_grant"; firstGrantDate: ISODate }
+  /** 적립일이 전역일 뒤라 그 주기 몫을 애초에 받지 못한다. */
+  | { kind: "after_discharge"; cycle: RegularOvernightCycle }
+  /** 그 주기 몫보다 많이 쓴다. usedDays는 이미 쓴 것까지 더한 값. */
+  | { kind: "over_cycle"; cycle: RegularOvernightCycle; usedDays: number };
+
+/**
+ * 요청한 구간을 정기외박으로 쓸 수 있는지 본다. 막을 이유가 있으면 첫 번째 이유를,
+ * 없으면 null을 돌려준다. 앱·웹 폼과 서버가 같은 규칙을 쓰도록 여기 한 곳에 둔다.
+ *
+ * 판정은 오늘이 아니라 "그 날짜가 속한 주기" 기준이라, 아직 오지 않은 주기라도
+ * 그 몫 안이면 미리 쓸 수 있다. 대신 적립일이 전역 뒤인 주기는 받지 못하므로 막는다.
+ *
+ * existing은 이미 저장된 구간이다. 수정이라면 부르는 쪽이 그 휴가의 구간을 빼서 넘긴다.
+ * 요청이 건드리지 않은 주기는 보지 않는다 — 이미 어긋나 있는 과거를 새 등록의 이유로
+ * 삼지 않는다.
+ */
+export function checkRegularOvernight(input: {
+  config: RegularOvernightConfig | null | undefined;
+  existing: readonly SegmentLike[];
+  requested: readonly SegmentLike[];
+  dischargeAt: ISODate;
+}): RegularOvernightBlock | null {
+  const active = activeConfig(input.config);
+  // 자동 적립을 안 쓰면 정기외박도 여느 재원처럼 적립분으로 따진다 — 여기서 막지 않는다.
+  if (!active) return null;
+
+  const requestedUsage = regularOvernightUsageByCycle(
+    input.config,
+    input.requested,
+  );
+  if (requestedUsage.beforeFirstGrantDays > 0) {
+    return { kind: "before_first_grant", firstGrantDate: firstGrantOf(active) };
+  }
+  if (!requestedUsage.cycles.length) return null;
+
+  for (const { cycle } of requestedUsage.cycles) {
+    if (cycle.start > input.dischargeAt) {
+      return { kind: "after_discharge", cycle };
+    }
+  }
+
+  // 이미 저장된 구간에 이번 요청을 더해 주기별 사용량을 다시 센다.
+  const after = regularOvernightUsageByCycle(input.config, [
+    ...input.existing,
+    ...input.requested,
+  ]);
+  const usedByCycleStart = new Map(
+    after.cycles.map((entry) => [entry.cycle.start, entry.usedDays]),
+  );
+  for (const { cycle } of requestedUsage.cycles) {
+    const usedDays = usedByCycleStart.get(cycle.start) ?? 0;
+    if (usedDays > cycle.grantDays) {
+      return { kind: "over_cycle", cycle, usedDays };
+    }
+  }
+  return null;
+}
+
+/** 막힌 이유를 사용자에게 보여줄 한 문장으로. 서버 오류와 폼 오류가 같은 문구를 쓴다. */
+export function regularOvernightBlockMessage(
+  block: RegularOvernightBlock,
+): string {
+  if (block.kind === "before_first_grant") {
+    return `정기외박은 첫 적립일(${fmtDateShort(block.firstGrantDate)}) 이후부터 사용할 수 있습니다`;
+  }
+  const { cycle } = block;
+  const label = `정기외박 ${cycle.index}주기(${fmtRangeTiny(cycle.start, cycle.end)})`;
+  if (block.kind === "after_discharge") {
+    return `${label}는 적립일이 전역일 뒤라 쓸 수 없어요`;
+  }
+  return `${label} 몫 ${cycle.grantDays}일을 ${block.usedDays - cycle.grantDays}일 초과했어요`;
+}
+
+/**
+ * [from, to]가 걸친 주기들 기준으로 쓸 수 있는 정기외박 일수. 여러 주기에 걸치면
+ * 가장 빡빡한 주기를 따른다(그 주기가 먼저 막히므로).
+ *
+ * 폼의 재원 칩 숫자에 쓴다. 초과분은 음수로 그대로 내보내서 "칩 숫자 < 0"과
+ * checkRegularOvernight이 막는 순간이 어긋나지 않게 한다.
+ * 쓸 수 있는 주기가 하나도 없으면(설정이 꺼졌거나, 첫 적립 전이 끼었거나,
+ * 적립일이 전역 뒤인 주기가 끼었거나) 0.
+ */
+export function regularOvernightAvailableIn(input: {
+  config: RegularOvernightConfig | null | undefined;
+  used: readonly SegmentLike[];
+  dischargeAt: ISODate;
+  from: ISODate;
+  to: ISODate;
+}): number {
+  const active = activeConfig(input.config);
+  if (!active) return 0;
+  // cyclesInRange는 첫 적립 전을 잘라내므로, 범위가 그 앞에서 시작하면 따로 막는다.
+  if (input.from < firstGrantOf(active)) return 0;
+
+  const cycles = cyclesInRange(input.config, input.from, input.to);
+  if (!cycles.length) return 0;
+
+  let available = Infinity;
+  for (const cycle of cycles) {
+    if (cycle.start > input.dischargeAt) return 0;
+    const remaining = cycleRemainingDays(cycle, input.used);
+    if (remaining < available) available = remaining;
+  }
+  return available;
 }

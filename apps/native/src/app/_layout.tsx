@@ -3,65 +3,39 @@ import { type ErrorBoundaryProps, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
 import { loadStoredToken, setUnauthorizedHandler } from "@/api/client";
+import { ErrorScreen } from "@/components/error-screen";
+import { persistFatalError, toFatalRecord } from "@/lib/fatal-error";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { setSessionAtom, tokenAtom } from "@/state/auth";
-import { colors, radius, spacing } from "@/theme";
+import { colors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 
 /**
- * 렌더 중 발생한 예외를 여기서 잡는다. 이게 없으면 프로덕션 빌드에서 렌더 에러가
- * RCTFatal로 올라가고, expo-updates가 복구용 업데이트를 찾지 못하면 앱이 그대로
- * 종료된다 (build 14 실행 즉시 종료의 실제 경로).
+ * 라우트 트리 안에서 난 렌더 오류를 잡는다. 이게 없으면 프로덕션에서 렌더 오류가
+ * 경계 없이 위로 올라가 RCTFatal로 앱이 종료된다.
+ *
+ * 이 경계는 라우트 트리 안쪽만 덮는다. 그 바깥은 index.js의 RootErrorBoundary가
+ * 맡는다. 여기서도 내용을 남겨야 다음 실행에서 원인을 되짚을 수 있다.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  void SplashScreen.hideAsync();
+  const record = useMemo(() => toFatalRecord(error), [error]);
+  useEffect(() => {
+    void SplashScreen.hideAsync();
+    persistFatalError(record);
+  }, [record]);
   return (
-    <View style={errorStyles.root}>
-      <Text style={errorStyles.title}>문제가 발생했어요</Text>
-      <Text style={errorStyles.body}>
-        화면을 그리는 중 오류가 났어요. 다시 시도해도 계속되면 잠시 후
-        열어주세요.
-      </Text>
-      <Text style={errorStyles.detail} selectable numberOfLines={6}>
-        {error.message}
-      </Text>
-      <Pressable style={errorStyles.button} onPress={() => void retry()}>
-        <Text style={errorStyles.buttonLabel}>다시 시도</Text>
-      </Pressable>
-    </View>
+    <ErrorScreen
+      title="문제가 발생했어요"
+      body="화면을 그리는 중 오류가 났어요. 다시 시도해도 계속되면 아래 내용을 알려주세요."
+      record={record}
+      actionLabel="다시 시도"
+      onAction={() => void retry()}
+    />
   );
 }
-
-const errorStyles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "center",
-    gap: spacing.md,
-    padding: spacing.xl,
-    backgroundColor: colors.canvas,
-  },
-  title: { fontSize: 24, fontWeight: "900", color: colors.ink },
-  body: { fontSize: 15, lineHeight: 22, color: colors.body },
-  detail: {
-    fontSize: 12,
-    color: colors.mute,
-    backgroundColor: colors.surfaceCard,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  button: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
-  buttonLabel: { fontSize: 15, fontWeight: "600", color: colors.onPrimary },
-});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -134,6 +108,8 @@ function RootNavigator() {
           options={{
             headerShown: true,
             title: "보유 휴가",
+            // 탭은 헤더를 숨겨 제목이 없으므로, 돌아갈 곳을 뒤로가기에 직접 적는다.
+            headerBackTitle: "내 휴가",
             headerStyle: { backgroundColor: colors.canvas },
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}

@@ -16,6 +16,7 @@ import {
   cyclesInRange,
   isRegularOvernightCycleBased,
   nextGrantDateAfter,
+  normalizeLegacyDischargeDate,
   todayInSeoul,
   type BalanceKey,
   type Branch,
@@ -35,10 +36,33 @@ import {
 } from "../db/schema";
 
 type Db = DrizzleD1Database;
-type User = { id: string; branch: Branch; dischargeAt: string };
+type User = {
+  id: string;
+  branch: Branch;
+  enlistedAt: string;
+  dischargeAt: string;
+};
 
 /** 주기가 아무리 촘촘해도 화면에 쏟아내지 않도록 두는 상한. */
 const MAX_LISTED_CYCLES = 200;
+
+/**
+ * 주기 계산에 쓰는 전역일.
+ *
+ * DB 원본은 구버전 기본값이 그대로 남아 있을 수 있어, 폼이 /auth/me에서 받는 값과
+ * 다를 수 있다. 정규화해서 폼과 서버가 같은 상한을 보게 한다.
+ */
+export function cycleDischargeDate(user: {
+  enlistedAt: string;
+  branch: Branch;
+  dischargeAt: string;
+}): string {
+  return normalizeLegacyDischargeDate(
+    user.enlistedAt,
+    user.branch,
+    user.dischargeAt,
+  );
+}
 
 export function toLeaveGrant(row: LeaveGrantRow): LeaveGrant {
   return {
@@ -174,6 +198,12 @@ export async function buildGrantsPage(db: Db, user: User) {
   const grants = grantRows.map(toLeaveGrant);
   const allocations = allocateAllGrants(grants, segments, today);
   const cycleBased = isRegularOvernightCycleBased(config);
+  const cycles = regularOvernightSummary(
+    config,
+    segments,
+    cycleDischargeDate(user),
+    today,
+  );
 
   const funds = BALANCE_KEYS.map((key) => {
     const allocation = allocations[key];
@@ -206,15 +236,23 @@ export async function buildGrantsPage(db: Db, user: User) {
     };
   });
 
-  // 대시보드 합계는 주기 재원을 뺀 값이다(주기 몫은 이월되지 않아 총량 개념이 다르다).
+  // 주기 재원은 적립분 원장이 없어 재원 합계로는 0이다. 대신 아래 주기 목록에서 뽑은
+  // 합계를 얹는다 — 전역까지 받을 몫까지 세야 "앞으로 쓸 수 있는 휴가"가 된다.
   const countable = funds.filter((fund) => !fund.cycleScoped);
+  const sum = (pick: (fund: (typeof funds)[number]) => number) =>
+    countable.reduce((acc, fund) => acc + pick(fund), 0);
   const totals = {
-    totalDays: countable.reduce((sum, f) => sum + f.totalDays, 0),
-    usedDays: countable.reduce((sum, f) => sum + f.usedDays, 0),
-    remainingDays: countable.reduce((sum, f) => sum + f.remainingDays, 0),
-    expiredDays: countable.reduce((sum, f) => sum + f.expiredDays, 0),
-    upcomingDays: countable.reduce((sum, f) => sum + f.upcomingDays, 0),
-    unattributedDays: countable.reduce((sum, f) => sum + f.unattributedDays, 0),
+    totalDays: sum((f) => f.totalDays) + cycles.totals.totalDays,
+    usedDays: sum((f) => f.usedDays) + cycles.totals.usedDays,
+    // 아직 오지 않은 주기 몫도 남은 휴가로 센다. 만기가 정해진 적립분과 달리 주기 몫은
+    // 복무 중이면 반드시 들어오므로, 지금 못 쓴다는 이유로 빼면 실제보다 적게 보인다.
+    remainingDays:
+      sum((f) => f.remainingDays) +
+      cycles.totals.remainingDays +
+      cycles.totals.upcomingDays,
+    expiredDays: sum((f) => f.expiredDays) + cycles.totals.expiredDays,
+    upcomingDays: sum((f) => f.upcomingDays),
+    unattributedDays: sum((f) => f.unattributedDays),
   };
 
   return {
@@ -227,9 +265,47 @@ export async function buildGrantsPage(db: Db, user: User) {
       intervalDays: config?.intervalDays ?? null,
       daysPerGrant: config?.daysPerGrant ?? null,
       nextGrantDate: nextGrantDateAfter(config, today),
-      cycles: buildCycleList(config, segments, user.dischargeAt, today),
+      cycles: cycles.list,
     },
   };
+}
+
+/**
+ * 주기 목록과 그 합계.
+ *
+ * 주기 몫은 이월되지 않아 재원 하나의 총량이라는 개념이 없다. 그래도 화면에 펼치는
+ * 주기를 그대로 합산하면 대시보드 숫자와 아래 주기 목록이 어긋나지 않는다.
+ * 지난 주기의 미사용분은 그 주기와 함께 사라지므로 소멸로 센다.
+ */
+export function regularOvernightSummary(
+  config: RegularOvernightConfigRow | undefined,
+  segments: Awaited<ReturnType<typeof userSegments>>,
+  dischargeAt: string,
+  today: string,
+) {
+  const list = buildCycleList(config, segments, dischargeAt, today);
+  const totals = {
+    totalDays: 0,
+    usedDays: 0,
+    /** 이번 주기의 잔여 — 지금 쓸 수 있는 몫. */
+    remainingDays: 0,
+    /** 아직 오지 않은 주기의 잔여 — 앞으로 받을 몫. */
+    upcomingDays: 0,
+    /** 지난 주기에서 못 쓰고 날린 몫. */
+    expiredDays: 0,
+  };
+  for (const cycle of list) {
+    totals.totalDays += cycle.grantDays;
+    totals.usedDays += cycle.usedDays;
+    if (cycle.state === "past") {
+      totals.expiredDays += cycle.remainingDays;
+    } else if (cycle.state === "future") {
+      totals.upcomingDays += cycle.remainingDays;
+    } else {
+      totals.remainingDays += cycle.remainingDays;
+    }
+  }
+  return { list, totals };
 }
 
 function buildCycleList(
