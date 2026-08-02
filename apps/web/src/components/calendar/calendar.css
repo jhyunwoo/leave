@@ -202,6 +202,11 @@
   font-weight: 600;
   color: var(--mute);
 }
+/* 아무도 안 나간 날은 흐리게 깔아 그리드를 조용히 둔다. */
+.cal-count.is-empty {
+  color: var(--muted-soft);
+  font-weight: 500;
+}
 .cal-count.is-exceeded {
   color: #fff;
   background: var(--negative);

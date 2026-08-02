@@ -34,7 +34,7 @@ import { colors, spacing } from "@/theme";
 
 const INITIAL_SPAN = 2;
 const PAGE_SIZE = 6;
-const CELL_H = 72; // month-calendar 셀 minHeight와 동일
+const CELL_H = 92; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
 const LABEL_H = 64;

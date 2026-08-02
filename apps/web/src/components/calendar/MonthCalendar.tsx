@@ -97,7 +97,7 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 휴가 ${stat?.count ?? 0}명${exceeded ? ", 최대 출타 인원 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 출타 ${stat?.count ?? 0}명 허용 ${stat?.allowed ?? 0}명${exceeded ? ", 최대 출타 인원 초과" : ""}`
                     : undefined
                 }
                 className={[
@@ -141,8 +141,8 @@ export function MonthCalendar(props: {
                     )}
                   </span>
                 )}
-                {/* 내 휴가가 있는 날은 재원 칩, 없으면 부대 출타율. */}
-                {cell.inMonth && mine ? (
+                {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
+                {cell.inMonth && mine && (
                   <span
                     className={[
                       "cal-mine",
@@ -153,16 +153,19 @@ export function MonthCalendar(props: {
                   >
                     {mine.isSegmentStart ? BALANCE_LABELS[mine.key] : ""}
                   </span>
-                ) : (
-                  cell.inMonth &&
-                  stat &&
-                  stat.count > 0 && (
-                    <span
-                      className={`cal-count ${exceeded ? "is-exceeded" : ""}`}
-                    >
-                      {stat.count}/{stat.allowed}
-                    </span>
-                  )
+                )}
+                {/* 부대 출타 인원은 날짜를 열어보지 않아도 되게 늘 보여준다.
+                    아무도 안 나간 날은 흐리게 깔아 그리드를 조용히 둔다. */}
+                {cell.inMonth && stat && (
+                  <span
+                    className={[
+                      "cal-count",
+                      stat.count === 0 ? "is-empty" : "",
+                      exceeded ? "is-exceeded" : "",
+                    ].join(" ")}
+                  >
+                    {stat.count}/{stat.allowed}
+                  </span>
                 )}
                 {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
                 {cycle && (

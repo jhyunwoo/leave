@@ -45,7 +45,11 @@ export function MonthCalendar(props: {
     () => new Map(calendar.days.map((d) => [d.date, d])),
     [calendar.days],
   );
-  const cellHeight = compact ? 44 : 72;
+  // 한 칸에 들어갈 수 있는 최대 높이. calendar-scroll의 CELL_H가 이 값에 맞춰져
+  // 있고 달 블록 높이가 거기서 나오므로, 내용이 이보다 커지면 아래 주가 잘린다.
+  // 최대치는 공휴일 이름 + 내 재원 칩 + 출타 알약 + 주기 선이 다 있는 날로
+  // 6+26+11+14+14+3 에 gap 3×4 와 선 아래 여백 4를 더해 90.
+  const cellHeight = compact ? 44 : 92;
 
   return (
     <View accessibilityLabel={`${calendar.month} 부대 휴가 달력`}>
@@ -92,9 +96,11 @@ export function MonthCalendar(props: {
                   cell.inMonth
                     ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${
                         cycle ? `, 정기외박 ${cycle.index}주기` : ""
-                      }${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 휴가 ${
+                      }${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 출타 ${
                         stat?.count ?? 0
-                      }명${exceeded ? ", 최대 출타 인원 초과" : ""}`
+                      }명 허용 ${stat?.allowed ?? 0}명${
+                        exceeded ? ", 최대 출타 인원 초과" : ""
+                      }`
                     : undefined
                 }
                 onPress={() => onSelectDate(cell.date)}
@@ -137,8 +143,8 @@ export function MonthCalendar(props: {
                         {holiday}
                       </Text>
                     )}
-                    {/* 내 휴가가 있는 날은 재원 칩, 없으면 부대 출타율. */}
-                    {!compact && mine && tone ? (
+                    {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
+                    {!compact && mine && tone && (
                       <View
                         style={[
                           styles.myChip,
@@ -158,33 +164,34 @@ export function MonthCalendar(props: {
                           </Text>
                         )}
                       </View>
-                    ) : (
-                      !compact &&
-                      stat &&
-                      stat.count > 0 && (
-                        <View
+                    )}
+                    {/* 부대 출타 인원은 날짜를 열어보지 않아도 되게 늘 보여준다.
+                        아무도 안 나간 날은 배경 없이 흐리게 깔아 그리드를 조용히 둔다. */}
+                    {!compact && stat && (
+                      <View
+                        style={[
+                          styles.countPill,
+                          stat.count === 0 && styles.countPillEmpty,
+                          exceeded && {
+                            backgroundColor: colors.negativeBg,
+                          },
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.countPill,
-                            exceeded && {
-                              backgroundColor: colors.negativeBg,
+                            styles.countText,
+                            stat.count === 0 && { color: colors.mute },
+                            exceeded && { color: "#fff" },
+                            isSelected && {
+                              color: exceeded
+                                ? colors.negativeDeep
+                                : colors.inkDeep,
                             },
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.countText,
-                              exceeded && { color: "#fff" },
-                              isSelected && {
-                                color: exceeded
-                                  ? colors.negativeDeep
-                                  : colors.inkDeep,
-                              },
-                            ]}
-                          >
-                            {stat.count}/{stat.allowed}
-                          </Text>
-                        </View>
-                      )
+                          {stat.count}/{stat.allowed}
+                        </Text>
+                      </View>
                     )}
                     {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
                     {cycle && (
@@ -222,7 +229,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingTop: 6,
-    gap: 4,
+    // 최대 구성(공휴일+재원 칩+출타 알약)이 cellHeight 안에 들어가야 해서
+    // 아래 요소들은 lineHeight·minHeight를 명시해 높이를 고정해 둔다.
+    gap: 3,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: "transparent",
@@ -241,22 +250,30 @@ const styles = StyleSheet.create({
   dayNum: { fontSize: 14, fontWeight: "600", color: colors.ink },
   holiday: {
     fontSize: 9,
+    lineHeight: 11,
     fontWeight: "600",
     color: colors.negative,
     maxWidth: "100%",
     paddingHorizontal: 2,
   },
   countPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    minHeight: 14,
+    justifyContent: "center",
+    paddingHorizontal: 5,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceCard,
   },
-  countText: { fontSize: 11, fontWeight: "600", color: colors.inkDeep },
+  countPillEmpty: { backgroundColor: "transparent" },
+  countText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "600",
+    color: colors.inkDeep,
+  },
   myChip: {
     alignSelf: "stretch",
     marginHorizontal: 1,
-    minHeight: 16,
+    minHeight: 14,
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
@@ -272,7 +289,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 0,
     borderBottomRightRadius: 0,
   },
-  myChipText: { fontSize: 10, fontWeight: "700" },
+  myChipText: { fontSize: 10, lineHeight: 12, fontWeight: "700" },
   cycleBar: {
     alignSelf: "stretch",
     // 칸 사이 간격(2)만큼 밖으로 빼 같은 주기의 날들이 끊기지 않게 잇는다.
