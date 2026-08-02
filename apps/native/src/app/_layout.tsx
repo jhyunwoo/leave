@@ -5,9 +5,9 @@ import { StatusBar } from "expo-status-bar";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { loadStoredToken } from "@/api/client";
+import { loadStoredToken, setUnauthorizedHandler } from "@/api/client";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
-import { tokenAtom } from "@/state/auth";
+import { setSessionAtom, tokenAtom } from "@/state/auth";
 import { colors, radius, spacing } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -23,7 +23,8 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View style={errorStyles.root}>
       <Text style={errorStyles.title}>문제가 발생했어요</Text>
       <Text style={errorStyles.body}>
-        화면을 그리는 중 오류가 났어요. 다시 시도해도 계속되면 잠시 후 열어주세요.
+        화면을 그리는 중 오류가 났어요. 다시 시도해도 계속되면 잠시 후
+        열어주세요.
       </Text>
       <Text style={errorStyles.detail} selectable numberOfLines={6}>
         {error.message}
@@ -71,6 +72,7 @@ const queryClient = new QueryClient({
 function RootNavigator() {
   const token = useAtomValue(tokenAtom);
   const setToken = useSetAtom(tokenAtom);
+  const setSession = useSetAtom(setSessionAtom);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -80,6 +82,16 @@ function RootNavigator() {
       void SplashScreen.hideAsync();
     });
   }, [setToken]);
+
+  // 저장된 토큰이 서버에서 더는 통하지 않으면(만료·세션 삭제) 조용히 로그아웃한다.
+  // 토큰을 비우면 아래 Stack.Protected가 로그인 화면으로 돌려보낸다.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      queryClient.clear();
+      void setSession(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [setSession]);
 
   const isAuthed = token !== null && token !== undefined;
   // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)

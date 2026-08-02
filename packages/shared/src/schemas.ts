@@ -204,7 +204,8 @@ export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   z.object({ enabled: z.literal(false) }),
   z.object({
     enabled: z.literal(true),
-    nextGrantDate: isoDateSchema,
+    // 적립 시작일 — 주기의 기준점. 이 날부터 주기마다 반복해서 적립된다.
+    startDate: isoDateSchema,
     intervalDays: z.int().min(1).max(365),
     daysPerGrant: z.int().min(1).max(30),
   }),

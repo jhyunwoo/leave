@@ -180,7 +180,8 @@ export const regularOvernightConfigs = sqliteTable(
       .primaryKey()
       .references(() => users.id, { onDelete: "cascade" }),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
-    nextGrantDate: text("next_grant_date"),
+    // 적립 시작일. 이 날 첫 적립이 이뤄지고 이후 주기마다 반복된다.
+    startDate: text("start_date"),
     intervalDays: integer("interval_days"),
     daysPerGrant: integer("days_per_grant"),
     updatedAt: text("updated_at").notNull(),

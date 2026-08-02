@@ -42,9 +42,7 @@ function LeaveBalanceSettingsForm(props: {
   );
   const config = props.summary.regularOvernight;
   const [regularEnabled, setRegularEnabled] = useState(config.enabled);
-  const [nextGrantDate, setNextGrantDate] = useState(
-    config.nextGrantDate ?? "",
-  );
+  const [startDate, setStartDate] = useState(config.startDate ?? "");
   const [intervalDays, setIntervalDays] = useState(config.intervalDays ?? 42);
   const [daysPerGrant, setDaysPerGrant] = useState(config.daysPerGrant ?? 3);
   const [message, setMessage] = useState<string | null>(null);
@@ -69,7 +67,7 @@ function LeaveBalanceSettingsForm(props: {
     try {
       await updateRegular.mutateAsync(
         regularEnabled
-          ? { enabled: true, nextGrantDate, intervalDays, daysPerGrant }
+          ? { enabled: true, startDate, intervalDays, daysPerGrant }
           : { enabled: false },
       );
       setMessage("정기외박 적립 설정을 저장했습니다.");
@@ -156,11 +154,14 @@ function LeaveBalanceSettingsForm(props: {
             <span>
               <strong>정기외박 자동 적립</strong>
               <small>
-                현재 자동 적립{" "}
+                적립 시작일부터 주기마다 자동으로 쌓여요 · 현재 자동 적립{" "}
                 {props.summary.balances.find(
                   (item) => item.key === "regular_overnight",
                 )?.automaticDays ?? 0}
                 일
+                {config.nextGrantDate
+                  ? ` · 다음 적립일 ${config.nextGrantDate}`
+                  : ""}
               </small>
             </span>
           </label>
@@ -173,12 +174,12 @@ function LeaveBalanceSettingsForm(props: {
               }}
             >
               <label className="field">
-                <span>다음 적립일</span>
+                <span>적립 시작일</span>
                 <input
                   className="input"
                   type="date"
-                  value={nextGrantDate}
-                  onChange={(event) => setNextGrantDate(event.target.value)}
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
                 />
               </label>
               <label className="field">

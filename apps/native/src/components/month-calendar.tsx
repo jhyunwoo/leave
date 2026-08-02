@@ -1,6 +1,7 @@
 import {
   BALANCE_LABELS,
   buildMonthGrid,
+  cycleColor,
   getHoliday,
   todayInSeoul,
   WEEKDAYS,
@@ -13,12 +14,6 @@ import type { Calendar } from "@/api/queries";
 import type { MyLeaveDay } from "@/lib/my-leave-days";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
-/**
- * 주 행 위에 비워두는 주기 구분선 자리의 높이.
- * calendar-scroll의 고정 높이 계산이 이 값을 함께 쓴다.
- */
-export const CYCLE_LANE_HEIGHT = 14;
-
 /** 부대 월 달력 그리드. 웹과 동일한 시각 언어(라임 선택, 빨간 초과일). */
 export function MonthCalendar(props: {
   calendar: Calendar;
@@ -29,7 +24,7 @@ export function MonthCalendar(props: {
   hideWeekdays?: boolean;
   /** 날짜 → 내 휴가 재원. 있으면 출타율 대신 재원 칩을 그린다. */
   myLeaveDays?: Map<ISODate, MyLeaveDay>;
-  /** 이 달과 겹치는 정기외박 주기들. 경계에 구분선을 긋는다. */
+  /** 이 달과 겹치는 정기외박 주기들. 각 날짜 아래에 주기별 색 선을 깐다. */
   cycles?: RegularOvernightCycle[];
   /** 오늘이 속한 정기외박 주기. 해당 날짜 칸에 옅은 배경을 깐다. */
   currentCycle?: RegularOvernightCycle | null;
@@ -50,16 +45,7 @@ export function MonthCalendar(props: {
     () => new Map(calendar.days.map((d) => [d.date, d])),
     [calendar.days],
   );
-  // 주기가 시작하는 날 → 순번. 그 날이 있는 주 위에 구분선을 그린다.
-  const cycleStarts = useMemo(
-    () => new Map((cycles ?? []).map((cycle) => [cycle.start, cycle.index])),
-    [cycles],
-  );
-
   const cellHeight = compact ? 44 : 72;
-  // 주기를 쓰는 동안에는 주 행마다 항상 같은 높이의 "구분선 자리"를 비워둬야
-  // 무한 스크롤의 고정 높이 계산(calendar-scroll의 itemHeight)이 흐트러지지 않는다.
-  const laneHeight = !compact && cycles?.length ? CYCLE_LANE_HEIGHT : 0;
 
   return (
     <View accessibilityLabel={`${calendar.month} 부대 휴가 달력`}>
@@ -75,158 +61,149 @@ export function MonthCalendar(props: {
           ))}
         </View>
       )}
-      {weeks.map((week, wi) => {
-        const cycleStart = week.find(
-          (cell) => cell.inMonth && cycleStarts.has(cell.date),
-        );
-        return (
-          <View key={wi}>
-            {laneHeight > 0 && (
-              <View style={[styles.cycleLane, { height: laneHeight }]}>
-                {cycleStart && (
-                  <>
-                    <View style={styles.cycleLine} />
-                    <Text style={styles.cycleLabel}>
-                      정기외박 {cycleStarts.get(cycleStart.date)}주기
-                    </Text>
-                    <View style={styles.cycleLine} />
-                  </>
-                )}
-              </View>
-            )}
-            <View style={styles.weekRow}>
-              {week.map((cell) => {
-                const stat = cell.inMonth
-                  ? statByDate.get(cell.date)
-                  : undefined;
-                const exceeded = stat?.exceeded ?? false;
-                const isToday = cell.date === today;
-                const isSelected = cell.date === selectedDate;
-                const dayNum = Number(cell.date.slice(8));
-                const sunday = new Date(cell.date).getUTCDay() === 0;
-                const holiday = cell.inMonth ? getHoliday(cell.date) : null;
-                const mine = cell.inMonth
-                  ? myLeaveDays?.get(cell.date)
-                  : undefined;
-                const inCycle =
-                  cell.inMonth &&
-                  currentCycle != null &&
-                  currentCycle.start <= cell.date &&
-                  cell.date <= currentCycle.end;
-                const tone = mine ? BALANCE_COLORS[mine.key] : null;
+      {weeks.map((week, wi) => (
+        <View key={wi} style={styles.weekRow}>
+          {week.map((cell) => {
+            const stat = cell.inMonth ? statByDate.get(cell.date) : undefined;
+            const exceeded = stat?.exceeded ?? false;
+            const isToday = cell.date === today;
+            const isSelected = cell.date === selectedDate;
+            const dayNum = Number(cell.date.slice(8));
+            const sunday = new Date(cell.date).getUTCDay() === 0;
+            const holiday = cell.inMonth ? getHoliday(cell.date) : null;
+            const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
+            const inCycle =
+              cell.inMonth &&
+              currentCycle != null &&
+              currentCycle.start <= cell.date &&
+              cell.date <= currentCycle.end;
+            const tone = mine ? BALANCE_COLORS[mine.key] : null;
+            // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
+            const cycle = cell.inMonth
+              ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
+              : undefined;
 
-                return (
-                  <Pressable
-                    key={cell.date}
-                    disabled={!cell.inMonth}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      cell.inMonth
-                        ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${
-                            mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""
-                          }, 휴가 ${stat?.count ?? 0}명${
-                            exceeded ? ", 최대 출타 인원 초과" : ""
-                          }`
-                        : undefined
-                    }
-                    onPress={() => onSelectDate(cell.date)}
-                    style={({ pressed }) => [
-                      styles.cell,
-                      { minHeight: cellHeight },
-                      inCycle && { backgroundColor: colors.cycleTint },
-                      exceeded && { backgroundColor: colors.negativeTint },
-                      pressed && { transform: [{ scale: 0.97 }] },
-                    ]}
-                  >
-                    {cell.inMonth && (
-                      <>
+            return (
+              <Pressable
+                key={cell.date}
+                disabled={!cell.inMonth}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  cell.inMonth
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${
+                        cycle ? `, 정기외박 ${cycle.index}주기` : ""
+                      }${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 휴가 ${
+                        stat?.count ?? 0
+                      }명${exceeded ? ", 최대 출타 인원 초과" : ""}`
+                    : undefined
+                }
+                onPress={() => onSelectDate(cell.date)}
+                style={({ pressed }) => [
+                  styles.cell,
+                  { minHeight: cellHeight },
+                  inCycle && { backgroundColor: colors.cycleTint },
+                  exceeded && { backgroundColor: colors.negativeTint },
+                  pressed && { transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                {cell.inMonth && (
+                  <>
+                    <View
+                      style={[
+                        styles.dayNumWrap,
+                        isToday && styles.todayWrap,
+                        isSelected && styles.selectedWrap,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayNum,
+                          (sunday || holiday) && { color: colors.negative },
+                          exceeded && { color: colors.negativeDeep },
+                          (isToday || isSelected) && {
+                            color: colors.onPrimary,
+                          },
+                        ]}
+                      >
+                        {dayNum}
+                      </Text>
+                    </View>
+                    {!compact && holiday && (
+                      <Text
+                        style={styles.holiday}
+                        numberOfLines={1}
+                        ellipsizeMode="clip"
+                      >
+                        {holiday}
+                      </Text>
+                    )}
+                    {/* 내 휴가가 있는 날은 재원 칩, 없으면 부대 출타율. */}
+                    {!compact && mine && tone ? (
+                      <View
+                        style={[
+                          styles.myChip,
+                          { backgroundColor: tone.bg },
+                          // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
+                          !mine.isSegmentStart && styles.chipJoinLeft,
+                          !mine.isSegmentEnd && styles.chipJoinRight,
+                        ]}
+                      >
+                        {mine.isSegmentStart && (
+                          <Text
+                            style={[styles.myChipText, { color: tone.fg }]}
+                            numberOfLines={1}
+                            ellipsizeMode="clip"
+                          >
+                            {BALANCE_LABELS[mine.key]}
+                          </Text>
+                        )}
+                      </View>
+                    ) : (
+                      !compact &&
+                      stat &&
+                      stat.count > 0 && (
                         <View
                           style={[
-                            styles.dayNumWrap,
-                            isToday && styles.todayWrap,
-                            isSelected && styles.selectedWrap,
+                            styles.countPill,
+                            exceeded && {
+                              backgroundColor: colors.negativeBg,
+                            },
                           ]}
                         >
                           <Text
                             style={[
-                              styles.dayNum,
-                              (sunday || holiday) && { color: colors.negative },
-                              exceeded && { color: colors.negativeDeep },
-                              (isToday || isSelected) && {
-                                color: colors.onPrimary,
+                              styles.countText,
+                              exceeded && { color: "#fff" },
+                              isSelected && {
+                                color: exceeded
+                                  ? colors.negativeDeep
+                                  : colors.inkDeep,
                               },
                             ]}
                           >
-                            {dayNum}
+                            {stat.count}/{stat.allowed}
                           </Text>
                         </View>
-                        {!compact && holiday && (
-                          <Text
-                            style={styles.holiday}
-                            numberOfLines={1}
-                            ellipsizeMode="clip"
-                          >
-                            {holiday}
-                          </Text>
-                        )}
-                        {/* 내 휴가가 있는 날은 재원 칩, 없으면 부대 출타율. */}
-                        {!compact && mine && tone ? (
-                          <View
-                            style={[
-                              styles.myChip,
-                              { backgroundColor: tone.bg },
-                              // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
-                              !mine.isSegmentStart && styles.chipJoinLeft,
-                              !mine.isSegmentEnd && styles.chipJoinRight,
-                            ]}
-                          >
-                            {mine.isSegmentStart && (
-                              <Text
-                                style={[styles.myChipText, { color: tone.fg }]}
-                                numberOfLines={1}
-                                ellipsizeMode="clip"
-                              >
-                                {BALANCE_LABELS[mine.key]}
-                              </Text>
-                            )}
-                          </View>
-                        ) : (
-                          !compact &&
-                          stat &&
-                          stat.count > 0 && (
-                            <View
-                              style={[
-                                styles.countPill,
-                                exceeded && {
-                                  backgroundColor: colors.negativeBg,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.countText,
-                                  exceeded && { color: "#fff" },
-                                  isSelected && {
-                                    color: exceeded
-                                      ? colors.negativeDeep
-                                      : colors.inkDeep,
-                                  },
-                                ]}
-                              >
-                                {stat.count}/{stat.allowed}
-                              </Text>
-                            </View>
-                          )
-                        )}
-                      </>
+                      )
                     )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        );
-      })}
+                    {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
+                    {cycle && (
+                      <View
+                        style={[
+                          styles.cycleBar,
+                          { backgroundColor: cycleColor(cycle.index) },
+                          cell.date === cycle.start && styles.cycleBarStart,
+                          cell.date === cycle.end && styles.cycleBarEnd,
+                        ]}
+                      />
+                    )}
+                  </>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -296,15 +273,22 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 0,
   },
   myChipText: { fontSize: 10, fontWeight: "700" },
-  cycleLane: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+  cycleBar: {
+    alignSelf: "stretch",
+    // 칸 사이 간격(2)만큼 밖으로 빼 같은 주기의 날들이 끊기지 않게 잇는다.
+    marginHorizontal: -2,
+    marginTop: "auto",
+    marginBottom: 4,
+    height: 3,
   },
-  cycleLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairline,
+  cycleBarStart: {
+    marginLeft: 2,
+    borderTopLeftRadius: radius.pill,
+    borderBottomLeftRadius: radius.pill,
   },
-  cycleLabel: { fontSize: 9, fontWeight: "700", color: colors.mute },
+  cycleBarEnd: {
+    marginRight: 2,
+    borderTopRightRadius: radius.pill,
+    borderBottomRightRadius: radius.pill,
+  },
 });

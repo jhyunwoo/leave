@@ -68,10 +68,9 @@ export function CalendarScreen() {
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
-  const enlistedAt = me.data?.user.enlistedAt ?? today;
   const currentCycle = useMemo(
-    () => cycleFor(regularOvernight, today, enlistedAt),
-    [regularOvernight, today, enlistedAt],
+    () => cycleFor(regularOvernight, today),
+    [regularOvernight, today],
   );
   const cycleUsage = useMemo(
     () =>
@@ -108,8 +107,7 @@ export function CalendarScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me.data?.user.id]);
 
-  // 정기외박 주기 유무에 따라 달력 한 달의 고정 높이가 달라지므로,
-  // 재원 정보가 도착하기 전에 그리면 나중에 레이아웃이 튄다. 함께 기다린다.
+  // 재원 정보가 있어야 주기 표시선·배너를 처음부터 함께 그릴 수 있다. 함께 기다린다.
   if (me.isPending || balances.isPending) {
     return (
       <View style={styles.center}>
@@ -180,7 +178,6 @@ export function CalendarScreen() {
             limitSummary={limitSummary}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
-            enlistedAt={enlistedAt}
             currentCycle={currentCycle}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
@@ -265,7 +262,7 @@ export function CalendarScreen() {
                     calendar={panelCalendar.data}
                     date={selectedDate}
                     myUserId={me.data?.user.id}
-                    cycle={cycleFor(regularOvernight, selectedDate, enlistedAt)}
+                    cycle={cycleFor(regularOvernight, selectedDate)}
                     onAddLeave={() => setFormOpen(true)}
                   />
                 </ScrollView>

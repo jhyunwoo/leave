@@ -12,7 +12,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { useSetAtom } from "jotai";
 import { setSessionAtom } from "../state/auth";
-import { api, API_URL, ApiError, getAuthToken, unwrap } from "./client";
+import {
+  api,
+  API_URL,
+  ApiError,
+  checkAuthorized,
+  getAuthToken,
+  unwrap,
+} from "./client";
 
 export type Me = InferResponseType<typeof api.auth.me.$get, 200>;
 export type Unit = InferResponseType<
@@ -49,21 +56,12 @@ export type LeaveBalanceSummary = InferResponseType<
 >;
 
 export function useMe() {
-  const setSession = useSetAtom(setSessionAtom);
   return useQuery({
     queryKey: ["me"],
+    // 401은 다시 물어봐야 답이 달라지지 않는다. 로그아웃 처리는 client.ts가 맡는다.
     retry: (count, error) =>
       error instanceof ApiError && error.status === 401 ? false : count < 2,
-    queryFn: async () => {
-      try {
-        return await unwrap<Me>(await api.auth.me.$get());
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          void setSession(null);
-        }
-        throw err;
-      }
-    },
+    queryFn: async () => unwrap<Me>(await api.auth.me.$get()),
   });
 }
 
@@ -266,6 +264,7 @@ export function useUploadUnitImage(unitId: string) {
         },
         body: blob,
       });
+      checkAuthorized(res);
       if (!res.ok) throw new Error("업로드하지 못했습니다");
       return (await res.json()) as { key: string };
     },

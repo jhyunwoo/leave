@@ -172,9 +172,11 @@ export const leaveBalanceSummarySchema = z
     balances: z.array(leaveBalanceItemSchema),
     regularOvernight: z.object({
       enabled: z.boolean(),
-      nextGrantDate: z.string().nullable(),
+      startDate: z.string().nullable(),
       intervalDays: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
+      /** 설정에서 파생한 다음 적립 예정일 (읽기 전용). */
+      nextGrantDate: z.string().nullable(),
     }),
   })
   .openapi("LeaveBalanceSummary");

@@ -51,9 +51,7 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
   );
   const config = props.summary.regularOvernight;
   const [regularEnabled, setRegularEnabled] = useState(config.enabled);
-  const [nextGrantDate, setNextGrantDate] = useState(
-    config.nextGrantDate ?? "",
-  );
+  const [startDate, setStartDate] = useState(config.startDate ?? "");
   const [intervalDays, setIntervalDays] = useState(config.intervalDays ?? 42);
   const [daysPerGrant, setDaysPerGrant] = useState(config.daysPerGrant ?? 3);
 
@@ -73,7 +71,7 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
     try {
       await updateRegular.mutateAsync(
         regularEnabled
-          ? { enabled: true, nextGrantDate, intervalDays, daysPerGrant }
+          ? { enabled: true, startDate, intervalDays, daysPerGrant }
           : { enabled: false },
       );
       Alert.alert("저장 완료", "정기외박 적립 설정을 저장했어요.");
@@ -144,7 +142,7 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
                 정기외박 자동 적립
               </Text>
               <Text style={styles.usedLabel} selectable>
-                6주는 42일 · 회당 3일 또는 4일처럼 설정
+                적립 시작일부터 주기마다 자동으로 쌓여요
               </Text>
             </View>
             <Switch
@@ -156,10 +154,17 @@ function SettingsForm(props: { branch: Branch; summary: LeaveBalanceSummary }) {
           {regularEnabled && (
             <>
               <DatePickerRow
-                label="다음 적립일"
-                value={nextGrantDate}
-                onChange={setNextGrantDate}
+                label="적립 시작일"
+                value={startDate}
+                onChange={setStartDate}
               />
+              <Text style={styles.usedLabel} selectable>
+                이 날 처음 적립되고, 이후 {intervalDays}일마다 {daysPerGrant}
+                일씩 반복해서 쌓여요.
+                {config.nextGrantDate
+                  ? ` 다음 적립일은 ${config.nextGrantDate}이에요.`
+                  : ""}
+              </Text>
               <View style={styles.regularNumbers}>
                 <View style={{ flex: 1, gap: spacing.xs }}>
                   <Text style={styles.balanceLabel}>주기 (일)</Text>

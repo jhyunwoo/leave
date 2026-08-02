@@ -34,10 +34,9 @@ export function CalendarPage(props: { me: Me }) {
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
-  const enlistedAt = props.me.user.enlistedAt;
   const currentCycle = useMemo(
-    () => cycleFor(regularOvernight, today, enlistedAt),
-    [regularOvernight, today, enlistedAt],
+    () => cycleFor(regularOvernight, today),
+    [regularOvernight, today],
   );
   const cycleUsage = useMemo(
     () =>
@@ -151,7 +150,6 @@ export function CalendarPage(props: { me: Me }) {
             selectedDate={selectedDate}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
-            enlistedAt={enlistedAt}
             currentCycle={currentCycle}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
@@ -188,7 +186,7 @@ export function CalendarPage(props: { me: Me }) {
             calendar={panelCalendar.data}
             date={selectedDate}
             myUserId={props.me.user.id}
-            cycle={cycleFor(regularOvernight, selectedDate, enlistedAt)}
+            cycle={cycleFor(regularOvernight, selectedDate)}
             onAddLeave={() => setFormOpen(true)}
           />
         )}

@@ -201,7 +201,7 @@ test("군별 기본 연가를 제안하고 모든 총량을 수정해 복합 휴
   assert.match(belowUsed.data.error, /이미 3일/);
 });
 
-test("해군·공군 정기외박은 사용자가 주기와 회당 일수를 정하고 중복 없이 적립한다", async () => {
+test("해군·공군 정기외박은 적립 시작일부터 주기마다 적립되고 중복 적립되지 않는다", async () => {
   const { token } = await signup({ branch: "navy" });
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -209,29 +209,67 @@ test("해군·공군 정기외박은 사용자가 주기와 회당 일수를 정
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  const daysAgo = (n) => {
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - n);
+    return date.toISOString().slice(0, 10);
+  };
+  const automatic = (data) =>
+    data.balances.find((item) => item.key === "regular_overnight")
+      .automaticDays;
 
+  // 적립 시작일이 오늘이면 첫 주기 한 번만 적립된다.
   const configured = await req("PUT", "/leaves/regular-overnight", {
     token,
     body: {
       enabled: true,
-      nextGrantDate: today,
+      startDate: today,
       intervalDays: 42,
       daysPerGrant: 4,
     },
   });
   assert.equal(configured.status, 200);
-  const first = configured.data.balances.find(
-    (item) => item.key === "regular_overnight",
-  );
-  assert.equal(first.automaticDays, 4);
+  assert.equal(automatic(configured.data), 4);
 
   const repeated = await req("GET", "/leaves/balances", { token });
-  const second = repeated.data.balances.find(
-    (item) => item.key === "regular_overnight",
-  );
-  assert.equal(second.automaticDays, 4, "같은 도래일은 한 번만 적립해야 함");
+  assert.equal(automatic(repeated.data), 4, "같은 적립일은 한 번만 적립해야 함");
+  assert.equal(repeated.data.regularOvernight.startDate, today);
   assert.equal(repeated.data.regularOvernight.intervalDays, 42);
   assert.equal(repeated.data.regularOvernight.daysPerGrant, 4);
+
+  // 적립 시작일을 84일 전으로 바꾸면 그 사이 도래한 3주기(오늘 포함)가 적립된다.
+  const backdated = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: daysAgo(84),
+      intervalDays: 42,
+      daysPerGrant: 4,
+    },
+  });
+  assert.equal(backdated.status, 200);
+  assert.equal(automatic(backdated.data), 12, "도래한 주기 수만큼 적립해야 함");
+  // 다음 적립일은 설정에서 파생돼 내려온다.
+  assert.equal(
+    backdated.data.regularOvernight.nextGrantDate,
+    (() => {
+      const date = new Date(`${daysAgo(84)}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + 126);
+      return date.toISOString().slice(0, 10);
+    })(),
+  );
+
+  // 일정을 앞당기면 예전 일정으로 쌓인 적립분은 새 일정 기준으로 다시 계산된다.
+  const rescheduled = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: daysAgo(10),
+      intervalDays: 42,
+      daysPerGrant: 4,
+    },
+  });
+  assert.equal(automatic(rescheduled.data), 4, "예전 일정 적립분은 남지 않음");
 });
 
 test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {

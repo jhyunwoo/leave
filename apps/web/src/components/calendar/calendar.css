@@ -286,24 +286,28 @@
   background: unset;
 }
 
-.cal-cycle-divider {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-sm);
-  padding: 2px 0;
+/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */
+.cal-cycle-bar {
+  display: block;
+  /* 칸 좌우 패딩(8px)과 테두리(1px)를 넘어 이웃한 날과 선이 이어지게 한다. */
+  width: calc(100% + 17px);
+  margin: auto -8px 0 -8px;
+  height: 3px;
 }
-.cal-cycle-divider::before,
-.cal-cycle-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--hairline);
+.cal-cycle-bar.is-cycle-start {
+  width: calc(100% + 14px);
+  margin-left: -5px;
+  border-top-left-radius: var(--r-pill);
+  border-bottom-left-radius: var(--r-pill);
 }
-.cal-cycle-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--mute);
-  white-space: nowrap;
+.cal-cycle-bar.is-cycle-end {
+  width: calc(100% + 14px);
+  margin-right: -5px;
+  border-top-right-radius: var(--r-pill);
+  border-bottom-right-radius: var(--r-pill);
+}
+.cal-cycle-bar.is-cycle-start.is-cycle-end {
+  width: calc(100% + 11px);
 }
 
 .cal-cycle-banner {

@@ -1,8 +1,9 @@
 import {
-  addDays,
   BALANCE_KEYS,
   BALANCE_LABELS,
   DEFAULT_ANNUAL_DAYS,
+  grantDatesThrough,
+  nextGrantDateAfter,
   segmentBalanceKey,
   todayInSeoul,
   type BalanceKey,
@@ -60,6 +61,12 @@ export async function ensureLeaveBalances(
   }
 }
 
+/**
+ * 도래한 주기마다 정기외박 일수를 적립한다.
+ *
+ * 적립일은 설정(적립 시작일·주기)에서 매번 새로 계산하므로 커서를 따로 들고 있지 않다.
+ * 이미 적립된 날은 건너뛰기 때문에 몇 번을 호출해도 결과가 같다.
+ */
 export async function accrueRegularOvernight(
   db: Db,
   userId: string,
@@ -70,43 +77,38 @@ export async function accrueRegularOvernight(
     .from(regularOvernightConfigs)
     .where(eq(regularOvernightConfigs.userId, userId))
     .get();
-  if (
-    !config?.enabled ||
-    !config.nextGrantDate ||
-    !config.intervalDays ||
-    !config.daysPerGrant ||
-    config.nextGrantDate > on
-  ) {
-    return;
-  }
+  const due = grantDatesThrough(config, on);
+  if (!due.length || !config?.daysPerGrant) return;
 
-  const grants: (typeof leaveBalanceGrants.$inferInsert)[] = [];
-  let due = config.nextGrantDate;
-  for (let count = 0; due <= on && count < 500; count += 1) {
-    grants.push({
+  const granted = new Set(
+    (
+      await db
+        .select({ effectiveDate: leaveBalanceGrants.effectiveDate })
+        .from(leaveBalanceGrants)
+        .where(
+          and(
+            eq(leaveBalanceGrants.userId, userId),
+            eq(leaveBalanceGrants.balanceKey, "regular_overnight"),
+          ),
+        )
+        .all()
+    ).map((row) => row.effectiveDate),
+  );
+
+  const now = new Date().toISOString();
+  const grants = due
+    .filter((date) => !granted.has(date))
+    .map((date) => ({
       id: crypto.randomUUID(),
       userId,
-      balanceKey: "regular_overnight",
-      days: config.daysPerGrant,
-      effectiveDate: due,
-      createdAt: new Date().toISOString(),
-    });
-    due = addDays(due, config.intervalDays);
-  }
+      balanceKey: "regular_overnight" as const,
+      days: config.daysPerGrant!,
+      effectiveDate: date,
+      createdAt: now,
+    }));
   if (!grants.length) return;
 
-  await db.batch([
-    db.insert(leaveBalanceGrants).values(grants).onConflictDoNothing(),
-    db
-      .update(regularOvernightConfigs)
-      .set({ nextGrantDate: due, updatedAt: new Date().toISOString() })
-      .where(
-        and(
-          eq(regularOvernightConfigs.userId, userId),
-          eq(regularOvernightConfigs.nextGrantDate, config.nextGrantDate),
-        ),
-      ),
-  ]);
+  await db.insert(leaveBalanceGrants).values(grants).onConflictDoNothing();
 }
 
 export async function accrueAllRegularOvernights(db: Db, on = todayInSeoul()) {
@@ -195,15 +197,18 @@ export async function getLeaveBalanceSummary(
     regularOvernight: config
       ? {
           enabled: config.enabled,
-          nextGrantDate: config.nextGrantDate,
+          startDate: config.startDate,
           intervalDays: config.intervalDays,
           daysPerGrant: config.daysPerGrant,
+          // 설정에서 파생하는 표시용 값 — 저장하지 않는다.
+          nextGrantDate: nextGrantDateAfter(config, todayInSeoul()),
         }
       : {
           enabled: false,
-          nextGrantDate: null,
+          startDate: null,
           intervalDays: null,
           daysPerGrant: null,
+          nextGrantDate: null,
         },
   };
 }
@@ -258,7 +263,7 @@ export async function saveRegularOvernightConfig(
     ? {
         userId: user.id,
         enabled: true,
-        nextGrantDate: input.nextGrantDate,
+        startDate: input.startDate,
         intervalDays: input.intervalDays,
         daysPerGrant: input.daysPerGrant,
         updatedAt: now,
@@ -266,7 +271,7 @@ export async function saveRegularOvernightConfig(
     : {
         userId: user.id,
         enabled: false,
-        nextGrantDate: null,
+        startDate: null,
         intervalDays: null,
         daysPerGrant: null,
         updatedAt: now,
@@ -275,6 +280,20 @@ export async function saveRegularOvernightConfig(
     target: regularOvernightConfigs.userId,
     set: values,
   });
+
+  // 일정이 바뀌면 예전 일정으로 쌓인 적립분은 더 이상 맞지 않는다. 지우고 새 일정으로
+  // 다시 쌓아 자동 적립분이 항상 "지금 설정으로 도래한 주기 수 × 회당 일수"가 되게 한다.
+  // (끄는 경우에는 이미 받은 적립분을 그대로 남긴다.)
+  if (input.enabled) {
+    await db
+      .delete(leaveBalanceGrants)
+      .where(
+        and(
+          eq(leaveBalanceGrants.userId, user.id),
+          eq(leaveBalanceGrants.balanceKey, "regular_overnight"),
+        ),
+      );
+  }
   return getLeaveBalanceSummary(db, user);
 }
 
