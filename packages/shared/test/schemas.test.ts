@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   leaveCreateSchema,
+  leaveGrantCreateSchema,
+  leaveGrantUpdateSchema,
   pushEventSchema,
   signupSchema,
   unitCreateSchema,
@@ -129,5 +131,59 @@ describe("unitCreateSchema", () => {
     expect(
       unitCreateSchema.safeParse({ ...base, maxLeaveCount: -1 }).success,
     ).toBe(false);
+  });
+});
+
+describe("적립분 스키마", () => {
+  it("일수는 1 이상이어야 한다", () => {
+    const base = { balanceKey: "award" as const };
+    expect(leaveGrantCreateSchema.safeParse({ ...base, days: 1 }).success).toBe(
+      true,
+    );
+    expect(leaveGrantCreateSchema.safeParse({ ...base, days: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  it("만기는 선택이며 null도 받는다", () => {
+    expect(
+      leaveGrantCreateSchema.safeParse({
+        balanceKey: "award",
+        days: 3,
+        expiresOn: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      leaveGrantCreateSchema.safeParse({ balanceKey: "award", days: 3 }).success,
+    ).toBe(true);
+  });
+
+  it("만기가 부여일보다 앞서면 거절한다", () => {
+    const parsed = leaveGrantCreateSchema.safeParse({
+      balanceKey: "award",
+      days: 3,
+      grantedOn: "2026-09-01",
+      expiresOn: "2026-08-31",
+    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toMatch(/부여일과 같거나 뒤/);
+  });
+
+  it("잘못된 날짜 형식은 거절한다", () => {
+    expect(
+      leaveGrantCreateSchema.safeParse({
+        balanceKey: "award",
+        days: 3,
+        expiresOn: "2026-13-01",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("수정 스키마는 재원을 바꿀 수 없다", () => {
+    const parsed = leaveGrantUpdateSchema.parse({
+      days: 2,
+      balanceKey: "annual",
+    });
+    expect(parsed).not.toHaveProperty("balanceKey");
   });
 });

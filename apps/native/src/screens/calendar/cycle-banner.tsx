@@ -13,6 +13,9 @@ export const CYCLE_BANNER_HEIGHT = 30;
 /**
  * 이번 정기외박 주기 요약. 정기외박은 주기 안에 소진해야 해서
  * 남은 일수와 마감까지 며칠인지를 달력 맨 위에 붙여둔다.
+ *
+ * 1주기는 첫 적립을 기다리는 구간이라 쥔 일수가 없다. 이때는 소진 현황 대신
+ * 첫 적립까지 며칠 남았는지를 보여준다.
  */
 export function CycleBanner(props: {
   cycle: RegularOvernightCycle;
@@ -24,6 +27,7 @@ export function CycleBanner(props: {
   const tone = BALANCE_COLORS.regular_overnight;
   // 남은 정기외박이 없으면 조용히, 마감이 일주일 안이면 눈에 띄게.
   const urgent = remaining > 0 && daysLeft <= 7;
+  const awaitingFirstGrant = props.cycle.grantDays === 0;
 
   return (
     <View
@@ -43,8 +47,14 @@ export function CycleBanner(props: {
       >
         정기외박 {props.cycle.index}주기{" "}
         {fmtRangeTiny(props.cycle.start, props.cycle.end)} ·{" "}
-        {props.cycle.grantDays}일 중 {props.usedDays}일 사용 · 잔여 {remaining}
-        일 · 마감 D-{daysLeft}
+        {awaitingFirstGrant ? (
+          <>첫 적립까지 D-{daysLeft + 1}</>
+        ) : (
+          <>
+            {props.cycle.grantDays}일 중 {props.usedDays}일 사용 · 잔여{" "}
+            {remaining}일 · 마감 D-{daysLeft}
+          </>
+        )}
       </Text>
     </View>
   );

@@ -1,6 +1,8 @@
 import type {
   LeaveBalanceUpdateInput,
   LeaveCreateInput,
+  LeaveGrantCreateInput,
+  LeaveGrantUpdateInput,
   LoginInput,
   RegularOvernightConfigInput,
   SignupInput,
@@ -12,7 +14,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { useSetAtom } from "jotai";
 import { setSessionAtom } from "../state/auth";
-import { api, API_URL, ApiError, getAuthToken, unwrap } from "./client";
+import {
+  api,
+  API_URL,
+  ApiError,
+  checkAuthorized,
+  getAuthToken,
+  unwrap,
+} from "./client";
 
 export type Me = InferResponseType<typeof api.auth.me.$get, 200>;
 export type Unit = InferResponseType<
@@ -49,21 +58,12 @@ export type LeaveBalanceSummary = InferResponseType<
 >;
 
 export function useMe() {
-  const setSession = useSetAtom(setSessionAtom);
   return useQuery({
     queryKey: ["me"],
+    // 401은 다시 물어봐야 답이 달라지지 않는다. 로그아웃 처리는 client.ts가 맡는다.
     retry: (count, error) =>
       error instanceof ApiError && error.status === 401 ? false : count < 2,
-    queryFn: async () => {
-      try {
-        return await unwrap<Me>(await api.auth.me.$get());
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          void setSession(null);
-        }
-        throw err;
-      }
-    },
+    queryFn: async () => unwrap<Me>(await api.auth.me.$get()),
   });
 }
 
@@ -266,6 +266,7 @@ export function useUploadUnitImage(unitId: string) {
         },
         body: blob,
       });
+      checkAuthorized(res);
       if (!res.ok) throw new Error("업로드하지 못했습니다");
       return (await res.json()) as { key: string };
     },
@@ -321,7 +322,71 @@ export function useUpdateRegularOvernight() {
       unwrap<LeaveBalanceSummary>(
         await api.leaves["regular-overnight"].$put({ json: input }),
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["leaveBalances"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+      // 주기 목록은 이 설정에서 파생하므로 보유 휴가 화면도 다시 받아야 한다.
+      void qc.invalidateQueries({ queryKey: ["leaveGrants"] });
+    },
+  });
+}
+
+export type LeaveGrantsPage = InferResponseType<
+  typeof api.leaves.grants.$get,
+  200
+>;
+export type LeaveGrantFund = LeaveGrantsPage["funds"][number];
+export type LeaveGrantItem = LeaveGrantFund["grants"][number];
+export type RegularOvernightCycleItem =
+  LeaveGrantsPage["regularOvernight"]["cycles"][number];
+
+export function useLeaveGrants() {
+  return useQuery({
+    queryKey: ["leaveGrants"],
+    queryFn: async () =>
+      unwrap<LeaveGrantsPage>(await api.leaves.grants.$get()),
+  });
+}
+
+/** 적립분을 바꾸면 재원 총량도 달라지므로 두 캐시를 함께 비운다. */
+function useInvalidateGrants() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ["leaveGrants"] });
+    void qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+  };
+}
+
+export function useCreateLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (input: LeaveGrantCreateInput) =>
+      unwrap<LeaveGrantsPage>(await api.leaves.grants.$post({ json: input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (vars: { id: string; input: LeaveGrantUpdateInput }) =>
+      unwrap<LeaveGrantsPage>(
+        await api.leaves.grants[":id"].$patch({
+          param: { id: vars.id },
+          json: vars.input,
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap<LeaveGrantsPage>(
+        await api.leaves.grants[":id"].$delete({ param: { id } }),
+      ),
+    onSuccess: invalidate,
   });
 }
 
@@ -332,6 +397,8 @@ function useInvalidateLeaveData() {
     void qc.invalidateQueries({ queryKey: ["myLeaves"] });
     void qc.invalidateQueries({ queryKey: ["notifications"] });
     void qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+    // 휴가를 등록·수정하면 적립분 사용량이 달라진다.
+    void qc.invalidateQueries({ queryKey: ["leaveGrants"] });
   };
 }
 

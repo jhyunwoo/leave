@@ -1,6 +1,7 @@
 import {
   cycleFor,
   cycleUsedDays,
+  diffDays,
   effectiveMemberCount,
   fmtRangeTiny,
   maxAllowedOut,
@@ -34,10 +35,9 @@ export function CalendarPage(props: { me: Me }) {
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
-  const enlistedAt = props.me.user.enlistedAt;
   const currentCycle = useMemo(
-    () => cycleFor(regularOvernight, today, enlistedAt),
-    [regularOvernight, today, enlistedAt],
+    () => cycleFor(regularOvernight, today),
+    [regularOvernight, today],
   );
   const cycleUsage = useMemo(
     () =>
@@ -141,8 +141,15 @@ export function CalendarPage(props: { me: Me }) {
             <p className="cal-cycle-banner">
               정기외박 {currentCycle.index}주기{" "}
               {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
-              {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
-              {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+              {/* 1주기는 첫 적립을 기다리는 구간이라 소진 현황 대신 남은 날을 센다. */}
+              {currentCycle.grantDays === 0 ? (
+                <>첫 적립까지 D-{diffDays(today, currentCycle.end) + 1}</>
+              ) : (
+                <>
+                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
+                  {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+                </>
+              )}
             </p>
           )}
           <CalendarScroll
@@ -151,7 +158,6 @@ export function CalendarPage(props: { me: Me }) {
             selectedDate={selectedDate}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
-            enlistedAt={enlistedAt}
             currentCycle={currentCycle}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
@@ -188,7 +194,7 @@ export function CalendarPage(props: { me: Me }) {
             calendar={panelCalendar.data}
             date={selectedDate}
             myUserId={props.me.user.id}
-            cycle={cycleFor(regularOvernight, selectedDate, enlistedAt)}
+            cycle={cycleFor(regularOvernight, selectedDate)}
             onAddLeave={() => setFormOpen(true)}
           />
         )}

@@ -52,7 +52,6 @@ export const CalendarScroll = forwardRef<
     onSelectDate: (date: string) => void;
     myLeaveDays: Map<string, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
-    enlistedAt: string;
     currentCycle: RegularOvernightCycle | null;
   }
 >(function CalendarScroll(
@@ -62,7 +61,6 @@ export const CalendarScroll = forwardRef<
     onSelectDate,
     myLeaveDays,
     regularOvernight,
-    enlistedAt,
     currentCycle,
   },
   ref,
@@ -181,7 +179,6 @@ export const CalendarScroll = forwardRef<
               onSelectDate={onSelectDate}
               myLeaveDays={myLeaveDays}
               regularOvernight={regularOvernight}
-              enlistedAt={enlistedAt}
               currentCycle={currentCycle}
             />
           </section>
@@ -199,14 +196,13 @@ function MonthBlock(props: {
   onSelectDate: (date: string) => void;
   myLeaveDays: Map<string, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
-  enlistedAt: string;
   currentCycle: RegularOvernightCycle | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
-    return cyclesInRange(props.regularOvernight, start, end, props.enlistedAt);
-  }, [props.month, props.regularOvernight, props.enlistedAt]);
+    return cyclesInRange(props.regularOvernight, start, end);
+  }, [props.month, props.regularOvernight]);
 
   if (calendar.isPending) {
     return (

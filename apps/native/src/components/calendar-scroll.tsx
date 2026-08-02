@@ -28,25 +28,19 @@ import {
   View,
 } from "react-native";
 import { useCalendar } from "@/api/queries";
-import { CYCLE_LANE_HEIGHT, MonthCalendar } from "@/components/month-calendar";
+import { MonthCalendar } from "@/components/month-calendar";
 import type { MyLeaveDay } from "@/lib/my-leave-days";
 import { colors, spacing } from "@/theme";
 
 const INITIAL_SPAN = 2;
 const PAGE_SIZE = 6;
-const CELL_H = 72; // month-calendar 셀 minHeight와 동일
+const CELL_H = 92; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
 const LABEL_H = 64;
 
-/**
- * 한 달 블록의 고정 높이. 정기외박 주기를 쓰면 주 행마다 구분선 자리가 하나씩
- * 더 들어가므로 그만큼 커진다. getItemLayout·snapToInterval이 이 값에 의존한다.
- */
-function itemHeight(hasCycles: boolean): number {
-  const laneH = hasCycles ? CYCLE_LANE_HEIGHT : 0;
-  return LABEL_H + ROWS * (laneH + CELL_H + ROW_GAP);
-}
+/** 한 달 블록의 고정 높이. getItemLayout·snapToInterval이 이 값에 의존한다. */
+const ITEM_H = LABEL_H + ROWS * (CELL_H + ROW_GAP);
 
 function monthRange(center: string, span: number): string[] {
   const out: string[] = [];
@@ -78,7 +72,6 @@ export const CalendarScroll = forwardRef<
     limitSummary: string;
     myLeaveDays: Map<ISODate, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
-    enlistedAt: ISODate;
     currentCycle: RegularOvernightCycle | null;
   }
 >(function CalendarScroll(
@@ -90,13 +83,11 @@ export const CalendarScroll = forwardRef<
     limitSummary,
     myLeaveDays,
     regularOvernight,
-    enlistedAt,
     currentCycle,
   },
   ref,
 ) {
   const currentMonth = todayInSeoul().slice(0, 7);
-  const ITEM_H = itemHeight(currentCycle != null);
   const [months, setMonths] = useState(() =>
     monthRange(currentMonth, INITIAL_SPAN),
   );
@@ -109,22 +100,18 @@ export const CalendarScroll = forwardRef<
     prependLock.current = false;
   }, [months]);
 
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      if (y < ITEM_H && !prependLock.current) {
-        prependLock.current = true;
-        setMonths((ms) => {
-          const first = ms[0]!;
-          const older: string[] = [];
-          for (let i = PAGE_SIZE; i >= 1; i--)
-            older.push(shiftMonth(first, -i));
-          return [...older, ...ms];
-        });
-      }
-    },
-    [ITEM_H],
-  );
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    if (y < ITEM_H && !prependLock.current) {
+      prependLock.current = true;
+      setMonths((ms) => {
+        const first = ms[0]!;
+        const older: string[] = [];
+        for (let i = PAGE_SIZE; i >= 1; i--) older.push(shiftMonth(first, -i));
+        return [...older, ...ms];
+      });
+    }
+  }, []);
 
   const onEndReached = useCallback(() => {
     setMonths((ms) => {
@@ -163,7 +150,7 @@ export const CalendarScroll = forwardRef<
         void Haptics.selectionAsync();
       }
     },
-    [months, ITEM_H],
+    [months],
   );
 
   return (
@@ -182,7 +169,6 @@ export const CalendarScroll = forwardRef<
             limitSummary={item === currentMonth ? limitSummary : undefined}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
-            enlistedAt={enlistedAt}
             currentCycle={currentCycle}
           />
         )}
@@ -226,14 +212,13 @@ function MonthBlock(props: {
   limitSummary?: string;
   myLeaveDays: Map<ISODate, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
-  enlistedAt: ISODate;
   currentCycle: RegularOvernightCycle | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
-    return cyclesInRange(props.regularOvernight, start, end, props.enlistedAt);
-  }, [props.month, props.regularOvernight, props.enlistedAt]);
+    return cyclesInRange(props.regularOvernight, start, end);
+  }, [props.month, props.regularOvernight]);
 
   return (
     <View style={[styles.monthBlock, { height: props.height }]}>

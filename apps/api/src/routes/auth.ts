@@ -1,9 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { loginSchema, signupSchema } from "@leave/shared";
+import { DEFAULT_ANNUAL_DAYS, loginSchema, signupSchema } from "@leave/shared";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import {
   accessLogs,
+  leaveGrants,
   leaves,
   notifications,
   pushLogs,
@@ -185,6 +186,19 @@ export const authRoutes = app
       createdAt: new Date().toISOString(),
     };
     await db.insert(users).values(user);
+    // 군별 기본 연가를 만기 없는 적립분 한 건으로 심는다. 사용자가 보유 휴가 화면에서
+    // 자유롭게 고칠 수 있는 제안값이다.
+    await db.insert(leaveGrants).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      balanceKey: "annual",
+      days: DEFAULT_ANNUAL_DAYS[user.branch],
+      grantedOn: null,
+      expiresOn: null,
+      note: null,
+      createdAt: user.createdAt,
+      updatedAt: user.createdAt,
+    });
     const token = await createSession(db, user.id);
     return c.json({ token, user: serializeUser(user) }, 201);
   })

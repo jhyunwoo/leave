@@ -1,12 +1,17 @@
 import type { AppType } from "@leave/api";
-import { buildImageUrl, resolveApiUrl } from "@leave/shared";
+import {
+  buildImageUrl,
+  resolveApiUrl,
+  unwrap as unwrapResponse,
+  type UnwrappableResponse,
+} from "@leave/shared";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { hc } from "hono/client";
 import { Platform } from "react-native";
 
 // 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
-export { ApiError, unwrap } from "@leave/shared";
+export { ApiError } from "@leave/shared";
 
 const TOKEN_KEY = "leave.token";
 
@@ -63,4 +68,33 @@ export const api = hc<AppType>(API_URL, {
 
 export function imageUrl(key: string | null | undefined): string | null {
   return buildImageUrl(API_URL, key);
+}
+
+/**
+ * 세션이 더 이상 유효하지 않을 때(토큰 만료·삭제·서버에서 세션 소멸) 부를 콜백.
+ * 루트 레이아웃이 등록해 토큰을 비우면 Stack.Protected가 로그인 화면으로 돌려보낸다.
+ */
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
+/** 토큰을 들고 보낸 요청이 401로 돌아왔을 때만 세션을 끊는다. */
+function reportUnauthorized(status: number): void {
+  if (status === 401 && authToken) onUnauthorized?.();
+}
+
+/**
+ * 공용 unwrap에 "인증이 깨지면 로그아웃" 처리를 얹은 앱 전용 래퍼.
+ * 화면마다 401을 따로 다루지 않아도 되도록 모든 요청이 이 함수를 지난다.
+ */
+export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
+  reportUnauthorized(res.status);
+  return unwrapResponse<T>(res);
+}
+
+/** 바이너리 업로드처럼 raw fetch를 쓰는 곳에서 401을 같은 방식으로 다룬다. */
+export function checkAuthorized(res: { status: number }): void {
+  reportUnauthorized(res.status);
 }

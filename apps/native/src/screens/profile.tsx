@@ -16,7 +16,6 @@ import { API_URL, getAuthToken } from "@/api/client";
 import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
-import { LeaveBalanceSettings } from "@/components/leave-balance-settings";
 import {
   ScreenHeader,
   useScreenHeaderHeight,
@@ -104,7 +103,11 @@ export function ProfileScreen() {
     <>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+        contentContainerStyle={[
+          styles.content,
+          // paddingTop이 styles.content의 padding을 덮어써서, 헤더 아래 여백을 되살린다
+          { paddingTop: headerHeight + spacing.lg },
+        ]}
       >
         {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
         <View style={styles.darkCard}>
@@ -162,9 +165,14 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        <LeaveBalanceSettings branch={user.branch} />
-
         <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
+          {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
+          <Button
+            title="보유 휴가"
+            variant="secondary"
+            onPress={() => router.push("/leave-grants")}
+            style={{ flex: 1 }}
+          />
           <Button
             title="부대 관리"
             variant="secondary"

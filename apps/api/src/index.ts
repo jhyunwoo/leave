@@ -1,8 +1,6 @@
 import { Scalar } from "@scalar/hono-api-reference";
-import { drizzle } from "drizzle-orm/d1";
 import { cors } from "hono/cors";
 import { createApp } from "./lib/app";
-import { accrueAllRegularOvernights } from "./lib/leave-balances";
 import { accessLogMiddleware } from "./middleware/access-log";
 import { authRoutes } from "./routes/auth";
 import { imageRoutes } from "./routes/images";
@@ -69,11 +67,4 @@ export type AppType = typeof routes;
 
 export default {
   fetch: app.fetch,
-  scheduled: async (
-    _controller: ScheduledController,
-    env: import("./lib/app").AppBindings,
-    ctx: ExecutionContext,
-  ) => {
-    ctx.waitUntil(accrueAllRegularOvernights(drizzle(env.DB)));
-  },
 };

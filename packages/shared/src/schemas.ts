@@ -200,11 +200,49 @@ export const leaveBalanceUpdateSchema = z.object({
   totals: z.record(z.enum(BALANCE_KEYS), z.int().min(0).max(999)),
 });
 
+/** 부여일보다 앞선 만기는 성립하지 않는다. */
+function grantDateOrder(
+  value: { grantedOn?: string | null; expiresOn?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (value.grantedOn && value.expiresOn && value.grantedOn > value.expiresOn) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["expiresOn"],
+      message: "만기 기한은 부여일과 같거나 뒤여야 합니다",
+    });
+  }
+}
+
+export const leaveGrantCreateSchema = z
+  .object({
+    balanceKey: z.enum(BALANCE_KEYS),
+    days: z.int().min(1, "1일 이상이어야 합니다").max(999),
+    grantedOn: isoDateSchema.nullable().optional(),
+    expiresOn: isoDateSchema.nullable().optional(),
+    note: z.string().trim().max(100).nullable().optional(),
+  })
+  .superRefine(grantDateOrder);
+
+/**
+ * 적립분 수정. balanceKey는 바꿀 수 없다 — 재원을 옮기면 두 재원의 사용분 귀속이
+ * 조용히 뒤집힌다. 재원을 바꾸려면 지우고 새로 만든다.
+ */
+export const leaveGrantUpdateSchema = z
+  .object({
+    days: z.int().min(1, "1일 이상이어야 합니다").max(999).optional(),
+    grantedOn: isoDateSchema.nullable().optional(),
+    expiresOn: isoDateSchema.nullable().optional(),
+    note: z.string().trim().max(100).nullable().optional(),
+  })
+  .superRefine(grantDateOrder);
+
 export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   z.object({ enabled: z.literal(false) }),
   z.object({
     enabled: z.literal(true),
-    nextGrantDate: isoDateSchema,
+    // 주기 시작일 — 1주기가 시작하는 날. 첫 적립은 한 주기 뒤에 이뤄진다.
+    startDate: isoDateSchema,
     intervalDays: z.int().min(1).max(365),
     daysPerGrant: z.int().min(1).max(30),
   }),
@@ -241,6 +279,8 @@ export type UnitUpdateInput = z.infer<typeof unitUpdateSchema>;
 export type UnitTransferInput = z.infer<typeof unitTransferSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
+export type LeaveGrantCreateInput = z.infer<typeof leaveGrantCreateSchema>;
+export type LeaveGrantUpdateInput = z.infer<typeof leaveGrantUpdateSchema>;
 export type RegularOvernightConfigInput = z.infer<
   typeof regularOvernightConfigSchema
 >;

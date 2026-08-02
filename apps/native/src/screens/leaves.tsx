@@ -4,10 +4,12 @@ import {
   fmtRangeTiny,
   segmentBalanceKey,
 } from "@leave/shared";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +32,19 @@ export function LeavesScreen() {
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
   const headerHeight = useScreenHeaderHeight({ subtitle: true });
+  const router = useRouter();
+
+  // 주기 재원은 이월되지 않아 총량 개념이 달라 요약에서 뺀다.
+  const holdings = (balances.data?.balances ?? [])
+    .filter((item) => !item.cycleScoped)
+    .reduce(
+      (sum, item) => ({
+        remaining: sum.remaining + item.remainingDays,
+        expiringSoon: sum.expiringSoon + item.expiringSoonDays,
+        expired: sum.expired + item.expiredDays,
+      }),
+      { remaining: 0, expiringSoon: 0, expired: 0 },
+    );
 
   const confirmDelete = (leave: MyLeave) => {
     Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [
@@ -49,21 +64,62 @@ export function LeavesScreen() {
         contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
       >
         {balances.data ? (
-          <View style={styles.balanceGrid}>
-            {balances.data.balances.map((item) => (
-              <View key={item.key} style={styles.balanceCard}>
-                <Text style={styles.balanceLabel} selectable>
-                  {item.label}
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="보유 휴가 자세히 보기"
+              onPress={() => router.push("/leave-grants")}
+              style={styles.holdingsCard}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.holdingsEyebrow} selectable>
+                  보유 휴가
                 </Text>
-                <Text style={styles.balanceValue} selectable>
-                  {item.remainingDays}일
+                <Text style={styles.holdingsValue} selectable>
+                  남은 {holdings.remaining}일
                 </Text>
-                <Text style={styles.balanceMeta} selectable>
-                  총 {item.totalDays} · 사용 {item.usedDays}
-                </Text>
+                {holdings.expiringSoon > 0 || holdings.expired > 0 ? (
+                  <Text style={styles.holdingsMeta} selectable>
+                    {holdings.expiringSoon > 0
+                      ? `만료 임박 ${holdings.expiringSoon}일`
+                      : ""}
+                    {holdings.expiringSoon > 0 && holdings.expired > 0
+                      ? " · "
+                      : ""}
+                    {holdings.expired > 0 ? `소멸 ${holdings.expired}일` : ""}
+                  </Text>
+                ) : (
+                  <Text style={styles.holdingsHint} selectable>
+                    만기 기한과 정기외박 주기를 관리해요
+                  </Text>
+                )}
               </View>
-            ))}
-          </View>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+
+            <View style={styles.balanceGrid}>
+              {balances.data.balances.map((item) => (
+                <View key={item.key} style={styles.balanceCard}>
+                  <Text style={styles.balanceLabel} selectable>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.balanceValue} selectable>
+                    {item.remainingDays}일
+                  </Text>
+                  {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
+                  <Text style={styles.balanceMeta} selectable>
+                    {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} ·
+                    사용 {item.usedDays}
+                  </Text>
+                  {item.expiredDays > 0 ? (
+                    <Text style={styles.balanceExpired} selectable>
+                      만료 {item.expiredDays}일
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </>
         ) : null}
 
         {leaves.isPending ? (
@@ -180,6 +236,42 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   balanceMeta: { fontSize: 10, color: colors.mute, paddingTop: 2 },
+  balanceExpired: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.negativeDeep,
+    paddingTop: 2,
+  },
+  holdingsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.canvas,
+    borderRadius: radius.xl,
+    borderCurve: "continuous",
+    padding: spacing.xl,
+  },
+  holdingsEyebrow: {
+    color: colors.brand,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.7,
+  },
+  holdingsValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.ink,
+    fontVariant: ["tabular-nums"],
+    paddingTop: 2,
+  },
+  holdingsMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.negativeDeep,
+    paddingTop: 2,
+  },
+  holdingsHint: { fontSize: 12, color: colors.mute, paddingTop: 2 },
+  chevron: { fontSize: 28, color: colors.mute, lineHeight: 30 },
   empty: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,
