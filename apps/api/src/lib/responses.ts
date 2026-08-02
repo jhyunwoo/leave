@@ -90,10 +90,13 @@ export const myJoinRequestSchema = z
   })
   .openapi("MyJoinRequest");
 
-export const leaveAllocationResponseSchema = z.object({
+/** 어느 날이 어떤 재원인지 알려주는 구간. */
+export const leaveSegmentResponseSchema = z.object({
   category: z.enum(LEAVE_CATEGORIES),
-  days: z.number(),
   overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+  startDate: z.string(),
+  endDate: z.string(),
+  days: z.number(),
 });
 
 export const leaveSchema = z
@@ -104,7 +107,7 @@ export const leaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
-    allocations: z.array(leaveAllocationResponseSchema),
+    segments: z.array(leaveSegmentResponseSchema),
     createdAt: z.string(),
   })
   .openapi("Leave");
@@ -120,7 +123,7 @@ export const calendarLeaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
-    allocations: z.array(leaveAllocationResponseSchema),
+    segments: z.array(leaveSegmentResponseSchema),
   })
   .openapi("CalendarLeave");
 

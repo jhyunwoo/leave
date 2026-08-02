@@ -1,21 +1,21 @@
 import {
   addDays,
-  allocationBalanceKey,
   BALANCE_KEYS,
   BALANCE_LABELS,
   DEFAULT_ANNUAL_DAYS,
+  segmentBalanceKey,
   todayInSeoul,
   type BalanceKey,
   type Branch,
-  type LeaveAllocation,
+  type LeaveSegment,
   type RegularOvernightConfigInput,
 } from "@leave/shared";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { type DrizzleD1Database } from "drizzle-orm/d1";
 import {
-  leaveAllocations,
   leaveBalanceGrants,
   leaves,
+  leaveSegments,
   regularOvernightConfigs,
   userLeaveBalances,
 } from "../db/schema";
@@ -144,14 +144,14 @@ export async function getLeaveBalanceSummary(
       .all(),
     db
       .select({
-        category: leaveAllocations.category,
-        overnightKind: leaveAllocations.overnightKind,
-        days: sql<number>`cast(sum(${leaveAllocations.days}) as integer)`,
+        category: leaveSegments.category,
+        overnightKind: leaveSegments.overnightKind,
+        days: sql<number>`cast(sum(${leaveSegments.days}) as integer)`,
       })
-      .from(leaveAllocations)
-      .innerJoin(leaves, eq(leaveAllocations.leaveId, leaves.id))
+      .from(leaveSegments)
+      .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
       .where(eq(leaves.userId, user.id))
-      .groupBy(leaveAllocations.category, leaveAllocations.overnightKind)
+      .groupBy(leaveSegments.category, leaveSegments.overnightKind)
       .all(),
     db
       .select()
@@ -168,7 +168,7 @@ export async function getLeaveBalanceSummary(
   );
   const used = new Map<BalanceKey, number>();
   for (const row of usedRows) {
-    const key = allocationBalanceKey({
+    const key = segmentBalanceKey({
       category: row.category,
       overnightKind: row.overnightKind ?? undefined,
     });
@@ -278,10 +278,11 @@ export async function saveRegularOvernightConfig(
   return getLeaveBalanceSummary(db, user);
 }
 
-export async function assertAllocationsAvailable(
+/** 구간을 재원별로 합산해 잔여량을 넘지 않는지 확인한다. */
+export async function assertSegmentsAvailable(
   db: Db,
   user: { id: string; branch: Branch },
-  allocations: LeaveAllocation[],
+  segments: LeaveSegment[],
   replacingLeaveId?: string,
 ) {
   const summary = await getLeaveBalanceSummary(db, user);
@@ -289,63 +290,74 @@ export async function assertAllocationsAvailable(
     summary.balances.map((item) => [item.key, item.remainingDays]),
   );
 
+  // 수정이면 기존 구간만큼은 다시 쓸 수 있으므로 잔여량에 되돌려준다.
   if (replacingLeaveId) {
     const old = await db
       .select()
-      .from(leaveAllocations)
-      .where(eq(leaveAllocations.leaveId, replacingLeaveId))
+      .from(leaveSegments)
+      .where(eq(leaveSegments.leaveId, replacingLeaveId))
       .all();
-    for (const allocation of old) {
-      const key = allocationBalanceKey({
-        category: allocation.category,
-        overnightKind: allocation.overnightKind ?? undefined,
+    for (const segment of old) {
+      const key = segmentBalanceKey({
+        category: segment.category,
+        overnightKind: segment.overnightKind ?? undefined,
       });
-      available.set(key, (available.get(key) ?? 0) + allocation.days);
+      available.set(key, (available.get(key) ?? 0) + segment.days);
     }
   }
 
-  for (const allocation of allocations) {
-    const key = allocationBalanceKey(allocation);
+  const requested = new Map<BalanceKey, number>();
+  for (const segment of segments) {
+    const key = segmentBalanceKey(segment);
+    requested.set(key, (requested.get(key) ?? 0) + segment.days);
+  }
+  for (const [key, days] of requested) {
     const remaining = available.get(key) ?? 0;
-    if (allocation.days > remaining) {
+    if (days > remaining) {
       throw new Error(
         `${BALANCE_LABELS[key]} 잔여 ${remaining}일보다 많이 사용할 수 없습니다`,
       );
     }
-    available.set(key, remaining - allocation.days);
   }
 }
 
-export async function insertLeaveAllocations(
-  db: Db,
-  leaveId: string,
-  allocations: LeaveAllocation[],
-) {
-  await db.insert(leaveAllocations).values(
-    allocations.map((allocation) => ({
-      id: crypto.randomUUID(),
-      leaveId,
-      category: allocation.category,
-      days: allocation.days,
-      overnightKind: allocation.overnightKind ?? null,
-    })),
-  );
+export function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
+  return segments.map((segment) => ({
+    id: crypto.randomUUID(),
+    leaveId,
+    category: segment.category,
+    overnightKind: segment.overnightKind ?? null,
+    startDate: segment.startDate,
+    endDate: segment.endDate,
+    days: segment.days,
+  }));
 }
 
-export async function allocationsForLeaves(db: Db, leaveIds: string[]) {
-  if (!leaveIds.length) return new Map<string, LeaveAllocation[]>();
+export async function insertLeaveSegments(
+  db: Db,
+  leaveId: string,
+  segments: LeaveSegment[],
+) {
+  await db.insert(leaveSegments).values(segmentRowsFor(leaveId, segments));
+}
+
+export async function segmentsForLeaves(db: Db, leaveIds: string[]) {
+  if (!leaveIds.length) return new Map<string, LeaveSegment[]>();
   const rows = await db
     .select()
-    .from(leaveAllocations)
-    .where(inArray(leaveAllocations.leaveId, leaveIds))
+    .from(leaveSegments)
+    .where(inArray(leaveSegments.leaveId, leaveIds))
+    .orderBy(asc(leaveSegments.startDate))
     .all();
-  const result = new Map<string, LeaveAllocation[]>();
+  const result = new Map<string, LeaveSegment[]>();
   for (const row of rows) {
     const values = result.get(row.leaveId) ?? [];
     values.push({
       category: row.category,
-      days: row.days,
       ...(row.overnightKind ? { overnightKind: row.overnightKind } : {}),
+      startDate: row.startDate,
+      endDate: row.endDate,
+      days: row.days,
     });
     result.set(row.leaveId, values);
   }

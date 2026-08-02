@@ -1,3 +1,9 @@
+import {
+  BALANCE_LABELS,
+  fmtRangeTiny,
+  segmentBalanceKey,
+  type LeaveSegment,
+} from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -188,6 +194,26 @@ const configs: Record<EntityResource, ResourceConfig> = {
         key: "period",
         label: "기간",
         render: (item) => `${text(item.startDate)} – ${text(item.endDate)}`,
+      },
+      {
+        key: "segments",
+        label: "구간",
+        render: (item) => {
+          const segments = Array.isArray(item.segments)
+            ? (item.segments as LeaveSegment[])
+            : [];
+          if (!segments.length) return "—";
+          return (
+            <span className="person-cell">
+              {segments.map((segment) => (
+                <small key={`${segment.category}-${segment.startDate}`}>
+                  {BALANCE_LABELS[segmentBalanceKey(segment)]}{" "}
+                  {fmtRangeTiny(segment.startDate, segment.endDate)}
+                </small>
+              ))}
+            </span>
+          );
+        },
       },
       {
         key: "created",

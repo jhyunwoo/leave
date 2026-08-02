@@ -11,13 +11,17 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { API_URL, getAuthToken } from "@/api/client";
 import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { LeaveBalanceSettings } from "@/components/leave-balance-settings";
+import {
+  ScreenHeader,
+  useScreenHeaderHeight,
+} from "@/components/screen-header";
+import { ServiceProgress } from "@/components/service-progress";
 import { colors, radius, spacing } from "@/theme";
 
 export function ProfileScreen() {
@@ -26,9 +30,7 @@ export function ProfileScreen() {
   const deleteAccount = useDeleteAccount();
   const router = useRouter();
   const qc = useQueryClient();
-  const insets = useSafeAreaInsets();
-  const topPadding =
-    process.env.EXPO_OS === "web" ? 80 : insets.top + spacing.lg;
+  const headerHeight = useScreenHeaderHeight({ subtitle: true });
   const [uploading, setUploading] = useState(false);
 
   if (me.isPending || !me.data) {
@@ -40,7 +42,6 @@ export function ProfileScreen() {
   }
 
   const { user, unit } = me.data;
-  const progress = Math.round(user.serviceProgress * 100);
 
   const confirmDeleteAccount = () => {
     Alert.alert(
@@ -100,111 +101,111 @@ export function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
-    >
-      <Text style={styles.pageTitle}>프로필</Text>
-
-      {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
-      <View style={styles.darkCard}>
-        <View style={styles.darkTop}>
-          <View>
-            <Text style={styles.darkEyebrow}>현재 계급</Text>
-            <Text style={styles.rank}>{user.rankLabel}</Text>
-            <Text style={styles.darkMeta}>
-              {user.branchLabel} · {user.name}
-            </Text>
+    <>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+      >
+        {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
+        <View style={styles.darkCard}>
+          <View style={styles.darkTop}>
+            <View>
+              <Text style={styles.darkEyebrow}>현재 계급</Text>
+              <Text style={styles.rank}>{user.rankLabel}</Text>
+              <Text style={styles.darkMeta}>
+                {user.branchLabel} · {user.name}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.darkEyebrow}>전역까지</Text>
+              <Text style={styles.dday}>D-{user.daysUntilDischarge}</Text>
+            </View>
           </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text style={styles.darkEyebrow}>전역까지</Text>
-            <Text style={styles.dday}>D-{user.daysUntilDischarge}</Text>
-          </View>
-        </View>
 
-        <View
-          style={styles.progressTrack}
-          accessibilityRole="progressbar"
-          accessibilityLabel={`복무 진행률 ${progress}%`}
-        >
-          <View style={[styles.progressFill, { width: `${progress}%` }]} />
-        </View>
-        <View style={styles.progressLabels}>
-          <Text style={styles.progressText}>복무 {progress}%</Text>
-          <Text style={styles.progressText}>
-            {user.nextPromotionDate
-              ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
-              : "최종 계급"}
-          </Text>
-        </View>
-      </View>
-
-      {/* 프로필 정보 */}
-      <View style={styles.card}>
-        <View style={styles.profileRow}>
-          <Avatar name={user.name} imageKey={user.profileImageKey} size={64} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.name}>{user.name}</Text>
-            <Text style={styles.email}>{user.email}</Text>
-          </View>
-          <Button
-            title={uploading ? "올리는 중…" : "사진 변경"}
-            variant="secondary"
-            size="sm"
-            loading={uploading}
-            onPress={() => void changePhoto()}
+          <ServiceProgress
+            enlistedAt={user.enlistedAt}
+            dischargeAt={user.dischargeAt}
+            caption={
+              user.nextPromotionDate
+                ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
+                : "최종 계급"
+            }
           />
         </View>
 
-        <View style={styles.infoGrid}>
-          <InfoItem label="군 종류" value={user.branchLabel} />
-          <InfoItem label="소속 부대" value={unit?.name ?? "미소속"} />
-          <InfoItem label="입대일" value={user.enlistedAt} />
-          <InfoItem label="전역 예정일" value={user.dischargeAt} />
+        {/* 프로필 정보 */}
+        <View style={styles.card}>
+          <View style={styles.profileRow}>
+            <Avatar
+              name={user.name}
+              imageKey={user.profileImageKey}
+              size={64}
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.name}>{user.name}</Text>
+              <Text style={styles.email}>{user.email}</Text>
+            </View>
+            <Button
+              title={uploading ? "올리는 중…" : "사진 변경"}
+              variant="secondary"
+              size="sm"
+              loading={uploading}
+              onPress={() => void changePhoto()}
+            />
+          </View>
+
+          <View style={styles.infoGrid}>
+            <InfoItem label="군 종류" value={user.branchLabel} />
+            <InfoItem label="소속 부대" value={unit?.name ?? "미소속"} />
+            <InfoItem label="입대일" value={user.enlistedAt} />
+            <InfoItem label="전역 예정일" value={user.dischargeAt} />
+          </View>
         </View>
-      </View>
 
-      <LeaveBalanceSettings branch={user.branch} />
+        <LeaveBalanceSettings branch={user.branch} />
 
-      <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
-        <Button
-          title="부대 관리"
-          variant="secondary"
-          onPress={() => router.push("/units")}
-          style={{ flex: 1 }}
-        />
-        <Button
-          title="로그아웃"
-          variant="tertiary"
-          loading={logout.isPending}
-          onPress={() =>
-            Alert.alert("로그아웃", "로그아웃할까요?", [
-              { text: "취소", style: "cancel" },
-              {
-                text: "로그아웃",
-                style: "destructive",
-                onPress: () => void logout.mutateAsync(),
-              },
-            ])
-          }
-          style={{ flex: 1 }}
-        />
-      </View>
+        <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
+          <Button
+            title="부대 관리"
+            variant="secondary"
+            onPress={() => router.push("/units")}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="로그아웃"
+            variant="tertiary"
+            loading={logout.isPending}
+            onPress={() =>
+              Alert.alert("로그아웃", "로그아웃할까요?", [
+                { text: "취소", style: "cancel" },
+                {
+                  text: "로그아웃",
+                  style: "destructive",
+                  onPress: () => void logout.mutateAsync(),
+                },
+              ])
+            }
+            style={{ flex: 1 }}
+          />
+        </View>
 
-      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
-      <Pressable
-        accessibilityRole="button"
-        onPress={confirmDeleteAccount}
-        disabled={deleteAccount.isPending}
-        style={styles.deleteRow}
-      >
-        {deleteAccount.isPending ? (
-          <ActivityIndicator color={colors.negativeDeep} />
-        ) : (
-          <Text style={styles.deleteText}>계정 삭제</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+        {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={confirmDeleteAccount}
+          disabled={deleteAccount.isPending}
+          style={styles.deleteRow}
+        >
+          {deleteAccount.isPending ? (
+            <ActivityIndicator color={colors.negativeDeep} />
+          ) : (
+            <Text style={styles.deleteText}>계정 삭제</Text>
+          )}
+        </Pressable>
+      </ScrollView>
+
+      <ScreenHeader title="프로필" subtitle="계급과 휴가 일수를 관리해요." />
+    </>
   );
 }
 
@@ -226,13 +227,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
-  pageTitle: {
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -0.8,
-    color: colors.ink,
-    marginBottom: spacing.xs,
-  },
   darkCard: {
     backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,
@@ -261,23 +255,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   darkMeta: { fontSize: 14, color: colors.body, marginTop: spacing.sm },
-  progressTrack: {
-    height: 10,
-    borderRadius: radius.pill,
-    backgroundColor: colors.hairline,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  progressLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: -spacing.md,
-  },
-  progressText: { fontSize: 12, color: colors.mute },
   card: {
     backgroundColor: colors.canvas,
     borderRadius: radius.xl,

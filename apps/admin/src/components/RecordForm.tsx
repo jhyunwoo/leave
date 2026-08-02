@@ -1,9 +1,17 @@
 import {
-  allocationBalanceKey,
+  addDays,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  draftsToSegments,
+  fitDrafts,
+  removeDraft,
+  resolveDrafts,
+  segmentsToDrafts,
+  setDraftEnd,
+  splitLastDraft,
   type BalanceKey,
-  type LeaveAllocation,
+  type LeaveSegment,
+  type SegmentDraft,
 } from "@leave/shared";
 import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -42,27 +50,12 @@ function nullable(form: FormData, key: string): string | null {
   return value(form, key) || null;
 }
 
-function allocationForKey(key: BalanceKey, days: number): LeaveAllocation {
-  if (key === "regular_overnight") {
-    return { category: "overnight", overnightKind: "regular", days };
-  }
-  if (key === "other_overnight") {
-    return { category: "overnight", overnightKind: "other", days };
-  }
-  return { category: key, days };
-}
-
-function initialAllocationDays(
+function initialSegments(
   initial: Record<string, unknown> | undefined,
-  key: BalanceKey,
-): number {
-  const allocations = Array.isArray(initial?.allocations)
-    ? (initial.allocations as LeaveAllocation[])
+): LeaveSegment[] {
+  return Array.isArray(initial?.segments)
+    ? (initial.segments as LeaveSegment[])
     : [];
-  return (
-    allocations.find((allocation) => allocationBalanceKey(allocation) === key)
-      ?.days ?? 0
-  );
 }
 
 export function RecordForm({
@@ -75,6 +68,38 @@ export function RecordForm({
   onSubmit,
 }: Props) {
   const [sendChecked, setSendChecked] = useState(false);
+
+  // 휴가는 "구간" 단위로 저장하므로 이 부분만 제어 컴포넌트로 다룬다.
+  const [leaveStart, setLeaveStart] = useState(() =>
+    stringValue(initial, "startDate"),
+  );
+  const [leaveEnd, setLeaveEnd] = useState(() =>
+    stringValue(initial, "endDate"),
+  );
+  const [drafts, setDrafts] = useState<SegmentDraft[]>(() => {
+    const segments = initialSegments(initial);
+    return segments.length
+      ? segmentsToDrafts(segments)
+      : fitDrafts(
+          [],
+          stringValue(initial, "startDate"),
+          stringValue(initial, "endDate"),
+        );
+  });
+  const leaveRangeValid = Boolean(
+    leaveStart && leaveEnd && leaveStart <= leaveEnd,
+  );
+  const resolvedDrafts = leaveRangeValid
+    ? resolveDrafts(leaveStart, drafts)
+    : [];
+  const leaveDuration = resolvedDrafts.reduce((sum, d) => sum + d.days, 0);
+
+  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
+  const applyLeaveRange = (nextStart: string, nextEnd: string) => {
+    setLeaveStart(nextStart);
+    setLeaveEnd(nextEnd);
+    setDrafts((current) => fitDrafts(current, nextStart, nextEnd));
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,15 +142,8 @@ export function RecordForm({
         onSubmit({
           userId: value(form, "userId"),
           title: value(form, "title"),
-          startDate: value(form, "startDate"),
-          endDate: value(form, "endDate"),
           reason: nullable(form, "reason"),
-          allocations: BALANCE_KEYS.map((key) =>
-            allocationForKey(
-              key,
-              Number(value(form, `allocation_${key}`)) || 0,
-            ),
-          ).filter((allocation) => allocation.days > 0),
+          segments: draftsToSegments(leaveStart, drafts),
           sendNotifications: sendChecked,
         });
         break;
@@ -292,20 +310,33 @@ export function RecordForm({
           <div className="form-grid">
             <Field label="사용자 ID" name="userId" required initial={initial} />
             <Field label="휴가 제목" name="title" required initial={initial} />
-            <Field
-              label="시작일"
-              name="startDate"
-              type="date"
-              required
-              initial={initial}
-            />
-            <Field
-              label="종료일"
-              name="endDate"
-              type="date"
-              required
-              initial={initial}
-            />
+            <label className="field">
+              <span>시작일</span>
+              <input
+                type="date"
+                value={leaveStart}
+                required
+                onChange={(event) => {
+                  const next = event.target.value;
+                  applyLeaveRange(
+                    next,
+                    !leaveEnd || leaveEnd < next ? next : leaveEnd,
+                  );
+                }}
+              />
+            </label>
+            <label className="field">
+              <span>종료일</span>
+              <input
+                type="date"
+                value={leaveEnd}
+                min={leaveStart || undefined}
+                required
+                onChange={(event) =>
+                  applyLeaveRange(leaveStart, event.target.value)
+                }
+              />
+            </label>
             <label className="field form-span">
               <span>사유</span>
               <textarea
@@ -314,17 +345,105 @@ export function RecordForm({
                 defaultValue={stringValue(initial, "reason")}
               />
             </label>
-            {BALANCE_KEYS.map((key) => (
-              <label key={key} className="field">
-                <span>{BALANCE_LABELS[key]} 사용 일수</span>
-                <input
-                  name={`allocation_${key}`}
-                  type="number"
-                  min={0}
-                  defaultValue={initialAllocationDays(initial, key)}
-                />
-              </label>
-            ))}
+          </div>
+
+          <div className="field">
+            <span>휴가 구간 — 언제부터 언제까지가 어떤 휴가인지</span>
+            {leaveRangeValid ? (
+              <>
+                {resolvedDrafts.map((draft, index) => {
+                  const isLast = index === resolvedDrafts.length - 1;
+                  // 뒤에 남은 구간 수만큼 최소 하루씩 남겨둬야 한다.
+                  const maxEnd = addDays(
+                    leaveEnd,
+                    -(resolvedDrafts.length - 1 - index),
+                  );
+                  return (
+                    <div key={index} className="form-grid">
+                      <label className="field">
+                        <span>재원</span>
+                        <select
+                          value={draft.key}
+                          onChange={(event) =>
+                            setDrafts((current) =>
+                              current.map((item, i) =>
+                                i === index
+                                  ? {
+                                      ...item,
+                                      key: event.target.value as BalanceKey,
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                        >
+                          {BALANCE_KEYS.map((key) => (
+                            <option key={key} value={key}>
+                              {BALANCE_LABELS[key]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>
+                          {draft.startDate} 부터 ({draft.days}일)
+                        </span>
+                        <input
+                          type="date"
+                          value={draft.endDate}
+                          min={draft.startDate}
+                          max={maxEnd}
+                          disabled={isLast}
+                          onChange={(event) =>
+                            setDrafts((current) =>
+                              setDraftEnd(
+                                current,
+                                index,
+                                event.target.value,
+                                leaveStart,
+                                leaveEnd,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        disabled={resolvedDrafts.length <= 1}
+                        onClick={() =>
+                          setDrafts((current) =>
+                            removeDraft(current, index, leaveStart, leaveEnd),
+                          )
+                        }
+                      >
+                        구간 삭제
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={leaveDuration <= resolvedDrafts.length}
+                  onClick={() =>
+                    setDrafts((current) => {
+                      const next = splitLastDraft(
+                        current,
+                        leaveStart,
+                        leaveEnd,
+                        "regular_overnight",
+                      );
+                      return next ?? current;
+                    })
+                  }
+                >
+                  구간 추가
+                </button>
+              </>
+            ) : (
+              <span>시작일과 종료일을 먼저 골라주세요.</span>
+            )}
           </div>
           <label className="check-field">
             <input

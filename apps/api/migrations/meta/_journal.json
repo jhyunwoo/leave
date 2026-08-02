@@ -43,6 +43,13 @@
       "when": 1785144985039,
       "tag": "0005_perfect_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785231385000,
+      "tag": "0006_leave_segments",
+      "breakpoints": true
     }
   ]
 }

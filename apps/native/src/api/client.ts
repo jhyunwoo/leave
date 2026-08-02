@@ -1,5 +1,5 @@
 import type { AppType } from "@leave/api";
-import { buildImageUrl } from "@leave/shared";
+import { buildImageUrl, resolveApiUrl } from "@leave/shared";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { hc } from "hono/client";
@@ -10,16 +10,12 @@ export { ApiError, unwrap } from "@leave/shared";
 
 const TOKEN_KEY = "leave.token";
 
-function defaultApiUrl(): string {
-  const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
-  // 개발 중에는 Metro 번들러 호스트(개발 PC)의 8787 포트로 접속
-  const host = Constants.expoConfig?.hostUri?.split(":")[0];
-  if (host) return `http://${host}:8787`;
-  return "http://localhost:8787";
-}
-
-export const API_URL = defaultApiUrl();
+// 개발 중에는 Metro 번들러 호스트(개발 PC)의 8787 포트로, 그 외에는 프로덕션으로.
+// hostUri는 개발 서버에 붙어 있을 때만 채워지므로 스탠드얼론 빌드는 항상 프로덕션이다.
+export const API_URL = resolveApiUrl({
+  envUrl: process.env.EXPO_PUBLIC_API_URL,
+  devHost: Constants.expoConfig?.hostUri?.split(":")[0],
+});
 
 let authToken: string | null = null;
 

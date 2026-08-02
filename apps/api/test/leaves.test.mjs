@@ -8,9 +8,9 @@ test("휴가 등록에는 소속 부대가 필요하다", async () => {
     token,
     body: {
       title: "휴가",
-      startDate: "2026-08-01",
-      endDate: "2026-08-03",
-      allocations: [{ category: "annual", days: 3 }],
+      segments: [
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-03" },
+      ],
     },
   });
   assert.equal(res.status, 400);
@@ -25,9 +25,9 @@ test("내 휴가 목록 CRUD", async () => {
     token,
     body: {
       title: "정기휴가",
-      startDate: "2026-08-01",
-      endDate: "2026-08-03",
-      allocations: [{ category: "annual", days: 3 }],
+      segments: [
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-03" },
+      ],
     },
   });
   assert.equal(created.status, 201);
@@ -40,9 +40,9 @@ test("내 휴가 목록 CRUD", async () => {
     token,
     body: {
       title: "수정휴가",
-      startDate: "2026-08-02",
-      endDate: "2026-08-04",
-      allocations: [{ category: "annual", days: 3 }],
+      segments: [
+        { category: "annual", startDate: "2026-08-02", endDate: "2026-08-04" },
+      ],
     },
   });
   assert.equal(updated.status, 200);
@@ -53,6 +53,92 @@ test("내 휴가 목록 CRUD", async () => {
 
   const after = await req("GET", "/leaves/mine", { token });
   assert.equal(after.data.leaves.length, 0);
+});
+
+test("휴가 구간으로 어느 날이 어떤 재원인지 저장한다", async () => {
+  const { token } = await signup({ branch: "air_force" });
+  await createUnit(token, { name: uniq("구간부대-") });
+
+  const totals = {};
+  for (const item of (await req("GET", "/leaves/balances", { token })).data
+    .balances) {
+    totals[item.key] = item.totalDays;
+  }
+  totals.regular_overnight = 8;
+  await req("PUT", "/leaves/balances", { token, body: { totals } });
+
+  const created = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "구간 휴가",
+      segments: [
+        { category: "annual", startDate: "2026-08-02", endDate: "2026-08-05" },
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-08-06",
+          endDate: "2026-08-09",
+        },
+      ],
+    },
+  });
+  assert.equal(created.status, 201);
+  // 전체 기간은 구간에서 파생된다.
+  assert.equal(created.data.leave.startDate, "2026-08-02");
+  assert.equal(created.data.leave.endDate, "2026-08-09");
+  assert.equal(created.data.leave.segments.length, 2);
+  assert.equal(created.data.leave.segments[0].days, 4);
+
+  const gap = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "빈 날 있는 휴가",
+      segments: [
+        { category: "annual", startDate: "2026-09-01", endDate: "2026-09-02" },
+        { category: "annual", startDate: "2026-09-04", endDate: "2026-09-05" },
+      ],
+    },
+  });
+  assert.equal(gap.status, 400);
+
+  const overlap = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "겹치는 휴가",
+      segments: [
+        { category: "annual", startDate: "2026-09-01", endDate: "2026-09-03" },
+        { category: "annual", startDate: "2026-09-03", endDate: "2026-09-05" },
+      ],
+    },
+  });
+  assert.equal(overlap.status, 400);
+
+  // 같은 재원이 두 번 나오는 구성(연가 → 외박 → 연가)도 허용한다.
+  const sandwich = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "샌드위치 휴가",
+      segments: [
+        { category: "annual", startDate: "2026-10-01", endDate: "2026-10-01" },
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-10-02",
+          endDate: "2026-10-02",
+        },
+        { category: "annual", startDate: "2026-10-03", endDate: "2026-10-03" },
+      ],
+    },
+  });
+  assert.equal(sandwich.status, 201);
+  assert.equal(sandwich.data.leave.segments.length, 3);
+  // 같은 재원이 두 구간에 나뉘어도 합치면 연가 2일.
+  assert.equal(
+    sandwich.data.leave.segments
+      .filter((s) => s.category === "annual")
+      .reduce((n, s) => n + s.days, 0),
+    2,
+  );
 });
 
 test("군별 기본 연가를 제안하고 모든 총량을 수정해 복합 휴가에서 차감한다", async () => {
@@ -87,16 +173,14 @@ test("군별 기본 연가를 제안하고 모든 총량을 수정해 복합 휴
     token,
     body: {
       title: "복합 휴가",
-      startDate: "2026-09-01",
-      endDate: "2026-09-05",
-      allocations: [
-        { category: "annual", days: 3 },
-        { category: "award", days: 2 },
+      segments: [
+        { category: "annual", startDate: "2026-09-01", endDate: "2026-09-03" },
+        { category: "award", startDate: "2026-09-04", endDate: "2026-09-05" },
       ],
     },
   });
   assert.equal(created.status, 201);
-  assert.equal(created.data.leave.allocations.length, 2);
+  assert.equal(created.data.leave.segments.length, 2);
 
   const after = await req("GET", "/leaves/balances", { token });
   assert.equal(
@@ -174,29 +258,28 @@ test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 
   });
 
   // 같은 날짜에 3명이 휴가 → 직접 지정한 2명 초과
-  const range = { startDate: "2026-10-05", endDate: "2026-10-05" };
+  const oneDay = [
+    { category: "annual", startDate: "2026-10-05", endDate: "2026-10-05" },
+  ];
   await req("POST", "/leaves", {
     token: owner.token,
     body: {
       title: "휴가1",
-      ...range,
-      allocations: [{ category: "annual", days: 1 }],
+      segments: oneDay,
     },
   });
   await req("POST", "/leaves", {
     token: u2.token,
     body: {
       title: "휴가2",
-      ...range,
-      allocations: [{ category: "annual", days: 1 }],
+      segments: oneDay,
     },
   });
   const third = await req("POST", "/leaves", {
     token: u3.token,
     body: {
       title: "휴가3",
-      ...range,
-      allocations: [{ category: "annual", days: 1 }],
+      segments: oneDay,
     },
   });
 

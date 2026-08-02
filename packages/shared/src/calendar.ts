@@ -22,6 +22,18 @@ export function fmtRange(start: ISODate, end: ISODate): string {
   return `${fmtDateShort(start)} – ${fmtDateShort(end)}`;
 }
 
+/** "8/2" — 칩·배너처럼 좁은 자리에 쓰는 짧은 표기. */
+export function fmtDateTiny(date: ISODate): string {
+  const d = parseISODate(date);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
+/** "8/2–8/5" — 하루짜리면 "8/2". */
+export function fmtRangeTiny(start: ISODate, end: ISODate): string {
+  if (start === end) return fmtDateTiny(start);
+  return `${fmtDateTiny(start)}–${fmtDateTiny(end)}`;
+}
+
 export function shiftMonth(month: string, delta: number): string {
   const { year, monthNum } = splitMonth(month);
   const total = year * 12 + (monthNum - 1) + delta;

@@ -1,21 +1,27 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  inclusiveDays,
   leaveBalanceUpdateSchema,
   leaveCreateSchema,
   leaveUpdateSchema,
   regularOvernightConfigSchema,
+  segmentsRange,
+  sortSegments,
+  type LeaveCreateInput,
+  type LeaveSegment,
 } from "@leave/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { leaveAllocations, leaves, type LeaveRow } from "../db/schema";
+import { leaves, leaveSegments, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
 import {
-  allocationsForLeaves,
-  assertAllocationsAvailable,
+  assertSegmentsAvailable,
   getLeaveBalanceSummary,
-  insertLeaveAllocations,
+  insertLeaveSegments,
   saveRegularOvernightConfig,
+  segmentRowsFor,
+  segmentsForLeaves,
   updateLeaveBalanceTotals,
 } from "../lib/leave-balances";
 import { checkOverageAndNotify } from "../lib/overage";
@@ -156,9 +162,17 @@ const deleteLeaveRoute = createRoute({
   },
 });
 
+/** 입력 구간에 일수를 채워 정렬한다. 일수는 항상 날짜에서 파생한다. */
+function toSegments(input: LeaveCreateInput): LeaveSegment[] {
+  return sortSegments(input.segments).map((segment) => ({
+    ...segment,
+    days: inclusiveDays(segment.startDate, segment.endDate),
+  }));
+}
+
 function serializeLeave(
   row: LeaveRow,
-  allocations: Awaited<ReturnType<typeof allocationsForLeaves>>,
+  segmentsByLeave: Map<string, LeaveSegment[]>,
 ) {
   return {
     id: row.id,
@@ -167,7 +181,7 @@ function serializeLeave(
     startDate: row.startDate,
     endDate: row.endDate,
     reason: row.reason,
-    allocations: allocations.get(row.id) ?? [],
+    segments: segmentsByLeave.get(row.id) ?? [],
     createdAt: row.createdAt,
   };
 }
@@ -224,12 +238,12 @@ export const leaveRoutes = app
       .where(eq(leaves.userId, user.id))
       .orderBy(desc(leaves.startDate))
       .all();
-    const allocations = await allocationsForLeaves(
+    const segments = await segmentsForLeaves(
       db,
       rows.map((row) => row.id),
     );
     return c.json(
-      { leaves: rows.map((row) => serializeLeave(row, allocations)) },
+      { leaves: rows.map((row) => serializeLeave(row, segments)) },
       200,
     );
   })
@@ -240,8 +254,10 @@ export const leaveRoutes = app
       return c.json({ error: "먼저 부대에 가입해주세요" }, 400);
     }
     const db = drizzle(c.env.DB);
+    const segments = toSegments(input);
+    const range = segmentsRange(segments)!;
     try {
-      await assertAllocationsAvailable(db, user, input.allocations);
+      await assertSegmentsAvailable(db, user, segments);
     } catch (error) {
       return c.json(
         {
@@ -255,13 +271,13 @@ export const leaveRoutes = app
       id: crypto.randomUUID(),
       userId: user.id,
       title: input.title,
-      startDate: input.startDate,
-      endDate: input.endDate,
+      startDate: range.startDate,
+      endDate: range.endDate,
       reason: input.reason ?? null,
       createdAt: new Date().toISOString(),
     };
     await db.insert(leaves).values(leave);
-    await insertLeaveAllocations(db, leave.id, input.allocations);
+    await insertLeaveSegments(db, leave.id, segments);
     // 휴가가 추가되면 부대 달력이 바뀌므로 캐시를 무효화한다.
     await bumpUnitVersion(c.env.CACHE, user.unitId);
 
@@ -271,9 +287,11 @@ export const leaveRoutes = app
       changedLeave: leave,
       waitUntil: (p) => c.executionCtx.waitUntil(p),
     });
-    const allocationMap = new Map([[leave.id, input.allocations]]);
     return c.json(
-      { leave: serializeLeave(leave, allocationMap), exceededDates },
+      {
+        leave: serializeLeave(leave, new Map([[leave.id, segments]])),
+        exceededDates,
+      },
       201,
     );
   })
@@ -291,8 +309,10 @@ export const leaveRoutes = app
     if (!existing) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
+    const segments = toSegments(input);
+    const range = segmentsRange(segments)!;
     try {
-      await assertAllocationsAvailable(db, user, input.allocations, id);
+      await assertSegmentsAvailable(db, user, segments, id);
     } catch (error) {
       return c.json(
         {
@@ -305,8 +325,8 @@ export const leaveRoutes = app
     const updated: LeaveRow = {
       ...existing,
       title: input.title,
-      startDate: input.startDate,
-      endDate: input.endDate,
+      startDate: range.startDate,
+      endDate: range.endDate,
       reason: input.reason ?? null,
     };
     await db.batch([
@@ -319,16 +339,8 @@ export const leaveRoutes = app
           reason: updated.reason,
         })
         .where(eq(leaves.id, id)),
-      db.delete(leaveAllocations).where(eq(leaveAllocations.leaveId, id)),
-      db.insert(leaveAllocations).values(
-        input.allocations.map((allocation) => ({
-          id: crypto.randomUUID(),
-          leaveId: id,
-          category: allocation.category,
-          days: allocation.days,
-          overnightKind: allocation.overnightKind ?? null,
-        })),
-      ),
+      db.delete(leaveSegments).where(eq(leaveSegments.leaveId, id)),
+      db.insert(leaveSegments).values(segmentRowsFor(id, segments)),
     ]);
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
@@ -340,9 +352,11 @@ export const leaveRoutes = app
           waitUntil: (p) => c.executionCtx.waitUntil(p),
         })
       : [];
-    const allocationMap = new Map([[id, input.allocations]]);
     return c.json(
-      { leave: serializeLeave(updated, allocationMap), exceededDates },
+      {
+        leave: serializeLeave(updated, new Map([[id, segments]])),
+        exceededDates,
+      },
       200,
     );
   })

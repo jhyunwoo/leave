@@ -18,6 +18,7 @@ export function DatePickerRow(props: {
   label: string;
   value: ISODate | "";
   min?: ISODate;
+  max?: ISODate;
   onChange: (date: ISODate) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -74,7 +75,9 @@ export function DatePickerRow(props: {
             <View key={wi} style={styles.weekRow}>
               {week.map((cell) => {
                 const disabled =
-                  !cell.inMonth || (props.min ? cell.date < props.min : false);
+                  !cell.inMonth ||
+                  (props.min ? cell.date < props.min : false) ||
+                  (props.max ? cell.date > props.max : false);
                 const selected = cell.date === props.value;
                 return (
                   <Pressable

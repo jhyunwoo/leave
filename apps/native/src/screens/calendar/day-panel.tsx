@@ -1,21 +1,37 @@
-import { fmtDateK, fmtRange, getHoliday, type ISODate } from "@leave/shared";
+import {
+  BALANCE_LABELS,
+  fmtDateK,
+  fmtRange,
+  fmtRangeTiny,
+  getHoliday,
+  segmentBalanceKey,
+  segmentOnDate,
+  type ISODate,
+  type RegularOvernightCycle,
+} from "@leave/shared";
 import { StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
-import { colors, radius, spacing } from "@/theme";
+import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
 export function DayPanel(props: {
   calendar: Calendar;
   date: ISODate;
   onAddLeave: () => void;
+  /** 내 사용자 id. 내 휴가를 맨 위로 올려 강조한다. */
+  myUserId?: string;
+  /** 이 날이 속한 정기외박 주기. */
+  cycle?: RegularOvernightCycle | null;
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
-  const dayLeaves = calendar.leaves.filter(
-    (l) => l.startDate <= date && date <= l.endDate,
-  );
+  const dayLeaves = calendar.leaves
+    .filter((l) => l.startDate <= date && date <= l.endDate)
+    .sort((a, b) =>
+      a.userId === props.myUserId ? -1 : b.userId === props.myUserId ? 1 : 0,
+    );
   const exceeded = stat?.exceeded ?? false;
   const holiday = getHoliday(date);
 
@@ -37,6 +53,13 @@ export function DayPanel(props: {
         </View>
       )}
 
+      {props.cycle && (
+        <Text style={styles.cycleLine}>
+          정기외박 {props.cycle.index}주기{" "}
+          {fmtRangeTiny(props.cycle.start, props.cycle.end)} 안에 속한 날이에요.
+        </Text>
+      )}
+
       {dayLeaves.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>이 날은 아무도 휴가가 아니에요.</Text>
@@ -44,22 +67,44 @@ export function DayPanel(props: {
         </View>
       ) : (
         <View style={{ gap: spacing.md }}>
-          {dayLeaves.map((l) => (
-            <View key={l.id} style={styles.leaveRow}>
-              <Avatar name={l.userName} imageKey={l.userProfileImageKey} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.leaveUser}>
-                  {l.userRankLabel} {l.userName}
-                </Text>
-                <Text style={styles.leaveMeta}>
-                  {l.title} · {fmtRange(l.startDate, l.endDate)}
-                </Text>
-                {l.reason ? (
-                  <Text style={styles.leaveReason}>{l.reason}</Text>
-                ) : null}
+          {dayLeaves.map((l) => {
+            // 이제 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
+            const segment = segmentOnDate(l.segments, date);
+            const key = segment ? segmentBalanceKey(segment) : null;
+            const tone = key ? BALANCE_COLORS[key] : null;
+            const mine = l.userId === props.myUserId;
+            return (
+              <View
+                key={l.id}
+                style={[styles.leaveRow, mine && styles.myLeaveRow]}
+              >
+                <Avatar name={l.userName} imageKey={l.userProfileImageKey} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={styles.leaveUserRow}>
+                    <Text style={styles.leaveUser}>
+                      {l.userRankLabel} {l.userName}
+                      {mine ? " (나)" : ""}
+                    </Text>
+                    {key && tone && (
+                      <View
+                        style={[styles.typeChip, { backgroundColor: tone.bg }]}
+                      >
+                        <Text style={[styles.typeChipText, { color: tone.fg }]}>
+                          {BALANCE_LABELS[key]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.leaveMeta}>
+                    {l.title} · {fmtRange(l.startDate, l.endDate)}
+                  </Text>
+                  {l.reason ? (
+                    <Text style={styles.leaveReason}>{l.reason}</Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -99,8 +144,27 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 14, color: colors.body },
   emptyCaption: { fontSize: 12, color: colors.mute },
+  cycleLine: { fontSize: 12, color: colors.body, marginTop: -spacing.sm },
   leaveRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  myLeaveRow: {
+    backgroundColor: colors.primaryPale,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    marginHorizontal: -spacing.sm,
+  },
+  leaveUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexWrap: "wrap",
+  },
   leaveUser: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  typeChip: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+  },
+  typeChipText: { fontSize: 10, fontWeight: "700" },
   leaveMeta: { fontSize: 12, color: colors.mute, marginTop: 1 },
   leaveReason: { fontSize: 12, color: colors.body, marginTop: 2 },
 });

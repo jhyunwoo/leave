@@ -17,7 +17,7 @@ import {
   getCachedCalendar,
   putCachedCalendar,
 } from "../lib/cache";
-import { allocationsForLeaves } from "../lib/leave-balances";
+import { segmentsForLeaves } from "../lib/leave-balances";
 import {
   calendarSchema,
   errorResponse,
@@ -687,7 +687,7 @@ export const unitRoutes = app
       rangeStart: start,
       rangeEnd: end,
     });
-    const allocationMap = await allocationsForLeaves(
+    const segmentMap = await segmentsForLeaves(
       db,
       rows.map((row) => row.id),
     );
@@ -705,7 +705,7 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
         reason: l.reason,
-        allocations: allocationMap.get(l.id) ?? [],
+        segments: segmentMap.get(l.id) ?? [],
       };
     });
 
