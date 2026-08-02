@@ -16,6 +16,7 @@ import {
   cyclesInRange,
   isRegularOvernightCycleBased,
   nextGrantDateAfter,
+  normalizeLegacyDischargeDate,
   todayInSeoul,
   type BalanceKey,
   type Branch,
@@ -35,10 +36,33 @@ import {
 } from "../db/schema";
 
 type Db = DrizzleD1Database;
-type User = { id: string; branch: Branch; dischargeAt: string };
+type User = {
+  id: string;
+  branch: Branch;
+  enlistedAt: string;
+  dischargeAt: string;
+};
 
 /** 주기가 아무리 촘촘해도 화면에 쏟아내지 않도록 두는 상한. */
 const MAX_LISTED_CYCLES = 200;
+
+/**
+ * 주기 계산에 쓰는 전역일.
+ *
+ * DB 원본은 구버전 기본값이 그대로 남아 있을 수 있어, 폼이 /auth/me에서 받는 값과
+ * 다를 수 있다. 정규화해서 폼과 서버가 같은 상한을 보게 한다.
+ */
+export function cycleDischargeDate(user: {
+  enlistedAt: string;
+  branch: Branch;
+  dischargeAt: string;
+}): string {
+  return normalizeLegacyDischargeDate(
+    user.enlistedAt,
+    user.branch,
+    user.dischargeAt,
+  );
+}
 
 export function toLeaveGrant(row: LeaveGrantRow): LeaveGrant {
   return {
@@ -177,7 +201,7 @@ export async function buildGrantsPage(db: Db, user: User) {
   const cycles = regularOvernightSummary(
     config,
     segments,
-    user.dischargeAt,
+    cycleDischargeDate(user),
     today,
   );
 

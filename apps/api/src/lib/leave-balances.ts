@@ -2,15 +2,15 @@ import {
   allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  checkRegularOvernight,
   cycleFor,
   cycleUsedDays,
-  firstGrantDate,
   fmtDateShort,
   isExpiringSoon,
   isRegularOvernightCycleBased,
   nextGrantDateAfter,
   planTotalChange,
-  regularOvernightUsageByCycle,
+  regularOvernightBlockMessage,
   segmentBalanceKey,
   todayInSeoul,
   type BalanceKey,
@@ -29,6 +29,7 @@ import {
   type RegularOvernightConfigRow,
 } from "../db/schema";
 import {
+  cycleDischargeDate,
   listGrants,
   regularOvernightSummary,
   toLeaveGrant,
@@ -92,7 +93,7 @@ async function regularOvernightSegments(
 
 export async function getLeaveBalanceSummary(
   db: Db,
-  user: { id: string; branch: Branch; dischargeAt: string },
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
 ) {
   const [grantRows, segments, config, regularSegments] = await Promise.all([
     listGrants(db, user.id),
@@ -120,7 +121,7 @@ export async function getLeaveBalanceSummary(
   const cycles = regularOvernightSummary(
     config,
     regularSegments,
-    user.dischargeAt,
+    cycleDischargeDate(user),
     today,
   );
 
@@ -196,7 +197,7 @@ export async function getLeaveBalanceSummary(
  */
 export async function updateLeaveBalanceTotals(
   db: Db,
-  user: { id: string; branch: Branch; dischargeAt: string },
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   totals: Partial<Record<BalanceKey, number>>,
 ) {
   const [grantRows, segments, config] = await Promise.all([
@@ -273,7 +274,7 @@ export async function updateLeaveBalanceTotals(
 
 export async function saveRegularOvernightConfig(
   db: Db,
-  user: { id: string; branch: Branch; dischargeAt: string },
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   input: RegularOvernightConfigInput,
 ) {
   if (user.branch === "army" && input.enabled) {
@@ -307,42 +308,27 @@ export async function saveRegularOvernightConfig(
 
 /**
  * 정기외박은 주기마다 따로 쌓이고 이월되지 않으므로 재원 총합이 아니라
- * 구간이 걸친 주기별로 따져야 한다. 지난 주기에 휴가를 넣더라도 그 주기 몫에서 빠진다.
+ * 구간이 걸친 주기별로 따져야 한다. 지난 주기에 휴가를 넣더라도 그 주기 몫에서 빠지고,
+ * 아직 오지 않은 주기도 그 몫 안이면 미리 쓸 수 있다.
+ *
+ * 판정 규칙은 폼과 공유하려고 @leave/shared에 있다 — 여기서는 재료만 모은다.
  */
 async function assertRegularOvernightAvailable(
   db: Db,
-  userId: string,
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   config: RegularOvernightConfigRow | undefined,
   requested: SegmentLike[],
   replacingLeaveId?: string,
 ) {
-  const requestedUsage = regularOvernightUsageByCycle(config, requested);
-  if (requestedUsage.beforeFirstGrantDays > 0) {
-    const first = firstGrantDate(config);
-    throw new Error(
-      first
-        ? `정기외박은 첫 적립일(${fmtDateShort(first)}) 이후부터 사용할 수 있습니다`
-        : "첫 적립 전에는 사용할 수 있는 정기외박이 없습니다",
-    );
-  }
-  if (!requestedUsage.cycles.length) return;
-
-  // 이미 저장된 구간에 이번 요청을 더해 주기별 사용량을 다시 센다.
   // 수정이면 교체될 휴가의 구간은 빼야 자기 자신과 부딪히지 않는다.
-  const kept = await regularOvernightSegments(db, userId, replacingLeaveId);
-  const after = regularOvernightUsageByCycle(config, [...kept, ...requested]);
-  const usageByCycleStart = new Map(
-    after.cycles.map((entry) => [entry.cycle.start, entry.usedDays]),
-  );
-
-  for (const { cycle } of requestedUsage.cycles) {
-    const used = usageByCycleStart.get(cycle.start) ?? 0;
-    if (used > cycle.grantDays) {
-      throw new Error(
-        `정기외박 ${cycle.index}주기(${cycle.start}~${cycle.end})에 쓸 수 있는 ${cycle.grantDays}일보다 많이 사용할 수 없습니다`,
-      );
-    }
-  }
+  const existing = await regularOvernightSegments(db, user.id, replacingLeaveId);
+  const block = checkRegularOvernight({
+    config,
+    existing,
+    requested,
+    dischargeAt: cycleDischargeDate(user),
+  });
+  if (block) throw new Error(regularOvernightBlockMessage(block));
 }
 
 /**
@@ -357,7 +343,7 @@ async function assertRegularOvernightAvailable(
  */
 export async function assertSegmentsAvailable(
   db: Db,
-  user: { id: string; branch: Branch },
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   segments: LeaveSegment[],
   replacingLeaveId?: string,
 ) {
@@ -402,7 +388,7 @@ export async function assertSegmentsAvailable(
   if (cycleBased && requested.has("regular_overnight")) {
     await assertRegularOvernightAvailable(
       db,
-      user.id,
+      user,
       config,
       segments,
       replacingLeaveId,
