@@ -104,7 +104,11 @@ export function ProfileScreen() {
     <>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+        contentContainerStyle={[
+          styles.content,
+          // paddingTop이 styles.content의 padding을 덮어써서, 헤더 아래 여백을 되살린다
+          { paddingTop: headerHeight + spacing.lg },
+        ]}
       >
         {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
         <View style={styles.darkCard}>
