@@ -268,3 +268,13 @@ export function cycleColor(index: number): string {
   const size = CYCLE_COLORS.length;
   return CYCLE_COLORS[(((index - 1) % size) + size) % size]!;
 }
+
+/** 오늘을 기준으로 이 주기가 지난 주기인지, 진행 중인지, 아직 오지 않았는지. */
+export function cycleState(
+  cycle: RegularOvernightCycle,
+  today: ISODate,
+): "past" | "current" | "future" {
+  if (today < cycle.start) return "future";
+  if (today > cycle.end) return "past";
+  return "current";
+}

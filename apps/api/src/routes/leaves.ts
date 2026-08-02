@@ -3,6 +3,8 @@ import {
   inclusiveDays,
   leaveBalanceUpdateSchema,
   leaveCreateSchema,
+  leaveGrantCreateSchema,
+  leaveGrantUpdateSchema,
   leaveUpdateSchema,
   regularOvernightConfigSchema,
   segmentsRange,
@@ -15,6 +17,12 @@ import { drizzle } from "drizzle-orm/d1";
 import { leaves, leaveSegments, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
+import {
+  buildGrantsPage,
+  createGrant,
+  deleteGrant,
+  updateGrant,
+} from "../lib/leave-grants";
 import {
   assertSegmentsAvailable,
   getLeaveBalanceSummary,
@@ -29,6 +37,7 @@ import {
   errorResponse,
   jsonContent,
   leaveBalanceSummarySchema,
+  leaveGrantsPageSchema,
   leaveSchema,
   okSchema,
 } from "../lib/responses";
@@ -70,7 +79,10 @@ const updateBalancesRoute = createRoute({
   method: "put",
   path: "/balances",
   tags: ["휴가"],
-  summary: "내 휴가 재원 총량 수정",
+  summary: "내 휴가 재원 총량 수정 (구버전 앱 호환)",
+  description:
+    "만기 없는 기본 적립분 하나를 늘리고 줄인다. 만기가 있는 적립분은 /leaves/grants에서만 다룬다.",
+  deprecated: true,
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -103,6 +115,72 @@ const regularOvernightRoute = createRoute({
     200: jsonContent(leaveBalanceSummarySchema, "정기외박 설정"),
     400: errorResponse("입력값 오류 또는 지원하지 않는 군종"),
     401: errorResponse("인증 실패"),
+  },
+});
+
+const grantsRoute = createRoute({
+  method: "get",
+  path: "/grants",
+  tags: ["휴가"],
+  summary: "보유 휴가 — 적립분·주기 현황",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(leaveGrantsPageSchema, "보유 휴가 현황"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const createGrantRoute = createRoute({
+  method: "post",
+  path: "/grants",
+  tags: ["휴가"],
+  summary: "적립분 추가",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: leaveGrantCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: jsonContent(leaveGrantsPageSchema, "추가 후 보유 휴가 현황"),
+    400: errorResponse("입력값 오류 또는 자동 적립 재원"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const updateGrantRoute = createRoute({
+  method: "patch",
+  path: "/grants/{id}",
+  tags: ["휴가"],
+  summary: "적립분 수정",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: leaveGrantUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveGrantsPageSchema, "수정 후 보유 휴가 현황"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    404: errorResponse("적립분 없음 또는 권한 없음"),
+  },
+});
+
+const deleteGrantRoute = createRoute({
+  method: "delete",
+  path: "/grants/{id}",
+  tags: ["휴가"],
+  summary: "적립분 삭제",
+  security: [{ Bearer: [] }],
+  request: { params: idParam },
+  responses: {
+    200: jsonContent(leaveGrantsPageSchema, "삭제 후 보유 휴가 현황"),
+    401: errorResponse("인증 실패"),
+    404: errorResponse("적립분 없음 또는 권한 없음"),
   },
 });
 
@@ -228,6 +306,54 @@ export const leaveRoutes = app
         400,
       );
     }
+  })
+  .openapi(grantsRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    return c.json(await buildGrantsPage(db, user), 200);
+  })
+  .openapi(createGrantRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    try {
+      await createGrant(db, user, c.req.valid("json"));
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "추가하지 못했습니다",
+        },
+        400,
+      );
+    }
+    return c.json(await buildGrantsPage(db, user), 201);
+  })
+  .openapi(updateGrantRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    try {
+      const found = await updateGrant(
+        db,
+        user,
+        c.req.valid("param").id,
+        c.req.valid("json"),
+      );
+      if (!found) return c.json({ error: "적립분을 찾을 수 없습니다" }, 404);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "수정하지 못했습니다",
+        },
+        400,
+      );
+    }
+    return c.json(await buildGrantsPage(db, user), 200);
+  })
+  .openapi(deleteGrantRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    const found = await deleteGrant(db, user, c.req.valid("param").id);
+    if (!found) return c.json({ error: "적립분을 찾을 수 없습니다" }, 404);
+    return c.json(await buildGrantsPage(db, user), 200);
   })
   .openapi(mineRoute, async (c) => {
     const user = c.get("user");

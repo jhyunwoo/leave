@@ -71,6 +71,13 @@
       "when": 1785843600000,
       "tag": "0009_drop_leave_balance_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785847200000,
+      "tag": "0010_leave_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -7,4 +7,5 @@ export * from "./holidays";
 export * from "./http";
 export * from "./leave";
 export * from "./leave-draft";
+export * from "./leave-grants";
 export * from "./regular-overnight";

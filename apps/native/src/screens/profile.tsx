@@ -16,7 +16,6 @@ import { API_URL, getAuthToken } from "@/api/client";
 import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
-import { LeaveBalanceSettings } from "@/components/leave-balance-settings";
 import {
   ScreenHeader,
   useScreenHeaderHeight,
@@ -166,9 +165,14 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        <LeaveBalanceSettings branch={user.branch} />
-
         <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
+          {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
+          <Button
+            title="보유 휴가"
+            variant="secondary"
+            onPress={() => router.push("/leave-grants")}
+            style={{ flex: 1 }}
+          />
           <Button
             title="부대 관리"
             variant="secondary"

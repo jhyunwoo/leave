@@ -1,5 +1,6 @@
 import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
 import { useState } from "react";
+import { Link } from "react-router";
 import type { MyLeave } from "../api/queries";
 import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "../api/queries";
 import { LeaveFormModal } from "../components/LeaveFormModal";
@@ -11,6 +12,18 @@ export function LeavesPage() {
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // 주기 재원은 이월되지 않아 총량 개념이 달라 요약에서 뺀다.
+  const holdings = (balances.data?.balances ?? [])
+    .filter((item) => !item.cycleScoped)
+    .reduce(
+      (sum, item) => ({
+        remaining: sum.remaining + item.remainingDays,
+        expiringSoon: sum.expiringSoon + item.expiringSoonDays,
+        expired: sum.expired + item.expiredDays,
+      }),
+      { remaining: 0, expiringSoon: 0, expired: 0 },
+    );
 
   return (
     <div
@@ -51,6 +64,48 @@ export function LeavesPage() {
       </header>
 
       {balances.data && (
+        <Link
+          to="/leaves/grants"
+          className="card-sage"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--sp-md)",
+            padding: "var(--sp-lg)",
+            textDecoration: "none",
+          }}
+        >
+          <span>
+            <span className="caption text-mute" style={{ display: "block" }}>
+              보유 휴가
+            </span>
+            <span
+              className="display-xs"
+              style={{ display: "block", marginTop: 2 }}
+            >
+              남은 {holdings.remaining}일
+            </span>
+            <span className="caption" style={{ display: "block", marginTop: 2 }}>
+              {holdings.expiringSoon > 0 || holdings.expired > 0
+                ? [
+                    holdings.expiringSoon > 0
+                      ? `만료 임박 ${holdings.expiringSoon}일`
+                      : null,
+                    holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "만기 기한과 정기외박 주기를 관리해요"}
+            </span>
+          </span>
+          <span aria-hidden="true" style={{ fontSize: 24 }}>
+            ›
+          </span>
+        </Link>
+      )}
+
+      {balances.data && (
         <section
           style={{
             display: "grid",
@@ -74,6 +129,11 @@ export function LeavesPage() {
                 {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} · 사용{" "}
                 {item.usedDays}
               </p>
+              {item.expiredDays > 0 && (
+                <p className="caption" style={{ color: "#a72027" }}>
+                  만료 {item.expiredDays}일
+                </p>
+              )}
             </div>
           ))}
         </section>

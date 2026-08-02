@@ -150,6 +150,38 @@ export const userLeaveBalances = sqliteTable(
   ],
 );
 
+/**
+ * 사용자가 실제로 "받은" 휴가 한 건. 같은 재원을 만기가 다른 여러 건으로 나눠 가질 수 있다
+ * (포상휴가 3일 ~8/31 + 포상휴가 2일 만기 없음). 재원 총량은 이 행들의 합이다.
+ *
+ * 정기외박 자동 적립분은 여기 담지 않는다 — 주기 설정에서 파생하며, 원장으로 담았다가
+ * 0009에서 되돌린 전례가 있다.
+ *
+ * 같은 날 받은 만기가 다른 두 건이 있을 수 있으므로 유니크 인덱스를 두지 않는다.
+ */
+export const leaveGrants = sqliteTable(
+  "leave_grants",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    balanceKey: text("balance_key", { enum: BALANCE_KEYS }).notNull(),
+    days: integer("days").notNull(),
+    /** 부여일 — 이 날부터 쓸 수 있다. null이면 시작 제한 없음. */
+    grantedOn: text("granted_on"),
+    /** 사용 만기 기한(이 날까지 포함). null이면 만료되지 않는다. */
+    expiresOn: text("expires_on"),
+    note: text("note"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("leave_grants_user_idx").on(t.userId),
+    index("leave_grants_user_key_idx").on(t.userId, t.balanceKey),
+  ],
+);
+
 export const regularOvernightConfigs = sqliteTable(
   "regular_overnight_configs",
   {
@@ -309,6 +341,7 @@ export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;
+export type LeaveGrantRow = typeof leaveGrants.$inferSelect;
 export type RegularOvernightConfigRow =
   typeof regularOvernightConfigs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

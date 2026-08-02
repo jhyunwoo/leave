@@ -420,3 +420,281 @@ test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 
   // 실제 Expo 토큰이 없으므로 skipped 상태로 기록된다
   assert.ok(["skipped", "ok", "error"].includes(sendLogs[0].status));
 });
+
+/** 한국 시간 오늘에서 days만큼 옮긴 YYYY-MM-DD. */
+function todayShift(days) {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const fundOf = (page, key) => page.funds.find((f) => f.key === key);
+
+test("적립분 CRUD — 만기 있는 건과 없는 건을 따로 들고 고친다", async () => {
+  const { token } = await signup({ branch: "army" });
+  await createUnit(token, { name: uniq("적립분부대-") });
+
+  const dated = await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 3, expiresOn: todayShift(30), note: "사격 우수" },
+  });
+  assert.equal(dated.status, 201);
+
+  const open = await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 2 },
+  });
+  assert.equal(open.status, 201);
+
+  const award = fundOf(open.data, "award");
+  assert.equal(award.totalDays, 5);
+  assert.equal(award.remainingDays, 5);
+  assert.equal(award.grants.length, 2);
+  // 만기가 빠른 건이 먼저 온다.
+  assert.equal(award.grants[0].days, 3);
+  assert.equal(award.grants[0].note, "사격 우수");
+  assert.equal(award.grants[0].status, "active");
+  assert.equal(award.grants[1].expiresOn, null);
+
+  const grantId = award.grants[0].id;
+  const patched = await req("PATCH", `/leaves/grants/${grantId}`, {
+    token,
+    body: { days: 6 },
+  });
+  assert.equal(patched.status, 200);
+  assert.equal(fundOf(patched.data, "award").totalDays, 8);
+
+  const removed = await req("DELETE", `/leaves/grants/${grantId}`, { token });
+  assert.equal(removed.status, 200);
+  assert.equal(fundOf(removed.data, "award").totalDays, 2);
+
+  const missing = await req("DELETE", `/leaves/grants/${grantId}`, { token });
+  assert.equal(missing.status, 404);
+});
+
+test("남의 적립분은 고치거나 지울 수 없다", async () => {
+  const mine = await signup();
+  const other = await signup();
+  const created = await req("POST", "/leaves/grants", {
+    token: mine.token,
+    body: { balanceKey: "award", days: 3 },
+  });
+  const id = fundOf(created.data, "award").grants[0].id;
+
+  assert.equal(
+    (await req("PATCH", `/leaves/grants/${id}`, { token: other.token, body: { days: 9 } })).status,
+    404,
+  );
+  assert.equal(
+    (await req("DELETE", `/leaves/grants/${id}`, { token: other.token })).status,
+    404,
+  );
+});
+
+test("만기가 지난 적립분은 잔여에서 빠지고 소멸로 잡힌다", async () => {
+  const { token } = await signup();
+  await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 4, expiresOn: todayShift(-1) },
+  });
+
+  const balances = await req("GET", "/leaves/balances", { token });
+  const award = balances.data.balances.find((item) => item.key === "award");
+  assert.equal(award.totalDays, 4);
+  assert.equal(award.remainingDays, 0);
+  assert.equal(award.expiredDays, 4);
+  assert.equal(award.grantCount, 1);
+});
+
+test("부여일이 아직 안 온 적립분은 예정으로 빠진다", async () => {
+  const { token } = await signup();
+  await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 4, grantedOn: todayShift(10) },
+  });
+  const balances = await req("GET", "/leaves/balances", { token });
+  const award = balances.data.balances.find((item) => item.key === "award");
+  assert.equal(award.upcomingDays, 4);
+  assert.equal(award.remainingDays, 0);
+});
+
+test("만기가 지난 날짜에는 그 적립분으로 휴가를 쓸 수 없다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("만기부대-") });
+  await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 5, expiresOn: todayShift(10) },
+  });
+
+  const tooLate = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "만기 넘긴 포상",
+      segments: [
+        { category: "award", startDate: todayShift(20), endDate: todayShift(21) },
+      ],
+    },
+  });
+  assert.equal(tooLate.status, 400);
+  assert.match(tooLate.data.error, /포상휴가/);
+
+  const inTime = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "만기 전 포상",
+      segments: [
+        { category: "award", startDate: todayShift(5), endDate: todayShift(6) },
+      ],
+    },
+  });
+  assert.equal(inTime.status, 201);
+
+  const page = await req("GET", "/leaves/grants", { token });
+  const award = fundOf(page.data, "award");
+  assert.equal(award.usedDays, 2);
+  assert.equal(award.remainingDays, 3);
+  assert.equal(award.grants[0].usedDays, 2);
+});
+
+test("적립분을 꽉 채워 쓴 휴가도 같은 범위로 다시 수정할 수 있다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("수정부대-") });
+  await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 2, expiresOn: todayShift(30) },
+  });
+
+  const created = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "포상휴가",
+      segments: [
+        { category: "award", startDate: todayShift(3), endDate: todayShift(4) },
+      ],
+    },
+  });
+  assert.equal(created.status, 201);
+
+  // 같은 범위로 제목만 바꾼다 — 자기 자신과 부딪히면 안 된다.
+  const patched = await req("PATCH", `/leaves/${created.data.leave.id}`, {
+    token,
+    body: {
+      title: "포상휴가(수정)",
+      segments: [
+        { category: "award", startDate: todayShift(3), endDate: todayShift(4) },
+      ],
+    },
+  });
+  assert.equal(patched.status, 200);
+});
+
+test("구버전 총량 API는 만기 없는 기본 적립분만 늘리고 줄인다", async () => {
+  const { token } = await signup({ branch: "army" });
+
+  const base = await req("GET", "/leaves/balances", { token });
+  const totals = Object.fromEntries(
+    base.data.balances.map((item) => [item.key, item.totalDays]),
+  );
+  totals.award = 7;
+  assert.equal((await req("PUT", "/leaves/balances", { token, body: { totals } })).status, 200);
+
+  let page = await req("GET", "/leaves/grants", { token });
+  let award = fundOf(page.data, "award");
+  assert.equal(award.grants.length, 1);
+  assert.equal(award.grants[0].days, 7);
+  assert.equal(award.grants[0].expiresOn, null);
+
+  // 만기가 붙은 적립분을 더한 뒤 총량을 올리면 만기 없는 쪽만 커진다.
+  await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "award", days: 3, expiresOn: todayShift(30) },
+  });
+  totals.award = 12;
+  assert.equal((await req("PUT", "/leaves/balances", { token, body: { totals } })).status, 200);
+
+  page = await req("GET", "/leaves/grants", { token });
+  award = fundOf(page.data, "award");
+  assert.equal(award.totalDays, 12);
+  const dated = award.grants.find((g) => g.expiresOn !== null);
+  const open = award.grants.find((g) => g.expiresOn === null);
+  assert.equal(dated.days, 3);
+  assert.equal(open.days, 9);
+});
+
+test("자동 적립을 쓰면 정기외박 적립분을 따로 만들 수 없다", async () => {
+  const { token } = await signup({ branch: "navy" });
+  await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: todayShift(-90),
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+
+  const rejected = await req("POST", "/leaves/grants", {
+    token,
+    body: { balanceKey: "regular_overnight", days: 3 },
+  });
+  assert.equal(rejected.status, 400);
+  assert.match(rejected.data.error, /주기 설정/);
+
+  // 육군은 자동 적립이 없으므로 수동 적립분을 가질 수 있다.
+  const army = await signup({ branch: "army" });
+  const allowed = await req("POST", "/leaves/grants", {
+    token: army.token,
+    body: { balanceKey: "regular_overnight", days: 3 },
+  });
+  assert.equal(allowed.status, 201);
+});
+
+test("주기 목록은 주기 시작일부터 전역일까지 이어진다", async () => {
+  const { token } = await signup({
+    branch: "navy",
+    enlistedAt: "2026-01-05",
+    dischargeAt: "2027-07-04",
+  });
+  const startDate = "2026-01-05";
+  await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: { enabled: true, startDate, intervalDays: 42, daysPerGrant: 3 },
+  });
+
+  const page = await req("GET", "/leaves/grants", { token });
+  const cycles = page.data.regularOvernight.cycles;
+  assert.ok(cycles.length > 10);
+  assert.equal(cycles[0].start, startDate);
+  // 1주기는 첫 적립을 기다리는 구간이라 쥔 일수가 없다.
+  assert.equal(cycles[0].grantDays, 0);
+  assert.equal(cycles[1].grantDays, 3);
+  assert.ok(cycles[cycles.length - 1].end >= "2027-07-04");
+  assert.equal(cycles.filter((c) => c.state === "current").length, 1);
+  // 주기 재원은 총합 대시보드에서 빠진다.
+  assert.equal(fundOf(page.data, "regular_overnight").cycleScoped, true);
+});
+
+test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", async () => {
+  const { token } = await signup();
+  assert.equal(
+    (await req("POST", "/leaves/grants", { token, body: { balanceKey: "award", days: 0 } })).status,
+    400,
+  );
+  const flipped = await req("POST", "/leaves/grants", {
+    token,
+    body: {
+      balanceKey: "award",
+      days: 2,
+      grantedOn: todayShift(30),
+      expiresOn: todayShift(10),
+    },
+  });
+  assert.equal(flipped.status, 400);
+  assert.match(flipped.data.error, /부여일과 같거나 뒤/);
+});

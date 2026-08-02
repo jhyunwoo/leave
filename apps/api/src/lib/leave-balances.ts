@@ -1,11 +1,14 @@
 import {
+  allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
   cycleFor,
   cycleUsedDays,
-  DEFAULT_ANNUAL_DAYS,
+  fmtDateShort,
+  isExpiringSoon,
   isRegularOvernightCycleBased,
   nextGrantDateAfter,
+  planTotalChange,
   regularOvernightUsageByCycle,
   segmentBalanceKey,
   todayInSeoul,
@@ -15,15 +18,16 @@ import {
   type RegularOvernightConfigInput,
   type SegmentLike,
 } from "@leave/shared";
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { type DrizzleD1Database } from "drizzle-orm/d1";
 import {
+  leaveGrants,
   leaves,
   leaveSegments,
   regularOvernightConfigs,
-  userLeaveBalances,
   type RegularOvernightConfigRow,
 } from "../db/schema";
+import { listGrants, toLeaveGrant, userSegments } from "./leave-grants";
 
 type Db = DrizzleD1Database;
 
@@ -39,36 +43,17 @@ export type LeaveBalanceItem = {
    * 이때 총량은 사용자가 직접 고칠 수 없다(주기 설정에서 파생한다).
    */
   cycleScoped: boolean;
+  /** 만료된 적립분 중 못 쓰고 날린 일수. */
+  expiredDays: number;
+  /** 아직 부여일이 오지 않은 적립분의 미사용분. */
+  upcomingDays: number;
+  /** 어떤 적립분으로도 설명되지 않는 사용 일수. */
+  unattributedDays: number;
+  /** 이 재원이 가진 적립분 건수. */
+  grantCount: number;
+  /** 30일 안에 만기가 닥치는, 아직 쓸 수 있는 일수. */
+  expiringSoonDays: number;
 };
-
-function defaultDays(key: BalanceKey, branch: Branch): number {
-  return key === "annual" ? DEFAULT_ANNUAL_DAYS[branch] : 0;
-}
-
-export async function ensureLeaveBalances(
-  db: Db,
-  user: { id: string; branch: Branch },
-) {
-  const existing = await db
-    .select({ key: userLeaveBalances.balanceKey })
-    .from(userLeaveBalances)
-    .where(eq(userLeaveBalances.userId, user.id))
-    .all();
-  const existingKeys = new Set(existing.map((row) => row.key));
-  const now = new Date().toISOString();
-  const missing = BALANCE_KEYS.filter((key) => !existingKeys.has(key)).map(
-    (key) => ({
-      id: crypto.randomUUID(),
-      userId: user.id,
-      balanceKey: key,
-      adjustmentDays: defaultDays(key, user.branch),
-      updatedAt: now,
-    }),
-  );
-  if (missing.length) {
-    await db.insert(userLeaveBalances).values(missing).onConflictDoNothing();
-  }
-}
 
 /**
  * 정기외박 잔여량 계산에 필요한, 날짜가 살아 있는 내 정기외박 구간들.
@@ -103,25 +88,9 @@ export async function getLeaveBalanceSummary(
   db: Db,
   user: { id: string; branch: Branch },
 ) {
-  await ensureLeaveBalances(db, user);
-
-  const [manualRows, usedRows, config, regularSegments] = await Promise.all([
-    db
-      .select()
-      .from(userLeaveBalances)
-      .where(eq(userLeaveBalances.userId, user.id))
-      .all(),
-    db
-      .select({
-        category: leaveSegments.category,
-        overnightKind: leaveSegments.overnightKind,
-        days: sql<number>`cast(sum(${leaveSegments.days}) as integer)`,
-      })
-      .from(leaveSegments)
-      .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-      .where(eq(leaves.userId, user.id))
-      .groupBy(leaveSegments.category, leaveSegments.overnightKind)
-      .all(),
+  const [grantRows, segments, config, regularSegments] = await Promise.all([
+    listGrants(db, user.id),
+    userSegments(db, user.id),
     db
       .select()
       .from(regularOvernightConfigs)
@@ -130,22 +99,17 @@ export async function getLeaveBalanceSummary(
     regularOvernightSegments(db, user.id),
   ]);
 
-  const manual = new Map(
-    manualRows.map((row) => [row.balanceKey, row.adjustmentDays]),
+  const today = todayInSeoul();
+  const allocations = allocateAllGrants(
+    grantRows.map(toLeaveGrant),
+    segments,
+    today,
   );
-  const used = new Map<BalanceKey, number>();
-  for (const row of usedRows) {
-    const key = segmentBalanceKey({
-      category: row.category,
-      overnightKind: row.overnightKind ?? undefined,
-    });
-    used.set(key, (used.get(key) ?? 0) + (row.days ?? 0));
-  }
 
   // 자동 적립을 쓰면 정기외박은 주기마다 새로 쌓이고 이월되지 않는다.
   // 그래서 누적 총량이 아니라 "이번 주기 몫과 그 주기 안 사용량"만 보여준다.
   const cycleBased = isRegularOvernightCycleBased(config);
-  const currentCycle = cycleFor(config, todayInSeoul());
+  const currentCycle = cycleFor(config, today);
 
   const balances: LeaveBalanceItem[] = BALANCE_KEYS.map((key) => {
     if (key === "regular_overnight" && cycleBased) {
@@ -161,18 +125,29 @@ export async function getLeaveBalanceSummary(
         remainingDays: grantDays - usedDays,
         automaticDays: grantDays,
         cycleScoped: true,
+        expiredDays: 0,
+        upcomingDays: 0,
+        unattributedDays: 0,
+        grantCount: 0,
+        expiringSoonDays: 0,
       };
     }
-    const totalDays = manual.get(key) ?? defaultDays(key, user.branch);
-    const usedDays = used.get(key) ?? 0;
+    const allocation = allocations[key];
     return {
       key,
       label: BALANCE_LABELS[key],
-      totalDays,
-      usedDays,
-      remainingDays: totalDays - usedDays,
+      totalDays: allocation.totalDays,
+      usedDays: allocation.usedDays,
+      remainingDays: allocation.remainingDays,
       automaticDays: 0,
       cycleScoped: false,
+      expiredDays: allocation.expiredDays,
+      upcomingDays: allocation.upcomingDays,
+      unattributedDays: allocation.unattributedDays,
+      grantCount: allocation.grants.length,
+      expiringSoonDays: allocation.grants
+        .filter((entry) => isExpiringSoon(entry.grant, today))
+        .reduce((sum, entry) => sum + entry.availableDays, 0),
     };
   });
 
@@ -197,44 +172,87 @@ export async function getLeaveBalanceSummary(
   };
 }
 
+/**
+ * 구버전 앱이 쓰는 "재원 총량을 N일로" API를 적립분 모델에 얹는다.
+ *
+ * 어느 적립분을 뜻하는지는 알 수 없으므로 관행을 정해 둔다: 늘릴 때는 만기 없는
+ * 기본 적립분 하나만 키우고, 줄일 때는 기본 적립분부터 그다음 만기가 늦은 것부터
+ * 흡수한다(만기 임박분을 최대한 살린다). 만기가 붙은 적립분은 이 API로 만들 수 없고,
+ * 보유 휴가 화면에서만 다룬다. 손실이 있는 매핑이지만 예측 가능한 쪽을 골랐다.
+ */
 export async function updateLeaveBalanceTotals(
   db: Db,
   user: { id: string; branch: Branch },
   totals: Partial<Record<BalanceKey, number>>,
 ) {
-  const current = await getLeaveBalanceSummary(db, user);
-  const byKey = new Map(current.balances.map((item) => [item.key, item]));
+  const [grantRows, segments, config] = await Promise.all([
+    listGrants(db, user.id),
+    userSegments(db, user.id),
+    db
+      .select()
+      .from(regularOvernightConfigs)
+      .where(eq(regularOvernightConfigs.userId, user.id))
+      .get(),
+  ]);
+  const allocations = allocateAllGrants(
+    grantRows.map(toLeaveGrant),
+    segments,
+    todayInSeoul(),
+  );
+  const cycleBased = isRegularOvernightCycleBased(config);
+
   // 주기에서 파생하는 재원은 사용자가 총량을 정할 수 없다. 클라이언트가 전체 재원을
   // 한 번에 보내므로 거절하는 대신 그 항목만 건너뛴다.
   const editable = (Object.entries(totals) as [BalanceKey, number][]).filter(
-    ([key]) => !byKey.get(key)?.cycleScoped,
+    ([key]) => !(key === "regular_overnight" && cycleBased),
   );
 
-  for (const [key, total] of editable) {
-    const item = byKey.get(key);
-    if (!item) continue;
-    if (total < item.usedDays) {
+  const plans = editable.map(([key, total]) => {
+    const plan = planTotalChange(allocations[key], total);
+    if (!plan.ok) {
       throw new Error(
-        `${item.label}는 이미 ${item.usedDays}일을 사용해 총량을 그보다 작게 설정할 수 없습니다`,
+        `${BALANCE_LABELS[key]}는 이미 ${plan.minimumTotal}일을 사용해 총량을 그보다 작게 설정할 수 없습니다`,
       );
     }
-  }
+    return { key, plan };
+  });
 
   const now = new Date().toISOString();
-  for (const [key, total] of editable) {
-    await db
-      .insert(userLeaveBalances)
-      .values({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        balanceKey: key,
-        adjustmentDays: total,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [userLeaveBalances.userId, userLeaveBalances.balanceKey],
-        set: { adjustmentDays: total, updatedAt: now },
-      });
+  for (const { key, plan } of plans) {
+    for (const mutation of plan.mutations) {
+      if (mutation.kind === "create") {
+        await db.insert(leaveGrants).values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          balanceKey: key,
+          days: mutation.days,
+          grantedOn: null,
+          expiresOn: null,
+          note: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else if (mutation.kind === "update") {
+        await db
+          .update(leaveGrants)
+          .set({ days: mutation.days, updatedAt: now })
+          .where(
+            and(
+              eq(leaveGrants.id, mutation.id),
+              eq(leaveGrants.userId, user.id),
+            ),
+          );
+      } else {
+        await db
+          .delete(leaveGrants)
+          .where(
+            and(
+              eq(leaveGrants.id, mutation.id),
+              eq(leaveGrants.userId, user.id),
+            ),
+          );
+      }
+    }
   }
   return getLeaveBalanceSummary(db, user);
 }
@@ -312,59 +330,61 @@ async function assertRegularOvernightAvailable(
   }
 }
 
-/** 구간을 재원별로 합산해 잔여량을 넘지 않는지 확인한다. */
+/**
+ * 요청한 구간을 실제로 지불할 적립분이 있는지 확인한다.
+ *
+ * "이 요청을 넣기 전"과 "넣은 뒤"를 각각 배분해 보고, 어떤 재원에서든 설명되지 않는
+ * 사용분(unattributedDays)이 늘어나면 거절한다. 이 한 조건이 "잔여 초과"와
+ * "만기가 지난 날짜에 사용"을 모두 흡수한다.
+ *
+ * 수정일 때 기존 구간을 빼고 배분하므로 환급 계산이 따로 필요 없고, 이미 미귀속이
+ * 쌓여 있는 사용자도 그것을 더 악화시키지 않는 한 다른 휴가를 계속 고칠 수 있다.
+ */
 export async function assertSegmentsAvailable(
   db: Db,
   user: { id: string; branch: Branch },
   segments: LeaveSegment[],
   replacingLeaveId?: string,
 ) {
-  const summary = await getLeaveBalanceSummary(db, user);
-  const available = new Map(
-    summary.balances.map((item) => [item.key, item.remainingDays]),
-  );
-  const cycleScoped = new Set(
-    summary.balances.filter((item) => item.cycleScoped).map((item) => item.key),
-  );
-
-  // 수정이면 기존 구간만큼은 다시 쓸 수 있으므로 잔여량에 되돌려준다.
-  if (replacingLeaveId) {
-    const old = await db
-      .select()
-      .from(leaveSegments)
-      .where(eq(leaveSegments.leaveId, replacingLeaveId))
-      .all();
-    for (const segment of old) {
-      const key = segmentBalanceKey({
-        category: segment.category,
-        overnightKind: segment.overnightKind ?? undefined,
-      });
-      available.set(key, (available.get(key) ?? 0) + segment.days);
-    }
-  }
-
-  const requested = new Map<BalanceKey, number>();
-  for (const segment of segments) {
-    const key = segmentBalanceKey(segment);
-    requested.set(key, (requested.get(key) ?? 0) + segment.days);
-  }
-  for (const [key, days] of requested) {
-    // 주기 단위 재원은 총합이 아니라 주기별로 따로 확인한다.
-    if (cycleScoped.has(key)) continue;
-    const remaining = available.get(key) ?? 0;
-    if (days > remaining) {
-      throw new Error(
-        `${BALANCE_LABELS[key]} 잔여 ${remaining}일보다 많이 사용할 수 없습니다`,
-      );
-    }
-  }
-
-  if (cycleScoped.has("regular_overnight")) {
-    const config = await db
+  const [grantRows, allSegments, config] = await Promise.all([
+    listGrants(db, user.id),
+    replacingLeaveId
+      ? userSegmentsExcluding(db, user.id, replacingLeaveId)
+      : userSegments(db, user.id),
+    db
       .select()
       .from(regularOvernightConfigs)
       .where(eq(regularOvernightConfigs.userId, user.id))
-      .get();
+      .get(),
+  ]);
+
+  const today = todayInSeoul();
+  const grants = grantRows.map(toLeaveGrant);
+  const before = allocateAllGrants(grants, allSegments, today);
+  const after = allocateAllGrants(grants, [...allSegments, ...segments], today);
+  const cycleBased = isRegularOvernightCycleBased(config);
+
+  const requested = new Set(segments.map((segment) => segmentBalanceKey(segment)));
+  for (const key of requested) {
+    // 주기 단위 재원은 총합이 아니라 주기별로 따로 확인한다.
+    if (key === "regular_overnight" && cycleBased) continue;
+    const gained = after[key].unattributedDays - before[key].unattributedDays;
+    if (gained <= 0) continue;
+
+    // 이번 요청 범위 안의 날짜를 짚을 수 있으면 그 날짜를 알려준다.
+    const blocked = after[key].unattributedDates.find((date) =>
+      segments.some(
+        (segment) => segment.startDate <= date && date <= segment.endDate,
+      ),
+    );
+    throw new Error(
+      blocked
+        ? `${BALANCE_LABELS[key]} — ${fmtDateShort(blocked)}에 쓸 수 있는 적립분이 없어요 (만료됐거나 잔여가 부족합니다)`
+        : `${BALANCE_LABELS[key]} 잔여 ${before[key].remainingDays}일보다 많이 사용할 수 없습니다`,
+    );
+  }
+
+  if (cycleBased && requested.has("regular_overnight")) {
     await assertRegularOvernightAvailable(
       db,
       user.id,
@@ -373,6 +393,25 @@ export async function assertSegmentsAvailable(
       replacingLeaveId,
     );
   }
+}
+
+/** 수정 중인 휴가의 구간을 뺀, 이 사용자의 나머지 구간들. */
+async function userSegmentsExcluding(
+  db: Db,
+  userId: string,
+  excludeLeaveId: string,
+) {
+  return db
+    .select({
+      category: leaveSegments.category,
+      overnightKind: leaveSegments.overnightKind,
+      startDate: leaveSegments.startDate,
+      endDate: leaveSegments.endDate,
+    })
+    .from(leaveSegments)
+    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+    .where(and(eq(leaves.userId, userId), ne(leaveSegments.leaveId, excludeLeaveId)))
+    .all();
 }
 
 export function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {

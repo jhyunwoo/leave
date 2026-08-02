@@ -4,6 +4,7 @@ import { useMe } from "./api/queries";
 import { AppLayout } from "./layouts/AppLayout";
 import { CalendarPage } from "./pages/CalendarPage";
 import { LandingPage } from "./pages/LandingPage";
+import { LeaveGrantsPage } from "./pages/LeaveGrantsPage";
 import { LeavesPage } from "./pages/LeavesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
@@ -41,6 +42,10 @@ function AuthedApp() {
         <Route path="units" element={<UnitsPage me={me.data} />} />
         <Route path="units/manage" element={<UnitManagePage me={me.data} />} />
         <Route path="leaves" element={<LeavesPage />} />
+        <Route
+          path="leaves/grants"
+          element={<LeaveGrantsPage me={me.data} />}
+        />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="profile" element={<ProfilePage me={me.data} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

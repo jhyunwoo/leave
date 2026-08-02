@@ -128,6 +128,16 @@ function RootNavigator() {
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
+        {/* 내 휴가 탭에서 들락거리는 목적지라 모달이 아니라 카드로 밀어 뒤로가기를 남긴다. */}
+        <Stack.Screen
+          name="leave-grants"
+          options={{
+            headerShown: true,
+            title: "보유 휴가",
+            headerStyle: { backgroundColor: colors.canvas },
+            headerTitleStyle: { fontWeight: "600", color: colors.ink },
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthed}>
         <Stack.Screen name="login" />

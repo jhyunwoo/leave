@@ -167,7 +167,89 @@ export const leaveBalanceItemSchema = z.object({
   automaticDays: z.number(),
   /** 총량·사용량이 이번 주기 기준인지 (정기외박 자동 적립). */
   cycleScoped: z.boolean(),
+  /** 만료된 적립분 중 못 쓰고 날린 일수. */
+  expiredDays: z.number(),
+  /** 아직 부여일이 오지 않은 적립분의 미사용분. */
+  upcomingDays: z.number(),
+  /** 어떤 적립분으로도 설명되지 않는 사용 일수. */
+  unattributedDays: z.number(),
+  /** 이 재원이 가진 적립분 건수. */
+  grantCount: z.number(),
+  /** 30일 안에 만기가 닥치는, 아직 쓸 수 있는 일수. */
+  expiringSoonDays: z.number(),
 });
+
+export const leaveGrantSchema = z
+  .object({
+    id: z.string(),
+    balanceKey: z.enum(BALANCE_KEYS),
+    days: z.number(),
+    usedDays: z.number(),
+    /** 오늘 기준 지금 쓸 수 있는 일수. 만료·예정이면 0. */
+    availableDays: z.number(),
+    unusedDays: z.number(),
+    grantedOn: z.string().nullable(),
+    expiresOn: z.string().nullable(),
+    note: z.string().nullable(),
+    status: z.enum(["future", "active", "expired"]),
+    /** 오늘 기준 만기까지 남은 일수. 만기가 없으면 null. */
+    daysUntilExpiry: z.number().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("LeaveGrant");
+
+export const leaveGrantFundSchema = z
+  .object({
+    key: z.enum(BALANCE_KEYS),
+    label: z.string(),
+    cycleScoped: z.boolean(),
+    totalDays: z.number(),
+    usedDays: z.number(),
+    remainingDays: z.number(),
+    expiredDays: z.number(),
+    upcomingDays: z.number(),
+    unattributedDays: z.number(),
+    grants: z.array(leaveGrantSchema),
+  })
+  .openapi("LeaveGrantFund");
+
+export const regularOvernightCycleSchema = z
+  .object({
+    index: z.number(),
+    start: z.string(),
+    end: z.string(),
+    grantDays: z.number(),
+    usedDays: z.number(),
+    remainingDays: z.number(),
+    state: z.enum(["past", "current", "future"]),
+    color: z.string(),
+  })
+  .openapi("RegularOvernightCycle");
+
+export const leaveGrantsPageSchema = z
+  .object({
+    /** 서버가 본 한국 시간 오늘 — 클라이언트가 만료 판정을 서버와 맞추도록 내려준다. */
+    today: z.string(),
+    totals: z.object({
+      totalDays: z.number(),
+      usedDays: z.number(),
+      remainingDays: z.number(),
+      expiredDays: z.number(),
+      upcomingDays: z.number(),
+      unattributedDays: z.number(),
+    }),
+    funds: z.array(leaveGrantFundSchema),
+    regularOvernight: z.object({
+      enabled: z.boolean(),
+      startDate: z.string().nullable(),
+      intervalDays: z.number().nullable(),
+      daysPerGrant: z.number().nullable(),
+      nextGrantDate: z.string().nullable(),
+      /** 주기 시작일부터 전역일까지의 모든 주기. 설정이 없으면 빈 배열. */
+      cycles: z.array(regularOvernightCycleSchema),
+    }),
+  })
+  .openapi("LeaveGrantsPage");
 
 export const leaveBalanceSummarySchema = z
   .object({

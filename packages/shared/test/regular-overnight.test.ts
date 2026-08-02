@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  addDays,
   cycleColor,
   cycleFor,
+  cycleState,
   cycleRemainingDays,
   cycleUsedDays,
   cyclesInRange,
@@ -265,5 +267,15 @@ describe("정기외박은 주기 안에서만 쓰고 이월되지 않는다", ()
     ]);
     expect(usage.cycles).toEqual([]);
     expect(usage.beforeStartDays).toBe(3);
+  });
+});
+
+describe("주기 진행 상태", () => {
+  it("주기 첫날과 마지막날은 진행 중으로 본다", () => {
+    const cycle = cycleFor(config, "2026-05-11")!;
+    expect(cycleState(cycle, cycle.start)).toBe("current");
+    expect(cycleState(cycle, cycle.end)).toBe("current");
+    expect(cycleState(cycle, addDays(cycle.start, -1))).toBe("future");
+    expect(cycleState(cycle, addDays(cycle.end, 1))).toBe("past");
   });
 });

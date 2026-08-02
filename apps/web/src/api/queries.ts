@@ -1,6 +1,8 @@
 import type {
   LeaveBalanceUpdateInput,
   LeaveCreateInput,
+  LeaveGrantCreateInput,
+  LeaveGrantUpdateInput,
   LoginInput,
   RegularOvernightConfigInput,
   SignupInput,
@@ -323,7 +325,71 @@ export function useUpdateRegularOvernight() {
       unwrap<LeaveBalanceSummary>(
         await api.leaves["regular-overnight"].$put({ json: input }),
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["leaveBalances"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+      // 주기 목록은 이 설정에서 파생하므로 보유 휴가 화면도 다시 받아야 한다.
+      qc.invalidateQueries({ queryKey: ["leaveGrants"] });
+    },
+  });
+}
+
+export type LeaveGrantsPage = InferResponseType<
+  typeof api.leaves.grants.$get,
+  200
+>;
+export type LeaveGrantFund = LeaveGrantsPage["funds"][number];
+export type LeaveGrantItem = LeaveGrantFund["grants"][number];
+export type RegularOvernightCycleItem =
+  LeaveGrantsPage["regularOvernight"]["cycles"][number];
+
+export function useLeaveGrants() {
+  return useQuery({
+    queryKey: ["leaveGrants"],
+    queryFn: async () =>
+      unwrap<LeaveGrantsPage>(await api.leaves.grants.$get()),
+  });
+}
+
+/** 적립분을 바꾸면 재원 총량도 달라지므로 두 캐시를 함께 비운다. */
+function useInvalidateGrants() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: ["leaveGrants"] });
+    qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+  };
+}
+
+export function useCreateLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (input: LeaveGrantCreateInput) =>
+      unwrap<LeaveGrantsPage>(await api.leaves.grants.$post({ json: input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (vars: { id: string; input: LeaveGrantUpdateInput }) =>
+      unwrap<LeaveGrantsPage>(
+        await api.leaves.grants[":id"].$patch({
+          param: { id: vars.id },
+          json: vars.input,
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteLeaveGrant() {
+  const invalidate = useInvalidateGrants();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap<LeaveGrantsPage>(
+        await api.leaves.grants[":id"].$delete({ param: { id } }),
+      ),
+    onSuccess: invalidate,
   });
 }
 
@@ -339,6 +405,7 @@ export function useCreateLeave() {
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+      qc.invalidateQueries({ queryKey: ["leaveGrants"] });
     },
   });
 }
@@ -358,6 +425,7 @@ export function useUpdateLeave() {
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+      qc.invalidateQueries({ queryKey: ["leaveGrants"] });
     },
   });
 }
@@ -371,6 +439,7 @@ export function useDeleteLeave() {
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: ["myLeaves"] });
       qc.invalidateQueries({ queryKey: ["leaveBalances"] });
+      qc.invalidateQueries({ queryKey: ["leaveGrants"] });
     },
   });
 }

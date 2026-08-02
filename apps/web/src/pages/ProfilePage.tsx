@@ -1,11 +1,10 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { API_URL, getAuthToken } from "../api/client";
 import type { Me } from "../api/queries";
 import { useDeleteAccount, useLogout } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "../components/Avatar";
-import { LeaveBalanceSettings } from "../components/LeaveBalanceSettings";
 import { fmtDateShort } from "../lib/format";
 
 export function ProfilePage(props: { me: Me }) {
@@ -208,7 +207,10 @@ export function ProfilePage(props: { me: Me }) {
         </dl>
       </section>
 
-      <LeaveBalanceSettings branch={user.branch} />
+      {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
+      <Link to="/leaves/grants" className="btn btn-secondary">
+        보유 휴가
+      </Link>
 
       <section
         className="card"
