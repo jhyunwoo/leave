@@ -221,7 +221,7 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     data.balances.find((item) => item.key === "regular_overnight");
   assert.ok(unit.data.unit.id);
 
-  // 주기 시작일이 오늘이면 1주기는 대기 구간이라 쓸 수 있는 정기외박이 0일이다.
+  // 주기 시작일이 오늘이면 아직 첫 적립 전이라 쓸 수 있는 정기외박이 0일이다.
   const waiting = await req("PUT", "/leaves/regular-overnight", {
     token,
     body: {
@@ -241,11 +241,11 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     { total: 0, remaining: 0, cycleScoped: true },
   );
 
-  // 1주기에는 정기외박을 쓸 수 없다.
+  // 첫 적립 전에는 정기외박을 쓸 수 없다.
   const tooEarly = await req("POST", "/leaves", {
     token,
     body: {
-      title: "1주기 정기외박",
+      title: "첫 적립 전 정기외박",
       segments: [
         {
           category: "overnight",
@@ -257,10 +257,10 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     },
   });
   assert.equal(tooEarly.status, 400);
-  assert.match(tooEarly.data.error, /첫 적립 전/);
+  assert.match(tooEarly.data.error, /첫 적립일/);
 
-  // 주기 시작일을 126일(3주기) 전으로 옮긴다.
-  // 2주기는 daysAgo(84)~daysAgo(43), 3주기는 daysAgo(42)~daysAgo(1), 4주기가 오늘 시작.
+  // 주기 시작일을 126일 전으로 옮긴다. 첫 적립은 그 42일 뒤인 daysAgo(84)이므로
+  // 1주기는 daysAgo(84)~daysAgo(43), 2주기는 daysAgo(42)~daysAgo(1), 3주기가 오늘 시작.
   await req("PUT", "/leaves/regular-overnight", {
     token,
     body: {
@@ -271,7 +271,7 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     },
   });
 
-  // 지난 2주기·3주기를 한 번도 쓰지 않았지만 쌓이지 않는다 — 이번 주기 몫은 3일뿐.
+  // 지난 1주기·2주기를 한 번도 쓰지 않았지만 쌓이지 않는다 — 이번 주기 몫은 3일뿐.
   const current = await req("GET", "/leaves/balances", { token });
   assert.equal(regular(current.data).totalDays, 3, "이월되면 안 됨");
   assert.equal(regular(current.data).remainingDays, 3);
@@ -315,7 +315,7 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
   assert.equal(over.status, 400);
   assert.match(over.data.error, /주기.*3일보다 많이/);
 
-  // 지난 주기(3주기)에는 아직 몫이 남아 있어 그 주기 날짜로는 등록된다.
+  // 지난 주기(2주기)에는 아직 몫이 남아 있어 그 주기 날짜로는 등록된다.
   const past = await req("POST", "/leaves", {
     token,
     body: {
@@ -655,7 +655,7 @@ test("자동 적립을 쓰면 정기외박 적립분을 따로 만들 수 없다
   assert.equal(allowed.status, 201);
 });
 
-test("주기 목록은 주기 시작일부터 전역일까지 이어진다", async () => {
+test("주기 목록은 첫 적립일부터 전역일까지 이어진다", async () => {
   const { token } = await signup({
     branch: "navy",
     enlistedAt: "2026-01-05",
@@ -670,10 +670,11 @@ test("주기 목록은 주기 시작일부터 전역일까지 이어진다", asy
   const page = await req("GET", "/leaves/grants", { token });
   const cycles = page.data.regularOvernight.cycles;
   assert.ok(cycles.length > 10);
-  assert.equal(cycles[0].start, startDate);
-  // 1주기는 첫 적립을 기다리는 구간이라 쥔 일수가 없다.
-  assert.equal(cycles[0].grantDays, 0);
-  assert.equal(cycles[1].grantDays, 3);
+  // 1주기는 주기 시작일이 아니라 한 주기 뒤 첫 적립일에 시작한다.
+  assert.equal(cycles[0].index, 1);
+  assert.equal(cycles[0].start, "2026-02-16");
+  // 모든 주기가 회당 적립 일수를 쥐고 시작한다.
+  assert.ok(cycles.every((c) => c.grantDays === 3));
   assert.ok(cycles[cycles.length - 1].end >= "2027-07-04");
   assert.equal(cycles.filter((c) => c.state === "current").length, 1);
   // 주기 재원은 총합 대시보드에서 빠진다.

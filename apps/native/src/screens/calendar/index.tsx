@@ -2,6 +2,7 @@ import {
   cycleFor,
   cycleUsedDays,
   effectiveMemberCount,
+  firstGrantDate,
   maxAllowedOut,
   todayInSeoul,
   WEEKDAYS,
@@ -40,7 +41,11 @@ import {
 import { buildMyLeaveDayMap } from "@/lib/my-leave-days";
 import { getPushToken } from "@/lib/notifications";
 import { colors, radius, spacing } from "@/theme";
-import { CYCLE_BANNER_HEIGHT, CycleBanner } from "./cycle-banner";
+import {
+  CYCLE_BANNER_HEIGHT,
+  CycleBanner,
+  FirstGrantBanner,
+} from "./cycle-banner";
 import { DayPanel } from "./day-panel";
 
 /** 헤더 아래 요일 행 높이. */
@@ -82,10 +87,16 @@ export function CalendarScreen() {
         : 0,
     [currentCycle, myLeaves.data],
   );
+  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다.
+  const pendingFirstGrant = useMemo(() => {
+    const first = firstGrantDate(regularOvernight);
+    return first && today < first ? first : null;
+  }, [regularOvernight, today]);
+  const hasBanner = Boolean(currentCycle || pendingFirstGrant);
 
   const headerHeight = useScreenHeaderHeight({
     subtitle: true,
-    belowHeight: WEEK_ROW_HEIGHT + (currentCycle ? CYCLE_BANNER_HEIGHT : 0),
+    belowHeight: WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0),
   });
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
@@ -189,9 +200,7 @@ export function CalendarScreen() {
           title="부대 달력"
           subtitle={unit.name}
           blurTarget={blurTargetRef}
-          belowHeight={
-            WEEK_ROW_HEIGHT + (currentCycle ? CYCLE_BANNER_HEIGHT : 0)
-          }
+          belowHeight={WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0)}
           actions={
             <>
               <Button
@@ -212,9 +221,11 @@ export function CalendarScreen() {
           }
           below={
             <>
-              {currentCycle && (
+              {currentCycle ? (
                 <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
-              )}
+              ) : pendingFirstGrant ? (
+                <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
+              ) : null}
               <View style={styles.weekRow}>
                 {WEEKDAYS.map((weekday, index) => (
                   <Text

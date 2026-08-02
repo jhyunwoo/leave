@@ -382,26 +382,18 @@ function CycleList(props: {
               </p>
             </div>
             <div style={{ textAlign: "right" }}>
-              {cycle.grantDays === 0 ? (
-                <p className="caption text-mute">첫 적립 대기</p>
+              <p
+                className="body-sm strong"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {cycle.usedDays}/{cycle.grantDays}일
+              </p>
+              {cycle.state === "past" && cycle.remainingDays > 0 ? (
+                <p className="caption" style={{ color: "#a72027" }}>
+                  소멸 {cycle.remainingDays}일
+                </p>
               ) : (
-                <>
-                  <p
-                    className="body-sm strong"
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {cycle.usedDays}/{cycle.grantDays}일
-                  </p>
-                  {cycle.state === "past" && cycle.remainingDays > 0 ? (
-                    <p className="caption" style={{ color: "#a72027" }}>
-                      소멸 {cycle.remainingDays}일
-                    </p>
-                  ) : (
-                    <p className="caption text-mute">
-                      잔여 {cycle.remainingDays}일
-                    </p>
-                  )}
-                </>
+                <p className="caption text-mute">잔여 {cycle.remainingDays}일</p>
               )}
             </div>
             {cycle.state === "current" && (

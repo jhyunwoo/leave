@@ -1,9 +1,12 @@
 import {
   diffDays,
+  fmtDateTiny,
   fmtRangeTiny,
   todayInSeoul,
+  type ISODate,
   type RegularOvernightCycle,
 } from "@leave/shared";
+import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
@@ -11,11 +14,8 @@ import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 export const CYCLE_BANNER_HEIGHT = 30;
 
 /**
- * 이번 정기외박 주기 요약. 정기외박은 주기 안에 소진해야 해서
+ * 이번 정기외박 주기 요약. 주기 몫은 다음 적립 전날까지 써야 하고 이월되지 않아서
  * 남은 일수와 마감까지 며칠인지를 달력 맨 위에 붙여둔다.
- *
- * 1주기는 첫 적립을 기다리는 구간이라 쥔 일수가 없다. 이때는 소진 현황 대신
- * 첫 적립까지 며칠 남았는지를 보여준다.
  */
 export function CycleBanner(props: {
   cycle: RegularOvernightCycle;
@@ -27,34 +27,47 @@ export function CycleBanner(props: {
   const tone = BALANCE_COLORS.regular_overnight;
   // 남은 정기외박이 없으면 조용히, 마감이 일주일 안이면 눈에 띄게.
   const urgent = remaining > 0 && daysLeft <= 7;
-  const awaitingFirstGrant = props.cycle.grantDays === 0;
 
   return (
-    <View
-      style={[
-        styles.root,
-        { backgroundColor: remaining > 0 ? tone.bg : colors.surfaceCard },
-        urgent && { backgroundColor: colors.warning },
-      ]}
+    <BannerLine
+      background={
+        urgent ? colors.warning : remaining > 0 ? tone.bg : colors.surfaceCard
+      }
+      color={
+        urgent ? colors.warningContent : remaining > 0 ? tone.fg : colors.mute
+      }
     >
-      <Text
-        style={[
-          styles.text,
-          { color: remaining > 0 ? tone.fg : colors.mute },
-          urgent && { color: colors.warningContent },
-        ]}
-        numberOfLines={1}
-      >
-        정기외박 {props.cycle.index}주기{" "}
-        {fmtRangeTiny(props.cycle.start, props.cycle.end)} ·{" "}
-        {awaitingFirstGrant ? (
-          <>첫 적립까지 D-{daysLeft + 1}</>
-        ) : (
-          <>
-            {props.cycle.grantDays}일 중 {props.usedDays}일 사용 · 잔여{" "}
-            {remaining}일 · 마감 D-{daysLeft}
-          </>
-        )}
+      정기외박 {props.cycle.index}주기{" "}
+      {fmtRangeTiny(props.cycle.start, props.cycle.end)} ·{" "}
+      {props.cycle.grantDays}일 중 {props.usedDays}일 사용 · 잔여 {remaining}일
+      · 마감 D-{daysLeft}
+    </BannerLine>
+  );
+}
+
+/**
+ * 첫 적립 전 대기 구간. 아직 1주기가 시작하지 않아 쓸 수 있는 정기외박이 없으므로
+ * 소진 현황 대신 첫 적립일과 남은 날을 보여준다.
+ */
+export function FirstGrantBanner(props: { firstGrantDate: ISODate }) {
+  const daysLeft = Math.max(diffDays(todayInSeoul(), props.firstGrantDate), 0);
+  return (
+    <BannerLine background={colors.surfaceCard} color={colors.mute}>
+      정기외박 첫 적립 {fmtDateTiny(props.firstGrantDate)} · D-{daysLeft} ·
+      그전에는 쓸 수 없어요
+    </BannerLine>
+  );
+}
+
+function BannerLine(props: {
+  background: string;
+  color: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={[styles.root, { backgroundColor: props.background }]}>
+      <Text style={[styles.text, { color: props.color }]} numberOfLines={1}>
+        {props.children}
       </Text>
     </View>
   );

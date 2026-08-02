@@ -160,8 +160,8 @@ export async function deleteGrant(db: Db, user: User, id: string) {
 /**
  * 보유 휴가 화면 payload.
  *
- * 주기 목록은 주기 시작일부터 전역일까지 전부 보여준다. 전역일이 이미 지났거나
- * 주기 시작일보다 이르더라도 현재·다음 주기는 보이도록 하한을 둔다.
+ * 주기 목록은 첫 적립일(1주기 첫날)부터 전역일까지 전부 보여준다. 전역일이 이미
+ * 지났거나 첫 적립일보다 이르더라도 1·2주기는 보이도록 하한을 둔다.
  */
 export async function buildGrantsPage(db: Db, user: User) {
   const [grantRows, segments, config] = await Promise.all([
@@ -239,7 +239,7 @@ function buildCycleList(
   today: string,
 ) {
   if (!config?.startDate || !isRegularOvernightCycleBased(config)) return [];
-  // 전역일이 지났거나 주기 시작보다 일러도 현재·다음 주기는 보이게 한다.
+  // 전역일이 지났거나 첫 적립보다 일러도 1·2주기는 보이게 한다(첫 적립 = 시작일 + 1주기).
   const floor = addDays(config.startDate, 2 * (config.intervalDays ?? 1));
   const end = [dischargeAt, today, floor].reduce((a, b) => (a > b ? a : b));
 

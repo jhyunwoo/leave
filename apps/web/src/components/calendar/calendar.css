@@ -326,3 +326,8 @@
   font-size: 12px;
   font-weight: 600;
 }
+/* 첫 적립 전 대기 구간 — 쥔 정기외박이 없으니 조용하게. */
+.cal-cycle-banner.is-pending {
+  background: var(--surface-card);
+  color: var(--mute);
+}

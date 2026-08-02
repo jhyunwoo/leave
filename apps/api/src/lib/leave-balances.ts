@@ -4,6 +4,7 @@ import {
   BALANCE_LABELS,
   cycleFor,
   cycleUsedDays,
+  firstGrantDate,
   fmtDateShort,
   isExpiringSoon,
   isRegularOvernightCycleBased,
@@ -303,9 +304,12 @@ async function assertRegularOvernightAvailable(
   replacingLeaveId?: string,
 ) {
   const requestedUsage = regularOvernightUsageByCycle(config, requested);
-  if (requestedUsage.beforeStartDays > 0) {
+  if (requestedUsage.beforeFirstGrantDays > 0) {
+    const first = firstGrantDate(config);
     throw new Error(
-      "정기외박 주기가 시작되기 전 날짜에는 정기외박을 사용할 수 없습니다",
+      first
+        ? `정기외박은 첫 적립일(${fmtDateShort(first)}) 이후부터 사용할 수 있습니다`
+        : "첫 적립 전에는 사용할 수 있는 정기외박이 없습니다",
     );
   }
   if (!requestedUsage.cycles.length) return;
@@ -322,9 +326,7 @@ async function assertRegularOvernightAvailable(
     const used = usageByCycleStart.get(cycle.start) ?? 0;
     if (used > cycle.grantDays) {
       throw new Error(
-        cycle.grantDays === 0
-          ? `정기외박 ${cycle.index}주기(${cycle.start}~${cycle.end})는 첫 적립 전이라 사용할 수 있는 정기외박이 없습니다`
-          : `정기외박 ${cycle.index}주기(${cycle.start}~${cycle.end})에 쓸 수 있는 ${cycle.grantDays}일보다 많이 사용할 수 없습니다`,
+        `정기외박 ${cycle.index}주기(${cycle.start}~${cycle.end})에 쓸 수 있는 ${cycle.grantDays}일보다 많이 사용할 수 없습니다`,
       );
     }
   }

@@ -104,6 +104,14 @@ export function RegularOvernightSettings(props: {
         </div>
       )}
 
+      {enabled && (
+        <small className="caption text-mute">
+          주기 시작일에서 {intervalDays}일이 지난 날 {daysPerGrant}일이 처음
+          적립되면서 1주기가 시작돼요. 한 주기 몫은 다음 적립 전날까지 쓰고
+          남으면 사라져요.
+        </small>
+      )}
+
       <button
         type="button"
         className="btn btn-tertiary"
