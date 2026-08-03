@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   computeDayStats,
-  effectiveMemberCount,
   monthBounds,
   monthSchema,
   unitCreateSchema,
@@ -310,12 +309,9 @@ export const unitRoutes = app
       id: crypto.randomUUID(),
       name: input.name,
       description: input.description ?? null,
-      maxLeaveNumerator: input.maxLeaveNumerator,
-      maxLeaveDenominator: input.maxLeaveDenominator,
-      maxLeaveCount: input.maxLeaveCount ?? null,
+      maxLeaveCount: input.maxLeaveCount,
       creatorId: user.id,
       adminId: user.id,
-      headcount: input.headcount ?? null,
       imageKey: null,
       createdAt: new Date().toISOString(),
     };
@@ -363,21 +359,14 @@ export const unitRoutes = app
     const patch: Partial<typeof units.$inferInsert> = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
-    if (input.maxLeaveNumerator !== undefined) {
-      patch.maxLeaveNumerator = input.maxLeaveNumerator;
-    }
-    if (input.maxLeaveDenominator !== undefined) {
-      patch.maxLeaveDenominator = input.maxLeaveDenominator;
-    }
     if (input.maxLeaveCount !== undefined) {
       patch.maxLeaveCount = input.maxLeaveCount;
     }
-    if (input.headcount !== undefined) patch.headcount = input.headcount;
 
     if (Object.keys(patch).length > 0) {
       await db.update(units).set(patch).where(eq(units.id, id));
     }
-    // 출타율·인원 변경은 달력 통계를 바꾸므로 캐시를 무효화한다.
+    // 최대 출타 인원 변경은 달력 통계를 바꾸므로 캐시를 무효화한다.
     await bumpUnitVersion(c.env.CACHE, id);
 
     const updated = await db.select().from(units).where(eq(units.id, id)).get();
@@ -635,7 +624,7 @@ export const unitRoutes = app
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
 
-    // KV 캐시 히트 시 D1 조회·출타율 계산 없이 즉시 반환한다.
+    // KV 캐시 히트 시 D1 조회·출타 인원 계산 없이 즉시 반환한다.
     const cached = await getCachedCalendar<z.infer<typeof calendarSchema>>(
       c.env.CACHE,
       id,
@@ -678,11 +667,6 @@ export const unitRoutes = app
         startDate: l.startDate,
         endDate: l.endDate,
       })),
-      memberCount: effectiveMemberCount(unit.headcount, members.length),
-      ratio: {
-        numerator: unit.maxLeaveNumerator,
-        denominator: unit.maxLeaveDenominator,
-      },
       maxCount: unit.maxLeaveCount,
       rangeStart: start,
       rangeEnd: end,

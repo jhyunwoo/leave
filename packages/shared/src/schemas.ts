@@ -45,69 +45,29 @@ export const loginSchema = z.object({
   password: z.string().min(1, "비밀번호를 입력해주세요"),
 });
 
-export const unitCreateSchema = z
-  .object({
-    name: z.string().trim().min(2, "부대 이름은 2자 이상이어야 합니다").max(80),
-    description: z.string().trim().max(200).optional(),
-    maxLeaveNumerator: z.int().min(1, "분자는 1 이상이어야 합니다"),
-    maxLeaveDenominator: z.int().min(1, "분모는 1 이상이어야 합니다"),
-    // 직접 지정한 하루 최대 출타 인원. null/미설정이면 비율로 계산한다.
-    maxLeaveCount: z
-      .int()
-      .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
-      .max(100000)
-      .nullable()
-      .optional(),
-    // 부대 인원(출타율 계산 기준). 미설정 시 앱 가입자 수로 대체한다.
-    headcount: z
-      .int()
-      .min(1, "부대 인원은 1명 이상이어야 합니다")
-      .max(100000)
-      .optional(),
-  })
-  .refine((v) => v.maxLeaveNumerator <= v.maxLeaveDenominator, {
-    message: "출타율은 1(전원)을 넘을 수 없습니다",
-    path: ["maxLeaveNumerator"],
-  });
+/** 하루 최대 출타 인원. 부대 관리자가 직접 지정한다. */
+const maxLeaveCountSchema = z
+  .int("최대 출타 인원을 입력해주세요")
+  .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
+  .max(100000, "최대 출타 인원이 너무 큽니다");
 
-/** 부대 정보 수정(관리자). 전 필드 선택적이되, 출타율은 같이 넘길 때만 검증. */
-export const unitUpdateSchema = z
-  .object({
-    name: z
-      .string()
-      .trim()
-      .min(2, "부대 이름은 2자 이상이어야 합니다")
-      .max(80)
-      .optional(),
-    description: z.string().trim().max(200).nullable().optional(),
-    maxLeaveNumerator: z.int().min(1, "분자는 1 이상이어야 합니다").optional(),
-    maxLeaveDenominator: z
-      .int()
-      .min(1, "분모는 1 이상이어야 합니다")
-      .optional(),
-    maxLeaveCount: z
-      .int()
-      .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
-      .max(100000)
-      .nullable()
-      .optional(),
-    headcount: z
-      .int()
-      .min(1, "부대 인원은 1명 이상이어야 합니다")
-      .max(100000)
-      .nullable()
-      .optional(),
-  })
-  .refine(
-    (v) =>
-      v.maxLeaveNumerator === undefined ||
-      v.maxLeaveDenominator === undefined ||
-      v.maxLeaveNumerator <= v.maxLeaveDenominator,
-    {
-      message: "출타율은 1(전원)을 넘을 수 없습니다",
-      path: ["maxLeaveNumerator"],
-    },
-  );
+export const unitCreateSchema = z.object({
+  name: z.string().trim().min(2, "부대 이름은 2자 이상이어야 합니다").max(80),
+  description: z.string().trim().max(200).optional(),
+  maxLeaveCount: maxLeaveCountSchema,
+});
+
+/** 부대 정보 수정(관리자). 전 필드 선택적. */
+export const unitUpdateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "부대 이름은 2자 이상이어야 합니다")
+    .max(80)
+    .optional(),
+  description: z.string().trim().max(200).nullable().optional(),
+  maxLeaveCount: maxLeaveCountSchema.optional(),
+});
 
 /** 관리자 이관 대상. */
 export const unitTransferSchema = z.object({

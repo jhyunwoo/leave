@@ -29,10 +29,7 @@ import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { Field, Input } from "@/components/field";
-import {
-  LeaveLimitFields,
-  type LeaveLimitMode,
-} from "@/components/leave-limit-fields";
+import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { colors, radius, spacing } from "@/theme";
 
 type Unit = NonNullable<Me["unit"]>;
@@ -86,15 +83,7 @@ function EditUnitSection(props: { unit: Unit }) {
 
   const [name, setName] = useState(unit.name);
   const [description, setDescription] = useState(unit.description ?? "");
-  const [num, setNum] = useState(unit.maxLeaveNumerator);
-  const [den, setDen] = useState(unit.maxLeaveDenominator);
-  const [limitMode, setLimitMode] = useState<LeaveLimitMode>(
-    unit.maxLeaveCount != null ? "count" : "ratio",
-  );
-  const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount ?? 1));
-  const [headcount, setHeadcount] = useState(
-    unit.headcount != null ? String(unit.headcount) : "",
-  );
+  const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -123,19 +112,10 @@ function EditUnitSection(props: { unit: Unit }) {
   const submit = async () => {
     setError(null);
     setSaved(false);
-    const hc = headcount.trim();
     const input = {
       name: name.trim(),
       description: description.trim() ? description.trim() : null,
-      maxLeaveNumerator: num,
-      maxLeaveDenominator: den,
-      maxLeaveCount:
-        limitMode === "count"
-          ? maxCount.trim() === ""
-            ? Number.NaN
-            : Number(maxCount)
-          : null,
-      headcount: hc === "" ? null : Number(hc),
+      maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
     } satisfies UnitUpdateInput;
     const parsed = unitUpdateSchema.safeParse(input);
     if (!parsed.success) {
@@ -150,7 +130,6 @@ function EditUnitSection(props: { unit: Unit }) {
     }
   };
 
-  const basis = headcount.trim() ? Number(headcount) : unit.memberCount;
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>부대 정보</Text>
@@ -187,32 +166,7 @@ function EditUnitSection(props: { unit: Unit }) {
         />
       </Field>
 
-      <LeaveLimitFields
-        mode={limitMode}
-        onModeChange={setLimitMode}
-        numerator={num}
-        denominator={den}
-        onNumeratorChange={setNum}
-        onDenominatorChange={setDen}
-        count={maxCount}
-        onCountChange={setMaxCount}
-        basis={basis}
-        basisLabel={`부대 인원 ${basis}명`}
-      />
-
-      <Field
-        label="부대 인원 (선택)"
-        hint="실제 부대 인원을 적으면 출타율이 이 값을 기준으로 계산돼요. 비워두면 앱 가입자 수를 사용해요."
-      >
-        <Input
-          value={headcount}
-          onChangeText={setHeadcount}
-          keyboardType="number-pad"
-          placeholder={`가입자 ${unit.memberCount}명`}
-          style={{ width: 160 }}
-          accessibilityLabel="부대 인원"
-        />
-      </Field>
+      <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
 
       {error && <Text style={styles.error}>{error}</Text>}
       {saved && <Text style={styles.saved}>저장했어요.</Text>}

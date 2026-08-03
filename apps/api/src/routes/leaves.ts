@@ -45,7 +45,7 @@ import { authMiddleware } from "../middleware/auth";
 
 const idParam = z.object({ id: z.string() });
 
-/** 등록/수정 응답: 휴가 + 그로 인해 출타율이 초과된 날짜 목록. */
+/** 등록/수정 응답: 휴가 + 그로 인해 최대 출타 인원이 초과된 날짜 목록. */
 const leaveResultSchema = z.object({
   leave: leaveSchema,
   exceededDates: z.array(z.string()),
@@ -190,7 +190,7 @@ const createLeaveRoute = createRoute({
   tags: ["휴가"],
   summary: "휴가 등록 (제목·시작일·종료일 필수, 사유 선택)",
   description:
-    "등록으로 특정 날짜의 출타율이 초과되면 해당 날짜에 휴가 중인 모든 부대원에게 알림이 전송됩니다.",
+    "등록으로 특정 날짜의 최대 출타 인원이 초과되면 해당 날짜에 휴가 중인 모든 부대원에게 알림이 전송됩니다.",
   security: [{ Bearer: [] }],
   request: {
     body: {

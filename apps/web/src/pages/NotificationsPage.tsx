@@ -71,7 +71,7 @@ export function NotificationsPage() {
             className="body-sm text-body"
             style={{ marginTop: "var(--sp-sm)" }}
           >
-            내 휴가 기간에 출타율이 초과되면 알려드릴게요.
+            내 휴가 기간에 최대 출타 인원이 초과되면 알려드릴게요.
           </p>
         </div>
       ) : (

@@ -24,10 +24,7 @@ import {
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { Field, Input } from "@/components/field";
-import {
-  LeaveLimitFields,
-  type LeaveLimitMode,
-} from "@/components/leave-limit-fields";
+import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { colors, radius, spacing } from "@/theme";
 
 export function UnitsScreen() {
@@ -110,10 +107,8 @@ export function UnitsScreen() {
           <Text style={styles.myUnitEyebrow}>내 부대</Text>
           <Text style={styles.myUnitName}>{myUnit.name}</Text>
           <Text style={styles.myUnitMeta}>
-            부대원 {myUnit.memberCount}명 · 최대 출타{" "}
-            {myUnit.maxLeaveCount != null
-              ? `${myUnit.maxLeaveCount}명`
-              : `${myUnit.maxLeaveNumerator}/${myUnit.maxLeaveDenominator}`}
+            부대원 {myUnit.memberCount}명 · 하루 최대 출타{" "}
+            {myUnit.maxLeaveCount}명
           </Text>
           <View style={styles.myUnitActions}>
             {isAdmin && (
@@ -189,10 +184,8 @@ export function UnitsScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.unitName}>{u.name}</Text>
                   <Text style={styles.unitMeta}>
-                    부대원 {u.memberCount}명 · 최대 출타{" "}
-                    {u.maxLeaveCount != null
-                      ? `${u.maxLeaveCount}명`
-                      : `${u.maxLeaveNumerator}/${u.maxLeaveDenominator}`}
+                    부대원 {u.memberCount}명 · 하루 최대 출타 {u.maxLeaveCount}
+                    명
                   </Text>
                   {u.description ? (
                     <Text style={styles.unitMeta}>{u.description}</Text>
@@ -255,9 +248,6 @@ function CreateUnitModal(props: {
 }) {
   const [name, setName] = useState(props.initialName);
   const [description, setDescription] = useState("");
-  const [num, setNum] = useState(1);
-  const [den, setDen] = useState(3);
-  const [limitMode, setLimitMode] = useState<LeaveLimitMode>("ratio");
   const [maxCount, setMaxCount] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
@@ -270,14 +260,7 @@ function CreateUnitModal(props: {
     const input = {
       name: name.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
-      maxLeaveNumerator: num,
-      maxLeaveDenominator: den,
-      maxLeaveCount:
-        limitMode === "count"
-          ? maxCount.trim() === ""
-            ? Number.NaN
-            : Number(maxCount)
-          : null,
+      maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
     };
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -333,18 +316,7 @@ function CreateUnitModal(props: {
               placeholder="부대를 알아볼 수 있는 한 줄"
             />
           </Field>
-          <LeaveLimitFields
-            mode={limitMode}
-            onModeChange={setLimitMode}
-            numerator={num}
-            denominator={den}
-            onNumeratorChange={setNum}
-            onDenominatorChange={setDen}
-            count={maxCount}
-            onCountChange={setMaxCount}
-            basis={30}
-            basisLabel="부대원 30명"
-          />
+          <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
 
           {error && (
             <Text

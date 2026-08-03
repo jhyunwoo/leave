@@ -1,7 +1,6 @@
 import {
   cycleFor,
   cycleUsedDays,
-  effectiveMemberCount,
   firstGrantDate,
   maxAllowedOut,
   todayInSeoul,
@@ -167,19 +166,8 @@ export function CalendarScreen() {
     );
   }
 
-  const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
-  const allowed = maxAllowedOut(
-    basis,
-    {
-      numerator: unit.maxLeaveNumerator,
-      denominator: unit.maxLeaveDenominator,
-    },
-    unit.maxLeaveCount,
-  );
-  const limitSummary =
-    unit.maxLeaveCount != null
-      ? `하루 최대 ${unit.maxLeaveCount}명 직접 지정 · 빨간 배경은 초과`
-      : `하루 최대 ${allowed}명 (${unit.maxLeaveNumerator}/${unit.maxLeaveDenominator}) · 빨간 배경은 초과`;
+  const allowed = maxAllowedOut(unit.maxLeaveCount);
+  const limitSummary = `하루 최대 ${allowed}명 · 빨간 배경은 초과`;
 
   /**
    * 휴가 등록 폼을 연다. 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌 뒤에 연다.

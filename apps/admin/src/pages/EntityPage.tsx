@@ -146,22 +146,14 @@ const configs: Record<EntityResource, ResourceConfig> = {
         render: (item) => text(item.memberCount),
       },
       {
-        key: "headcount",
-        label: "기준 인원",
-        render: (item) => text(item.headcount),
-      },
-      {
         key: "admin",
         label: "관리자 ID",
         render: (item) => text(item.adminId),
       },
       {
-        key: "ratio",
-        label: "최대 출타 기준",
-        render: (item) =>
-          item.maxLeaveCount !== null && item.maxLeaveCount !== undefined
-            ? `${text(item.maxLeaveCount)}명`
-            : `${text(item.maxLeaveNumerator)} / ${text(item.maxLeaveDenominator)}`,
+        key: "maxLeaveCount",
+        label: "하루 최대 출타",
+        render: (item) => `${text(item.maxLeaveCount)}명`,
       },
       {
         key: "created",

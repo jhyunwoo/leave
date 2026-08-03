@@ -42,7 +42,7 @@ export function NotificationsScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
             <Text style={styles.emptyCaption}>
-              내 휴가 기간에 출타율이 초과되면 알려드릴게요.
+              내 휴가 기간에 최대 출타 인원이 초과되면 알려드릴게요.
             </Text>
           </View>
         ) : (

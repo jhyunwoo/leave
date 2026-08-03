@@ -88,8 +88,7 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
     headers: { Authorization: `Bearer ${auth.token}` },
     data: {
       name: `E2E부대-${Date.now()}`,
-      maxLeaveNumerator: 1,
-      maxLeaveDenominator: 3,
+      maxLeaveCount: 3,
     },
   });
   expect(unit.ok()).toBeTruthy();

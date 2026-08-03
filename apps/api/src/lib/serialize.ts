@@ -77,12 +77,9 @@ export function serializeUnit(
     id: unit.id,
     name: unit.name,
     description: unit.description,
-    maxLeaveNumerator: unit.maxLeaveNumerator,
-    maxLeaveDenominator: unit.maxLeaveDenominator,
     maxLeaveCount: unit.maxLeaveCount,
     memberCount,
     adminId: unit.adminId,
-    headcount: unit.headcount,
     imageKey: unit.imageKey,
     createdAt: unit.createdAt,
   };

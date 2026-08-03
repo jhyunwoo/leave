@@ -109,27 +109,22 @@ describe("leaveCreateSchema", () => {
 });
 
 describe("unitCreateSchema", () => {
-  it("출타율은 1(전원)을 넘을 수 없다", () => {
-    expect(
-      unitCreateSchema.safeParse({
-        name: "테스트대대",
-        maxLeaveNumerator: 4,
-        maxLeaveDenominator: 3,
-      }).success,
-    ).toBe(false);
+  it("최대 출타 인원은 필수다", () => {
+    expect(unitCreateSchema.safeParse({ name: "테스트대대" }).success).toBe(
+      false,
+    );
   });
 
-  it("직접 지정 최대 출타 인원은 0명 이상이어야 한다", () => {
-    const base = {
-      name: "테스트대대",
-      maxLeaveNumerator: 1,
-      maxLeaveDenominator: 3,
-    };
+  it("최대 출타 인원은 0명 이상의 정수여야 한다", () => {
+    const base = { name: "테스트대대" };
     expect(
       unitCreateSchema.safeParse({ ...base, maxLeaveCount: 0 }).success,
     ).toBe(true);
     expect(
       unitCreateSchema.safeParse({ ...base, maxLeaveCount: -1 }).success,
+    ).toBe(false);
+    expect(
+      unitCreateSchema.safeParse({ ...base, maxLeaveCount: 1.5 }).success,
     ).toBe(false);
   });
 });

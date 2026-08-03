@@ -72,29 +72,14 @@ const userUpdateSchema = z
 const unitBaseSchema = z.object({
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(200).nullable().optional(),
-  maxLeaveNumerator: z.int().min(1),
-  maxLeaveDenominator: z.int().min(1),
-  maxLeaveCount: z.int().min(0).max(100_000).nullable().optional(),
+  maxLeaveCount: z.int().min(0).max(100_000),
   creatorId: z.string().min(1),
   adminId: z.string().min(1),
-  headcount: z.int().min(1).max(100_000).nullable().optional(),
 });
 
-const unitCreateSchema = unitBaseSchema.refine(
-  (value) => value.maxLeaveNumerator <= value.maxLeaveDenominator,
-  { path: ["maxLeaveNumerator"], message: "출타율은 1을 넘을 수 없습니다" },
-);
+const unitCreateSchema = unitBaseSchema;
 
-const unitUpdateSchema = unitBaseSchema
-  .omit({ creatorId: true })
-  .partial()
-  .refine(
-    (value) =>
-      value.maxLeaveNumerator === undefined ||
-      value.maxLeaveDenominator === undefined ||
-      value.maxLeaveNumerator <= value.maxLeaveDenominator,
-    { path: ["maxLeaveNumerator"], message: "출타율은 1을 넘을 수 없습니다" },
-  );
+const unitUpdateSchema = unitBaseSchema.omit({ creatorId: true }).partial();
 
 function userDto(user: typeof users.$inferSelect) {
   return {
@@ -398,12 +383,9 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       id: crypto.randomUUID(),
       name: input.data.name,
       description: input.data.description ?? null,
-      maxLeaveNumerator: input.data.maxLeaveNumerator,
-      maxLeaveDenominator: input.data.maxLeaveDenominator,
-      maxLeaveCount: input.data.maxLeaveCount ?? null,
+      maxLeaveCount: input.data.maxLeaveCount,
       creatorId: creator.id,
       adminId: admin.id,
-      headcount: input.data.headcount ?? null,
       imageKey: null,
       createdAt: nowIso(),
     };

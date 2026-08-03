@@ -270,14 +270,14 @@ test("관리자 거절 → 부대원 편입 안 됨", async () => {
   assert.equal(me.data.joinRequest, null);
 });
 
-test("부대 정보 수정은 관리자만 (headcount로 출타율 계산)", async () => {
+test("부대 정보 수정은 관리자만 (최대 출타 인원이 달력에 반영)", async () => {
   const owner = await signup();
   const unit = await createUnit(owner.token, {
     name: uniq("수정부대-"),
-    maxLeaveNumerator: 1,
-    maxLeaveDenominator: 3,
+    maxLeaveCount: 10,
   });
   const unitId = unit.data.unit.id;
+  assert.equal(unit.data.unit.maxLeaveCount, 10);
 
   // 비관리자 403
   const outsider = await signup();
@@ -287,49 +287,42 @@ test("부대 정보 수정은 관리자만 (headcount로 출타율 계산)", asy
   });
   assert.equal(forbidden.status, 403);
 
-  // 부대 인원 30명 설정 → 하루 허용 floor(30/3)=10
-  const patch = await req("PATCH", `/units/${unitId}`, {
-    token: owner.token,
-    body: { headcount: 30, description: "수정됨" },
-  });
-  assert.equal(patch.status, 200);
-  assert.equal(patch.data.unit.headcount, 30);
-
   const cal = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
     token: owner.token,
   });
   assert.equal(cal.status, 200);
   assert.equal(cal.data.days[0].allowed, 10);
 
-  // 직접 인원을 지정하면 비율보다 우선한다.
-  const direct = await req("PATCH", `/units/${unitId}`, {
+  // 관리자가 인원을 바꾸면 달력 허용 인원도 따라간다.
+  const patch = await req("PATCH", `/units/${unitId}`, {
     token: owner.token,
-    body: { maxLeaveCount: 2 },
+    body: { maxLeaveCount: 2, description: "수정됨" },
   });
-  assert.equal(direct.status, 200);
-  assert.equal(direct.data.unit.maxLeaveCount, 2);
+  assert.equal(patch.status, 200);
+  assert.equal(patch.data.unit.maxLeaveCount, 2);
 
-  const directCal = await req(
+  const patchedCal = await req(
     "GET",
     `/units/${unitId}/calendar?month=2026-08`,
     { token: owner.token },
   );
-  assert.equal(directCal.status, 200);
-  assert.equal(directCal.data.days[0].allowed, 2);
+  assert.equal(patchedCal.status, 200);
+  assert.equal(patchedCal.data.days[0].allowed, 2);
 
-  // null로 해제하면 보존된 비율 설정으로 돌아간다.
-  const ratioAgain = await req("PATCH", `/units/${unitId}`, {
+  // 0명(전원 출타 불가)도 유효한 설정이다.
+  const zero = await req("PATCH", `/units/${unitId}`, {
+    token: owner.token,
+    body: { maxLeaveCount: 0 },
+  });
+  assert.equal(zero.status, 200);
+  assert.equal(zero.data.unit.maxLeaveCount, 0);
+
+  // null은 더 이상 허용하지 않는다.
+  const nulled = await req("PATCH", `/units/${unitId}`, {
     token: owner.token,
     body: { maxLeaveCount: null },
   });
-  assert.equal(ratioAgain.status, 200);
-  assert.equal(ratioAgain.data.unit.maxLeaveCount, null);
-
-  const ratioCal = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
-    token: owner.token,
-  });
-  assert.equal(ratioCal.status, 200);
-  assert.equal(ratioCal.data.days[0].allowed, 10);
+  assert.equal(nulled.status, 400);
 });
 
 test("관리자 이관 후 새 관리자만 수정 가능", async () => {

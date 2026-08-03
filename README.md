@@ -1,11 +1,11 @@
 # 리브 (Leave)
 
-군 병사들이 부대별로 휴가를 계획·공유하고, 날짜별 **출타율**(부대 인원 대비 휴가 인원 비율)이 한도를 넘는 날을 미리 확인하는 서비스.
+군 병사들이 부대별로 휴가를 계획·공유하고, 날짜별 출타 인원이 부대의 **하루 최대 출타 인원**을 넘는 날을 미리 확인하는 서비스.
 
 - 회원가입 시 군종(육/해/공)·입대일·전역예정일·계급을 등록하면 복무기간에 따라 **계급이 자동 진급**됩니다 (이병 2개월 → 일병 6개월 → 상병 6개월 → 병장).
-- 부대를 검색해 가입하거나, 없으면 **최대 출타율**(예: 전체 인원의 1/3)과 함께 새로 만들 수 있습니다.
-- 부대 달력에서 부대원들의 휴가를 함께 보고, **출타율 초과일은 빨간색**으로 표시됩니다.
-- 휴가 등록으로 특정 날짜의 출타율이 초과되면, 그 날짜에 휴가가 걸린 모든 부대원에게 **인앱 + Expo 푸시 알림**이 전송됩니다.
+- 부대를 검색해 가입하거나, 없으면 **하루 최대 출타 인원**(예: 4명)과 함께 새로 만들 수 있습니다. 이 값은 부대 관리자가 직접 지정하며 언제든 바꿀 수 있습니다.
+- 부대 달력에서 부대원들의 휴가를 함께 보고, **최대 출타 인원 초과일은 빨간색**으로 표시됩니다.
+- 휴가 등록으로 특정 날짜의 최대 출타 인원이 초과되면, 그 날짜에 휴가가 걸린 모든 부대원에게 **인앱 + Expo 푸시 알림**이 전송됩니다.
 - 서비스 운영·보안을 위해 가입 시 동의를 받아 **접속 기록**(접속 시각·경로·플랫폼·앱 버전 등)과 이 앱 푸시의 **발송·수신·열람 로그**를 남기며, 사용자는 `GET /auth/activity`로 자신의 기록을 **직접 열람**할 수 있습니다(개인정보 열람권).
 
 review@leave.app / reviewpass123
@@ -17,7 +17,7 @@ review@leave.app / reviewpass123
 | `apps/api` | 백엔드 API | Hono + Cloudflare Workers, D1(Drizzle), R2, **KV 캐시**, 접속/푸시 로깅, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
 | `apps/web` | 웹 앱 | Vite + React SPA, Jotai, TanStack Query, Cloudflare Workers 정적 에셋 배포, Playwright e2e |
 | `apps/native` | iOS/Android 앱 | Expo SDK 57, expo-router(NativeTabs — iOS 26 Liquid Glass), expo-notifications, iPad 대응, Maestro e2e |
-| `packages/shared` | 공유 도메인 로직 | 계급 자동진급 계산, 출타율 계산, zod 스키마, 날짜/달력 유틸, 공용 HTTP 유틸(`unwrap`/`ApiError`) + vitest 테스트 |
+| `packages/shared` | 공유 도메인 로직 | 계급 자동진급 계산, 출타 인원 계산, zod 스키마, 날짜/달력 유틸, 공용 HTTP 유틸(`unwrap`/`ApiError`) + vitest 테스트 |
 
 타입 안정성: `apps/api`가 `AppType`을 export → 웹/앱이 `hc<AppType>()`로 타입 안전 RPC 클라이언트 사용. 디자인은 `DESIGN.md`(Wise 스타일) 토큰을 웹·앱이 공유합니다.
 
@@ -52,7 +52,7 @@ pnpm test --filter @leave/api    # API 통합 테스트 (TDD, 19개)
 ```
 
 - **API 통합 테스트**(`apps/api/test/*.test.mjs`): 격리된 로컬 D1로 `wrangler dev`를 자동 기동해
-  인증·부대·휴가·출타율·**접속 로그**·**푸시 이벤트**·**달력 캐시 무효화**를 Node 내장 러너로 검증(추가 의존성 없음).
+  인증·부대·휴가·출타 인원·**접속 로그**·**푸시 이벤트**·**달력 캐시 무효화**를 Node 내장 러너로 검증(추가 의존성 없음).
 - **웹 e2e**(Playwright): `pnpm --filter @leave/web test:e2e`
   (사전 1회: `pnpm add -D @playwright/test && npx playwright install chromium`). 설정은 `apps/web/playwright.config.ts`.
 - **앱 e2e**(Maestro): `apps/native/.maestro/README.md` 참고.
@@ -111,5 +111,5 @@ Expo Insights는 새 네이티브 빌드부터 앱 콜드 스타트 사용량을
 
 ## 성능 (Cloudflare KV)
 
-- 부대 **달력**은 여러 D1 조회 + 출타율 계산이 필요한 읽기 위주 응답이라 KV(`CACHE`)로 캐싱합니다.
+- 부대 **달력**은 여러 D1 조회 + 출타 인원 계산이 필요한 읽기 위주 응답이라 KV(`CACHE`)로 캐싱합니다.
 - 무효화는 **부대별 버전 토큰**으로 처리합니다 — 휴가 등록/수정/삭제, 부대 가입/탈퇴 시 버전을 새로 발급해 이전 캐시를 무효화하고, 남은 키는 짧은 TTL(60초)로 소멸합니다.

@@ -126,16 +126,9 @@ export function RecordForm({
         onSubmit({
           name: value(form, "name"),
           description: nullable(form, "description"),
-          maxLeaveNumerator: Number(value(form, "maxLeaveNumerator")),
-          maxLeaveDenominator: Number(value(form, "maxLeaveDenominator")),
-          maxLeaveCount: value(form, "maxLeaveCount")
-            ? Number(value(form, "maxLeaveCount"))
-            : null,
+          maxLeaveCount: Number(value(form, "maxLeaveCount")),
           ...(mode === "create" ? { creatorId: value(form, "creatorId") } : {}),
           adminId: value(form, "adminId"),
-          headcount: value(form, "headcount")
-            ? Number(value(form, "headcount"))
-            : null,
         });
         break;
       case "leaves":
@@ -259,26 +252,11 @@ export function RecordForm({
           <Field label="부대 이름" name="name" required initial={initial} />
           <Field label="설명" name="description" initial={initial} />
           <Field
-            label="최대 휴가 인원 분자"
-            name="maxLeaveNumerator"
-            type="number"
-            min={1}
-            required
-            initial={initial}
-          />
-          <Field
-            label="최대 휴가 인원 분모"
-            name="maxLeaveDenominator"
-            type="number"
-            min={1}
-            required
-            initial={initial}
-          />
-          <Field
-            label="직접 지정 최대 인원 (선택)"
+            label="하루 최대 출타 인원"
             name="maxLeaveCount"
             type="number"
             min={0}
+            required
             initial={initial}
           />
           {mode === "create" ? (
@@ -293,13 +271,6 @@ export function RecordForm({
             label="부대 관리자 사용자 ID"
             name="adminId"
             required
-            initial={initial}
-          />
-          <Field
-            label="기준 인원 (선택)"
-            name="headcount"
-            type="number"
-            min={1}
             initial={initial}
           />
         </div>

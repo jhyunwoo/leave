@@ -2,7 +2,6 @@ import {
   cycleFor,
   cycleUsedDays,
   diffDays,
-  effectiveMemberCount,
   firstGrantDate,
   fmtRangeTiny,
   maxAllowedOut,
@@ -71,15 +70,7 @@ export function CalendarPage(props: { me: Me }) {
 
   if (!unit) return <Navigate to="/units" replace />;
 
-  const basis = effectiveMemberCount(unit.headcount, unit.memberCount);
-  const allowed = maxAllowedOut(
-    basis,
-    {
-      numerator: unit.maxLeaveNumerator,
-      denominator: unit.maxLeaveDenominator,
-    },
-    unit.maxLeaveCount,
-  );
+  const allowed = maxAllowedOut(unit.maxLeaveCount);
 
   const onSaved = (exceededDates: string[]) => {
     if (exceededDates.length > 0) {
@@ -181,14 +172,7 @@ export function CalendarPage(props: { me: Me }) {
           >
             <span className="caption text-mute">
               하루 최대 출타{" "}
-              <strong style={{ color: "var(--ink)" }}>
-                {unit.maxLeaveCount != null
-                  ? `${unit.maxLeaveCount}명 직접 지정`
-                  : `${unit.maxLeaveNumerator}/${unit.maxLeaveDenominator}`}
-              </strong>{" "}
-              {unit.maxLeaveCount == null
-                ? `(${unit.headcount != null ? "부대 인원" : "가입자"} ${basis}명 기준 ${allowed}명)`
-                : null}
+              <strong style={{ color: "var(--ink)" }}>{allowed}명</strong>
             </span>
             <span className="caption" style={{ color: "var(--negative-deep)" }}>
               ● 빨간 날 = 최대 출타 인원 초과 · 공휴일은 빨간 날짜

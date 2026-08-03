@@ -7,24 +7,17 @@ import {
   type LeaveSpan,
 } from "../src";
 
-const ratio13 = { numerator: 1, denominator: 3 };
-
 describe("maxAllowedOut", () => {
-  it("floors the allowed count", () => {
-    expect(maxAllowedOut(9, ratio13)).toBe(3);
-    expect(maxAllowedOut(10, ratio13)).toBe(3);
-    expect(maxAllowedOut(2, ratio13)).toBe(0);
-    expect(maxAllowedOut(4, { numerator: 1, denominator: 2 })).toBe(2);
+  it("uses the configured count, including zero", () => {
+    expect(maxAllowedOut(4)).toBe(4);
+    expect(maxAllowedOut(0)).toBe(0);
   });
 
-  it("guards against a zero denominator", () => {
-    expect(maxAllowedOut(10, { numerator: 1, denominator: 0 })).toBe(0);
-  });
-
-  it("prefers a manually configured count, including zero", () => {
-    expect(maxAllowedOut(30, ratio13, 4)).toBe(4);
-    expect(maxAllowedOut(30, ratio13, 0)).toBe(0);
-    expect(maxAllowedOut(30, ratio13, null)).toBe(10);
+  it("normalizes missing or malformed values to zero", () => {
+    expect(maxAllowedOut(null)).toBe(0);
+    expect(maxAllowedOut(undefined)).toBe(0);
+    expect(maxAllowedOut(-3)).toBe(0);
+    expect(maxAllowedOut(2.7)).toBe(2);
   });
 });
 
@@ -38,8 +31,7 @@ describe("computeDayStats", () => {
   it("counts distinct users per day and flags overage", () => {
     const stats = computeDayStats({
       leaves,
-      memberCount: 6, // 허용 인원 = floor(6/3) = 2
-      ratio: ratio13,
+      maxCount: 2,
       rangeStart: "2026-08-01",
       rangeEnd: "2026-08-05",
     });
@@ -57,8 +49,7 @@ describe("computeDayStats", () => {
         { userId: "a", startDate: "2026-08-01", endDate: "2026-08-02" },
         { userId: "a", startDate: "2026-08-02", endDate: "2026-08-03" },
       ],
-      memberCount: 6,
-      ratio: ratio13,
+      maxCount: 2,
       rangeStart: "2026-08-02",
       rangeEnd: "2026-08-02",
     });
@@ -68,19 +59,16 @@ describe("computeDayStats", () => {
   it("clips leaves that extend beyond the range", () => {
     const stats = computeDayStats({
       leaves: [{ userId: "a", startDate: "2026-07-20", endDate: "2026-09-10" }],
-      memberCount: 3,
-      ratio: ratio13,
+      maxCount: 1,
       rangeStart: "2026-08-01",
       rangeEnd: "2026-08-02",
     });
     expect(stats.every((s) => s.count === 1)).toBe(true);
   });
 
-  it("uses the manually configured count for overage", () => {
+  it("uses the configured count for overage", () => {
     const stats = computeDayStats({
       leaves,
-      memberCount: 30,
-      ratio: ratio13,
       maxCount: 1,
       rangeStart: "2026-08-01",
       rangeEnd: "2026-08-02",
@@ -104,8 +92,7 @@ describe("findExceededDates", () => {
     const dates = findExceededDates({
       leaves: [...existing, newLeave],
       newLeave,
-      memberCount: 6, // 허용 2명
-      ratio: ratio13,
+      maxCount: 2,
     });
     expect(dates).toEqual(["2026-08-03"]); // a+b+c 3명 → 초과
   });
@@ -120,8 +107,7 @@ describe("findExceededDates", () => {
       findExceededDates({
         leaves: [newLeave],
         newLeave,
-        memberCount: 6,
-        ratio: ratio13,
+        maxCount: 2,
       }),
     ).toEqual([]);
   });

@@ -479,13 +479,11 @@ test("적립일이 전역일 뒤인 정기외박 주기는 미리 쓸 수 없다
   assert.match(afterDischarge.data.error, /전역일 뒤/);
 });
 
-test("직접 지정 최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
-  // 비율상 전원 출타 가능하지만 직접 지정 최대 인원은 2명
+test("최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 로그", async () => {
+  // 부대원 3명이 같은 날 겹치지만 하루 최대 출타는 2명
   const owner = await signup();
   const unit = await createUnit(owner.token, {
     name: uniq("초과부대-"),
-    maxLeaveNumerator: 1,
-    maxLeaveDenominator: 1,
     maxLeaveCount: 2,
   });
   const unitId = unit.data.unit.id;

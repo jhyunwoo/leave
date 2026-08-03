@@ -51,16 +51,12 @@ export const unitSchema = z
     id: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    maxLeaveNumerator: z.number(),
-    maxLeaveDenominator: z.number(),
-    // 직접 지정한 하루 최대 출타 인원. null이면 출타율로 계산.
-    maxLeaveCount: z.number().nullable(),
+    // 부대 관리자가 지정한 하루 최대 출타 인원.
+    maxLeaveCount: z.number(),
     // 앱 가입자 수.
     memberCount: z.number(),
     // 부대 관리자 사용자 id.
     adminId: z.string(),
-    // 관리자가 설정한 부대 인원(출타율 기준). 미설정이면 null → 가입자 수 사용.
-    headcount: z.number().nullable(),
     // 부대 대표 이미지 R2 키.
     imageKey: z.string().nullable(),
     createdAt: z.string(),

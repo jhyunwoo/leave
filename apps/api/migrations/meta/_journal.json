@@ -78,6 +78,13 @@
       "when": 1785847200000,
       "tag": "0010_leave_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1785850800000,
+      "tag": "0011_unit_max_leave_count",
+      "breakpoints": true
     }
   ]
 }

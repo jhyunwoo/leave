@@ -53,15 +53,11 @@ export const units = sqliteTable("units", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  maxLeaveNumerator: integer("max_leave_numerator").notNull(),
-  maxLeaveDenominator: integer("max_leave_denominator").notNull(),
-  // 직접 지정한 하루 최대 출타 인원. null이면 기존 비율을 사용한다.
-  maxLeaveCount: integer("max_leave_count"),
+  // 부대 관리자가 지정한 하루 최대 출타 인원.
+  maxLeaveCount: integer("max_leave_count").notNull(),
   creatorId: text("creator_id").notNull(),
   // 부대 관리자. 생성 시 생성자로 초기화되며 이관으로 바뀔 수 있다.
   adminId: text("admin_id").notNull(),
-  // 관리자가 설정한 부대 인원(출타율 계산 기준). null이면 앱 가입자 수로 대체.
-  headcount: integer("headcount"),
   // 부대 대표 이미지 R2 키.
   imageKey: text("image_key"),
   createdAt: text("created_at").notNull(),

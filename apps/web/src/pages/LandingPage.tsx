@@ -28,7 +28,7 @@ function HeroCalendar() {
     <div className="lp-cal lp-anim" aria-hidden="true">
       <div className="lp-cal-head">
         <span className="lp-cal-month">7월</span>
-        <span className="lp-cal-cap lp-num">출타율 1/3</span>
+        <span className="lp-cal-cap lp-num">하루 최대 4명</span>
       </div>
       <div className="lp-cal-dow">
         {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
@@ -99,7 +99,7 @@ const VALUES = [
   },
   {
     title: "초과되면 자동 알림",
-    body: "누군가 등록해 출타율이 넘으면, 그 날 휴가인 부대원 모두에게 앱·푸시 알림이 가요.",
+    body: "누군가 등록해 하루 최대 출타 인원이 넘으면, 그 날 휴가인 부대원 모두에게 앱·푸시 알림이 가요.",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -160,7 +160,7 @@ const STEPS = [
   },
   {
     n: "03",
-    title: "출타율 지키기",
+    title: "출타 인원 지키기",
     body: "빈 날은 한눈에, 넘치는 날은 미리 알림으로. 겹침 없이 계획해요.",
   },
 ];
@@ -226,8 +226,8 @@ export function LandingPage() {
               <em>겹치지 않게.</em>
             </h1>
             <p className="lp-sub">
-              출타율에 맞춰 비어 있는 날을 한눈에 보고, 초과되는 날은 함께
-              조율하세요.
+              하루 최대 출타 인원에 맞춰 비어 있는 날을 한눈에 보고, 초과되는
+              날은 함께 조율하세요.
             </p>
             <div className="lp-cta-row">
               <Link to="/signup" className="lp-btn lp-btn--primary lp-btn--lg">
@@ -287,13 +287,13 @@ export function LandingPage() {
               <div>
                 <p className="lp-band-eyebrow">실시간 출타 초과 알림</p>
                 <h2>
-                  출타율이 넘는 순간,
+                  출타 인원이 넘는 순간,
                   <br />그 날 휴가인 모두가 알아요.
                 </h2>
                 <p>
-                  한 명이 더 등록해 비율을 넘기면, 같은 날 휴가인 부대원
-                  전원에게 인앱·푸시 알림이 갑니다. 누가 일정을 조정해야 할지
-                  바로 보여요.
+                  한 명이 더 등록해 하루 최대 출타 인원을 넘기면, 같은 날 휴가인
+                  부대원 전원에게 인앱·푸시 알림이 갑니다. 누가 일정을 조정해야
+                  할지 바로 보여요.
                 </p>
               </div>
               <div className="lp-notif">

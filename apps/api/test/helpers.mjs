@@ -42,13 +42,12 @@ export async function signup(overrides = {}) {
   return { ...res, email, token: res.data?.token };
 }
 
-/** 부대 생성 (기본 출타율 1/3) */
+/** 부대 생성 (기본 하루 최대 출타 3명) */
 export async function createUnit(token, overrides = {}) {
   const body = {
     name: uniq("부대-"),
     description: "테스트 부대",
-    maxLeaveNumerator: 1,
-    maxLeaveDenominator: 3,
+    maxLeaveCount: 3,
     ...overrides,
   };
   return req("POST", "/units", { token, body });

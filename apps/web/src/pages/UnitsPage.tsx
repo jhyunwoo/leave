@@ -10,10 +10,7 @@ import {
   useUnitSearch,
 } from "../api/queries";
 import { Field } from "../components/Field";
-import {
-  LeaveLimitFields,
-  type LeaveLimitMode,
-} from "../components/LeaveLimitFields";
+import { LeaveLimitFields } from "../components/LeaveLimitFields";
 import { Modal } from "../components/Modal";
 
 export function UnitsPage(props: { me: Me }) {
@@ -102,10 +99,8 @@ export function UnitsPage(props: { me: Me }) {
               {myUnit.name}
             </p>
             <p className="caption text-body" style={{ marginTop: 4 }}>
-              부대원 {myUnit.memberCount}명 · 최대 출타{" "}
-              {myUnit.maxLeaveCount != null
-                ? `${myUnit.maxLeaveCount}명`
-                : `${myUnit.maxLeaveNumerator}/${myUnit.maxLeaveDenominator}`}
+              부대원 {myUnit.memberCount}명 · 하루 최대 출타{" "}
+              {myUnit.maxLeaveCount}명
             </p>
           </div>
           <div
@@ -259,11 +254,8 @@ export function UnitsPage(props: { me: Me }) {
                 <div style={{ minWidth: 0 }}>
                   <p className="body-sm strong">{u.name}</p>
                   <p className="caption text-mute">
-                    부대원 {u.memberCount}명 · 최대 출타{" "}
-                    {u.maxLeaveCount != null
-                      ? `${u.maxLeaveCount}명`
-                      : `${u.maxLeaveNumerator}/${u.maxLeaveDenominator}`}
-                    {u.description ? ` · ${u.description}` : ""}
+                    부대원 {u.memberCount}명 · 하루 최대 출타 {u.maxLeaveCount}
+                    명{u.description ? ` · ${u.description}` : ""}
                   </p>
                 </div>
                 {myUnit?.id === u.id ? (
@@ -331,9 +323,6 @@ function CreateUnitModal(props: {
 }) {
   const [name, setName] = useState(props.initialName);
   const [description, setDescription] = useState("");
-  const [num, setNum] = useState(1);
-  const [den, setDen] = useState(3);
-  const [limitMode, setLimitMode] = useState<LeaveLimitMode>("ratio");
   const [maxCount, setMaxCount] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
@@ -342,14 +331,7 @@ function CreateUnitModal(props: {
     const input = {
       name: name.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
-      maxLeaveNumerator: num,
-      maxLeaveDenominator: den,
-      maxLeaveCount:
-        limitMode === "count"
-          ? maxCount.trim() === ""
-            ? Number.NaN
-            : Number(maxCount)
-          : null,
+      maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
     };
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -394,18 +376,7 @@ function CreateUnitModal(props: {
             placeholder="부대를 알아볼 수 있는 한 줄"
           />
         </Field>
-        <LeaveLimitFields
-          mode={limitMode}
-          onModeChange={setLimitMode}
-          numerator={num}
-          denominator={den}
-          onNumeratorChange={setNum}
-          onDenominatorChange={setDen}
-          count={maxCount}
-          onCountChange={setMaxCount}
-          basis={30}
-          basisLabel="부대원 30명"
-        />
+        <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
         {error && (
           <p className="field-error" role="alert">
             {error}

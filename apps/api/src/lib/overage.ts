@@ -1,5 +1,4 @@
 import {
-  effectiveMemberCount,
   findExceededDates,
   usersOnLeaveDuring,
   type ISODate,
@@ -25,7 +24,7 @@ function formatDateList(dates: ISODate[]): string {
 }
 
 /**
- * 휴가 등록/수정 후 해당 기간의 출타율 초과일을 계산하고,
+ * 휴가 등록/수정 후 해당 기간의 최대 출타 인원 초과일을 계산하고,
  * 초과일에 휴가가 걸린 모든 부대원에게 알림(인앱 + 푸시)을 보낸다.
  * @returns 초과된 날짜 목록 (없으면 빈 배열)
  */
@@ -71,11 +70,6 @@ export async function checkOverageAndNotify(params: {
     newLeave: {
       startDate: changedLeave.startDate,
       endDate: changedLeave.endDate,
-    },
-    memberCount: effectiveMemberCount(unit.headcount, members.length),
-    ratio: {
-      numerator: unit.maxLeaveNumerator,
-      denominator: unit.maxLeaveDenominator,
     },
     maxCount: unit.maxLeaveCount,
   });
