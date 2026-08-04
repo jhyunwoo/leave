@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/theme";
 
-/** 소수점 자릿수. 10자리면 1/10^10 %가 약 0.05ms마다 바뀌어 눈에 띄게 흘러간다. */
-const DECIMALS = 10;
-/** 20fps. 자릿수가 계속 흐르는 것을 보여주기에 충분하고 배터리 부담은 적다. */
-const TICK_MS = 50;
+/** 한눈에 읽을 수 있는 정밀도만 유지한다. */
+const DECIMALS = 1;
+/** 진행률은 분 단위 갱신으로도 충분하며 화면·배터리 노이즈를 만들지 않는다. */
+const TICK_MS = 60_000;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -60,7 +60,7 @@ function useTicker(): number {
   return now;
 }
 
-/** 복무 진행률 막대 + 실시간으로 흘러가는 퍼센트. */
+/** 복무 진행률 막대와 읽기 쉬운 퍼센트. */
 export function ServiceProgress(props: {
   enlistedAt: ISODate;
   dischargeAt: ISODate;

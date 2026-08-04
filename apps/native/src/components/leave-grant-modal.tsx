@@ -5,13 +5,12 @@ import {
   todayInSeoul,
   type BalanceKey,
 } from "@leave/shared";
+import { Picker } from "@expo/ui/community/picker";
 import { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -22,7 +21,9 @@ import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@/api/queries";
 import { Button } from "@/components/button";
 import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { SheetScaffold } from "@/components/sheet-scaffold";
+import { colors, spacing } from "@/theme";
 
 /**
  * 적립분 추가·수정 시트.
@@ -91,35 +92,29 @@ export function LeaveGrantModal(props: {
   };
 
   return (
-    <Modal
-      visible={props.visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={props.onClose}
+    <NativeBottomSheet
+      isPresented={props.visible}
+      snapPoints={[{ fraction: 0.82 }, "full"]}
+      onDismiss={props.onClose}
+      testID="leave-grant-sheet"
     >
       <KeyboardAvoidingView
         behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
         style={styles.sheet}
       >
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+        <SheetScaffold
+          title={editing ? "적립분 수정" : "적립분 추가"}
+          onClose={props.onClose}
+          closeTestID="leave-grant-close"
+          footer={
+            <Button
+              title={editing ? "적립분 수정" : "적립분 추가"}
+              loading={pending}
+              onPress={() => void submit()}
+              testID="leave-grant-submit"
+            />
+          }
         >
-          <View style={styles.header}>
-            <Text style={styles.title} selectable>
-              {editing ? "적립분 수정" : "적립분 추가"}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="닫기"
-              onPress={props.onClose}
-              style={styles.closeBtn}
-            >
-              <Text style={styles.closeText}>✕</Text>
-            </Pressable>
-          </View>
-
           <Field
             label="재원"
             hint={
@@ -128,32 +123,23 @@ export function LeaveGrantModal(props: {
                 : undefined
             }
           >
-            <View style={styles.chips}>
-              {BALANCE_KEYS.map((key) => {
-                const tone = BALANCE_COLORS[key];
-                const selected = key === balanceKey;
-                const disabled = Boolean(editing) || key === props.lockedKey;
-                return (
-                  <Pressable
-                    key={key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected, disabled }}
-                    disabled={disabled}
-                    onPress={() => setBalanceKey(key)}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: tone.bg },
-                      selected && styles.chipOn,
-                      disabled && !selected && styles.chipOff,
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: tone.fg }]}>
-                      {BALANCE_LABELS[key]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Picker
+              selectedValue={balanceKey}
+              enabled={!editing}
+              onValueChange={(value) => setBalanceKey(value as BalanceKey)}
+              style={styles.pickerHost}
+              testID="leave-grant-balance-picker"
+            >
+              {BALANCE_KEYS.filter(
+                (key) => key !== props.lockedKey || key === balanceKey,
+              ).map((key) => (
+                <Picker.Item
+                  key={key}
+                  value={key}
+                  label={BALANCE_LABELS[key]}
+                />
+              ))}
+            </Picker>
           </Field>
 
           <Field label="일수">
@@ -217,16 +203,9 @@ export function LeaveGrantModal(props: {
           )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Button
-            title={editing ? "수정" : "추가"}
-            loading={pending}
-            onPress={() => void submit()}
-          />
-          <Button title="취소" variant="ghost" onPress={props.onClose} />
-        </ScrollView>
+        </SheetScaffold>
       </KeyboardAvoidingView>
-    </Modal>
+    </NativeBottomSheet>
   );
 }
 
@@ -249,34 +228,8 @@ export function confirmGrantDelete(
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  title: { fontSize: 24, fontWeight: "800", color: colors.ink },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceCard,
-  },
-  closeText: { fontSize: 15, color: colors.body },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  chipOn: { borderColor: colors.ink },
-  chipOff: { opacity: 0.4 },
-  chipText: { fontSize: 13, fontWeight: "600" },
+  sheet: { flex: 1 },
+  pickerHost: { minHeight: 44 },
   switchRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
   hint: { fontSize: 12, color: colors.mute },

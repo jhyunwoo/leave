@@ -71,7 +71,6 @@ export const CalendarScroll = forwardRef<
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
   const monthEls = useRef(new Map<string, HTMLElement>());
   const topSentinel = useRef<HTMLDivElement>(null);
   const bottomSentinel = useRef<HTMLDivElement>(null);
@@ -83,8 +82,13 @@ export const CalendarScroll = forwardRef<
     const el = monthEls.current.get(month);
     const scroller = scrollRef.current;
     if (!el || !scroller) return;
-    const headerH = headerRef.current?.offsetHeight ?? 0;
-    scroller.scrollTo({ top: el.offsetTop - headerH - 8, behavior });
+    // offsetTop은 더 바깥 조상을 기준으로 잡힐 수 있다. 현재 스크롤 위치와
+    // 두 요소의 실제 화면 좌표 차이를 합쳐 컨테이너 내부 좌표로 환산한다.
+    const top =
+      scroller.scrollTop +
+      el.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top;
+    scroller.scrollTo({ top: Math.max(0, top), behavior });
   };
 
   // 최초 렌더에서 현재 달로 위치를 맞춘다.
@@ -147,7 +151,6 @@ export const CalendarScroll = forwardRef<
     <div className="cal-scroll-shell">
       <div
         className="cal-weekdays cal-weekdays-sticky"
-        ref={headerRef}
         role="row"
       >
         {WEEKDAYS.map((w, i) => (

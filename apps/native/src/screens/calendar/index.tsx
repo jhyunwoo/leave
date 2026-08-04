@@ -7,18 +7,9 @@ import {
   WEEKDAYS,
   type ISODate,
 } from "@leave/shared";
-import { BlurTargetView } from "expo-blur";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useCalendar,
@@ -28,18 +19,18 @@ import {
   useRegisterPushToken,
 } from "@/api/queries";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
+import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
 import {
   CalendarScroll,
   type CalendarScrollHandle,
 } from "@/components/calendar-scroll";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import {
-  ScreenHeader,
-  useScreenHeaderHeight,
-} from "@/components/screen-header";
+import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { SheetScaffold } from "@/components/sheet-scaffold";
 import { buildMyLeaveDayMap } from "@/lib/my-leave-days";
 import { getPushToken } from "@/lib/notifications";
-import { colors, radius, spacing } from "@/theme";
+import { colors, spacing } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
   CycleBanner,
@@ -49,6 +40,8 @@ import { DayPanel } from "./day-panel";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
+const UNIT_ROW_HEIGHT = 24;
+const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
 
 export function CalendarScreen() {
   const me = useMe();
@@ -62,7 +55,6 @@ export function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
-  const blurTargetRef = useRef<View>(null);
 
   const unit = me.data?.unit ?? null;
   const registerPush = useRegisterPushToken();
@@ -97,10 +89,9 @@ export function CalendarScreen() {
   }, [regularOvernight, today]);
   const hasBanner = Boolean(currentCycle || pendingFirstGrant);
 
-  const headerHeight = useScreenHeaderHeight({
-    subtitle: true,
-    belowHeight: WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0),
-  });
+  const glassStripHeight =
+    UNIT_ROW_HEIGHT + WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
+  const headerHeight = insets.top + NATIVE_HEADER_HEIGHT + glassStripHeight;
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
   const panelMonth = selectedDate
@@ -134,7 +125,10 @@ export function CalendarScreen() {
   if (me.isError || balances.isError) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
-        <View style={styles.emptyCard}>
+        {process.env.EXPO_OS === "web" && (
+          <Text style={styles.webTitle}>부대 달력</Text>
+        )}
+        <ContentPanel style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>불러오지 못했어요</Text>
           <Text style={styles.emptyBody}>
             서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해주세요.
@@ -146,7 +140,7 @@ export function CalendarScreen() {
               void balances.refetch();
             }}
           />
-        </View>
+        </ContentPanel>
       </View>
     );
   }
@@ -154,14 +148,17 @@ export function CalendarScreen() {
   if (!unit) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
-        <View style={styles.emptyCard}>
+        {process.env.EXPO_OS === "web" && (
+          <Text style={styles.webTitle}>부대 달력</Text>
+        )}
+        <ContentPanel style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>아직 소속 부대가 없어요</Text>
           <Text style={styles.emptyBody}>
             부대에 들어가면 부대원들의 휴가 달력이 열려요. 부대를 검색하거나
             새로 만들 수 있어요.
           </Text>
           <Button title="부대 찾기" onPress={() => router.push("/units")} />
-        </View>
+        </ContentPanel>
       </View>
     );
   }
@@ -195,7 +192,7 @@ export function CalendarScreen() {
   return (
     <>
       <View style={styles.root}>
-        <BlurTargetView ref={blurTargetRef} style={styles.calendarLayer}>
+        <View style={styles.calendarLayer}>
           <CalendarScroll
             ref={scrollRef}
             unitId={unit.id}
@@ -211,104 +208,91 @@ export function CalendarScreen() {
               setSelectedDate((cur) => (cur === d ? null : d));
             }}
           />
-        </BlurTargetView>
+        </View>
 
-        <ScreenHeader
-          title="부대 달력"
-          subtitle={unit.name}
-          blurTarget={blurTargetRef}
-          belowHeight={WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0)}
-          actions={
-            <>
-              <Button
-                title="오늘"
-                variant="ghost"
-                size="sm"
-                onPress={() => {
-                  setSelectedDate(today);
-                  scrollRef.current?.scrollToToday();
-                }}
-              />
-              <Button
-                title="휴가 등록"
-                size="sm"
-                onPress={() => openForm(selectedDate ?? today)}
-              />
-            </>
-          }
-          below={
-            <>
-              {currentCycle ? (
-                <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
-              ) : pendingFirstGrant ? (
-                <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
-              ) : null}
-              <View style={styles.weekRow}>
-                {WEEKDAYS.map((weekday, index) => (
-                  <Text
-                    key={weekday}
-                    style={[
-                      styles.weekday,
-                      index === 0 && { color: colors.negative },
-                    ]}
-                  >
-                    {weekday}
-                  </Text>
-                ))}
-              </View>
-            </>
-          }
-        />
+        <LiquidGlassSurface
+          style={[
+            styles.glassStrip,
+            {
+              top: insets.top + NATIVE_HEADER_HEIGHT,
+              height: glassStripHeight,
+            },
+          ]}
+        >
+          <Text style={styles.unitName} numberOfLines={1} selectable>
+            {unit.name}
+          </Text>
+          {currentCycle ? (
+            <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
+          ) : pendingFirstGrant ? (
+            <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
+          ) : null}
+          <View style={styles.weekRow}>
+            {WEEKDAYS.map((weekday, index) => (
+              <Text
+                key={weekday}
+                style={[
+                  styles.weekday,
+                  index === 0 && { color: colors.negative },
+                ]}
+              >
+                {weekday}
+              </Text>
+            ))}
+          </View>
+        </LiquidGlassSurface>
       </View>
 
-      {/* 선택 날짜 상세: 바텀시트 */}
-      <Modal
-        visible={selectedDate != null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedDate(null)}
-        // iOS에서만 온다. 시트가 완전히 닫힌 뒤라야 폼을 띄울 수 있다.
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          onPress={() => scrollRef.current?.scrollToToday()}
+        >
+          오늘
+        </Stack.Toolbar.Button>
+        <Stack.Toolbar.Button
+          icon="plus"
+          variant="prominent"
+          tintColor={colors.brand}
+          onPress={() => openForm(selectedDate ?? today)}
+        >
+          휴가 등록
+        </Stack.Toolbar.Button>
+      </Stack.Toolbar>
+
+      {/* 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
+      <NativeBottomSheet
+        isPresented={selectedDate != null}
+        snapPoints={["half", "full"]}
+        testID="calendar-day-sheet"
         onDismiss={() => {
+          setSelectedDate(null);
           const pending = pendingFormDate.current;
           if (!pending) return;
           pendingFormDate.current = null;
           setFormDate(pending);
         }}
       >
-        <Pressable
-          style={styles.sheetBackdrop}
-          onPress={() => setSelectedDate(null)}
+        <SheetScaffold
+          title="날짜 상세"
+          onClose={() => setSelectedDate(null)}
+          contentContainerStyle={styles.daySheetContent}
         >
-          <Pressable
-            style={[
-              styles.sheet,
-              { paddingBottom: insets.bottom + spacing.lg },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.sheetHandle} />
-            {selectedDate &&
-              (panelCalendar.data ? (
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  bounces={false}
-                >
-                  <DayPanel
-                    calendar={panelCalendar.data}
-                    date={selectedDate}
-                    myUserId={me.data?.user.id}
-                    cycle={cycleFor(regularOvernight, selectedDate)}
-                    onAddLeave={() => openForm(selectedDate)}
-                  />
-                </ScrollView>
-              ) : (
-                <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-                  <ActivityIndicator color={colors.ink} />
-                </View>
-              ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+          {selectedDate &&
+            (panelCalendar.data ? (
+              <DayPanel
+                calendar={panelCalendar.data}
+                date={selectedDate}
+                myUserId={me.data?.user.id}
+                cycle={cycleFor(regularOvernight, selectedDate)}
+                onAddLeave={() => openForm(selectedDate)}
+              />
+            ) : (
+              <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
+                <ActivityIndicator color={colors.ink} />
+              </View>
+            ))}
+        </SheetScaffold>
+      </NativeBottomSheet>
 
       {formDate && (
         <LeaveFormModal
@@ -331,6 +315,22 @@ const styles = StyleSheet.create({
     left: 0,
     backgroundColor: colors.canvas,
   },
+  glassStrip: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderRadius: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  unitName: {
+    height: UNIT_ROW_HEIGHT,
+    paddingHorizontal: spacing.lg,
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.body,
+  },
   center: {
     flex: 1,
     backgroundColor: colors.canvasSoft,
@@ -338,18 +338,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyCard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xxl,
     gap: spacing.lg,
     maxWidth: 420,
     width: "100%",
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderCurve: "continuous",
   },
   emptyTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   emptyBody: { fontSize: 15, lineHeight: 22, color: colors.body },
+  webTitle: {
+    position: "absolute",
+    top: 80,
+    left: spacing.lg,
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.ink,
+  },
   weekRow: {
     height: WEEK_ROW_HEIGHT,
     paddingHorizontal: spacing.lg,
@@ -364,26 +367,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.mute,
   },
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(17, 17, 17, 0.32)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: colors.canvas,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    maxHeight: "82%",
-    borderCurve: "continuous",
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.hairline,
-    marginBottom: spacing.md,
-  },
+  daySheetContent: { padding: 0, gap: 0 },
 });

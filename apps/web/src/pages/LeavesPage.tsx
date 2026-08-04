@@ -24,6 +24,14 @@ export function LeavesPage() {
       }),
       { remaining: 0, expiringSoon: 0, expired: 0 },
     );
+  const visibleBalances = (balances.data?.balances ?? []).filter(
+    (item) =>
+      item.totalDays > 0 ||
+      item.usedDays > 0 ||
+      item.remainingDays > 0 ||
+      item.expiringSoonDays > 0 ||
+      item.expiredDays > 0,
+  );
 
   return (
     <div
@@ -105,21 +113,13 @@ export function LeavesPage() {
         </Link>
       )}
 
-      {balances.data && (
+      {visibleBalances.length > 0 && (
         <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: "var(--sp-sm)",
-          }}
+          className="metric-strip"
           aria-label="휴가 잔여량"
         >
-          {balances.data.balances.map((item) => (
-            <div
-              key={item.key}
-              className="card-sage"
-              style={{ padding: "var(--sp-md)" }}
-            >
+          {visibleBalances.map((item) => (
+            <div key={item.key} className="metric-strip__item">
               <p className="caption text-mute">{item.label}</p>
               <p className="display-xs" style={{ marginTop: 2 }}>
                 {item.remainingDays}일
@@ -164,19 +164,17 @@ export function LeavesPage() {
         </div>
       ) : (
         <ul
+          className="content-panel"
           style={{
             listStyle: "none",
             margin: 0,
             padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--sp-md)",
           }}
         >
           {leaves.data.leaves.map((l) => (
             <li
               key={l.id}
-              className="card"
+              className="content-row"
               style={{
                 display: "flex",
                 justifyContent: "space-between",

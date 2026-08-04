@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Image,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,8 +11,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLogin } from "@/api/queries";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
-import { colors, radius, spacing } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 export function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -34,7 +34,7 @@ export function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
       style={styles.root}
     >
       <ScrollView
@@ -54,7 +54,7 @@ export function LoginScreen() {
           <Text style={styles.tagline}>부대 휴가, 겹치기 전에 미리 보기.</Text>
         </View>
 
-        <View style={styles.card}>
+        <ContentPanel style={styles.card}>
           <Text style={styles.cardTitle}>로그인</Text>
           <Field label="이메일">
             <Input
@@ -64,6 +64,7 @@ export function LoginScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
+              testID="login-email"
             />
           </Field>
           <Field label="비밀번호">
@@ -73,6 +74,7 @@ export function LoginScreen() {
               placeholder="••••••••"
               secureTextEntry
               autoComplete="current-password"
+              testID="login-password"
             />
           </Field>
           {error && <Text style={styles.error}>{error}</Text>}
@@ -81,6 +83,7 @@ export function LoginScreen() {
             onPress={() => void submit()}
             disabled={!email || !password}
             loading={login.isPending}
+            testID="login-submit"
           />
           <Text style={styles.footer}>
             처음이신가요?{" "}
@@ -88,7 +91,7 @@ export function LoginScreen() {
               가입하기
             </Link>
           </Text>
-        </View>
+        </ContentPanel>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -112,8 +115,6 @@ const styles = StyleSheet.create({
   },
   tagline: { fontSize: 17, color: colors.body },
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
     width: "100%",

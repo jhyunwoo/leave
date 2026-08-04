@@ -12,10 +12,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,8 +26,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_URL, getAuthToken } from "@/api/client";
 import { useSignup } from "@/api/queries";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
+import { NativeSegmentedControl } from "@/components/segmented-control";
+import { NativeCheckbox } from "@/components/native-checkbox";
 import { colors, radius, spacing } from "@/theme";
 
 const STEPS = ["계정", "군 정보", "프로필"] as const;
@@ -50,6 +53,15 @@ export function SignupScreen() {
 
   const signup = useSignup();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+
+  const goToStep = (nextStep: number) => {
+    Keyboard.dismiss();
+    setStep(nextStep);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  };
 
   const suggestDischarge = (b: Branch, enlisted: string) => {
     if (enlisted && !dischargeTouched) {
@@ -80,7 +92,7 @@ export function SignupScreen() {
       return;
     }
     setError(null);
-    setStep((s) => s + 1);
+    goToStep(step + 1);
   };
 
   const pickPhoto = async () => {
@@ -137,10 +149,11 @@ export function SignupScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
       style={styles.root}
     >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + spacing.xxl },
@@ -163,7 +176,7 @@ export function SignupScreen() {
           ))}
         </View>
 
-        <View style={styles.card}>
+        <ContentPanel style={styles.card}>
           {step === 0 && (
             <>
               <Field label="이메일">
@@ -173,6 +186,7 @@ export function SignupScreen() {
                   placeholder="you@example.com"
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  testID="signup-email"
                 />
               </Field>
               <Field label="비밀번호" hint="8자 이상">
@@ -180,6 +194,7 @@ export function SignupScreen() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
+                  testID="signup-password"
                 />
               </Field>
               <Field label="비밀번호 확인">
@@ -187,6 +202,7 @@ export function SignupScreen() {
                   value={passwordConfirm}
                   onChangeText={setPasswordConfirm}
                   secureTextEntry
+                  testID="signup-password-confirm"
                 />
               </Field>
               <Field label="이름">
@@ -194,6 +210,7 @@ export function SignupScreen() {
                   value={name}
                   onChangeText={setName}
                   placeholder="홍길동"
+                  testID="signup-name"
                 />
               </Field>
             </>
@@ -202,35 +219,21 @@ export function SignupScreen() {
           {step === 1 && (
             <>
               <Field label="군 종류">
-                <View style={styles.segment}>
-                  {BRANCHES.map((b) => (
-                    <Pressable
-                      key={b}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setBranch(b);
-                        suggestDischarge(b, enlistedAt);
-                      }}
-                      style={[
-                        styles.segmentBtn,
-                        branch === b && styles.segmentBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          branch === b && { color: colors.onPrimary },
-                        ]}
-                      >
-                        {BRANCH_LABELS[b]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <NativeSegmentedControl
+                  values={BRANCHES}
+                  labels={BRANCH_LABELS}
+                  value={branch}
+                  onValueChange={(next) => {
+                    setBranch(next);
+                    suggestDischarge(next, enlistedAt);
+                  }}
+                  testID="signup-branch"
+                />
               </Field>
               <DatePickerRow
                 label="입대일"
                 value={enlistedAt}
+                testID="signup-enlisted-at"
                 onChange={(d) => {
                   setEnlistedAt(d);
                   suggestDischarge(branch, d);
@@ -239,6 +242,7 @@ export function SignupScreen() {
               <DatePickerRow
                 label="전역 예정일"
                 value={dischargeAt}
+                testID="signup-discharge-at"
                 onChange={(d) => {
                   setDischargeAt(d);
                   setDischargeTouched(true);
@@ -248,28 +252,13 @@ export function SignupScreen() {
                 {`${BRANCH_LABELS[branch]} 복무기간 ${SERVICE_MONTHS[branch]}개월의 마지막 날로 전역일이 자동 입력돼요`}
               </Text>
               <Field label="현재 계급" hint="표준 진급일은 매월 1일이에요">
-                <View style={styles.segment}>
-                  {RANKS.map((r) => (
-                    <Pressable
-                      key={r}
-                      accessibilityRole="button"
-                      onPress={() => setRank(r)}
-                      style={[
-                        styles.segmentBtn,
-                        rank === r && styles.segmentBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          rank === r && { color: colors.onPrimary },
-                        ]}
-                      >
-                        {RANK_LABELS[r]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <NativeSegmentedControl
+                  values={RANKS}
+                  labels={RANK_LABELS}
+                  value={rank}
+                  onValueChange={setRank}
+                  testID="signup-rank"
+                />
               </Field>
             </>
           )}
@@ -304,23 +293,12 @@ export function SignupScreen() {
               </View>
 
               {/* 개인정보 수집·이용 동의 (접속 기록·푸시 로그) */}
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: dataConsent }}
-                onPress={() => setDataConsent((v) => !v)}
-                style={styles.consentRow}
-              >
-                <View
-                  style={[styles.checkbox, dataConsent && styles.checkboxOn]}
-                >
-                  {dataConsent && <Text style={styles.checkboxMark}>✓</Text>}
-                </View>
-                <Text style={styles.consentText}>
-                  서비스 운영·보안을 위해 접속 기록(접속 시각·기기 플랫폼·앱
-                  버전 등)과 이 앱의 푸시 알림 발송·수신 기록을 수집·이용하는 데
-                  동의합니다. 수집된 내 기록은 앱에서 언제든 열람할 수 있습니다.
-                </Text>
-              </Pressable>
+              <NativeCheckbox
+                value={dataConsent}
+                onValueChange={setDataConsent}
+                label="서비스 운영·보안을 위해 접속 기록과 푸시 알림 발송·수신 기록을 수집·이용하는 데 동의합니다. 수집된 내 기록은 앱에서 언제든 열람할 수 있습니다."
+                testID="signup-data-consent"
+              />
             </View>
           )}
 
@@ -333,9 +311,10 @@ export function SignupScreen() {
                 variant="secondary"
                 onPress={() => {
                   setError(null);
-                  setStep((s) => s - 1);
+                  goToStep(step - 1);
                 }}
                 style={{ flex: 1 }}
+                testID="signup-previous"
               />
             )}
             <Button
@@ -346,6 +325,7 @@ export function SignupScreen() {
               loading={signup.isPending}
               disabled={step === 2 && !dataConsent}
               style={{ flex: 2 }}
+              testID="signup-next"
             />
           </View>
 
@@ -355,7 +335,7 @@ export function SignupScreen() {
               로그인
             </Link>
           </Text>
-        </View>
+        </ContentPanel>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -374,37 +354,29 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: "center",
   },
-  steps: { flexDirection: "row", justifyContent: "center", gap: spacing.sm },
-  stepPill: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+  steps: {
+    flexDirection: "row",
+    alignSelf: "center",
+    padding: spacing.xs,
     borderRadius: radius.pill,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.surfaceCard,
   },
-  stepPillActive: { backgroundColor: colors.primary },
+  stepPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: "transparent",
+  },
+  stepPillActive: { backgroundColor: colors.canvas },
   stepText: { fontSize: 12, fontWeight: "600", color: colors.mute },
-  stepTextActive: { color: colors.onPrimary },
+  stepTextActive: { color: colors.ink },
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
     width: "100%",
     maxWidth: 480,
     alignSelf: "center",
   },
-  segment: { flexDirection: "row", gap: spacing.sm },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.xl,
-    backgroundColor: colors.canvasSoft,
-    alignItems: "center",
-    minHeight: 38,
-    justifyContent: "center",
-  },
-  segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { fontSize: 14, fontWeight: "600", color: colors.ink },
   hint: { fontSize: 12, color: colors.mute },
   photoCircle: {
     width: 112,
@@ -429,25 +401,6 @@ const styles = StyleSheet.create({
   },
   summaryName: { fontSize: 15, fontWeight: "600", color: colors.ink },
   summaryDetail: { fontSize: 12, color: colors.body },
-  consentRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    alignSelf: "stretch",
-    alignItems: "flex-start",
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.sm,
-    borderWidth: 2,
-    borderColor: colors.mute,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 1,
-  },
-  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxMark: { color: colors.onPrimary, fontSize: 14, fontWeight: "600" },
-  consentText: { flex: 1, fontSize: 12, color: colors.body, lineHeight: 18 },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   actions: { flexDirection: "row", gap: spacing.md },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },

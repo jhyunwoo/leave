@@ -2,9 +2,7 @@ import type { PushEventInput } from "@leave/shared";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
 import { api } from "../api/client";
-import { colors } from "../theme";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -21,14 +19,14 @@ Notifications.setNotificationHandler({
  */
 export async function getPushToken(): Promise<string | null> {
   try {
-    if (Platform.OS === "web" || !Device.isDevice) return null;
+    if (process.env.EXPO_OS === "web" || !Device.isDevice) return null;
 
-    if (Platform.OS === "android") {
+    if (process.env.EXPO_OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "기본 알림",
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: colors.primary,
+        lightColor: "#9fe870",
       });
     }
 

@@ -1,5 +1,6 @@
 import {
   addDays,
+  BALANCE_KEYS,
   BALANCE_LABELS,
   balanceKeyToCategory,
   checkRegularOvernight,
@@ -18,6 +19,7 @@ import {
   segmentsToDrafts,
   setDraftEnd,
   splitLastDraft,
+  todayInSeoul,
   type BalanceKey,
   type LeaveCreateInput,
   type SegmentDraft,
@@ -27,9 +29,6 @@ import { useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -43,9 +42,11 @@ import {
   useUpdateLeave,
 } from "@/api/queries";
 import { Button } from "./button";
-import { DatePickerRow } from "./date-picker";
+import { DateRangePicker } from "./date-picker";
 import { Field, Input } from "./field";
 import { SegmentRow } from "./segment-row";
+import { NativeBottomSheet } from "./native-bottom-sheet";
+import { SheetScaffold } from "./sheet-scaffold";
 import { colors, radius, spacing } from "@/theme";
 
 export function LeaveFormModal(props: {
@@ -55,25 +56,22 @@ export function LeaveFormModal(props: {
   onClose: () => void;
 }) {
   const editing = props.editing ?? null;
+  const initialStartDate =
+    editing?.startDate ?? props.initialDate ?? todayInSeoul();
+  const initialEndDate =
+    editing?.endDate ?? props.initialDate ?? initialStartDate;
   const balances = useLeaveBalances();
   const me = useMe();
   const myLeaves = useMyLeaves();
   const [title, setTitle] = useState(editing?.title ?? "");
-  const [startDate, setStartDate] = useState(
-    editing?.startDate ?? props.initialDate ?? "",
-  );
-  const [endDate, setEndDate] = useState(
-    editing?.endDate ?? props.initialDate ?? "",
-  );
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
   const [reason, setReason] = useState(editing?.reason ?? "");
   const [drafts, setDrafts] = useState<SegmentDraft[]>(() =>
     editing?.segments.length
       ? segmentsToDrafts(editing.segments)
-      : fitDrafts(
-          [],
-          editing?.startDate ?? props.initialDate ?? "",
-          editing?.endDate ?? props.initialDate ?? "",
-        ),
+      : fitDrafts([], initialStartDate, initialEndDate),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -177,14 +175,35 @@ export function LeaveFormModal(props: {
   const overused = [...availableByKey.entries()].filter(
     ([, remaining]) => remaining < 0,
   );
-  const canSubmit =
-    validRange &&
-    drafts.length > 0 &&
-    !overused.length &&
-    !regularBlock &&
-    title.trim().length > 0;
+  const balanceBlockMessage = [
+    ...overused.map(
+      ([key, remaining]) =>
+        `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
+    ),
+    ...(regularBlock ? [regularOvernightBlockMessage(regularBlock)] : []),
+  ].join(", ");
+  const submitBlocker = !title.trim()
+    ? "휴가 제목을 입력해주세요."
+    : !validRange
+      ? "시작일과 종료일을 확인해주세요."
+      : drafts.length === 0
+        ? "휴가 종류를 선택해주세요."
+        : balanceBlockMessage || null;
+  const lastDraft = resolved[resolved.length - 1];
+  const splitAvailable = lastDraft
+    ? rowAvailable(lastDraft.startDate, lastDraft.endDate)
+    : null;
+  const suggestedSplitKey =
+    lastDraft && splitAvailable && lastDraft.days > 1
+      ? BALANCE_KEYS.find(
+          (key) => key !== lastDraft.key && (splitAvailable.get(key) ?? 0) >= 1,
+        )
+      : undefined;
 
   const submit = async () => {
+    setTitleTouched(true);
+    if (submitBlocker) return;
+
     const input: LeaveCreateInput = {
       title: title.trim(),
       segments: draftsToSegments(startDate, drafts),
@@ -216,64 +235,80 @@ export function LeaveFormModal(props: {
   };
 
   return (
-    <Modal
-      visible={props.visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={props.onClose}
+    <NativeBottomSheet
+      isPresented={props.visible}
+      snapPoints={[{ fraction: 0.92 }, "full"]}
+      onDismiss={props.onClose}
+      testID="leave-form-sheet"
     >
       <KeyboardAvoidingView
         behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
         style={styles.sheet}
       >
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+        <SheetScaffold
+          title={editing ? "휴가 수정" : "휴가 등록"}
+          onClose={props.onClose}
+          closeTestID="leave-form-close"
+          footer={
+            <View style={styles.footerActions}>
+              <Text
+                style={[
+                  styles.footerHint,
+                  submitBlocker && styles.footerHintBlocked,
+                ]}
+                accessibilityLiveRegion="polite"
+              >
+                {submitBlocker ??
+                  `${fmtDateShort(startDate)}부터 ${fmtDateShort(endDate)}까지 · ${duration}일`}
+              </Text>
+              <Button
+                title={
+                  pending ? "저장 중…" : editing ? "변경사항 저장" : "휴가 등록"
+                }
+                onPress={() => void submit()}
+                loading={pending}
+                testID="leave-form-submit"
+              />
+            </View>
+          }
         >
-          <View style={styles.header}>
-            <Text style={styles.title} selectable>
-              {editing ? "휴가 수정" : "휴가 등록"}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="닫기"
-              onPress={props.onClose}
-              style={styles.closeBtn}
-            >
-              <Text style={styles.closeText}>✕</Text>
-            </Pressable>
-          </View>
-
-          <Field label="휴가 제목">
+          <Field
+            label="휴가 제목"
+            error={
+              titleTouched && !title.trim()
+                ? "어떤 휴가인지 알아볼 수 있는 제목을 입력해주세요."
+                : null
+            }
+          >
             <Input
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(value) => {
+                setTitle(value);
+                if (error) setError(null);
+              }}
+              onBlur={() => setTitleTouched(true)}
               placeholder="예: 제주도 가족여행"
+              returnKeyType="done"
+              accessibilityLabel="휴가 제목"
+              testID="leave-title-input"
             />
           </Field>
-          <DatePickerRow
-            label="시작일"
-            value={startDate}
-            onChange={(date) =>
-              applyRange(date, !endDate || endDate < date ? date : endDate)
-            }
-          />
-          <DatePickerRow
-            label="종료일"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(date) => applyRange(startDate, date)}
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={applyRange}
+            testID="leave-date-range"
           />
 
           <View style={styles.segmentCard}>
             <View style={styles.segmentHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.segmentTitle} selectable>
-                  휴가 구간
+                  휴가 종류
                 </Text>
                 <Text style={styles.segmentHint} selectable>
-                  언제부터 언제까지가 어떤 휴가인지 나눠서 지정해요.
+                  기본은 기간 전체에 한 종류를 사용해요. 여러 종류를 이어서
+                  사용한다면 구간을 나눌 수 있어요.
                 </Text>
               </View>
               <Text style={styles.segmentTotal} selectable>
@@ -323,40 +358,50 @@ export function LeaveFormModal(props: {
               </Text>
             )}
 
-            {validRange && (
-              <Button
-                title="구간 추가"
-                variant="secondary"
-                size="sm"
-                disabled={duration <= drafts.length}
-                onPress={() =>
-                  setDrafts((current) => {
-                    const next = splitLastDraft(
-                      current,
-                      startDate,
-                      endDate,
-                      "regular_overnight",
-                    );
-                    return next ?? current;
-                  })
-                }
-              />
-            )}
+            {validRange && duration > drafts.length && suggestedSplitKey ? (
+              <View style={styles.splitActions}>
+                <Button
+                  title="다른 휴가 종류 이어 쓰기"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() =>
+                    setDrafts((current) => {
+                      const next = splitLastDraft(
+                        current,
+                        startDate,
+                        endDate,
+                        suggestedSplitKey,
+                      );
+                      // 새 종류는 1일부터 시작한다. 잔여가 적어도 추가할 수 있고,
+                      // 사용자는 앞 구간의 마지막 날을 바꿔 원하는 만큼 늘릴 수 있다.
+                      return next
+                        ? setDraftEnd(
+                            next,
+                            next.length - 2,
+                            addDays(endDate, -1),
+                            startDate,
+                            endDate,
+                          )
+                        : current;
+                    })
+                  }
+                />
+                <Text style={styles.splitHint} selectable>
+                  추가한 뒤 각 종류의 마지막 날을 조정할 수 있어요.
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {(overused.length > 0 || regularBlock) && (
-            <Text selectable style={styles.error}>
-              {[
-                ...overused.map(
-                  ([key, remaining]) =>
-                    `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
-                ),
-                ...(regularBlock
-                  ? [regularOvernightBlockMessage(regularBlock)]
-                  : []),
-              ].join(", ")}
+          {balanceBlockMessage ? (
+            <Text
+              selectable
+              style={styles.error}
+              accessibilityLiveRegion="assertive"
+            >
+              {balanceBlockMessage}
             </Text>
-          )}
+          ) : null}
 
           <Field label="사유 (선택)">
             <Input
@@ -370,47 +415,32 @@ export function LeaveFormModal(props: {
           </Field>
 
           {error && (
-            <Text selectable style={styles.error}>
+            <Text
+              selectable
+              style={styles.error}
+              accessibilityLiveRegion="assertive"
+            >
               {error}
             </Text>
           )}
-
-          <Button
-            title={
-              pending ? "저장 중…" : editing ? "변경사항 저장" : "휴가 등록"
-            }
-            onPress={() => void submit()}
-            loading={pending}
-            disabled={!canSubmit}
-          />
-        </ScrollView>
+        </SheetScaffold>
       </KeyboardAvoidingView>
-    </Modal>
+    </NativeBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: colors.canvas },
-  content: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-    paddingBottom: spacing.xxxl,
+  sheet: { flex: 1 },
+  footerActions: { width: "100%", gap: spacing.sm },
+  footerHint: {
+    minHeight: 17,
+    paddingHorizontal: spacing.xs,
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.positiveDeep,
+    textAlign: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  title: { fontSize: 24, fontWeight: "600", color: colors.ink },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    backgroundColor: colors.canvasSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeText: { fontSize: 15, color: colors.ink },
+  footerHintBlocked: { color: colors.body },
   segmentCard: {
     backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,
@@ -431,5 +461,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontVariant: ["tabular-nums"],
   },
+  splitActions: { gap: spacing.xs, paddingTop: spacing.xs },
+  splitHint: { fontSize: 11, color: colors.mute, textAlign: "center" },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
 });

@@ -7,7 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { colors } from "@/theme";
 
 type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
 
@@ -19,41 +19,45 @@ export function Button(props: {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  systemImage?: string;
+  testID?: string;
 }) {
   const variant = props.variant ?? "primary";
   const size = props.size ?? "md";
-  const disabled = props.disabled || props.loading;
+  const disabled = Boolean(props.disabled || props.loading);
+  const foreground =
+    variant === "primary"
+      ? colors.onPrimary
+      : variant === "danger"
+        ? colors.negative
+        : variant === "ghost"
+          ? colors.brand
+          : colors.ink;
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled, busy: props.loading }}
       disabled={disabled}
       onPress={props.onPress}
+      testID={props.testID}
       style={({ pressed }) => [
-        styles.base,
-        styles[variant],
+        styles.button,
         size === "sm" && styles.sm,
-        pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
-        disabled && { opacity: 0.45 },
+        variant === "primary" && styles.primary,
+        variant === "secondary" && styles.secondary,
+        variant === "tertiary" && styles.tertiary,
+        variant === "danger" && styles.danger,
+        variant === "ghost" && styles.ghost,
+        pressed && styles.pressed,
+        disabled && styles.disabled,
         props.style,
       ]}
     >
       {props.loading ? (
-        <ActivityIndicator
-          color={variant === "primary" ? colors.onPrimary : colors.ink}
-        />
+        <ActivityIndicator color={foreground} size="small" />
       ) : typeof props.title === "string" ? (
-        <Text
-          style={[
-            styles.label,
-            size === "sm" && styles.labelSm,
-            variant === "primary" && { color: colors.onPrimary },
-            variant === "danger" && { color: colors.negativeDeep },
-            variant === "ghost" && { color: colors.brand, fontWeight: "700" },
-          ]}
-        >
-          {props.title}
-        </Text>
+        <Text style={[styles.label, { color: foreground }]}>{props.title}</Text>
       ) : (
         props.title
       )}
@@ -62,44 +66,29 @@ export function Button(props: {
 }
 
 const styles = StyleSheet.create({
-  base: {
-    flexDirection: "row",
+  button: {
+    minHeight: 48,
+    minWidth: 44,
+    paddingHorizontal: 20,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.xl,
-    minHeight: 48,
-    borderCurve: "continuous",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "transparent",
   },
-  sm: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    minHeight: 42,
-  },
+  sm: { minHeight: 42, paddingHorizontal: 16 },
   primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.canvas,
-    borderWidth: 1,
     borderColor: colors.hairline,
   },
-  tertiary: {
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
-    borderColor: colors.ink,
-  },
+  tertiary: { backgroundColor: colors.primaryPale },
   danger: {
     backgroundColor: colors.canvas,
-    borderWidth: 1,
     borderColor: colors.negative,
   },
-  /** 배경·테두리 없는 텍스트 버튼. 헤더의 보조 액션("오늘")용. */
-  ghost: { backgroundColor: "transparent", paddingHorizontal: spacing.sm },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.ink,
-  },
-  labelSm: { fontSize: 14 },
+  ghost: { backgroundColor: "transparent" },
+  pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.45 },
+  label: { fontSize: 15, fontWeight: "700" },
 });

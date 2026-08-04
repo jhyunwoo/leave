@@ -11,33 +11,36 @@ env:
 - tapOn: "가입하기"
 
 # 1단계: 계정
-- tapOn: "you@example.com"
+- tapOn:
+    id: "signup-email"
 - inputRandomEmail
 - tapOn:
-    below: "비밀번호"
-    index: 0
+    id: "signup-password"
 - inputText: ${PASSWORD}
 - tapOn:
-    below: "비밀번호 확인"
+    id: "signup-password-confirm"
 - inputText: ${PASSWORD}
 - tapOn:
-    below: "이름"
+    id: "signup-name"
 - inputText: "이순신"
-- tapOn: "다음"
+- tapOn:
+    id: "signup-next"
 
 # 2단계: 군 정보 (기본값 육군/이병 사용, 날짜는 환경에 맞게 조정)
 - assertVisible: "입대일"
 # TODO: DatePicker 조작 — 기기별로 상이. 예시:
 # - tapOn: "입대일"
 # - ... (날짜 선택) ...
-- tapOn: "다음"
+- tapOn:
+    id: "signup-next"
 
 # 3단계: 동의 후 가입
 - assertVisible:
     text: "동의합니다"
 - tapOn:
-    text: ".*수집·이용하는 데.*동의합니다.*"  # 동의 체크박스 영역
-- tapOn: "가입 완료"
+    id: "signup-data-consent"
+- tapOn:
+    id: "signup-next"
 
 # 가입 성공 시 탭 화면(부대/달력 등)으로 진입
 - assertVisible: "부대"

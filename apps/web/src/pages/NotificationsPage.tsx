@@ -76,19 +76,17 @@ export function NotificationsPage() {
         </div>
       ) : (
         <ul
+          className="content-panel"
           style={{
             listStyle: "none",
             margin: 0,
             padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--sp-md)",
           }}
         >
           {list.data.notifications.map((n) => (
             <li
               key={n.id}
-              className="card"
+              className="content-row"
               style={{
                 display: "flex",
                 gap: "var(--sp-md)",

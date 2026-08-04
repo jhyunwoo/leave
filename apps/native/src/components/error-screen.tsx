@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Button } from "@/components/button";
 import type { FatalErrorRecord } from "@/lib/fatal-error";
 import { colors, radius, spacing } from "@/theme";
 
@@ -39,13 +40,12 @@ export function ErrorScreen(props: {
           ) : null}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          title={props.actionLabel}
           style={styles.button}
           onPress={props.onAction}
-        >
-          <Text style={styles.buttonLabel}>{props.actionLabel}</Text>
-        </Pressable>
+          testID="error-retry"
+        />
       </ScrollView>
     </View>
   );
@@ -72,11 +72,5 @@ const styles = StyleSheet.create({
   detailStack: { fontSize: 11, lineHeight: 16, color: colors.mute },
   button: {
     alignSelf: "flex-start",
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    borderCurve: "continuous",
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
   },
-  buttonLabel: { fontSize: 15, fontWeight: "600", color: colors.onPrimary },
 });

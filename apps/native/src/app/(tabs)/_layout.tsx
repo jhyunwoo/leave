@@ -10,8 +10,13 @@ export default function TabLayout() {
   const unread = notifications.data?.unreadCount ?? 0;
 
   return (
-    <NativeTabs tintColor={colors.brand}>
-      <NativeTabs.Trigger name="index">
+    <NativeTabs
+      tintColor={colors.brand}
+      minimizeBehavior={
+        process.env.EXPO_OS === "ios" ? "onScrollDown" : undefined
+      }
+    >
+      <NativeTabs.Trigger name="(calendar)">
         <NativeTabs.Trigger.Label>달력</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "calendar", selected: "calendar" }}

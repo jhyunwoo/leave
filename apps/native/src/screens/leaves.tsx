@@ -4,7 +4,7 @@ import {
   fmtRangeTiny,
   segmentBalanceKey,
 } from "@leave/shared";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,13 +17,10 @@ import {
 } from "react-native";
 import type { MyLeave } from "@/api/queries";
 import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@/api/queries";
-import { Button } from "@/components/button";
+import { ActionMenu } from "@/components/action-menu";
+import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import {
-  ScreenHeader,
-  useScreenHeaderHeight,
-} from "@/components/screen-header";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { BALANCE_COLORS, colors, layout, radius, spacing } from "@/theme";
 
 export function LeavesScreen() {
   const leaves = useMyLeaves();
@@ -31,7 +28,6 @@ export function LeavesScreen() {
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
-  const headerHeight = useScreenHeaderHeight({ subtitle: true });
   const router = useRouter();
 
   // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫(upcomingDays)까지
@@ -46,6 +42,13 @@ export function LeavesScreen() {
       expired: sum.expired + item.expiredDays,
     }),
     { remaining: 0, expiringSoon: 0, expired: 0 },
+  );
+  const visibleBalances = (balances.data?.balances ?? []).filter(
+    (item) =>
+      item.totalDays > 0 ||
+      item.usedDays > 0 ||
+      item.remainingDays > 0 ||
+      item.expiredDays > 0,
   );
 
   const confirmDelete = (leave: MyLeave) => {
@@ -63,8 +66,12 @@ export function LeavesScreen() {
     <>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight }]}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
       >
+        {process.env.EXPO_OS === "web" && (
+          <Text style={styles.webTitle}>내 휴가</Text>
+        )}
         {balances.data ? (
           <>
             <Pressable
@@ -96,31 +103,42 @@ export function LeavesScreen() {
                   </Text>
                 )}
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Text style={styles.detailLink}>자세히</Text>
             </Pressable>
 
-            <View style={styles.balanceGrid}>
-              {balances.data.balances.map((item) => (
-                <View key={item.key} style={styles.balanceCard}>
-                  <Text style={styles.balanceLabel} selectable>
-                    {item.label}
-                  </Text>
+            <ContentPanel style={styles.balancePanel}>
+              <Text style={styles.sectionTitle} selectable>
+                휴가 재원
+              </Text>
+              {visibleBalances.map((item, index) => (
+                <View
+                  key={item.key}
+                  style={[styles.balanceRow, index > 0 && styles.rowDivider]}
+                >
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.balanceLabel} selectable>
+                      {item.label}
+                    </Text>
+                    {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
+                    <Text style={styles.balanceMeta} selectable>
+                      {item.cycleScoped ? "이번 주기 · " : ""}총{" "}
+                      {item.totalDays}일 · 사용 {item.usedDays}일
+                      {item.expiredDays > 0
+                        ? ` · 만료 ${item.expiredDays}일`
+                        : ""}
+                    </Text>
+                  </View>
                   <Text style={styles.balanceValue} selectable>
                     {item.remainingDays}일
                   </Text>
-                  {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
-                  <Text style={styles.balanceMeta} selectable>
-                    {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} ·
-                    사용 {item.usedDays}
-                  </Text>
-                  {item.expiredDays > 0 ? (
-                    <Text style={styles.balanceExpired} selectable>
-                      만료 {item.expiredDays}일
-                    </Text>
-                  ) : null}
                 </View>
               ))}
-            </View>
+              {visibleBalances.length < balances.data.balances.length && (
+                <Text style={styles.balanceHint} selectable>
+                  잔여가 없는 재원은 보유 휴가 상세에서 추가할 수 있어요.
+                </Text>
+              )}
+            </ContentPanel>
           </>
         ) : null}
 
@@ -129,75 +147,85 @@ export function LeavesScreen() {
             <ActivityIndicator color={colors.ink} />
           </View>
         ) : !leaves.data || leaves.data.leaves.length === 0 ? (
-          <View style={styles.empty}>
+          <ContentPanel style={styles.empty}>
             <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
             <Text style={styles.emptyCaption}>
               휴가를 등록하면 부대 달력에 함께 표시돼요.
             </Text>
-          </View>
+          </ContentPanel>
         ) : (
-          leaves.data.leaves.map((l) => (
-            <View key={l.id} style={styles.leaveCard}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.leaveTitle}>{l.title}</Text>
-                <Text style={styles.leaveDates}>
-                  {fmtRange(l.startDate, l.endDate)}
-                </Text>
-                {l.reason ? (
-                  <Text style={styles.leaveReason}>{l.reason}</Text>
-                ) : null}
-                <View style={styles.segmentBadges}>
-                  {l.segments.map((segment) => {
-                    const key = segmentBalanceKey(segment);
-                    const tone = BALANCE_COLORS[key];
-                    return (
-                      <View
-                        key={`${key}-${segment.startDate}`}
-                        style={[styles.badge, { backgroundColor: tone.bg }]}
-                      >
-                        <Text
-                          style={[styles.badgeText, { color: tone.fg }]}
-                          selectable
+          <ContentPanel style={styles.leaveList}>
+            {leaves.data.leaves.map((l, index) => (
+              <View
+                key={l.id}
+                style={[styles.leaveRow, index > 0 && styles.rowDivider]}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.leaveTitle}>{l.title}</Text>
+                  <Text style={styles.leaveDates}>
+                    {fmtRange(l.startDate, l.endDate)}
+                  </Text>
+                  {l.reason ? (
+                    <Text style={styles.leaveReason}>{l.reason}</Text>
+                  ) : null}
+                  <View style={styles.segmentBadges}>
+                    {l.segments.map((segment) => {
+                      const key = segmentBalanceKey(segment);
+                      const tone = BALANCE_COLORS[key];
+                      return (
+                        <View
+                          key={`${key}-${segment.startDate}`}
+                          style={[styles.badge, { backgroundColor: tone.bg }]}
                         >
-                          {BALANCE_LABELS[key]}{" "}
-                          {fmtRangeTiny(segment.startDate, segment.endDate)}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                          <Text
+                            style={[styles.badgeText, { color: tone.fg }]}
+                            selectable
+                          >
+                            {BALANCE_LABELS[key]}{" "}
+                            {fmtRangeTiny(segment.startDate, segment.endDate)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
-              <View style={styles.actions}>
-                <Button
-                  title="수정"
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => setEditing(l)}
+                <ActionMenu
+                  label={`${l.title} 작업`}
+                  buttonLabel="휴가 관리"
+                  testID={`leave-actions-${l.id}`}
+                  actions={[
+                    {
+                      id: "edit",
+                      title: "수정",
+                      systemImage: "pencil",
+                      onPress: () => setEditing(l),
+                    },
+                    {
+                      id: "delete",
+                      title: "삭제",
+                      systemImage: "trash",
+                      destructive: true,
+                      disabled: del.isPending,
+                      onPress: () => confirmDelete(l),
+                    },
+                  ]}
                 />
-                <Button
-                  title="삭제"
-                  variant="danger"
-                  size="sm"
-                  disabled={del.isPending}
-                  onPress={() => confirmDelete(l)}
-                />
               </View>
-            </View>
-          ))
+            ))}
+          </ContentPanel>
         )}
       </ScrollView>
 
-      <ScreenHeader
-        title="내 휴가"
-        subtitle="등록한 휴가를 고치거나 지울 수 있어요."
-        actions={
-          <Button
-            title="휴가 등록"
-            size="sm"
-            onPress={() => setCreating(true)}
-          />
-        }
-      />
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="plus"
+          variant="prominent"
+          tintColor={colors.brand}
+          onPress={() => setCreating(true)}
+        >
+          등록
+        </Stack.Toolbar.Button>
+      </Stack.Toolbar>
 
       {(creating || editing) && (
         <LeaveFormModal
@@ -215,40 +243,54 @@ export function LeavesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
-  balanceGrid: {
+  content: {
+    width: "100%",
+    maxWidth: layout.readableContent,
+    alignSelf: "center",
+    padding: spacing.lg,
+    paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: 120,
+  },
+  webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
+  balancePanel: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.ink,
+    paddingBottom: spacing.sm,
+  },
+  balanceRow: {
+    minHeight: 58,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
+    alignItems: "center",
+    gap: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  balanceCard: {
-    width: "31%",
-    minWidth: 96,
-    backgroundColor: colors.primaryPale,
-    borderRadius: radius.lg,
-    borderCurve: "continuous",
-    padding: spacing.md,
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
   },
-  balanceLabel: { fontSize: 11, color: colors.mute },
+  balanceLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
   balanceValue: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "800",
     color: colors.ink,
     fontVariant: ["tabular-nums"],
-    paddingTop: 2,
   },
-  balanceMeta: { fontSize: 10, color: colors.mute, paddingTop: 2 },
-  balanceExpired: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.negativeDeep,
-    paddingTop: 2,
+  balanceMeta: { fontSize: 11, color: colors.mute, paddingTop: 2 },
+  balanceHint: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    paddingTop: spacing.md,
+    fontSize: 11,
+    color: colors.mute,
   },
   holdingsCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,
     borderCurve: "continuous",
     padding: spacing.xl,
@@ -273,27 +315,20 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   holdingsHint: { fontSize: 12, color: colors.mute, paddingTop: 2 },
-  chevron: { fontSize: 28, color: colors.mute, lineHeight: 30 },
+  detailLink: { fontSize: 13, fontWeight: "700", color: colors.brand },
   empty: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xxxl,
     alignItems: "center",
     gap: spacing.sm,
-    borderWidth: 0,
-    borderCurve: "continuous",
   },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   emptyCaption: { fontSize: 13, color: colors.body },
-  leaveCard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
+  leaveList: { paddingHorizontal: spacing.xl },
+  leaveRow: {
+    paddingVertical: spacing.xl,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.lg,
-    borderWidth: 0,
-    borderCurve: "continuous",
   },
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
@@ -310,5 +345,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   badgeText: { fontSize: 11, fontWeight: "600" },
-  actions: { gap: spacing.sm },
 });

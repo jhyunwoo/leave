@@ -7,10 +7,10 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, type ColorValue } from "react-native";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
-/** 배너 한 줄의 높이. ScreenHeader가 헤더 높이를 계산할 때 쓴다. */
+/** 네이티브 헤더 아래 글래스 스트립이 높이를 계산할 때 쓰는 배너 높이. */
 export const CYCLE_BANNER_HEIGHT = 30;
 
 /**
@@ -30,7 +30,7 @@ export function CycleBanner(props: {
 
   return (
     <BannerLine
-      background={
+      accent={
         urgent ? colors.warning : remaining > 0 ? tone.bg : colors.surfaceCard
       }
       color={
@@ -52,7 +52,7 @@ export function CycleBanner(props: {
 export function FirstGrantBanner(props: { firstGrantDate: ISODate }) {
   const daysLeft = Math.max(diffDays(todayInSeoul(), props.firstGrantDate), 0);
   return (
-    <BannerLine background={colors.surfaceCard} color={colors.mute}>
+    <BannerLine accent={colors.surfaceStrong} color={colors.mute}>
       정기외박 첫 적립 {fmtDateTiny(props.firstGrantDate)} · D-{daysLeft} ·
       그전에는 쓸 수 없어요
     </BannerLine>
@@ -60,12 +60,13 @@ export function FirstGrantBanner(props: { firstGrantDate: ISODate }) {
 }
 
 function BannerLine(props: {
-  background: string;
-  color: string;
+  accent: ColorValue;
+  color: ColorValue;
   children: ReactNode;
 }) {
   return (
-    <View style={[styles.root, { backgroundColor: props.background }]}>
+    <View style={styles.root}>
+      <View style={[styles.dot, { backgroundColor: props.accent }]} />
       <Text style={[styles.text, { color: props.color }]} numberOfLines={1}>
         {props.children}
       </Text>
@@ -78,10 +79,11 @@ const styles = StyleSheet.create({
     height: CYCLE_BANNER_HEIGHT - spacing.xs,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xs,
-    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
+    flexDirection: "row",
+    gap: spacing.sm,
     alignItems: "center",
-    justifyContent: "center",
   },
-  text: { fontSize: 11, fontWeight: "600" },
+  dot: { width: 6, height: 6, borderRadius: radius.pill },
+  text: { flex: 1, fontSize: 11, fontWeight: "600" },
 });

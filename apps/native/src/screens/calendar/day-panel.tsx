@@ -14,6 +14,7 @@ import type { Calendar } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
 export function DayPanel(props: {
@@ -67,10 +68,10 @@ export function DayPanel(props: {
       )}
 
       {dayLeaves.length === 0 ? (
-        <View style={styles.empty}>
+        <ContentPanel tone="grouped" style={styles.empty}>
           <Text style={styles.emptyTitle}>이 날은 아무도 휴가가 아니에요.</Text>
           <Text style={styles.emptyCaption}>가장 먼저 휴가를 잡아보세요.</Text>
-        </View>
+        </ContentPanel>
       ) : (
         <View style={{ gap: spacing.md }}>
           {dayLeaves.map((l) => {
@@ -121,8 +122,6 @@ export function DayPanel(props: {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
   },
@@ -147,8 +146,6 @@ const styles = StyleSheet.create({
   },
   exceededText: { fontSize: 12, fontWeight: "600", color: colors.negativeDeep },
   empty: {
-    backgroundColor: colors.canvasSoft,
-    borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: "center",
     gap: 4,

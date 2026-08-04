@@ -3,9 +3,10 @@ import { Alert, StyleSheet, Switch, Text, View } from "react-native";
 import type { LeaveGrantsPage } from "@/api/queries";
 import { useUpdateRegularOvernight } from "@/api/queries";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Input } from "@/components/field";
-import { colors, radius, spacing } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 /**
  * 정기외박 자동 적립 설정. 잔여량이 이 설정에서 파생하므로 육군에서는 쓰지 않는다.
@@ -41,7 +42,7 @@ export function RegularOvernightSettings(props: {
   };
 
   return (
-    <View style={styles.card}>
+    <ContentPanel tone="accent" style={styles.card}>
       <View style={styles.switchRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} selectable>
@@ -106,15 +107,12 @@ export function RegularOvernightSettings(props: {
         loading={update.isPending}
         onPress={() => void save()}
       />
-    </View>
+    </ContentPanel>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.primaryPale,
-    borderRadius: radius.lg,
-    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
   },

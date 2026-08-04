@@ -1,9 +1,4 @@
-import {
-  BALANCE_LABELS,
-  fmtDateShort,
-  fmtRangeTiny,
-  type BalanceKey,
-} from "@leave/shared";
+import { fmtDateShort, fmtRangeTiny, type BalanceKey } from "@leave/shared";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,13 +12,15 @@ import type { LeaveGrantFund, LeaveGrantItem } from "@/api/queries";
 import { useDeleteLeaveGrant, useLeaveGrants, useMe } from "@/api/queries";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { ActionMenu } from "@/components/action-menu";
+import { ContentPanel } from "@/components/content-panel";
 import {
   confirmGrantDelete,
   LeaveGrantModal,
 } from "@/components/leave-grant-modal";
 import { RegularOvernightSettings } from "@/components/regular-overnight-settings";
 import { StackedBar } from "@/components/stacked-bar";
-import { BALANCE_COLORS, colors, radius, spacing, type } from "@/theme";
+import { BALANCE_COLORS, colors, layout, radius, spacing, type } from "@/theme";
 
 /** 만기가 이 안으로 다가오면 임박으로 본다. */
 const EXPIRING_SOON = 30;
@@ -55,7 +52,8 @@ export function LeaveGrantsScreen() {
     .reduce((sum, cycle) => sum + cycle.remainingDays, 0);
   // 적립분이 있거나 이미 쓴 재원만 카드로 편다. 나머지는 아래 칩으로 둔다.
   const active = funds.filter(
-    (fund) => !fund.cycleScoped && (fund.grants.length > 0 || fund.usedDays > 0),
+    (fund) =>
+      !fund.cycleScoped && (fund.grants.length > 0 || fund.usedDays > 0),
   );
   const empty = funds.filter(
     (fund) =>
@@ -69,7 +67,7 @@ export function LeaveGrantsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <View style={styles.dashboard}>
+        <ContentPanel tone="accent" style={styles.dashboard}>
           <Text style={styles.eyebrow} selectable>
             보유 휴가
           </Text>
@@ -90,14 +88,26 @@ export function LeaveGrantsScreen() {
 
           <View style={styles.chipRow}>
             {totals.expiredDays > 0 && (
-              <View style={[styles.statChip, { backgroundColor: colors.negativeTint }]}>
-                <Text style={[styles.statChipText, { color: colors.negativeDeep }]}>
+              <View
+                style={[
+                  styles.statChip,
+                  { backgroundColor: colors.negativeTint },
+                ]}
+              >
+                <Text
+                  style={[styles.statChipText, { color: colors.negativeDeep }]}
+                >
                   소멸 {totals.expiredDays}일
                 </Text>
               </View>
             )}
             {totals.upcomingDays > 0 && (
-              <View style={[styles.statChip, { backgroundColor: colors.surfaceCard }]}>
+              <View
+                style={[
+                  styles.statChip,
+                  { backgroundColor: colors.surfaceCard },
+                ]}
+              >
                 <Text style={[styles.statChipText, { color: colors.body }]}>
                   예정 {totals.upcomingDays}일
                 </Text>
@@ -107,8 +117,8 @@ export function LeaveGrantsScreen() {
 
           {totals.unattributedDays > 0 && (
             <Text style={styles.warning} selectable>
-              적립분으로 설명되지 않는 사용 {totals.unattributedDays}일이 있어요.
-              적립분을 확인해주세요.
+              적립분으로 설명되지 않는 사용 {totals.unattributedDays}일이
+              있어요. 적립분을 확인해주세요.
             </Text>
           )}
 
@@ -123,7 +133,7 @@ export function LeaveGrantsScreen() {
           <Text style={styles.rule} selectable>
             만기가 빠른 적립분부터 자동으로 차감돼요.
           </Text>
-        </View>
+        </ContentPanel>
 
         {active.map((fund) => (
           <FundCard
@@ -138,7 +148,7 @@ export function LeaveGrantsScreen() {
         ))}
 
         {empty.length > 0 && (
-          <View style={styles.addCard}>
+          <ContentPanel style={styles.addCard}>
             <Text style={styles.addTitle} selectable>
               다른 재원 추가
             </Text>
@@ -160,7 +170,7 @@ export function LeaveGrantsScreen() {
                 );
               })}
             </View>
-          </View>
+          </ContentPanel>
         )}
 
         {me.data && me.data.user.branch !== "army" && (
@@ -198,10 +208,12 @@ function FundCard(props: {
   const tone = BALANCE_COLORS[fund.key];
 
   return (
-    <View style={styles.fundCard}>
+    <ContentPanel style={styles.fundCard}>
       <View style={styles.fundHeader}>
         <View style={[styles.chip, { backgroundColor: tone.bg }]}>
-          <Text style={[styles.chipText, { color: tone.fg }]}>{fund.label}</Text>
+          <Text style={[styles.chipText, { color: tone.fg }]}>
+            {fund.label}
+          </Text>
         </View>
         <Text style={styles.fundTotals} selectable>
           잔여 {fund.remainingDays}일 / 총 {fund.totalDays}일
@@ -235,7 +247,7 @@ function FundCard(props: {
         size="sm"
         onPress={props.onAdd}
       />
-    </View>
+    </ContentPanel>
   );
 }
 
@@ -259,20 +271,27 @@ function GrantRow(props: {
             {grant.days}일
           </Text>
           <Text style={styles.grantMeta} selectable>
-            {grant.expiresOn ? `만기 ${fmtDateShort(grant.expiresOn)}` : "만기 없음"}
+            {grant.expiresOn
+              ? `만기 ${fmtDateShort(grant.expiresOn)}`
+              : "만기 없음"}
             {grant.usedDays > 0 ? ` · 사용 ${grant.usedDays}일` : ""}
           </Text>
         </View>
         <View style={styles.grantBadges}>
           {expired ? (
             <Badge
-              text={grant.unusedDays > 0 ? `소멸 ${grant.unusedDays}일` : "만료됨"}
+              text={
+                grant.unusedDays > 0 ? `소멸 ${grant.unusedDays}일` : "만료됨"
+              }
               kind="negative"
             />
           ) : grant.status === "future" ? (
             <Badge text={`${fmtDateShort(grant.grantedOn!)}부터`} />
           ) : soon ? (
-            <Badge text={`D-${grant.daysUntilExpiry} 만료 임박`} kind="negative" />
+            <Badge
+              text={`D-${grant.daysUntilExpiry} 만료 임박`}
+              kind="negative"
+            />
           ) : (
             <Badge text="사용 가능" kind="positive" />
           )}
@@ -283,10 +302,25 @@ function GrantRow(props: {
           </Text>
         ) : null}
       </View>
-      <View style={styles.grantActions}>
-        <Button title="수정" variant="secondary" size="sm" onPress={props.onEdit} />
-        <Button title="삭제" variant="danger" size="sm" onPress={props.onDelete} />
-      </View>
+      <ActionMenu
+        label="적립분 작업"
+        buttonLabel="적립분 관리"
+        actions={[
+          {
+            id: "edit",
+            title: "수정",
+            systemImage: "pencil",
+            onPress: props.onEdit,
+          },
+          {
+            id: "delete",
+            title: "삭제",
+            systemImage: "trash",
+            destructive: true,
+            onPress: props.onDelete,
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -311,10 +345,12 @@ function CycleList(props: {
   const rest = props.cycles.filter((cycle) => cycle.state !== "past");
   // 14일 주기로 21개월이면 40행이 넘는다. 기본은 최근 지난 주기만 편다.
   const hidden = Math.max(0, past.length - RECENT_PAST_CYCLES);
-  const shown = props.expanded ? props.cycles : [...past.slice(-RECENT_PAST_CYCLES), ...rest];
+  const shown = props.expanded
+    ? props.cycles
+    : [...past.slice(-RECENT_PAST_CYCLES), ...rest];
 
   return (
-    <View style={styles.fundCard}>
+    <ContentPanel style={styles.fundCard}>
       <Text style={styles.addTitle} selectable>
         정기외박 주기
       </Text>
@@ -335,7 +371,9 @@ function CycleList(props: {
             cycle.state === "current" && styles.cycleCurrent,
           ]}
         >
-          <View style={[styles.cycleStripe, { backgroundColor: cycle.color }]} />
+          <View
+            style={[styles.cycleStripe, { backgroundColor: cycle.color }]}
+          />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               style={[
@@ -364,16 +402,25 @@ function CycleList(props: {
               </Text>
             )}
           </View>
-          {cycle.state === "current" && <Badge text="이번 주기" kind="positive" />}
+          {cycle.state === "current" && (
+            <Badge text="이번 주기" kind="positive" />
+          )}
         </View>
       ))}
-    </View>
+    </ContentPanel>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 80 },
+  content: {
+    width: "100%",
+    maxWidth: layout.readableContent,
+    alignSelf: "center",
+    padding: spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: 80,
+  },
   loading: {
     flex: 1,
     alignItems: "center",
@@ -382,9 +429,6 @@ const styles = StyleSheet.create({
   },
 
   dashboard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
-    borderCurve: "continuous",
     padding: spacing.xl,
     gap: spacing.sm,
   },
@@ -416,9 +460,6 @@ const styles = StyleSheet.create({
   rule: { fontSize: 12, color: colors.mute, paddingTop: spacing.xs },
 
   fundCard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
-    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
   },
@@ -455,12 +496,8 @@ const styles = StyleSheet.create({
   grantMeta: { fontSize: 12, color: colors.mute, flexShrink: 1 },
   grantBadges: { flexDirection: "row", gap: spacing.xs, paddingTop: 2 },
   grantNote: { fontSize: 12, color: colors.mute, paddingTop: 2 },
-  grantActions: { gap: spacing.xs },
 
   addCard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
-    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
   },

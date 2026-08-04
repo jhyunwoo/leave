@@ -12,7 +12,7 @@
     "orientation": "default",
     "icon": "./assets/images/leave-icon.png",
     "scheme": "leave",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.leave.mobile",

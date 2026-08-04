@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,11 +25,13 @@ import {
   useUploadUnitImage,
 } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
+import { ActionMenu } from "@/components/action-menu";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
-import { colors, radius, spacing } from "@/theme";
+import { colors, layout, radius, spacing } from "@/theme";
 
 type Unit = NonNullable<Me["unit"]>;
 
@@ -59,7 +60,11 @@ export function UnitManageScreen() {
   return (
     <ScrollView
       style={styles.root}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{
+        width: "100%",
+        maxWidth: layout.readableContent,
+        alignSelf: "center",
         padding: spacing.lg,
         paddingBottom: insets.bottom + spacing.xxxl,
         gap: spacing.lg,
@@ -131,7 +136,7 @@ function EditUnitSection(props: { unit: Unit }) {
   };
 
   return (
-    <View style={styles.card}>
+    <ContentPanel style={styles.card}>
       <Text style={styles.sectionTitle}>부대 정보</Text>
 
       <View style={styles.imageRow}>
@@ -177,7 +182,7 @@ function EditUnitSection(props: { unit: Unit }) {
         onPress={() => void submit()}
         style={{ alignSelf: "flex-start" }}
       />
-    </View>
+    </ContentPanel>
   );
 }
 
@@ -188,7 +193,7 @@ function JoinRequestsSection(props: { unitId: string }) {
   const list = requests.data?.requests ?? [];
 
   return (
-    <View style={styles.card}>
+    <ContentPanel style={styles.card}>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>가입 신청</Text>
         {list.length > 0 && (
@@ -234,7 +239,7 @@ function JoinRequestsSection(props: { unitId: string }) {
           ))}
         </View>
       )}
-    </View>
+    </ContentPanel>
   );
 }
 
@@ -270,7 +275,7 @@ function MembersSection(props: { me: Me; unit: Unit }) {
   };
 
   return (
-    <View style={styles.card}>
+    <ContentPanel style={styles.card}>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>부대원</Text>
         <Text style={styles.personMeta}>{list.length}명</Text>
@@ -298,29 +303,34 @@ function MembersSection(props: { me: Me; unit: Unit }) {
                 {isUnitAdmin ? (
                   <Badge text="관리자" kind="positive" />
                 ) : (
-                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                    <Button
-                      title="위임"
-                      variant="secondary"
-                      size="sm"
-                      disabled={transfer.isPending}
-                      onPress={() => doTransfer(m.id, m.name)}
-                    />
-                    <Button
-                      title="내보내기"
-                      variant="danger"
-                      size="sm"
-                      disabled={remove.isPending}
-                      onPress={() => doRemove(m.id, m.name)}
-                    />
-                  </View>
+                  <ActionMenu
+                    label={`${m.name} 부대원 작업`}
+                    buttonLabel="부대원 관리"
+                    actions={[
+                      {
+                        id: "transfer",
+                        title: "관리자 위임",
+                        systemImage: "person.badge.key",
+                        disabled: transfer.isPending,
+                        onPress: () => doTransfer(m.id, m.name),
+                      },
+                      {
+                        id: "remove",
+                        title: "부대에서 내보내기",
+                        systemImage: "person.crop.circle.badge.minus",
+                        destructive: true,
+                        disabled: remove.isPending,
+                        onPress: () => doRemove(m.id, m.name),
+                      },
+                    ]}
+                  />
                 )}
               </View>
             );
           })}
         </View>
       )}
-    </View>
+    </ContentPanel>
   );
 }
 
@@ -335,8 +345,6 @@ const styles = StyleSheet.create({
   forbidden: { fontSize: 16, color: colors.body, textAlign: "center" },
   lead: { fontSize: 14, color: colors.body },
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
   },

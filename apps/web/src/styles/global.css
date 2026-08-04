@@ -9,7 +9,7 @@
   --ink: #0e0f0c;
   --ink-deep: #163300;
   --body: #454745;
-  --mute: #868685;
+  --mute: #666864;
   --muted-soft: #9a9c99;
   --canvas: #ffffff;
   --canvas-soft: #e8ebe6;
@@ -56,6 +56,10 @@
   --shadow-card: 0 12px 30px rgba(14, 15, 12, 0.08);
   --shadow-modal: 0 28px 80px rgba(14, 15, 12, 0.22);
   --shadow-toast: 0 16px 40px rgba(14, 15, 12, 0.2);
+  --glass-chrome: rgba(255, 255, 255, 0.82);
+  --glass-chrome-border: rgba(14, 15, 12, 0.1);
+  --glass-control: rgba(232, 235, 230, 0.72);
+  --glass-shadow: 0 10px 32px rgba(14, 15, 12, 0.08);
 }
 
 *,
@@ -330,6 +334,45 @@ a {
   color: var(--canvas-soft);
 }
 
+/* 콘텐츠는 유리 효과를 겹치지 않고 한 표면 안에서 행으로 묶는다. */
+.content-panel,
+.metric-strip {
+  overflow: hidden;
+  border-radius: var(--r-xl);
+}
+
+.content-panel {
+  background: var(--canvas);
+  border: 1px solid rgba(14, 15, 12, 0.08);
+}
+
+.content-row {
+  padding: var(--sp-xl);
+}
+
+.content-row + .content-row {
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--surface-card);
+}
+
+.metric-strip__item {
+  min-width: 0;
+  padding: var(--sp-md) var(--sp-lg);
+}
+
+.metric-strip__item:nth-child(2n) {
+  border-left: 1px solid var(--hairline);
+}
+
+.metric-strip__item:nth-child(n + 3) {
+  border-top: 1px solid var(--hairline);
+}
+
 /* 입력 */
 .field {
   display: flex;
@@ -499,9 +542,11 @@ textarea.input {
   top: 0;
   z-index: 40;
   height: 64px;
-  background: rgba(255, 255, 255, 0.96);
-  border-bottom: 1px solid rgba(14, 15, 12, 0.08);
-  backdrop-filter: blur(18px) saturate(1.2);
+  background: var(--glass-chrome);
+  border-bottom: 1px solid var(--glass-chrome-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(1.32);
+  backdrop-filter: blur(24px) saturate(1.32);
 }
 
 .app-nav-inner {
@@ -527,8 +572,8 @@ textarea.input {
   justify-self: center;
   width: min(100%, 470px);
   padding: 5px;
-  background: var(--canvas-soft);
-  border: 0;
+  background: var(--glass-control);
+  border: 1px solid rgba(255, 255, 255, 0.68);
   border-radius: var(--r-pill);
 }
 
@@ -621,6 +666,14 @@ textarea.input {
   .card-green,
   .card-dark {
     padding: var(--sp-lg);
+  }
+
+  .content-row {
+    padding: var(--sp-lg);
+  }
+
+  .metric-strip__item {
+    padding: var(--sp-md);
   }
 
   .app-nav-inner {

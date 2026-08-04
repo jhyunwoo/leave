@@ -1,11 +1,10 @@
 import { fmtDateShort } from "@leave/shared";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,12 +15,9 @@ import { API_URL, getAuthToken } from "@/api/client";
 import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
-import {
-  ScreenHeader,
-  useScreenHeaderHeight,
-} from "@/components/screen-header";
+import { ContentPanel } from "@/components/content-panel";
 import { ServiceProgress } from "@/components/service-progress";
-import { colors, radius, spacing } from "@/theme";
+import { colors, layout, spacing } from "@/theme";
 
 export function ProfileScreen() {
   const me = useMe();
@@ -29,7 +25,6 @@ export function ProfileScreen() {
   const deleteAccount = useDeleteAccount();
   const router = useRouter();
   const qc = useQueryClient();
-  const headerHeight = useScreenHeaderHeight({ subtitle: true });
   const [uploading, setUploading] = useState(false);
 
   if (me.isPending || !me.data) {
@@ -103,14 +98,14 @@ export function ProfileScreen() {
     <>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[
-          styles.content,
-          // paddingTop이 styles.content의 padding을 덮어써서, 헤더 아래 여백을 되살린다
-          { paddingTop: headerHeight + spacing.lg },
-        ]}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
       >
+        {process.env.EXPO_OS === "web" && (
+          <Text style={styles.webTitle}>프로필</Text>
+        )}
         {/* 계급/전역 — DESIGN.md의 밝고 절제된 제품 UI 패널 */}
-        <View style={styles.darkCard}>
+        <ContentPanel tone="accent" style={styles.darkCard}>
           <View style={styles.darkTop}>
             <View>
               <Text style={styles.darkEyebrow}>현재 계급</Text>
@@ -134,10 +129,10 @@ export function ProfileScreen() {
                 : "최종 계급"
             }
           />
-        </View>
+        </ContentPanel>
 
         {/* 프로필 정보 */}
-        <View style={styles.card}>
+        <ContentPanel style={styles.card}>
           <View style={styles.profileRow}>
             <Avatar
               name={user.name}
@@ -148,14 +143,14 @@ export function ProfileScreen() {
               <Text style={styles.name}>{user.name}</Text>
               <Text style={styles.email}>{user.email}</Text>
             </View>
-            <Button
-              title={uploading ? "올리는 중…" : "사진 변경"}
-              variant="secondary"
-              size="sm"
-              loading={uploading}
-              onPress={() => void changePhoto()}
-            />
           </View>
+          <Button
+            title={uploading ? "올리는 중…" : "프로필 사진 변경"}
+            variant="secondary"
+            size="sm"
+            loading={uploading}
+            onPress={() => void changePhoto()}
+          />
 
           <View style={styles.infoGrid}>
             <InfoItem label="군 종류" value={user.branchLabel} />
@@ -163,20 +158,19 @@ export function ProfileScreen() {
             <InfoItem label="입대일" value={user.enlistedAt} />
             <InfoItem label="전역 예정일" value={user.dischargeAt} />
           </View>
-        </View>
-
-        {/* 보유 휴가는 내 휴가 탭에서만 들어간다 — 입구를 하나로 둬야 뒤로가기가 헷갈리지 않는다. */}
-        <View style={[styles.card, { flexDirection: "row", gap: spacing.md }]}>
+          <View style={styles.cardDivider} />
           <Button
             title="부대 관리"
             variant="secondary"
             onPress={() => router.push("/units")}
-            style={{ flex: 1 }}
           />
-          <Button
-            title="로그아웃"
-            variant="tertiary"
-            loading={logout.isPending}
+        </ContentPanel>
+      </ScrollView>
+
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Menu icon="ellipsis">
+          <Stack.Toolbar.MenuAction
+            icon="rectangle.portrait.and.arrow.right"
             onPress={() =>
               Alert.alert("로그아웃", "로그아웃할까요?", [
                 { text: "취소", style: "cancel" },
@@ -187,33 +181,26 @@ export function ProfileScreen() {
                 },
               ])
             }
-            style={{ flex: 1 }}
-          />
-        </View>
-
-        {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
-        <Pressable
-          accessibilityRole="button"
-          onPress={confirmDeleteAccount}
-          disabled={deleteAccount.isPending}
-          style={styles.deleteRow}
-        >
-          {deleteAccount.isPending ? (
-            <ActivityIndicator color={colors.negativeDeep} />
-          ) : (
-            <Text style={styles.deleteText}>계정 삭제</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-
-      <ScreenHeader title="프로필" subtitle="계급과 휴가 일수를 관리해요." />
+          >
+            로그아웃
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="trash"
+            destructive
+            disabled={deleteAccount.isPending}
+            onPress={confirmDeleteAccount}
+          >
+            계정 삭제
+          </Stack.Toolbar.MenuAction>
+        </Stack.Toolbar.Menu>
+      </Stack.Toolbar>
     </>
   );
 }
 
 function InfoItem(props: { label: string; value: string }) {
   return (
-    <View style={{ width: "45%" }}>
+    <View style={styles.infoItem}>
       <Text style={styles.infoLabel}>{props.label}</Text>
       <Text style={styles.infoValue}>{props.value}</Text>
     </View>
@@ -228,16 +215,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 120 },
+  content: {
+    width: "100%",
+    maxWidth: layout.readableContent,
+    alignSelf: "center",
+    padding: spacing.lg,
+    paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: 120,
+  },
+  webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
   darkCard: {
-    backgroundColor: colors.primaryPale,
-    borderRadius: radius.xl,
     padding: spacing.xxl,
     gap: spacing.xl,
-    borderWidth: 0,
-    borderCurve: "continuous",
   },
-  darkTop: { flexDirection: "row", justifyContent: "space-between" },
+  darkTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: spacing.xl,
+  },
   darkEyebrow: {
     fontSize: 12,
     fontWeight: "500",
@@ -258,12 +255,8 @@ const styles = StyleSheet.create({
   },
   darkMeta: { fontSize: 14, color: colors.body, marginTop: spacing.sm },
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
-    borderWidth: 0,
-    borderCurve: "continuous",
   },
   profileRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   name: { fontSize: 22, fontWeight: "600", color: colors.ink },
@@ -273,23 +266,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.lg,
   },
+  infoItem: { flexGrow: 1, flexBasis: "44%", minWidth: 132 },
+  cardDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.hairline,
+  },
   infoLabel: { fontSize: 12, color: colors.mute },
   infoValue: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.ink,
     marginTop: 2,
-  },
-  deleteRow: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.md,
-    minHeight: 44,
-  },
-  deleteText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.negativeDeep,
-    textDecorationLine: "underline",
   },
 });

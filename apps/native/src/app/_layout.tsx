@@ -85,20 +85,38 @@ function RootNavigator() {
         <Stack.Screen
           name="units"
           options={{
-            presentation: "modal",
+            presentation: "formSheet",
             headerShown: true,
             title: "부대 찾기",
-            headerStyle: { backgroundColor: colors.canvas },
+            headerTransparent: process.env.EXPO_OS !== "web",
+            headerShadowVisible: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: [0.75, 1],
+            contentStyle: {
+              backgroundColor:
+                process.env.EXPO_OS === "web"
+                  ? colors.canvasSoft
+                  : "transparent",
+            },
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
         <Stack.Screen
           name="unit-manage"
           options={{
-            presentation: "modal",
+            presentation: "formSheet",
             headerShown: true,
             title: "부대 관리",
-            headerStyle: { backgroundColor: colors.canvas },
+            headerTransparent: process.env.EXPO_OS !== "web",
+            headerShadowVisible: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: [0.75, 1],
+            contentStyle: {
+              backgroundColor:
+                process.env.EXPO_OS === "web"
+                  ? colors.canvasSoft
+                  : "transparent",
+            },
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
@@ -126,7 +144,7 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
       <RootNavigator />
     </QueryClientProvider>
   );

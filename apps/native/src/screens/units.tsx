@@ -5,9 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,9 +20,12 @@ import {
 } from "@/api/queries";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
-import { colors, radius, spacing } from "@/theme";
+import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { SheetScaffold } from "@/components/sheet-scaffold";
+import { colors, layout, radius, spacing } from "@/theme";
 
 export function UnitsScreen() {
   const me = useMe();
@@ -94,6 +94,7 @@ export function UnitsScreen() {
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.subtitle}>
@@ -103,7 +104,7 @@ export function UnitsScreen() {
       </Text>
 
       {myUnit && (
-        <View style={styles.myUnitCard}>
+        <ContentPanel tone="accent" style={styles.myUnitCard}>
           <Text style={styles.myUnitEyebrow}>내 부대</Text>
           <Text style={styles.myUnitName}>{myUnit.name}</Text>
           <Text style={styles.myUnitMeta}>
@@ -127,11 +128,11 @@ export function UnitsScreen() {
               onPress={doLeave}
             />
           </View>
-        </View>
+        </ContentPanel>
       )}
 
       {!myUnit && joinRequest && (
-        <View style={styles.pendingCard}>
+        <ContentPanel style={styles.pendingCard}>
           <Text style={styles.pendingEyebrow}>가입 신청 중</Text>
           <Text style={styles.myUnitName}>{joinRequest.unitName}</Text>
           <Text style={styles.myUnitMeta}>
@@ -145,10 +146,10 @@ export function UnitsScreen() {
             onPress={() => void cancelRequest.mutateAsync()}
             style={{ alignSelf: "flex-start", marginTop: spacing.sm }}
           />
-        </View>
+        </ContentPanel>
       )}
 
-      <View style={styles.card}>
+      <ContentPanel style={styles.card}>
         <Input
           value={query}
           onChangeText={setQuery}
@@ -225,7 +226,7 @@ export function UnitsScreen() {
           variant="secondary"
           onPress={() => setCreateOpen(true)}
         />
-      </View>
+      </ContentPanel>
 
       <CreateUnitModal
         visible={createOpen}
@@ -276,32 +277,29 @@ function CreateUnitModal(props: {
   };
 
   return (
-    <Modal
-      visible={props.visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={props.onClose}
+    <NativeBottomSheet
+      isPresented={props.visible}
+      snapPoints={[{ fraction: 0.72 }, "full"]}
+      onDismiss={props.onClose}
+      testID="create-unit-sheet"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, backgroundColor: colors.canvas }}
+        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        style={styles.createSheet}
       >
-        <ScrollView
-          contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}
-          keyboardShouldPersistTaps="handled"
+        <SheetScaffold
+          title="새 부대 만들기"
+          onClose={props.onClose}
+          closeTestID="create-unit-close"
+          footer={
+            <Button
+              title={create.isPending ? "만드는 중…" : "부대 만들고 가입하기"}
+              onPress={() => void submit()}
+              loading={create.isPending}
+              testID="create-unit-submit"
+            />
+          }
         >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>새 부대 만들기</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="닫기"
-              onPress={props.onClose}
-              style={styles.closeBtn}
-            >
-              <Text style={{ fontSize: 15, color: colors.ink }}>✕</Text>
-            </Pressable>
-          </View>
-
           <Field label="부대 이름">
             <Input
               value={name}
@@ -329,29 +327,25 @@ function CreateUnitModal(props: {
               {error}
             </Text>
           )}
-
-          <Button
-            title={create.isPending ? "만드는 중…" : "부대 만들고 가입하기"}
-            onPress={() => void submit()}
-            loading={create.isPending}
-          />
-        </ScrollView>
+        </SheetScaffold>
       </KeyboardAvoidingView>
-    </Modal>
+    </NativeBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
+  createSheet: { flex: 1 },
   content: {
+    width: "100%",
+    maxWidth: layout.readableContent,
+    alignSelf: "center",
     padding: spacing.lg,
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
   subtitle: { fontSize: 16, color: colors.body },
   myUnitCard: {
-    backgroundColor: colors.primaryPale,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: 4,
   },
@@ -369,8 +363,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   pendingCard: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: 4,
     borderWidth: 1,
@@ -382,8 +374,6 @@ const styles = StyleSheet.create({
     color: colors.warningContent,
   },
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.lg,
   },
@@ -420,19 +410,5 @@ const styles = StyleSheet.create({
     color: colors.negativeDeep,
     textAlign: "center",
     lineHeight: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  modalTitle: { fontSize: 24, fontWeight: "600", color: colors.ink },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    backgroundColor: colors.canvasSoft,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

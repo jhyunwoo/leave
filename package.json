@@ -3,7 +3,12 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "browser:close": "agent-browser close --all",
+    "browser:doctor": "agent-browser doctor --offline --quick",
+    "browser:install": "agent-browser install",
     "dev": "turbo run dev",
+    "dev:admin": "turbo run dev --filter=@leave/admin",
+    "dev:web": "turbo run dev --filter=@leave/api --filter=@leave/web",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
@@ -11,8 +16,9 @@
     "test:e2e": "turbo run test:e2e"
   },
   "devDependencies": {
-    "prettier": "^3.7.4",
-    "turbo": "^2.10.5",
+    "agent-browser": "0.33.2",
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.8",
     "typescript": "5.9.2"
   },
   "packageManager": "pnpm@11.13.1",

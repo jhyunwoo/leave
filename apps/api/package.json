@@ -9,7 +9,7 @@
     "./server": "./src/admin-shared.ts"
   },
   "scripts": {
-    "dev": "wrangler dev --port 8787",
+    "dev": "wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:5173",
     "deploy": "pnpm db:migrate:remote && wrangler deploy",
     "check-types": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
