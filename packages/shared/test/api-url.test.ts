@@ -5,10 +5,10 @@ describe("resolveApiUrl", () => {
   it("빌드에 주입된 주소가 있으면 그대로 쓴다", () => {
     expect(
       resolveApiUrl({
-        envUrl: "https://leave-api.moveto.workers.dev",
+        envUrl: "https://api.leave.moveto.kr",
         devHost: "192.168.0.10",
       }),
-    ).toBe("https://leave-api.moveto.workers.dev");
+    ).toBe("https://api.leave.moveto.kr");
   });
 
   it("주입된 주소가 없고 개발 서버에 붙어 있으면 그 호스트의 8787", () => {

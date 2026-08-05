@@ -51,7 +51,7 @@
 
 - 앱의 프로필과 내 기록 화면에서 일부 정보를 열람·정정할 수 있습니다.
 - 계정 전체 삭제는 앱의 `프로필 → 계정 삭제`에서 직접 처리할 수 있습니다.
-- 앱에 접근할 수 없으면 [계정 삭제 안내](https://leave-web.moveto.workers.dev/delete-account)에 따라 가입 이메일로 요청할 수 있습니다.
+- 앱에 접근할 수 없으면 [계정 삭제 안내](https://leave.moveto.kr/delete-account)에 따라 가입 이메일로 요청할 수 있습니다.
 - 기타 요청은 `jhyunwoo0228@gmail.com`으로 보내 주세요. 본인 확인 후 지체 없이 처리하고 결과를 안내합니다.
 
 법정대리인 등 정당한 대리인은 관계 법령에 따른 증빙을 제출해 권리를 행사할 수 있습니다.
@@ -81,10 +81,10 @@
 
 - 개인정보 보호책임자 및 운영자: Hyunwoo Jeon
 - 이메일: `jhyunwoo0228@gmail.com`
-- 지원 페이지: `https://leave-web.moveto.workers.dev/support`
+- 지원 페이지: `https://leave.moveto.kr/support`
 
 ## 12. 방침 변경
 
 법령, 기능, 처리업체 또는 수집 항목이 변경되면 시행 최소 7일 전에 앱 또는 공개 웹페이지에서 알립니다. 이용자 권리에 중대한 변경은 최소 30일 전에 알립니다.
 
-관련 문서: [이용약관](https://leave-web.moveto.workers.dev/terms) · [지원](https://leave-web.moveto.workers.dev/support) · [계정 삭제](https://leave-web.moveto.workers.dev/delete-account)
+관련 문서: [이용약관](https://leave.moveto.kr/terms) · [지원](https://leave.moveto.kr/support) · [계정 삭제](https://leave.moveto.kr/delete-account)

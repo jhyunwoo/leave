@@ -41,7 +41,7 @@
 
 ## 8. 개인정보
 
-개인정보 처리에는 [개인정보 처리방침](https://leave-web.moveto.workers.dev/privacy)이 적용됩니다.
+개인정보 처리에는 [개인정보 처리방침](https://leave.moveto.kr/privacy)이 적용됩니다.
 
 ## 9. 약관 변경과 준거법
 
@@ -51,4 +51,4 @@
 
 - 운영자: Hyunwoo Jeon
 - 이메일: `jhyunwoo0228@gmail.com`
-- 지원: `https://leave-web.moveto.workers.dev/support`
+- 지원: `https://leave.moveto.kr/support`

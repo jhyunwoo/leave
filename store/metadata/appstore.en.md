@@ -65,9 +65,9 @@ This is an unofficial reference tool. Actual leave remains subject to commander 
 |---|---|
 | Primary Category | Productivity |
 | Secondary Category | Utilities |
-| Support URL | `https://leave-web.moveto.workers.dev/support` |
+| Support URL | `https://leave.moveto.kr/support` |
 | Marketing URL | Leave blank |
-| Privacy Policy URL | `https://leave-web.moveto.workers.dev/privacy` |
+| Privacy Policy URL | `https://leave.moveto.kr/privacy` |
 | Tracking | No |
 | Sign-in required | Yes |
 

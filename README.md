@@ -62,6 +62,16 @@ pnpm test --filter @leave/api    # API 통합 테스트 (TDD, 19개)
 
 ## 배포 (Cloudflare)
 
+세 워커는 각각 아래 커스텀 도메인으로 나갑니다. 도메인은 `wrangler.jsonc`의
+`routes`(`custom_domain: true`)에 선언돼 있어, 배포할 때 wrangler가 DNS 레코드와
+인증서를 자동으로 만듭니다. `moveto.kr` 존이 배포 계정에 있어야 합니다.
+
+| 워커 | 도메인 |
+| --- | --- |
+| `leave-web` (사용자 웹) | `https://leave.moveto.kr` |
+| `leave-admin` (관리자) | `https://admin.leave.moveto.kr` |
+| `leave-api` (API·문서) | `https://api.leave.moveto.kr` |
+
 ```bash
 # 1. 리소스 생성
 cd apps/api
@@ -73,11 +83,18 @@ npx wrangler kv namespace create CACHE   # 출력된 id를 wrangler.jsonc의 kv_
 pnpm db:migrate:remote
 pnpm deploy
 
-# 3. 웹 배포 (배포된 API 주소를 빌드에 주입)
-cd apps/web
-VITE_API_URL=https://leave-api.<계정>.workers.dev pnpm deploy
-# 배포 후 apps/api/wrangler.jsonc의 CORS_ORIGIN을 웹 주소로 좁히는 것을 권장
+# 3. 웹 배포 (API 주소는 apps/web/.env.production에서 빌드에 주입됨)
+cd ../web
+pnpm deploy
+
+# 4. 관리자 배포
+cd ../admin
+pnpm deploy
 ```
+
+API의 `CORS_ORIGIN`은 `apps/api/wrangler.jsonc`에서 `https://leave.moveto.kr`로
+좁혀 두었습니다(관리자 앱은 자기 워커에서 `/api/*`를 처리하므로 CORS 대상이 아니고,
+네이티브 앱은 브라우저 CORS 대상이 아닙니다).
 
 ### 앱 스토어 배포 (EAS)
 

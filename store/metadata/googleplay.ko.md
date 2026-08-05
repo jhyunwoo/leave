@@ -46,9 +46,9 @@
 | Category | Productivity |
 | Tags | Calendar, Schedule management, Productivity |
 | Contact email | `jhyunwoo0228@gmail.com` |
-| Website | `https://leave-web.moveto.workers.dev/support` |
-| Privacy Policy URL | `https://leave-web.moveto.workers.dev/privacy` |
-| Account deletion URL | `https://leave-web.moveto.workers.dev/delete-account` |
+| Website | `https://leave.moveto.kr/support` |
+| Privacy Policy URL | `https://leave.moveto.kr/privacy` |
+| Account deletion URL | `https://leave.moveto.kr/delete-account` |
 | Contains ads | 아니요 |
 | In-app purchases | 없음 |
 | Target audience | 만 18세 이상, 아동 대상 아님 |

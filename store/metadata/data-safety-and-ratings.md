@@ -43,7 +43,7 @@
 ### 계정 삭제
 
 - 인앱: 프로필 → 계정 삭제 → `DELETE /auth/account`
-- 웹 안내: `https://leave-web.moveto.workers.dev/delete-account`
+- 웹 안내: `https://leave.moveto.kr/delete-account`
 - 삭제 대상: 사용자, 세션, 가입 요청·초대코드, 휴가와 하위 데이터, 휴가 잔여/부여 설정, 알림, 접속·푸시 로그. 관리자였던 1인 그룹은 그룹을 삭제하고, 구성원이 남으면 관리자를 승계합니다.
 - 배포 직전 프로덕션 환경에서 생성→삭제→재로그인 실패→DB/로그/백업 보존 정책 확인을 다시 수행해야 합니다.
 

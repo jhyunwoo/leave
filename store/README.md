@@ -6,10 +6,10 @@
 
 | 자료 | 저장소 원본 | 공개 URL |
 |---|---|---|
-| 개인정보 처리방침 | `legal/privacy-policy.ko.md`, `legal/privacy-policy.html` | `https://leave-web.moveto.workers.dev/privacy` |
-| 이용약관 | `legal/terms-of-service.ko.md`, `legal/terms-of-service.html` | `https://leave-web.moveto.workers.dev/terms` |
-| 지원·문의 | `legal/support.html` | `https://leave-web.moveto.workers.dev/support` |
-| 계정 삭제 안내 | `legal/delete-account.html` | `https://leave-web.moveto.workers.dev/delete-account` |
+| 개인정보 처리방침 | `legal/privacy-policy.ko.md`, `legal/privacy-policy.html` | `https://leave.moveto.kr/privacy` |
+| 이용약관 | `legal/terms-of-service.ko.md`, `legal/terms-of-service.html` | `https://leave.moveto.kr/terms` |
+| 지원·문의 | `legal/support.html` | `https://leave.moveto.kr/support` |
+| 계정 삭제 안내 | `legal/delete-account.html` | `https://leave.moveto.kr/delete-account` |
 | Apple 메타데이터 | `metadata/appstore.ko.md`, `metadata/appstore.en.md` | App Store Connect |
 | Google 메타데이터 | `metadata/googleplay.ko.md`, `metadata/googleplay.en.md` | Play Console |
 | 개인정보 라벨 답변 | `metadata/data-safety-and-ratings.md` | 두 스토어 콘솔 |

@@ -6,7 +6,7 @@
  */
 
 /** 스탠드얼론(스토어·OTA) 클라이언트가 붙을 기본 API 주소. */
-export const PRODUCTION_API_URL = "https://leave-api.moveto.workers.dev";
+export const PRODUCTION_API_URL = "https://api.leave.moveto.kr";
 
 /**
  * 클라이언트가 붙을 API 주소를 정한다.

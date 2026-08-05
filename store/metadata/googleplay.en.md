@@ -41,9 +41,9 @@ Leave is an independently developed service and is not affiliated with or endors
 |---|---|
 | Category | Productivity |
 | Contact email | `jhyunwoo0228@gmail.com` |
-| Website | `https://leave-web.moveto.workers.dev/support` |
-| Privacy policy | `https://leave-web.moveto.workers.dev/privacy` |
-| Account deletion | `https://leave-web.moveto.workers.dev/delete-account` |
+| Website | `https://leave.moveto.kr/support` |
+| Privacy policy | `https://leave.moveto.kr/privacy` |
+| Account deletion | `https://leave.moveto.kr/delete-account` |
 | Contains ads | No |
 | In-app purchases | None |
 | Target audience | 18 and older; not directed to children |

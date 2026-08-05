@@ -2,7 +2,7 @@ import * as Linking from "expo-linking";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, spacing } from "@/theme";
 
-const PUBLIC_SITE = "https://leave-web.moveto.workers.dev";
+const PUBLIC_SITE = "https://leave.moveto.kr";
 
 const LINKS = [
   { label: "개인정보처리방침", url: `${PUBLIC_SITE}/privacy` },

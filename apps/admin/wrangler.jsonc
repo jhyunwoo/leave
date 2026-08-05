@@ -4,6 +4,13 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-07-26",
   "compatibility_flags": ["nodejs_compat"],
+  // 배포 시 DNS 레코드와 인증서를 wrangler가 자동으로 만든다 (moveto.kr 존이 이 계정에 있어야 함)
+  "routes": [
+    {
+      "pattern": "admin.leave.moveto.kr",
+      "custom_domain": true,
+    },
+  ],
   "assets": {
     "not_found_handling": "single-page-application",
     "binding": "ASSETS",

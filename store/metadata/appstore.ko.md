@@ -69,9 +69,9 @@
 |---|---|
 | Primary Category | Productivity |
 | Secondary Category | Utilities |
-| Support URL | `https://leave-web.moveto.workers.dev/support` |
+| Support URL | `https://leave.moveto.kr/support` |
 | Marketing URL | 비워 둠 |
-| Privacy Policy URL | `https://leave-web.moveto.workers.dev/privacy` |
+| Privacy Policy URL | `https://leave.moveto.kr/privacy` |
 | Copyright | 2026 Hyunwoo Jeon |
 | Tracking | 사용하지 않음 |
 | Sign-in required | 예 |
