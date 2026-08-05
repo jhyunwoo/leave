@@ -259,6 +259,7 @@ function serializeLeave(
     startDate: row.startDate,
     endDate: row.endDate,
     reason: row.reason,
+    status: row.status,
     segments: segmentsByLeave.get(row.id) ?? [],
     createdAt: row.createdAt,
   };
@@ -400,6 +401,8 @@ export const leaveRoutes = app
       startDate: range.startDate,
       endDate: range.endDate,
       reason: input.reason ?? null,
+      // 생략하면 기존 동작대로 "희망"(집계 반영)으로 저장한다.
+      status: input.status ?? "shared",
       createdAt: new Date().toISOString(),
     };
     await db.insert(leaves).values(leave);
@@ -454,6 +457,8 @@ export const leaveRoutes = app
       startDate: range.startDate,
       endDate: range.endDate,
       reason: input.reason ?? null,
+      // 상태를 보내지 않으면 지금 상태를 유지한다(초안이 조용히 공유되지 않게).
+      status: input.status ?? existing.status,
     };
     await db.batch([
       db
@@ -463,6 +468,7 @@ export const leaveRoutes = app
           startDate: updated.startDate,
           endDate: updated.endDate,
           reason: updated.reason,
+          status: updated.status,
         })
         .where(eq(leaves.id, id)),
       db.delete(leaveSegments).where(eq(leaveSegments.leaveId, id)),

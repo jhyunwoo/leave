@@ -6,6 +6,8 @@ import {
   pushEventSchema,
   signupSchema,
   unitCreateSchema,
+  unitInviteCreateSchema,
+  unitJoinSchema,
 } from "../src";
 
 const baseSignup = {
@@ -127,6 +129,48 @@ describe("unitCreateSchema", () => {
       unitCreateSchema.safeParse({ ...base, maxLeaveCount: 1.5 }).success,
     ).toBe(false);
   });
+
+  it("기준 인원·갱신 시각·초대 제한을 검증한다", () => {
+    const valid = {
+      name: "비식별 모임",
+      referenceMemberTotal: 60,
+      maxLeaveCount: 12,
+      lastTotalUpdatedAt: "2026-08-04T12:00:00.000Z",
+      inviteExpiresAt: "2026-08-11T12:00:00.000Z",
+      inviteMaxUses: 50,
+    };
+    expect(unitCreateSchema.safeParse(valid).success).toBe(true);
+    expect(
+      unitCreateSchema.safeParse({ ...valid, referenceMemberTotal: 0 }).success,
+    ).toBe(false);
+    expect(
+      unitCreateSchema.safeParse({ ...valid, inviteMaxUses: 0 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("unitJoinSchema / unitInviteCreateSchema", () => {
+  it("짧은 추측 가능 코드는 거부한다", () => {
+    expect(unitJoinSchema.safeParse({ code: "123456" }).success).toBe(false);
+    expect(unitJoinSchema.safeParse({ code: "A".repeat(32) }).success).toBe(
+      true,
+    );
+  });
+
+  it("재발급 제한은 양의 사용 횟수와 ISO 시각만 받는다", () => {
+    expect(
+      unitInviteCreateSchema.safeParse({
+        maxUses: 10,
+        expiresAt: "2026-08-11T12:00:00.000Z",
+      }).success,
+    ).toBe(true);
+    expect(unitInviteCreateSchema.safeParse({ maxUses: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      unitInviteCreateSchema.safeParse({ expiresAt: "2026-08-11" }).success,
+    ).toBe(false);
+  });
 });
 
 describe("적립분 스키마", () => {
@@ -149,7 +193,8 @@ describe("적립분 스키마", () => {
       }).success,
     ).toBe(true);
     expect(
-      leaveGrantCreateSchema.safeParse({ balanceKey: "award", days: 3 }).success,
+      leaveGrantCreateSchema.safeParse({ balanceKey: "award", days: 3 })
+        .success,
     ).toBe(true);
   });
 

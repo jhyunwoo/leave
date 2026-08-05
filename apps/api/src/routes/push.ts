@@ -70,11 +70,7 @@ export const pushRoutes = app
       userId: user.id,
       notificationId: input.notificationId ?? null,
       direction: input.direction,
-      title: input.title ?? null,
-      body: input.body ?? null,
-      dataJson: input.data ? JSON.stringify(input.data) : null,
       status: "ok",
-      detail: null,
       createdAt: new Date().toISOString(),
     });
     return c.json({ ok: true as const }, 200);

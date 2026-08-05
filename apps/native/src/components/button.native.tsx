@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
     minWidth: 44,
     alignSelf: "stretch",
   },
-  sm: { minHeight: 42 },
+  sm: { minHeight: 44 },
 });

@@ -1,76 +1,92 @@
-import { unitCreateSchema } from "@leave/shared";
+import {
+  unitCreateSchema,
+  unitJoinSchema,
+  type UnitCreateInput,
+} from "@leave/shared";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import {
-  useCancelJoinRequest,
+  type IssuedUnitInvite,
   useCreateUnit,
   useJoinUnit,
   useLeaveUnit,
   useMe,
-  useUnitSearch,
 } from "@/api/queries";
-import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { colors, layout, radius, spacing } from "@/theme";
 
+async function shareInvite(invite: IssuedUnitInvite) {
+  await Share.share({
+    title: "리브 공유 그룹 초대",
+    message: [
+      "리브 앱에서 아래 초대코드를 입력하세요.",
+      invite.code,
+      `만료: ${new Date(invite.expiresAt).toLocaleString("ko-KR")}`,
+      "실제 부대명·부대번호·주소·병력 현황은 입력하지 마세요.",
+    ].join("\n\n"),
+  });
+}
+
 export function UnitsScreen() {
   const me = useMe();
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const router = useRouter();
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 250);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  const search = useUnitSearch(debounced);
   const join = useJoinUnit();
   const leaveUnit = useLeaveUnit();
-  const cancelRequest = useCancelJoinRequest();
-  const myUnit = me.data?.unit ?? null;
-  const joinRequest = me.data?.joinRequest ?? null;
-  const isAdmin = myUnit != null && me.data?.user.id === myUnit.adminId;
+  const router = useRouter();
+  const [inviteCode, setInviteCode] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [issuedInvite, setIssuedInvite] = useState<IssuedUnitInvite | null>(
+    null,
+  );
 
-  const doJoin = async (unitId: string, unitName: string) => {
+  const myUnit = me.data?.unit ?? null;
+  const isAdmin = myUnit != null && me.data?.user.id === myUnit.adminId;
+  const participation =
+    myUnit?.referenceMemberTotal && myUnit.referenceMemberTotal > 0
+      ? Math.min(
+          100,
+          Math.round((myUnit.memberCount / myUnit.referenceMemberTotal) * 100),
+        )
+      : null;
+
+  const doJoin = async () => {
+    setJoinError(null);
+    const parsed = unitJoinSchema.safeParse({ code: inviteCode });
+    if (!parsed.success) {
+      setJoinError(
+        parsed.error.issues[0]?.message ?? "초대코드를 확인해주세요",
+      );
+      return;
+    }
     try {
-      // 가입은 관리자 승인이 필요 — 신청만 하고 대기 상태로 전환된다.
-      // 단, 부대원이 아무도 없는 부대는 승인해 줄 사람이 없어 즉시 가입·관리자가 된다.
-      const res = await join.mutateAsync(unitId);
-      if (res.joined) {
-        Alert.alert(
-          "부대에 들어왔어요",
-          `${unitName}에 첫 부대원으로 가입했어요. 부대 관리자를 맡게 됩니다.`,
-        );
-      }
-    } catch (err) {
-      Alert.alert(
-        "가입 신청 실패",
-        err instanceof Error
-          ? err.message
-          : `${unitName}에 신청하지 못했습니다`,
+      await join.mutateAsync(parsed.data);
+      setInviteCode("");
+      Alert.alert("참여했어요", "공유 그룹의 휴가 계획 달력이 열렸습니다.");
+    } catch (error) {
+      setJoinError(
+        error instanceof Error ? error.message : "그룹에 참여하지 못했습니다",
       );
     }
   };
 
   const doLeave = () => {
     if (!myUnit) return;
-    Alert.alert("부대 나가기", `${myUnit.name}에서 나갈까요?`, [
+    Alert.alert("공유 그룹 나가기", "이 그룹에서 나갈까요?", [
       { text: "취소", style: "cancel" },
       {
         text: "나가기",
@@ -78,12 +94,12 @@ export function UnitsScreen() {
         onPress: () =>
           void leaveUnit
             .mutateAsync()
-            .catch((err) =>
+            .catch((error) =>
               Alert.alert(
                 "나가기 실패",
-                err instanceof Error
-                  ? err.message
-                  : "관리자라면 먼저 다른 부대원에게 관리자를 넘겨주세요.",
+                error instanceof Error
+                  ? error.message
+                  : "관리자라면 먼저 다른 참여자에게 권한을 넘겨주세요.",
               ),
             ),
       },
@@ -98,30 +114,34 @@ export function UnitsScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.subtitle}>
-        {myUnit
-          ? "다른 부대로 옮기거나 부대에서 나갈 수 있어요."
-          : "소속 부대에 들어가면 휴가 달력이 열려요."}
+        그룹은 검색되지 않습니다. 관리자에게 받은 초대코드로만 참여할 수 있어요.
       </Text>
+      <OfficialDisclaimer compact />
 
-      {myUnit && (
+      {myUnit ? (
         <ContentPanel tone="accent" style={styles.myUnitCard}>
-          <Text style={styles.myUnitEyebrow}>내 부대</Text>
+          <Text style={styles.myUnitEyebrow}>내 공유 그룹</Text>
           <Text style={styles.myUnitName}>{myUnit.name}</Text>
           <Text style={styles.myUnitMeta}>
-            부대원 {myUnit.memberCount}명 · 하루 최대 출타{" "}
-            {myUnit.maxLeaveCount}명
+            참여율 {participation === null ? "미설정" : `${participation}%`}
+            {participation !== null && participation < 70
+              ? " · 실제 출타율은 더 높을 수 있어요"
+              : ""}
+          </Text>
+          <Text style={styles.securityNote}>
+            그룹 이름에 실제 부대명·부대번호·주소·위치를 넣지 마세요.
           </Text>
           <View style={styles.myUnitActions}>
-            {isAdmin && (
+            {isAdmin ? (
               <Button
-                title="부대 관리"
+                title="그룹 관리·초대"
                 variant="secondary"
                 size="sm"
                 onPress={() => router.push("/unit-manage")}
               />
-            )}
+            ) : null}
             <Button
-              title="부대 나가기"
+              title="그룹 나가기"
               variant="danger"
               size="sm"
               loading={leaveUnit.isPending}
@@ -129,157 +149,132 @@ export function UnitsScreen() {
             />
           </View>
         </ContentPanel>
-      )}
+      ) : (
+        <>
+          <ContentPanel style={styles.card}>
+            <Text style={styles.sectionTitle}>초대코드로 참여</Text>
+            <Field
+              label="초대코드"
+              hint="코드는 만료되거나 사용 횟수가 소진되면 사용할 수 없습니다."
+            >
+              <Input
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="관리자에게 받은 긴 초대코드"
+                accessibilityLabel="공유 그룹 초대코드"
+                testID="unit-invite-code"
+              />
+            </Field>
+            {joinError ? (
+              <Text style={styles.errorText}>{joinError}</Text>
+            ) : null}
+            <Button
+              title={join.isPending ? "확인 중…" : "그룹 참여"}
+              loading={join.isPending}
+              onPress={() => void doJoin()}
+              testID="unit-join-submit"
+            />
+          </ContentPanel>
 
-      {!myUnit && joinRequest && (
-        <ContentPanel style={styles.pendingCard}>
-          <Text style={styles.pendingEyebrow}>가입 신청 중</Text>
-          <Text style={styles.myUnitName}>{joinRequest.unitName}</Text>
-          <Text style={styles.myUnitMeta}>
-            관리자의 승인을 기다리고 있어요. 승인되면 바로 달력이 열려요.
-          </Text>
-          <Button
-            title="신청 취소"
-            variant="tertiary"
-            size="sm"
-            loading={cancelRequest.isPending}
-            onPress={() => void cancelRequest.mutateAsync()}
-            style={{ alignSelf: "flex-start", marginTop: spacing.sm }}
-          />
-        </ContentPanel>
-      )}
-
-      <ContentPanel style={styles.card}>
-        <Input
-          value={query}
-          onChangeText={setQuery}
-          placeholder="부대 이름으로 검색 (예: 제12보병사단)"
-          accessibilityLabel="부대 검색"
-        />
-
-        {search.isPending ? (
-          <View style={{ padding: spacing.xl, alignItems: "center" }}>
-            <ActivityIndicator color={colors.ink} />
-          </View>
-        ) : search.isError ? (
-          // 오류를 "검색 결과 없음"으로 감추면 원인을 알 수 없다 — 따로 알린다.
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>
-              부대 목록을 불러오지 못했어요.{"\n"}
-              {search.error instanceof Error
-                ? search.error.message
-                : "잠시 후 다시 시도해주세요."}
+          <ContentPanel style={styles.card}>
+            <Text style={styles.sectionTitle}>관리자가 아직 없나요?</Text>
+            <Text style={styles.body}>
+              식별 정보가 없는 공유 그룹을 만든 뒤, 한 번만 보이는 초대코드를
+              직접 전달하세요.
             </Text>
             <Button
-              title="다시 시도"
+              title="새 공유 그룹 만들기"
               variant="secondary"
-              size="sm"
-              loading={search.isFetching}
-              onPress={() => void search.refetch()}
+              onPress={() => setCreateOpen(true)}
+              testID="create-unit-open"
             />
-          </View>
-        ) : search.data && search.data.units.length > 0 ? (
-          <View>
-            {search.data.units.map((u) => (
-              <View key={u.id} style={styles.unitRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.unitName}>{u.name}</Text>
-                  <Text style={styles.unitMeta}>
-                    부대원 {u.memberCount}명 · 하루 최대 출타 {u.maxLeaveCount}
-                    명
-                  </Text>
-                  {u.description ? (
-                    <Text style={styles.unitMeta}>{u.description}</Text>
-                  ) : null}
-                </View>
-                {myUnit?.id === u.id ? (
-                  <Badge text="소속됨" kind="positive" />
-                ) : joinRequest?.unitId === u.id ? (
-                  <Badge text="신청 중" kind="neutral" />
-                ) : (
-                  <Button
-                    title="가입 신청"
-                    variant="tertiary"
-                    size="sm"
-                    disabled={join.isPending || myUnit != null}
-                    onPress={() => void doJoin(u.id, u.name)}
-                  />
-                )}
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              {debounced
-                ? `"${debounced}"에 해당하는 부대가 없어요.`
-                : "부대 이름을 검색해보세요."}
-            </Text>
-            <Text style={styles.emptyCaption}>
-              찾는 부대가 없다면 새로 만들 수 있어요.
-            </Text>
-          </View>
-        )}
+          </ContentPanel>
+        </>
+      )}
 
-        <Button
-          title="새 부대 만들기"
-          variant="secondary"
-          onPress={() => setCreateOpen(true)}
+      {issuedInvite ? (
+        <InvitePanel
+          invite={issuedInvite}
+          onShare={() => void shareInvite(issuedInvite)}
         />
-      </ContentPanel>
+      ) : null}
 
       <CreateUnitModal
         visible={createOpen}
-        initialName={debounced}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => {
+        onCreated={(invite) => {
+          setIssuedInvite(invite);
           setCreateOpen(false);
-          router.back();
         }}
       />
     </ScrollView>
   );
 }
 
+function InvitePanel(props: { invite: IssuedUnitInvite; onShare: () => void }) {
+  return (
+    <ContentPanel style={styles.inviteCard}>
+      <Text style={styles.sectionTitle}>지금 초대코드를 보관하세요</Text>
+      <Text style={styles.body}>
+        원문은 서버에 저장되지 않아 이 화면을 떠나면 다시 볼 수 없습니다.
+      </Text>
+      <Text selectable accessibilityLabel="발급된 초대코드" style={styles.code}>
+        {props.invite.code}
+      </Text>
+      <Text style={styles.myUnitMeta}>
+        {new Date(props.invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
+        {props.invite.maxUses}회
+      </Text>
+      <Button title="안전하게 공유" onPress={props.onShare} />
+    </ContentPanel>
+  );
+}
+
 function CreateUnitModal(props: {
   visible: boolean;
-  initialName: string;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (invite: IssuedUnitInvite) => void;
 }) {
-  const [name, setName] = useState(props.initialName);
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState("");
+  const [referenceTotal, setReferenceTotal] = useState("");
   const [maxCount, setMaxCount] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
 
   useEffect(() => {
-    if (props.visible) setName((n) => n || props.initialName);
-  }, [props.visible, props.initialName]);
+    if (!props.visible) setError(null);
+  }, [props.visible]);
 
   const submit = async () => {
     const input = {
       name: name.trim(),
-      ...(description.trim() ? { description: description.trim() } : {}),
+      referenceMemberTotal:
+        referenceTotal.trim() === "" ? null : Number(referenceTotal),
       maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
-    };
+    } satisfies UnitCreateInput;
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "입력값을 확인해주세요");
       return;
     }
     try {
-      await create.mutateAsync(parsed.data);
-      props.onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "부대를 만들지 못했습니다");
+      const result = await create.mutateAsync(parsed.data);
+      props.onCreated(result.invite);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "그룹을 만들지 못했습니다",
+      );
     }
   };
 
   return (
     <NativeBottomSheet
       isPresented={props.visible}
-      snapPoints={[{ fraction: 0.72 }, "full"]}
+      snapPoints={[{ fraction: 0.78 }, "full"]}
       onDismiss={props.onClose}
       testID="create-unit-sheet"
     >
@@ -288,45 +283,52 @@ function CreateUnitModal(props: {
         style={styles.createSheet}
       >
         <SheetScaffold
-          title="새 부대 만들기"
+          title="새 공유 그룹"
           onClose={props.onClose}
           closeTestID="create-unit-close"
           footer={
             <Button
-              title={create.isPending ? "만드는 중…" : "부대 만들고 가입하기"}
+              title={create.isPending ? "만드는 중…" : "그룹 만들기"}
               onPress={() => void submit()}
               loading={create.isPending}
               testID="create-unit-submit"
             />
           }
         >
-          <Field label="부대 이름">
+          <ContentPanel style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              실제 부대명·고유번호·주소·위치·병력 현황·작전/훈련 정보를 입력하지
+              마세요. 이름은 서버 검색에 사용되지 않습니다.
+            </Text>
+          </ContentPanel>
+          <Field label="그룹 안에서만 보이는 별칭">
             <Input
               value={name}
               onChangeText={setName}
-              placeholder="예: 제12보병사단 51연대 2대대"
+              placeholder="예: 여름 휴가방"
+              maxLength={80}
+              testID="create-unit-name"
             />
           </Field>
-          <Field label="소개 (선택)">
+          <Field
+            label="계산 기준 인원 (선택)"
+            hint="실제 편제·정원이 아닌 관리자가 정한 참고값입니다. 마지막 변경 시각이 함께 표시됩니다."
+          >
             <Input
-              value={description}
-              onChangeText={setDescription}
-              placeholder="부대를 알아볼 수 있는 한 줄"
+              value={referenceTotal}
+              onChangeText={setReferenceTotal}
+              keyboardType="number-pad"
+              placeholder="예: 50"
+              accessibilityLabel="계산 기준 인원"
+              testID="create-unit-reference-total"
             />
           </Field>
-          <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
-
-          {error && (
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "600",
-                color: colors.negativeDeep,
-              }}
-            >
-              {error}
-            </Text>
-          )}
+          <LeaveLimitFields
+            count={maxCount}
+            onCountChange={setMaxCount}
+            testID="create-unit-max-out"
+          />
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </SheetScaffold>
       </KeyboardAvoidingView>
     </NativeBottomSheet>
@@ -344,71 +346,60 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  subtitle: { fontSize: 16, color: colors.body },
-  myUnitCard: {
-    padding: spacing.xl,
-    gap: 4,
-  },
+  subtitle: { fontSize: 15, lineHeight: 22, color: colors.body },
+  myUnitCard: { padding: spacing.xl, gap: spacing.xs },
   myUnitEyebrow: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.positiveDeep,
   },
-  myUnitName: { fontSize: 22, fontWeight: "600", color: colors.ink },
-  myUnitMeta: { fontSize: 13, color: colors.body },
+  myUnitName: { fontSize: 22, fontWeight: "700", color: colors.ink },
+  myUnitMeta: { fontSize: 13, lineHeight: 19, color: colors.body },
+  securityNote: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.warningContent,
+    marginTop: spacing.xs,
+  },
   myUnitActions: {
     flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.sm,
     flexWrap: "wrap",
   },
-  pendingCard: {
+  card: { padding: spacing.xl, gap: spacing.lg },
+  inviteCard: {
     padding: spacing.xl,
-    gap: 4,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  sectionTitle: { fontSize: 19, fontWeight: "700", color: colors.ink },
+  body: { fontSize: 14, lineHeight: 21, color: colors.body },
+  code: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.canvasSoft,
+    color: colors.ink,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  warningBox: {
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.warning,
   },
-  pendingEyebrow: {
-    fontSize: 12,
-    fontWeight: "600",
+  warningText: {
     color: colors.warningContent,
-  },
-  card: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  unitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.canvasSoft,
-  },
-  unitName: { fontSize: 15, fontWeight: "600", color: colors.ink },
-  unitMeta: { fontSize: 12, color: colors.mute, marginTop: 1 },
-  empty: {
-    backgroundColor: colors.canvasSoft,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    alignItems: "center",
-    gap: 4,
-  },
-  emptyText: { fontSize: 14, color: colors.body, textAlign: "center" },
-  emptyCaption: { fontSize: 12, color: colors.mute },
-  errorBox: {
-    backgroundColor: colors.canvasSoft,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    alignItems: "center",
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.negative,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
   },
   errorText: {
-    fontSize: 14,
     color: colors.negativeDeep,
-    textAlign: "center",
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
   },
 });

@@ -1,4 +1,5 @@
 import {
+  availabilitySignal,
   BALANCE_LABELS,
   fmtRangeTiny,
   getHoliday,
@@ -8,28 +9,29 @@ import {
 } from "@leave/shared";
 import type { Calendar } from "../../api/queries";
 import { fmtDateK, fmtRange } from "../../lib/format";
-import { Avatar } from "../Avatar";
+import { OfficialDisclaimer } from "../OfficialDisclaimer";
 
 export function DayPanel(props: {
   calendar: Calendar;
   date: string;
   onAddLeave: () => void;
-  /** 내 사용자 id. 내 휴가를 맨 위로 올려 강조한다. */
+  /** 이전 응답과의 호출 호환용. 서버는 이제 내 일정 상세만 내려준다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
-  const dayLeaves = calendar.leaves
-    .filter((l) => l.startDate <= date && date <= l.endDate)
-    .sort((a, b) =>
-      a.userId === props.myUserId ? -1 : b.userId === props.myUserId ? 1 : 0,
-    );
+  // 서버가 타인의 일정 상세를 내려주지 않으므로 여기 남는 건 전부 내 계획이다.
+  const dayLeaves = calendar.leaves.filter(
+    (l) => l.startDate <= date && date <= l.endDate,
+  );
   const exceeded = stat?.exceeded ?? false;
+  const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
   const holiday = getHoliday(date);
-  // 이 날 더 나갈 수 있는 인원. 초과한 날은 음수가 되므로 0에서 끊는다.
-  const remaining = stat ? Math.max(stat.allowed - stat.count, 0) : 0;
+  const blackout = calendar.blackouts.find(
+    (b) => b.startDate <= date && date <= b.endDate,
+  );
 
   return (
     <div
@@ -63,21 +65,43 @@ export function DayPanel(props: {
           <span
             className={`badge ${exceeded ? "badge-negative" : "badge-positive"}`}
           >
-            출타 {stat.count}명 / 허용 {stat.allowed}명
-          </span>
-          <span className="badge badge-neutral">
-            {remaining > 0 ? `잔여 ${remaining}명` : "잔여 없음"}
+            {signal?.percent == null
+              ? "기준 미설정"
+              : `${signal.label} ${signal.percent}%`}
           </span>
           {exceeded && (
             <span
               className="caption"
               style={{ color: "var(--negative-deep)", fontWeight: 600 }}
             >
-              최대 출타 인원 초과
+              참고 기준 초과
             </span>
           )}
         </div>
       )}
+
+      {blackout && (
+        <div
+          className="card-sage"
+          style={{
+            padding: "var(--sp-md)",
+            border: "1px solid var(--warning)",
+          }}
+        >
+          <p
+            className="body-sm strong"
+            style={{ color: "var(--warning-content)" }}
+          >
+            제한 가능 기간
+          </p>
+          <p className="caption text-body" style={{ marginTop: 2 }}>
+            {blackout.reason ?? "관리자가 등록한 기간입니다."} 출타율과 무관하게
+            지휘관이 휴가를 제한할 수 있어요.
+          </p>
+        </div>
+      )}
+
+      <OfficialDisclaimer />
 
       {props.cycle && (
         <p className="caption text-body">
@@ -91,48 +115,52 @@ export function DayPanel(props: {
           className="card-sage"
           style={{ textAlign: "center", padding: "var(--sp-2xl) var(--sp-lg)" }}
         >
-          <p className="body-sm text-body">이 날은 아무도 휴가가 아니에요.</p>
+          <p className="body-sm text-body">공유된 내 계획이 아직 없어요.</p>
           <p className="caption text-mute" style={{ marginTop: 4 }}>
-            가장 먼저 휴가를 잡아보세요.
+            내 계획을 먼저 시뮬레이션해보세요.
           </p>
         </div>
       ) : (
-        <ul
+        <div
           style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
             display: "flex",
             flexDirection: "column",
             gap: "var(--sp-md)",
           }}
         >
-          {dayLeaves.map((l) => {
-            // 이제 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
-            const segment = segmentOnDate(l.segments, date);
-            const key = segment ? segmentBalanceKey(segment) : null;
-            const mine = l.userId === props.myUserId;
-            return (
-              <li
-                key={l.id}
-                style={{
-                  display: "flex",
-                  gap: "var(--sp-md)",
-                  alignItems: "center",
-                  background: mine ? "var(--primary-pale, #e2f6d5)" : undefined,
-                  borderRadius: mine ? "var(--r-lg)" : undefined,
-                  padding: mine ? "var(--sp-sm)" : undefined,
-                }}
-              >
-                <Avatar
-                  name={l.userName}
-                  imageKey={l.userProfileImageKey}
-                  size={40}
-                />
-                <div style={{ minWidth: 0 }}>
+          <div className="card-sage" style={{ padding: "var(--sp-md)" }}>
+            <p className="body-sm strong">다른 참여자는 집계로만 표시</p>
+            <p className="caption text-mute" style={{ marginTop: 2 }}>
+              사회적 압력을 줄이기 위해 이름·계급·일정 상세·사유는 내려받지
+              않아요.
+            </p>
+          </div>
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-md)",
+            }}
+          >
+            {dayLeaves.map((l) => {
+              // 이제 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
+              const segment = segmentOnDate(l.segments, date);
+              const key = segment ? segmentBalanceKey(segment) : null;
+              return (
+                <li
+                  key={l.id}
+                  style={{
+                    background: "var(--primary-pale, #e2f6d5)",
+                    borderRadius: "var(--r-lg)",
+                    padding: "var(--sp-sm)",
+                    minWidth: 0,
+                  }}
+                >
                   <p className="body-sm strong">
-                    {l.userRankLabel} {l.userName}
-                    {mine ? " (나)" : ""}
+                    내 계획
                     {key && (
                       <span
                         className="cal-mine"
@@ -150,16 +178,11 @@ export function DayPanel(props: {
                   <p className="caption text-mute">
                     {l.title} · {fmtRange(l.startDate, l.endDate)}
                   </p>
-                  {l.reason && (
-                    <p className="caption text-body" style={{ marginTop: 2 }}>
-                      {l.reason}
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       <button

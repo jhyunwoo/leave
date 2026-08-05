@@ -49,7 +49,7 @@ export function ActionMenu(props: {
 const styles = StyleSheet.create({
   trigger: {
     minWidth: 44,
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
     alignItems: "center",

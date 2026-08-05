@@ -1,4 +1,5 @@
 import {
+  availabilitySignal,
   BALANCE_LABELS,
   buildMonthGrid,
   cycleColor,
@@ -14,7 +15,7 @@ import type { Calendar } from "@/api/queries";
 import type { MyLeaveDay } from "@/lib/my-leave-days";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
-/** 부대 월 달력 그리드. 웹과 동일한 시각 언어(라임 선택, 빨간 초과일). */
+/** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */
 export function MonthCalendar(props: {
   calendar: Calendar;
   selectedDate: ISODate | null;
@@ -52,7 +53,7 @@ export function MonthCalendar(props: {
   const cellHeight = compact ? 44 : 92;
 
   return (
-    <View accessibilityLabel={`${calendar.month} 부대 휴가 달력`}>
+    <View accessibilityLabel={`${calendar.month} 휴가 계획 달력`}>
       {!hideWeekdays && (
         <View style={styles.weekRow}>
           {WEEKDAYS.map((w, i) => (
@@ -69,7 +70,12 @@ export function MonthCalendar(props: {
         <View key={wi} style={styles.weekRow}>
           {week.map((cell) => {
             const stat = cell.inMonth ? statByDate.get(cell.date) : undefined;
-            const exceeded = stat?.exceeded ?? false;
+            const signal = stat
+              ? availabilitySignal(stat.count, stat.allowed)
+              : null;
+            const exceeded = signal?.key === "exceeded";
+            // 블랙아웃은 출타율과 무관하게 제한될 수 있는 날이다.
+            const blocked = stat?.blocked ?? false;
             const isToday = cell.date === today;
             const isSelected = cell.date === selectedDate;
             const dayNum = Number(cell.date.slice(8));
@@ -96,11 +102,21 @@ export function MonthCalendar(props: {
                   cell.inMonth
                     ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${
                         cycle ? `, 정기외박 ${cycle.index}주기` : ""
-                      }${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 출타 ${
-                        stat?.count ?? 0
-                      }명 허용 ${stat?.allowed ?? 0}명${
-                        exceeded ? ", 최대 출타 인원 초과" : ""
-                      }`
+                      }${
+                        mine
+                          ? `, 내 ${BALANCE_LABELS[mine.key]} ${
+                              mine.isDraft
+                                ? "초안"
+                                : mine.isConfirmed
+                                  ? "확정"
+                                  : "희망"
+                            }`
+                          : ""
+                      }, ${
+                        signal?.percent == null
+                          ? "출타 기준 미설정"
+                          : `출타율 ${signal.percent}퍼센트, ${signal.label}`
+                      }${blocked ? ", 제한 가능 기간" : ""}`
                     : undefined
                 }
                 onPress={() => onSelectDate(cell.date)}
@@ -149,6 +165,10 @@ export function MonthCalendar(props: {
                         style={[
                           styles.myChip,
                           { backgroundColor: tone.bg },
+                          // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
+                          mine.isConfirmed
+                            ? [styles.chipConfirmed, { borderColor: tone.fg }]
+                            : [styles.chipTentative, { borderColor: tone.fg }],
                           // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
                           !mine.isSegmentStart && styles.chipJoinLeft,
                           !mine.isSegmentEnd && styles.chipJoinRight,
@@ -160,18 +180,24 @@ export function MonthCalendar(props: {
                             numberOfLines={1}
                             ellipsizeMode="clip"
                           >
+                            {mine.isDraft ? "초안 " : ""}
                             {BALANCE_LABELS[mine.key]}
                           </Text>
                         )}
                       </View>
                     )}
-                    {/* 부대 출타 인원은 날짜를 열어보지 않아도 되게 늘 보여준다.
-                        아무도 안 나간 날은 배경 없이 흐리게 깔아 그리드를 조용히 둔다. */}
-                    {!compact && stat && (
+                    {/* 서버의 절대 인원은 셀에서 드러내지 않고 상태·비율만 보여준다. */}
+                    {!compact && blocked && (
+                      <View style={styles.blockedPill}>
+                        <Text style={styles.blockedText}>제한</Text>
+                      </View>
+                    )}
+                    {!compact && signal && (
                       <View
                         style={[
                           styles.countPill,
-                          stat.count === 0 && styles.countPillEmpty,
+                          signal.percent === 0 && styles.countPillEmpty,
+                          signal.key === "near" && styles.countPillNear,
                           exceeded && {
                             backgroundColor: colors.negativeBg,
                           },
@@ -180,7 +206,10 @@ export function MonthCalendar(props: {
                         <Text
                           style={[
                             styles.countText,
-                            stat.count === 0 && { color: colors.mute },
+                            signal.percent === 0 && { color: colors.mute },
+                            signal.key === "near" && {
+                              color: colors.warningContent,
+                            },
                             exceeded && { color: "#fff" },
                             isSelected && {
                               color: exceeded
@@ -189,7 +218,9 @@ export function MonthCalendar(props: {
                             },
                           ]}
                         >
-                          {stat.count}/{stat.allowed}
+                          {signal.percent == null
+                            ? signal.label
+                            : `${signal.label} ${signal.percent}%`}
                         </Text>
                       </View>
                     )}
@@ -264,6 +295,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCard,
   },
   countPillEmpty: { backgroundColor: "transparent" },
+  blockedPill: {
+    minHeight: 14,
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    borderRadius: radius.sm,
+    backgroundColor: colors.warning,
+  },
+  blockedText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "700",
+    color: colors.warningContent,
+  },
+  countPillNear: { backgroundColor: colors.warning },
   countText: {
     fontSize: 10,
     lineHeight: 12,
@@ -279,6 +324,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 2,
   },
+  chipConfirmed: { borderWidth: 1, borderStyle: "solid" },
+  chipTentative: { borderWidth: 1, borderStyle: "dashed" },
   chipJoinLeft: {
     marginLeft: -2,
     borderTopLeftRadius: 0,

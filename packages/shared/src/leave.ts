@@ -18,6 +18,53 @@ export type LeaveCategory = (typeof LEAVE_CATEGORIES)[number];
 export const OVERNIGHT_KINDS = ["regular", "other"] as const;
 export type OvernightKind = (typeof OVERNIGHT_KINDS)[number];
 
+/**
+ * 휴가 한 건의 진행 상태.
+ *
+ * `draft`는 나만 보는 시뮬레이션이라 그룹 집계에 들어가지 않는다. `shared`부터
+ * `approved`까지는 **익명으로** 집계에 반영된다 — 달력이 이미 집계값과 내 일정만
+ * 내려주므로, 공유해도 누가 언제 나가는지는 드러나지 않는다.
+ * `rejected`와 `cancelled`는 실제로 나가지 않으므로 집계에서 뺀다.
+ */
+export const LEAVE_STATUSES = [
+  "draft",
+  "shared",
+  "requested",
+  "approved",
+  "rejected",
+  "cancelled",
+  "completed",
+] as const;
+
+export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
+
+export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
+  draft: "초안(나만 보기)",
+  shared: "희망",
+  requested: "신청함",
+  approved: "확정",
+  rejected: "반려",
+  cancelled: "취소",
+  completed: "복귀 완료",
+};
+
+/** 출타 집계에 들어가는 상태. 서버와 클라이언트가 같은 목록을 써야 숫자가 맞는다. */
+export const COUNTED_LEAVE_STATUSES: readonly LeaveStatus[] = [
+  "shared",
+  "requested",
+  "approved",
+  "completed",
+];
+
+export function isCountedLeaveStatus(status: string): boolean {
+  return (COUNTED_LEAVE_STATUSES as readonly string[]).includes(status);
+}
+
+/** 확정(approved/completed)은 희망과 시각적으로 반드시 구분해야 한다. */
+export function isConfirmedLeaveStatus(status: string): boolean {
+  return status === "approved" || status === "completed";
+}
+
 export const BALANCE_KEYS = [
   "annual",
   "award",

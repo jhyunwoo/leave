@@ -9,12 +9,31 @@ export interface PushMessage {
   data?: Record<string, unknown>;
 }
 
+/**
+ * 잠금화면에 그룹명·그룹 id·휴가 날짜가 노출되지 않도록 하는 최소 푸시 payload.
+ * 상세 내용은 인증 후 notificationId로 인앱 알림을 조회한다.
+ */
+export function buildNotificationPushMessage(
+  notificationId: string,
+): PushMessage {
+  return {
+    title: "휴가 일정 알림",
+    body: "앱에서 새로운 알림을 확인해주세요.",
+    data: { notificationId },
+  };
+}
+
 /** 토큰 하나에 대한 발송 결과 — 발송 로그(push_logs) 저장에 사용. */
 export interface PushSendResult {
   token: string;
   status: "ok" | "error";
   /** 성공 시 Expo 티켓 id, 실패 시 오류 사유 */
   detail?: string;
+}
+
+export interface TokenPushMessage {
+  token: string | null | undefined;
+  message: PushMessage;
 }
 
 function isExpoToken(t: string | null | undefined): t is string {
@@ -29,7 +48,17 @@ export async function sendExpoPush(
   tokens: (string | null | undefined)[],
   message: PushMessage,
 ): Promise<PushSendResult[]> {
-  const valid = tokens.filter(isExpoToken);
+  return sendExpoPushMessages(tokens.map((token) => ({ token, message })));
+}
+
+/** 서로 다른 최소 payload를 토큰별로 지정하면서 Expo의 100건 배치를 유지한다. */
+export async function sendExpoPushMessages(
+  messages: TokenPushMessage[],
+): Promise<PushSendResult[]> {
+  const valid = messages.filter(
+    (entry): entry is { token: string; message: PushMessage } =>
+      isExpoToken(entry.token),
+  );
   if (valid.length === 0) return [];
 
   const results: PushSendResult[] = [];
@@ -43,14 +72,22 @@ export async function sendExpoPush(
           "content-type": "application/json",
         },
         body: JSON.stringify(
-          chunk.map((to) => ({ to, sound: "default", ...message })),
+          chunk.map((entry) => ({
+            to: entry.token,
+            sound: "default",
+            ...entry.message,
+          })),
         ),
       });
       if (!res.ok) {
         const text = await res.text();
         console.error("expo push failed", res.status, text);
-        for (const to of chunk) {
-          results.push({ token: to, status: "error", detail: `HTTP ${res.status}` });
+        for (const entry of chunk) {
+          results.push({
+            token: entry.token,
+            status: "error",
+            detail: `HTTP ${res.status}`,
+          });
         }
         continue;
       }
@@ -59,13 +96,17 @@ export async function sendExpoPush(
         data?: { status: string; id?: string; message?: string }[];
       };
       const tickets = json.data ?? [];
-      chunk.forEach((to, idx) => {
+      chunk.forEach((entry, idx) => {
         const ticket = tickets[idx];
         if (ticket && ticket.status === "ok") {
-          results.push({ token: to, status: "ok", detail: ticket.id });
+          results.push({
+            token: entry.token,
+            status: "ok",
+            detail: ticket.id,
+          });
         } else {
           results.push({
-            token: to,
+            token: entry.token,
             status: "error",
             detail: ticket?.message ?? "unknown",
           });
@@ -73,8 +114,12 @@ export async function sendExpoPush(
       });
     } catch (err) {
       console.error("expo push error", err);
-      for (const to of chunk) {
-        results.push({ token: to, status: "error", detail: String(err) });
+      for (const entry of chunk) {
+        results.push({
+          token: entry.token,
+          status: "error",
+          detail: String(err),
+        });
       }
     }
   }

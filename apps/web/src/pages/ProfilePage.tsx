@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { API_URL, getAuthToken } from "../api/client";
 import type { Me } from "../api/queries";
 import { useDeleteAccount, useLogout } from "../api/queries";
-import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "../components/Avatar";
+import { LegalLinks } from "../components/LegalLinks";
+import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { fmtDateShort } from "../lib/format";
 
 export function ProfilePage(props: { me: Me }) {
@@ -12,10 +11,6 @@ export function ProfilePage(props: { me: Me }) {
   const logout = useLogout();
   const deleteAccount = useDeleteAccount();
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const onDeleteAccount = () => {
     const ok = window.confirm(
@@ -33,32 +28,6 @@ export function ProfilePage(props: { me: Me }) {
   };
 
   const progress = Math.round(user.serviceProgress * 100);
-
-  const uploadPhoto = async (file: File) => {
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const res = await fetch(`${API_URL}/images/profile`, {
-        method: "PUT",
-        headers: {
-          "content-type": file.type,
-          Authorization: `Bearer ${getAuthToken() ?? ""}`,
-        },
-        body: file,
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(data?.error ?? "업로드하지 못했습니다");
-      }
-      await qc.invalidateQueries({ queryKey: ["me"] });
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "업로드 실패");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <div
@@ -162,50 +131,23 @@ export function ProfilePage(props: { me: Me }) {
         <div
           style={{ display: "flex", alignItems: "center", gap: "var(--sp-lg)" }}
         >
-          <Avatar name={user.name} imageKey={user.profileImageKey} size={64} />
+          <Avatar name={user.name} size={64} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className="display-xs">{user.name}</p>
             <p className="caption text-mute">{user.email}</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-          >
-            {uploading ? "올리는 중…" : "사진 변경"}
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void uploadPhoto(f);
-            }}
-          />
         </div>
-        {uploadError && (
-          <p className="field-error" role="alert">
-            {uploadError}
-          </p>
-        )}
+        <p className="caption text-body">
+          별칭만 표시합니다. 실명·군번·계급·기수·사진은 프로필에 저장하지
+          마세요.
+        </p>
 
-        <dl
-          style={{
-            margin: 0,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--sp-lg)",
-          }}
-        >
-          <InfoItem label="군 종류" value={user.branchLabel} />
-          <InfoItem label="소속 부대" value={unit?.name ?? "미소속"} />
-          <InfoItem label="입대일" value={user.enlistedAt} />
-          <InfoItem label="전역 예정일" value={user.dischargeAt} />
+        <dl style={{ margin: 0 }}>
+          <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
         </dl>
       </section>
+
+      <OfficialDisclaimer />
 
       {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
       <Link to="/leaves/grants" className="btn btn-secondary">
@@ -222,7 +164,7 @@ export function ProfilePage(props: { me: Me }) {
           style={{ flex: 1 }}
           onClick={() => navigate("/units")}
         >
-          부대 관리
+          공유 그룹
         </button>
         <button
           type="button"
@@ -235,6 +177,22 @@ export function ProfilePage(props: { me: Me }) {
         >
           로그아웃
         </button>
+      </section>
+
+      <section
+        className="card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-md)",
+        }}
+      >
+        <h2 className="display-xs">개인정보와 계정</h2>
+        <p className="body-sm text-body">
+          앱을 삭제한 뒤에도 공개 삭제 요청 페이지에서 계정 삭제 방법을 확인할
+          수 있어요. 여기서는 아래 버튼으로 바로 요청할 수 있습니다.
+        </p>
+        <LegalLinks />
       </section>
 
       {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}

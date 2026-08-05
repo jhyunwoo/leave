@@ -2,13 +2,14 @@ import {
   cycleFor,
   cycleUsedDays,
   firstGrantDate,
-  maxAllowedOut,
   todayInSeoul,
   WEEKDAYS,
   type ISODate,
 } from "@leave/shared";
+import { useNetInfo } from "@react-native-community/netinfo";
+import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -16,11 +17,12 @@ import {
   useLeaveBalances,
   useMe,
   useMyLeaves,
-  useRegisterPushToken,
+  type Calendar,
 } from "@/api/queries";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
+import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import {
   CalendarScroll,
   type CalendarScrollHandle,
@@ -29,7 +31,6 @@ import { LeaveFormModal } from "@/components/leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { buildMyLeaveDayMap } from "@/lib/my-leave-days";
-import { getPushToken } from "@/lib/notifications";
 import { colors, spacing } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
@@ -40,11 +41,23 @@ import { DayPanel } from "./day-panel";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
-const UNIT_ROW_HEIGHT = 24;
+const UNIT_ROW_HEIGHT = 60;
 const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
+
+const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
 export function CalendarScreen() {
   const me = useMe();
+  const netInfo = useNetInfo();
+  const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
   const today = todayInSeoul();
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   // 폼을 열었는지와 폼의 시작일을 한 값으로 둔다. 날짜 시트를 닫으면서 열어야
@@ -56,8 +69,24 @@ export function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
 
-  const unit = me.data?.unit ?? null;
-  const registerPush = useRegisterPushToken();
+  // `me`에는 이메일 등 계정 정보가 있어 디스크에 저장하지 않는다. 완전 오프라인
+  // 재실행에서는 이미 허용 목록으로 복원된 달력 캐시에서 비식별 그룹 요약만 꺼낸다.
+  const cachedCalendar = useMemo(() => {
+    const candidates = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: ["calendar"] })
+      .filter(
+        (query): query is typeof query & { state: { data: Calendar } } =>
+          query.state.status === "success" && query.state.data != null,
+      )
+      .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+    return candidates[0]?.state.data ?? null;
+  }, [isRestoring, queryClient]);
+  const offlineCachedUnit =
+    netInfo.isConnected === false || netInfo.isInternetReachable === false
+      ? (cachedCalendar?.unit ?? null)
+      : null;
+  const unit = me.data?.unit ?? offlineCachedUnit;
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
 
@@ -98,22 +127,22 @@ export function CalendarScreen() {
     ? selectedDate.slice(0, 7)
     : today.slice(0, 7);
   const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
-
-  // 로그인 후 한 번 푸시 토큰 등록 (권한 거부/시뮬레이터면 조용히 건너뜀)
-  useEffect(() => {
-    if (!me.data) return;
-    let cancelled = false;
-    void getPushToken().then((token) => {
-      if (token && !cancelled) registerPush.mutate(token);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me.data?.user.id]);
+  const isOffline =
+    netInfo.isConnected === false || netInfo.isInternetReachable === false;
+  const lastUpdatedAt = Math.max(
+    me.dataUpdatedAt,
+    myLeaves.dataUpdatedAt,
+    balances.dataUpdatedAt,
+    panelCalendar.dataUpdatedAt,
+  );
+  const lastUpdatedLabel =
+    lastUpdatedAt > 0
+      ? LAST_UPDATED_FORMATTER.format(new Date(lastUpdatedAt))
+      : "기록 없음";
+  const syncStatusLabel = `${isOffline ? "오프라인 · " : ""}마지막 갱신 ${lastUpdatedLabel}`;
 
   // 재원 정보가 있어야 주기 표시선·배너를 처음부터 함께 그릴 수 있다. 함께 기다린다.
-  if (me.isPending || balances.isPending) {
+  if (isRestoring || ((me.isPending && !unit) || balances.isPending)) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} size="large" />
@@ -122,14 +151,23 @@ export function CalendarScreen() {
   }
 
   // 통신 실패를 "부대 없음"으로 보여주면 데이터가 사라진 것처럼 보인다. 따로 알린다.
-  if (me.isError || balances.isError) {
+  if (
+    (me.isError && !me.data && !offlineCachedUnit) ||
+    (balances.isError && !balances.data)
+  ) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
         {process.env.EXPO_OS === "web" && (
-          <Text style={styles.webTitle}>부대 달력</Text>
+          <Text style={styles.webTitle}>휴가 계획 달력</Text>
         )}
         <ContentPanel style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>불러오지 못했어요</Text>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
+          >
+            {syncStatusLabel}
+          </Text>
           <Text style={styles.emptyBody}>
             서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해주세요.
           </Text>
@@ -149,22 +187,24 @@ export function CalendarScreen() {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
         {process.env.EXPO_OS === "web" && (
-          <Text style={styles.webTitle}>부대 달력</Text>
+          <Text style={styles.webTitle}>휴가 계획 달력</Text>
         )}
         <ContentPanel style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>아직 소속 부대가 없어요</Text>
+          <Text style={styles.emptyTitle}>아직 공유 그룹이 없어요</Text>
           <Text style={styles.emptyBody}>
-            부대에 들어가면 부대원들의 휴가 달력이 열려요. 부대를 검색하거나
-            새로 만들 수 있어요.
+            초대코드로 그룹에 참여하거나 새 그룹을 만들면 익명 집계 달력이
+            열려요. 그룹 이름에는 실제 부대명을 입력하지 마세요.
           </Text>
-          <Button title="부대 찾기" onPress={() => router.push("/units")} />
+          <Button
+            title="그룹 참여·만들기"
+            onPress={() => router.push("/units")}
+          />
         </ContentPanel>
       </View>
     );
   }
 
-  const allowed = maxAllowedOut(unit.maxLeaveCount);
-  const limitSummary = `하루 최대 ${allowed}명 · 빨간 배경은 초과`;
+  const limitSummary = `여유·보통·임박·초과 상태 · 공식 승인과 무관`;
 
   /**
    * 휴가 등록 폼을 연다. 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌 뒤에 연다.
@@ -221,6 +261,13 @@ export function CalendarScreen() {
         >
           <Text style={styles.unitName} numberOfLines={1} selectable>
             {unit.name}
+          </Text>
+          <OfficialDisclaimer compact />
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
+          >
+            {syncStatusLabel}
           </Text>
           {currentCycle ? (
             <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
@@ -325,11 +372,24 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   unitName: {
-    height: UNIT_ROW_HEIGHT,
+    height: 24,
+    lineHeight: 24,
     paddingHorizontal: spacing.lg,
     fontSize: 12,
     fontWeight: "600",
     color: colors.body,
+  },
+  syncStatus: {
+    height: 20,
+    lineHeight: 18,
+    paddingHorizontal: spacing.lg,
+    textAlign: "center",
+    fontSize: 11,
+    color: colors.mute,
+  },
+  syncStatusOffline: {
+    color: colors.negativeDeep,
+    fontWeight: "700",
   },
   center: {
     flex: 1,

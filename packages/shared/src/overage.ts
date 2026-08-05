@@ -1,4 +1,4 @@
-import { eachDate, rangesOverlap, type ISODate } from "./dates";
+import { addDays, eachDate, rangesOverlap, type ISODate } from "./dates";
 
 /** 출타 인원 계산에 필요한 최소 휴가 정보. */
 export interface LeaveSpan {
@@ -35,19 +35,34 @@ export function computeDayStats(params: {
   maxCount: number | null | undefined;
   rangeStart: ISODate;
   rangeEnd: ISODate;
+  /**
+   * 복귀일을 출타 인원으로 셀지 여부. 단, 시작일과 종료일이 같은 당일
+   * 외출은 이 값과 무관하게 하루로 센다.
+   */
+  returnDayCounts?: boolean;
 }): DayStat[] {
-  const { leaves, maxCount, rangeStart, rangeEnd } = params;
+  const {
+    leaves,
+    maxCount,
+    rangeStart,
+    rangeEnd,
+    returnDayCounts = true,
+  } = params;
   const allowed = maxAllowedOut(maxCount);
   const byDate = new Map<ISODate, Set<string>>();
   for (const date of eachDate(rangeStart, rangeEnd)) {
     byDate.set(date, new Set());
   }
   for (const leave of leaves) {
-    if (!rangesOverlap(leave.startDate, leave.endDate, rangeStart, rangeEnd)) {
+    const effectiveEnd =
+      returnDayCounts || leave.startDate === leave.endDate
+        ? leave.endDate
+        : addDays(leave.endDate, -1);
+    if (!rangesOverlap(leave.startDate, effectiveEnd, rangeStart, rangeEnd)) {
       continue;
     }
     const from = leave.startDate > rangeStart ? leave.startDate : rangeStart;
-    const to = leave.endDate < rangeEnd ? leave.endDate : rangeEnd;
+    const to = effectiveEnd < rangeEnd ? effectiveEnd : rangeEnd;
     for (const date of eachDate(from, to)) {
       byDate.get(date)?.add(leave.userId);
     }
@@ -70,12 +85,14 @@ export function findExceededDates(params: {
   leaves: LeaveSpan[];
   newLeave: { startDate: ISODate; endDate: ISODate };
   maxCount: number | null | undefined;
+  returnDayCounts?: boolean;
 }): ISODate[] {
   return computeDayStats({
     leaves: params.leaves,
     maxCount: params.maxCount,
     rangeStart: params.newLeave.startDate,
     rangeEnd: params.newLeave.endDate,
+    returnDayCounts: params.returnDayCounts,
   })
     .filter((s) => s.exceeded)
     .map((s) => s.date);

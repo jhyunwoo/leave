@@ -63,11 +63,3 @@ export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
   }
   return data as T;
 }
-
-/** API_URL과 이미지 key로 이미지 URL을 만든다 (key 없으면 null). */
-export function buildImageUrl(
-  apiUrl: string,
-  key: string | null | undefined,
-): string | null {
-  return key ? `${apiUrl}/images/${key}` : null;
-}

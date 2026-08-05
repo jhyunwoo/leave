@@ -10,7 +10,11 @@ import {
   fmtDateShort,
   inclusiveDays,
   isRegularOvernightCycleBased,
+  isConfirmedLeaveStatus,
+  LEAVE_STATUS_LABELS,
   leaveCreateSchema,
+  monthsSpanning,
+  recommendDateRanges,
   regularOvernightAvailableIn,
   regularOvernightBlockMessage,
   removeDraft,
@@ -21,12 +25,14 @@ import {
   splitLastDraft,
   type BalanceKey,
   type LeaveCreateInput,
+  type LeaveStatus,
   type SegmentDraft,
   type SegmentLike,
 } from "@leave/shared";
 import { useMemo, useState } from "react";
 import type { MyLeave } from "../api/queries";
 import {
+  useCalendarDays,
   useCreateLeave,
   useLeaveBalances,
   useMe,
@@ -35,6 +41,10 @@ import {
 } from "../api/queries";
 import { Field } from "./Field";
 import { Modal } from "./Modal";
+import { OfficialDisclaimer } from "./OfficialDisclaimer";
+
+/** 대안 날짜를 찾을 때 선택 구간 앞뒤로 살펴보는 일수. */
+const RECOMMENDATION_RADIUS_DAYS = 14;
 
 export function LeaveFormModal(props: {
   initialDate?: string;
@@ -54,6 +64,8 @@ export function LeaveFormModal(props: {
     editing?.endDate ?? props.initialDate ?? "",
   );
   const [reason, setReason] = useState(editing?.reason ?? "");
+  // 새 계획의 기본은 "희망"(익명 집계 반영). 초안은 나만 보고 집계에서 빠진다.
+  const [status, setStatus] = useState<LeaveStatus>(editing?.status ?? "shared");
   const [drafts, setDrafts] = useState<SegmentDraft[]>(() =>
     editing?.segments.length
       ? segmentsToDrafts(editing.segments)
@@ -70,6 +82,61 @@ export function LeaveFormModal(props: {
   const pending = create.isPending || update.isPending;
   const validRange = Boolean(startDate && endDate && startDate <= endDate);
   const duration = validRange ? inclusiveDays(startDate, endDate) : 0;
+
+  // 추천은 선택 구간 밖 ±RECOMMENDATION_RADIUS_DAYS까지 살펴보므로, 그 범위가
+  // 걸치는 달을 모두 받아야 월초·월말 후보가 빠지지 않는다.
+  const calendarMonths = useMemo(() => {
+    if (!startDate) return [];
+    const end = endDate && endDate >= startDate ? endDate : startDate;
+    return monthsSpanning(
+      addDays(startDate, -RECOMMENDATION_RADIUS_DAYS),
+      addDays(end, RECOMMENDATION_RADIUS_DAYS),
+    );
+  }, [startDate, endDate]);
+  const calendar = useCalendarDays(me.data?.unit?.id ?? null, calendarMonths);
+
+  /** 이 계획을 더했을 때 구간 안에서 가장 붐비는 날의 비율. */
+  const selectedSimulation = useMemo(() => {
+    if (!validRange || calendar.days.length === 0) return null;
+    const stats = new Map(calendar.days.map((day) => [day.date, day]));
+    let peak = 0;
+    let exceeded = false;
+    for (let index = 0; index < duration; index += 1) {
+      const stat = stats.get(addDays(startDate, index));
+      if (!stat || stat.allowed <= 0) return null;
+      const countAfter = stat.count + (editing ? 0 : 1);
+      peak = Math.max(peak, Math.round((countAfter / stat.allowed) * 100));
+      exceeded ||= countAfter > stat.allowed;
+    }
+    return { peak, exceeded };
+  }, [calendar.days, duration, editing, startDate, validRange]);
+
+  /** 선택 구간이 블랙아웃에 걸리면 저장 전에 알려야 한다. */
+  const blackoutWarning = useMemo(() => {
+    if (!validRange) return false;
+    const blocked = new Set(
+      calendar.days.filter((day) => day.blocked).map((day) => day.date),
+    );
+    for (let index = 0; index < duration; index += 1) {
+      if (blocked.has(addDays(startDate, index))) return true;
+    }
+    return false;
+  }, [calendar.days, duration, startDate, validRange]);
+
+  const recommendations = useMemo(() => {
+    if (!validRange || calendar.days.length === 0) return [];
+    return recommendDateRanges({
+      days: calendar.days.map((day) => ({
+        date: day.date,
+        count: day.count + (editing ? 0 : 1),
+        allowed: day.allowed,
+      })),
+      selectedStart: startDate,
+      durationDays: duration,
+      radiusDays: RECOMMENDATION_RADIUS_DAYS,
+    });
+  }, [calendar.days, duration, editing, startDate, validRange]);
+
   const resolved = useMemo(
     () => (validRange ? resolveDrafts(startDate, drafts) : []),
     [validRange, startDate, drafts],
@@ -174,6 +241,7 @@ export function LeaveFormModal(props: {
   const submit = async () => {
     const input: LeaveCreateInput = {
       title: title.trim(),
+      status,
       segments: draftsToSegments(startDate, drafts),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
     };
@@ -244,6 +312,100 @@ export function LeaveFormModal(props: {
             />
           </Field>
         </div>
+
+        <Field
+          label="계획 상태"
+          hint={
+            status === "draft"
+              ? "초안은 나만 볼 수 있고 그룹 집계에 들어가지 않아요."
+              : isConfirmedLeaveStatus(status)
+                ? "확정된 일정이에요. 달력에서 희망 일정과 구분해 보여줍니다."
+                : "희망 일정으로 익명 집계에 반영돼요. 누구인지는 드러나지 않습니다."
+          }
+        >
+          <select
+            className="input"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as LeaveStatus)}
+            data-testid="leave-status"
+          >
+            {(
+              [
+                "draft",
+                "shared",
+                "requested",
+                "approved",
+                "rejected",
+                "cancelled",
+                "completed",
+              ] as const
+            ).map((value) => (
+              <option key={value} value={value}>
+                {LEAVE_STATUS_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {blackoutWarning && (
+          <p
+            className="caption strong"
+            style={{
+              padding: "var(--sp-md)",
+              borderRadius: "var(--r-md)",
+              border: "1px solid var(--warning)",
+              color: "var(--warning-content)",
+            }}
+            role="status"
+          >
+            이 기간에는 제한 기간(검열·훈련)이 등록돼 있어요. 출타율과 무관하게
+            지휘관이 휴가를 제한할 수 있습니다.
+          </p>
+        )}
+
+        <OfficialDisclaimer />
+
+        <section className="card-sage" style={{ padding: "var(--sp-lg)" }}>
+          <p className="caption text-mute">이 계획을 더하면</p>
+          <p className="body-sm strong" style={{ marginTop: 2 }}>
+            {selectedSimulation
+              ? `${
+                  selectedSimulation.exceeded
+                    ? "초과"
+                    : selectedSimulation.peak >= 80
+                      ? "임박"
+                      : selectedSimulation.peak >= 50
+                        ? "보통"
+                        : "여유"
+                } · 구간 최고 ${selectedSimulation.peak}%`
+              : "기준을 불러오는 중이거나 설정되지 않았어요"}
+          </p>
+          {recommendations.length > 0 && (
+            <div style={{ marginTop: "var(--sp-md)" }}>
+              <p className="caption text-mute">더 여유로운 인접 날짜</p>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "var(--sp-sm)",
+                  marginTop: "var(--sp-sm)",
+                }}
+              >
+                {recommendations.map((range) => (
+                  <button
+                    key={`${range.startDate}-${range.endDate}`}
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => applyRange(range.startDate, range.endDate)}
+                  >
+                    {fmtDateShort(range.startDate)} ~{" "}
+                    {fmtDateShort(range.endDate)} · 최고 {range.peakPercent}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="card-sage" style={{ padding: "var(--sp-lg)" }}>
           <div

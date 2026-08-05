@@ -1,5 +1,6 @@
 import {
   findExceededDates,
+  isCountedLeaveStatus,
   usersOnLeaveDuring,
   type ISODate,
 } from "@leave/shared";
@@ -10,10 +11,11 @@ import {
   notifications,
   pushLogs,
   units,
+  userNotificationPrefs,
   users,
   type LeaveRow,
 } from "../db/schema";
-import { sendExpoPush } from "./push";
+import { buildNotificationPushMessage, sendExpoPushMessages } from "./push";
 
 function formatDateList(dates: ISODate[]): string {
   const first = dates[0];
@@ -59,11 +61,17 @@ export async function checkOverageAndNotify(params: {
     )
     .all();
 
-  const spans = unitLeaves.map((l) => ({
-    userId: l.userId,
-    startDate: l.startDate,
-    endDate: l.endDate,
-  }));
+  // 초안·반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
+  const spans = unitLeaves
+    .filter((l) => isCountedLeaveStatus(l.status))
+    .map((l) => ({
+      userId: l.userId,
+      startDate: l.startDate,
+      endDate: l.endDate,
+    }));
+
+  // 초안은 나만 보는 시뮬레이션이라 남에게 알림을 보내지 않는다.
+  if (!isCountedLeaveStatus(changedLeave.status)) return [];
 
   const exceededDates = findExceededDates({
     leaves: spans,
@@ -72,10 +80,27 @@ export async function checkOverageAndNotify(params: {
       endDate: changedLeave.endDate,
     },
     maxCount: unit.maxLeaveCount,
+    returnDayCounts: unit.returnDayCounts,
   });
   if (exceededDates.length === 0) return [];
 
-  const affectedIds = usersOnLeaveDuring(spans, exceededDates);
+  const allAffectedIds = usersOnLeaveDuring(spans, exceededDates);
+  // 초과 알림을 끈 사용자에게는 인앱 알림도 푸시도 만들지 않는다.
+  const optedOut = new Set(
+    allAffectedIds.length === 0
+      ? []
+      : (
+          await db
+            .select()
+            .from(userNotificationPrefs)
+            .where(inArray(userNotificationPrefs.userId, allAffectedIds))
+            .all()
+        )
+          .filter((pref) => !pref.overage)
+          .map((pref) => pref.userId),
+  );
+  const affectedIds = allAffectedIds.filter((id) => !optedOut.has(id));
+
   if (affectedIds.length > 0) {
     const now = new Date().toISOString();
     const title = "최대 출타 인원 초과 알림";
@@ -99,17 +124,19 @@ export async function checkOverageAndNotify(params: {
     );
 
     const affectedMembers = members.filter((m) => affectedIds.includes(m.id));
-    const data = { type: "overage", unitId, dates: exceededDates };
 
     // 푸시 발송과 발송 로그 저장을 하나의 백그라운드 작업으로 처리해 응답을 막지 않는다.
     waitUntil(
       (async () => {
-        const results = await sendExpoPush(
-          affectedMembers.map((m) => m.expoPushToken),
-          { title, body, data },
+        const results = await sendExpoPushMessages(
+          affectedMembers.map((member) => ({
+            token: member.expoPushToken,
+            message: buildNotificationPushMessage(
+              notificationIdByUser.get(member.id)!,
+            ),
+          })),
         );
         const resultByToken = new Map(results.map((r) => [r.token, r]));
-        const dataJson = JSON.stringify(data);
 
         // 부대원별로 발송 결과를 push_logs(direction: send)에 남긴다.
         const logRows = affectedMembers.map((m) => {
@@ -123,12 +150,8 @@ export async function checkOverageAndNotify(params: {
             userId: m.id,
             notificationId: notificationIdByUser.get(m.id) ?? null,
             direction: "send" as const,
-            title,
-            body,
-            dataJson,
             // 유효 토큰이 없으면 skipped, 있으면 발송 결과(ok/error)
             status: result ? result.status : "skipped",
-            detail: result?.detail ?? (token ? null : "토큰 없음"),
             createdAt: new Date().toISOString(),
           };
         });

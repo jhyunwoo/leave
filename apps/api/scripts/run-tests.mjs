@@ -83,6 +83,10 @@ async function main() {
       "--persist-to",
       STATE_DIR,
       "--local",
+      // 스위트 전체가 한 IP에서 돈다. IP 버킷을 쓰는 가입·로그인만 상한을 풀어
+      // 두고, 사용자별 버킷인 나머지는 실제 값 그대로 검증한다.
+      "--var",
+      'RATE_LIMITS:{"signup":100000,"login":100000}',
     ],
     { cwd: apiDir, detached: true, stdio: "ignore" },
   );
@@ -99,7 +103,8 @@ async function main() {
     .filter((f) => f.endsWith(".test.mjs"))
     .map((f) => path.join("test", f));
 
-  const result = run("node", ["--test", ...testFiles], {
+  // 모든 파일이 같은 격리 D1을 사용하므로 파일 간 병렬 실행은 상태 경합을 만든다.
+  const result = run("node", ["--test", "--test-concurrency=1", ...testFiles], {
     env: { ...process.env, API_URL: BASE },
   });
 

@@ -135,16 +135,16 @@ const PHONE = { logicalW: 430, logicalH: 930 };
 const TABLET = { logicalW: 1200, logicalH: 1600 };
 
 const phoneShots = [
-  { id: "01-calendar", screen: "calendar", caption: "우리 부대 휴가,<br>한 달력에", sub: "같은 부대원의 휴가가 달력에 한눈에 모여요" },
-  { id: "02-overage", screen: "dayPanel", caption: "출타율 초과일은<br>빨갛게", sub: "정원을 넘는 날을 미리 확인하세요" },
+  { id: "01-calendar", screen: "calendar", caption: "그룹 휴가 일정,<br>한 달력에", sub: "가상 별칭과 혼잡 신호로 계획을 참고해요" },
+  { id: "02-overage", screen: "dayPanel", caption: "혼잡 신호를<br>미리 확인", sub: "사용자 입력에 따른 추정치이며 공식 승인이 아니에요" },
   { id: "03-register", screen: "leaveForm", caption: "휴가 등록은<br>캘린더처럼 간단히", sub: "제목·기간만 입력하면 끝, 사유는 선택" },
-  { id: "04-unit", screen: "unit", caption: "부대 만들고<br>출타율 설정", sub: "전체의 1/3처럼 비율로 관리해요" },
-  { id: "05-notify", screen: "notif", caption: "초과되면<br>바로 알림", sub: "겹치는 날엔 관련 부대원 모두에게 푸시" },
-  { id: "06-rank", screen: "profile", caption: "복무기간 따라<br>계급 자동 진급", sub: "다음 진급일·전역일까지 한 화면에" },
+  { id: "04-unit", screen: "unit", caption: "가상 그룹으로<br>기준값 설정", sub: "실제 부대 식별 정보는 입력하지 마세요" },
+  { id: "05-notify", screen: "notif", caption: "신호가 바뀌면<br>선택 알림", sub: "필요한 일정 변화만 확인해요" },
+  { id: "06-rank", screen: "profile", caption: "개인 휴가 계획을<br>한 화면에", sub: "표시명에는 실명 대신 별칭을 권장해요" },
 ];
 const tabletShots = [
-  { id: "01-calendar", screen: "tabletCalendar", caption: "넓은 화면에서 달력과 상세를 나란히", sub: "부대 휴가와 출타율 초과일을 한눈에" },
-  { id: "02-register", screen: "tabletUnit", caption: "부대 찾고 휴가 등록까지 한 번에", sub: "최대 출타율은 비율로, 등록은 캘린더처럼" },
+  { id: "01-calendar", screen: "tabletCalendar", caption: "넓은 화면에서 달력과 상세를 나란히", sub: "가상 그룹 일정과 혼잡 신호를 한눈에" },
+  { id: "02-register", screen: "tabletUnit", caption: "그룹 확인과 휴가 등록을 한 번에", sub: "사용자 입력에 따른 비공식 계획 참고 도구" },
 ];
 
 // 아이콘 페이지(풀블리드, 흰 배경 합성)
@@ -165,8 +165,8 @@ function featureHTML(W, H) {
         <img src="${ICON_URI}" style="width:96px;height:96px;border-radius:22px;box-shadow:0 8px 24px rgba(0,0,0,.25)"/>
         <div style="font-size:58px;font-weight:800;color:#fff;letter-spacing:-1px">리브</div>
       </div>
-      <div style="font-size:60px;font-weight:800;color:#fff;letter-spacing:-2px;line-height:1.1;margin-top:34px">부대 휴가, 한 달력에.</div>
-      <div style="font-size:30px;font-weight:600;color:#eaf6dc;margin-top:18px;line-height:1.4">출타율 초과일은 빨갛게, 초과되면 알림까지</div>
+      <div style="font-size:60px;font-weight:800;color:#fff;letter-spacing:-2px;line-height:1.1;margin-top:34px">그룹 휴가, 한 달력에.</div>
+      <div style="font-size:30px;font-weight:600;color:#eaf6dc;margin-top:18px;line-height:1.4">입력 일정 기반 혼잡 신호 · 비공식 참고용</div>
     </div>
     <div style="z-index:2;width:300px;height:300px;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3);border-radius:34px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:22px;margin-right:20px">
       ${Array.from({length:16}).map((_,i)=>{const over=i===6||i===10;return `<div style="border-radius:10px;background:${over?"#d03238":"rgba(255,255,255,.85)"};display:flex;align-items:center;justify-content:center;font-weight:800;color:${over?"#fff":"#163300"};font-size:22px">${i+8}</div>`;}).join("")}

@@ -1,7 +1,9 @@
 import {
   assertSegmentsAvailable,
+  buildNotificationPushMessage,
   bumpUnitVersion,
   checkOverageAndNotify,
+  contentReports,
   insertLeaveSegments,
   leaves,
   leaveSegments,
@@ -10,7 +12,7 @@ import {
   notifications,
   pushLogs,
   sendExpoPush,
-  unitJoinRequests,
+  unitInvites,
   units,
   users,
 } from "@leave/api/server";
@@ -23,7 +25,7 @@ import {
   sortSegments,
   type LeaveSegment,
 } from "@leave/shared";
-import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -325,140 +327,149 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
     });
     return c.json({ ok: true as const });
   })
-  .get("/join-requests", async (c) => {
+  // 초대코드는 원문을 저장하지 않으므로 관리자도 조회할 수 없다.
+  // 운영에 필요한 건 "어느 그룹에 유효한 코드가 몇 개 살아 있는가"와 폐기 수단뿐이다.
+  .get("/unit-invites", async (c) => {
     const db = drizzle(c.env.DB);
     const { page, pageSize, offset, q } = listParams(c);
     const where = q
-      ? or(
-          like(users.name, `%${q}%`),
-          like(users.email, `%${q}%`),
-          like(units.name, `%${q}%`),
-        )
+      ? or(like(units.name, `%${q}%`), like(unitInvites.unitId, `%${q}%`))
       : undefined;
     const [items, total] = await Promise.all([
       db
         .select({
-          id: unitJoinRequests.id,
-          unitId: unitJoinRequests.unitId,
+          id: unitInvites.id,
+          unitId: unitInvites.unitId,
           unitName: units.name,
-          userId: unitJoinRequests.userId,
-          userName: users.name,
-          userEmail: users.email,
-          createdAt: unitJoinRequests.createdAt,
+          expiresAt: unitInvites.expiresAt,
+          maxUses: unitInvites.maxUses,
+          usedCount: unitInvites.usedCount,
+          revokedAt: unitInvites.revokedAt,
+          createdBy: unitInvites.createdBy,
+          createdAt: unitInvites.createdAt,
         })
-        .from(unitJoinRequests)
-        .innerJoin(users, eq(unitJoinRequests.userId, users.id))
-        .innerJoin(units, eq(unitJoinRequests.unitId, units.id))
+        .from(unitInvites)
+        .innerJoin(units, eq(unitInvites.unitId, units.id))
         .where(where)
-        .orderBy(desc(unitJoinRequests.createdAt))
+        .orderBy(desc(unitInvites.createdAt))
         .limit(pageSize)
         .offset(offset)
         .all(),
       db
         .select({ count: sql<number>`cast(count(*) as integer)` })
-        .from(unitJoinRequests)
-        .innerJoin(users, eq(unitJoinRequests.userId, users.id))
-        .innerJoin(units, eq(unitJoinRequests.unitId, units.id))
+        .from(unitInvites)
+        .innerJoin(units, eq(unitInvites.unitId, units.id))
         .where(where)
         .get()
         .then((row) => row?.count ?? 0),
     ]);
     return c.json({ items, meta: listMeta(page, pageSize, total) });
   })
-  .post("/join-requests", async (c) => {
-    const input = z
-      .object({ userId: z.string().min(1), unitId: z.string().min(1) })
-      .safeParse(await c.req.json().catch(() => null));
-    if (!input.success)
-      return c.json({ error: "사용자와 부대를 선택해주세요" }, 400);
-    const db = drizzle(c.env.DB);
-    const [user, unit] = await Promise.all([
-      getUser(db, input.data.userId),
-      db.select().from(units).where(eq(units.id, input.data.unitId)).get(),
-    ]);
-    if (!user || !unit)
-      return c.json({ error: "사용자 또는 부대를 찾을 수 없습니다" }, 404);
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, user.id));
-    const request = {
-      id: crypto.randomUUID(),
-      userId: user.id,
-      unitId: unit.id,
-      createdAt: nowIso(),
-    };
-    await db.insert(unitJoinRequests).values(request);
-    await writeAudit(c, {
-      action: "create",
-      entityType: "join_request",
-      entityId: request.id,
-      after: request,
-    });
-    return c.json({ item: request }, 201);
-  })
-  .post("/join-requests/:id/approve", async (c) => {
+  .post("/unit-invites/:id/revoke", async (c) => {
     const db = drizzle(c.env.DB);
     const id = c.req.param("id");
-    const request = await db
+    const before = await db
       .select()
-      .from(unitJoinRequests)
-      .where(eq(unitJoinRequests.id, id))
+      .from(unitInvites)
+      .where(eq(unitInvites.id, id))
       .get();
-    if (!request) return c.json({ error: "가입 요청을 찾을 수 없습니다" }, 404);
-    const user = await getUser(db, request.userId);
+    if (!before) return c.json({ error: "초대코드를 찾을 수 없습니다" }, 404);
+    if (before.revokedAt) {
+      return c.json({ error: "이미 폐기된 초대코드입니다" }, 409);
+    }
+    const revokedAt = nowIso();
     await db
-      .update(users)
-      .set({ unitId: request.unitId })
-      .where(eq(users.id, request.userId));
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, request.userId));
-    if (user?.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
-    await bumpUnitVersion(c.env.CACHE, request.unitId);
+      .update(unitInvites)
+      .set({ revokedAt })
+      .where(eq(unitInvites.id, id));
     await writeAudit(c, {
-      action: "approve",
-      entityType: "join_request",
+      action: "revoke",
+      entityType: "unit_invite",
       entityId: id,
-      before: request,
-      after: { userId: request.userId, unitId: request.unitId },
+      before: { ...before, codeHash: undefined },
+      after: { revokedAt },
     });
     return c.json({ ok: true as const });
   })
-  .post("/join-requests/:id/reject", async (c) => {
+  .delete("/unit-invites/:id", async (c) => {
     const db = drizzle(c.env.DB);
     const id = c.req.param("id");
-    const request = await db
+    const before = await db
       .select()
-      .from(unitJoinRequests)
-      .where(eq(unitJoinRequests.id, id))
+      .from(unitInvites)
+      .where(eq(unitInvites.id, id))
       .get();
-    if (!request) return c.json({ error: "가입 요청을 찾을 수 없습니다" }, 404);
-    await db.delete(unitJoinRequests).where(eq(unitJoinRequests.id, id));
-    await writeAudit(c, {
-      action: "reject",
-      entityType: "join_request",
-      entityId: id,
-      before: request,
-    });
-    return c.json({ ok: true as const });
-  })
-  .delete("/join-requests/:id", async (c) => {
-    const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
-    const request = await db
-      .select()
-      .from(unitJoinRequests)
-      .where(eq(unitJoinRequests.id, id))
-      .get();
-    if (!request) return c.json({ error: "가입 요청을 찾을 수 없습니다" }, 404);
-    await db.delete(unitJoinRequests).where(eq(unitJoinRequests.id, id));
+    if (!before) return c.json({ error: "초대코드를 찾을 수 없습니다" }, 404);
+    await db.delete(unitInvites).where(eq(unitInvites.id, id));
     await writeAudit(c, {
       action: "delete",
-      entityType: "join_request",
+      entityType: "unit_invite",
       entityId: id,
-      before: request,
+      // 해시라도 감사 로그에 남기지 않는다.
+      before: { ...before, codeHash: undefined },
     });
     return c.json({ ok: true as const });
+  })
+  // UGC 신고 처리 큐. Apple 1.2와 Play UGC 정책은 "24시간 내 조치"를 요구하므로
+  // 운영자가 미처리 건을 한눈에 보고 상태를 바꿀 수 있어야 한다.
+  .get("/content-reports", async (c) => {
+    const db = drizzle(c.env.DB);
+    const { page, pageSize, offset, q } = listParams(c);
+    const status = c.req.query("status");
+    const conditions: SQL<unknown>[] = [];
+    if (q) {
+      conditions.push(
+        or(
+          like(contentReports.targetId, `%${q}%`),
+          like(contentReports.reason, `%${q}%`),
+          like(contentReports.detail, `%${q}%`),
+        )!,
+      );
+    }
+    if (status === "open" || status === "reviewing" || status === "resolved") {
+      conditions.push(eq(contentReports.status, status));
+    }
+    const where = conditions.length ? and(...conditions) : undefined;
+    const [items, total] = await Promise.all([
+      db
+        .select()
+        .from(contentReports)
+        .where(where)
+        // 미처리 건이 항상 위로 오게 한다.
+        .orderBy(asc(contentReports.status), desc(contentReports.createdAt))
+        .limit(pageSize)
+        .offset(offset)
+        .all(),
+      db.$count(contentReports, where),
+    ]);
+    return c.json({ items, meta: listMeta(page, pageSize, total) });
+  })
+  .patch("/content-reports/:id", async (c) => {
+    const input = z
+      .object({ status: z.enum(["open", "reviewing", "resolved"]) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!input.success) return c.json({ error: "상태를 확인해주세요" }, 400);
+    const db = drizzle(c.env.DB);
+    const id = c.req.param("id");
+    const before = await db
+      .select()
+      .from(contentReports)
+      .where(eq(contentReports.id, id))
+      .get();
+    if (!before) return c.json({ error: "신고를 찾을 수 없습니다" }, 404);
+    const resolvedAt = input.data.status === "resolved" ? nowIso() : null;
+    await db
+      .update(contentReports)
+      .set({ status: input.data.status, resolvedAt })
+      .where(eq(contentReports.id, id));
+    await writeAudit(c, {
+      action: "update",
+      entityType: "content_report",
+      entityId: id,
+      before,
+      after: { ...before, status: input.data.status, resolvedAt },
+    });
+    return c.json({ item: { ...before, status: input.data.status, resolvedAt } });
   })
   .get("/notifications", async (c) => {
     const db = drizzle(c.env.DB);
@@ -536,24 +547,18 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
     };
     await db.insert(notifications).values(notification);
     if (input.data.sendPush) {
-      const results = await sendExpoPush([user.expoPushToken], {
-        title: notification.title,
-        body: notification.body,
-        data: { notificationId: notification.id },
-      });
+      // 잠금화면에는 제목·본문을 싣지 않는다. 상세는 앱에서 notificationId로 조회한다.
+      const results = await sendExpoPush(
+        [user.expoPushToken],
+        buildNotificationPushMessage(notification.id),
+      );
       const result = results[0];
       await db.insert(pushLogs).values({
         id: crypto.randomUUID(),
         userId: user.id,
         notificationId: notification.id,
         direction: "send",
-        title: notification.title,
-        body: notification.body,
-        dataJson: JSON.stringify({ notificationId: notification.id }),
         status: result?.status ?? "skipped",
-        detail:
-          result?.detail ??
-          (user.expoPushToken ? "유효하지 않은 Expo 토큰" : "토큰 없음"),
         createdAt: nowIso(),
       });
     }

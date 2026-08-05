@@ -330,7 +330,11 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
       ],
     },
   });
-  assert.equal(past.status, 201, "지난 주기 몫은 그 주기 날짜로 쓸 수 있어야 함");
+  assert.equal(
+    past.status,
+    201,
+    "지난 주기 몫은 그 주기 날짜로 쓸 수 있어야 함",
+  );
   // 지난 주기에 쓴 건 이번 주기 사용량에 섞이지 않는다.
   const mixed = await req("GET", "/leaves/balances", { token });
   assert.equal(regular(mixed.data).usedDays, 3, "이번 주기 사용량만 세야 함");
@@ -345,7 +349,11 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
     body: { totals: { ...body, regular_overnight: 99, award: 7 } },
   });
   assert.equal(totals.status, 200);
-  assert.equal(regular(totals.data).totalDays, 3, "주기 재원 총량은 무시해야 함");
+  assert.equal(
+    regular(totals.data).totalDays,
+    3,
+    "주기 재원 총량은 무시해야 함",
+  );
   assert.equal(
     totals.data.balances.find((item) => item.key === "award").totalDays,
     7,
@@ -490,14 +498,13 @@ test("최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 
 
   const u2 = await signup();
   const u3 = await signup();
-  await req("POST", `/units/${unitId}/join`, { token: u2.token });
-  await req("POST", `/units/${unitId}/join`, { token: u3.token });
-  // 관리자(owner)가 두 신청을 승인해야 부대원으로 편입된다.
-  await req("POST", `/units/${unitId}/requests/${u2.data.user.id}/approve`, {
-    token: owner.token,
+  await req("POST", "/units/join", {
+    token: u2.token,
+    body: { code: unit.data.invite.code },
   });
-  await req("POST", `/units/${unitId}/requests/${u3.data.user.id}/approve`, {
-    token: owner.token,
+  await req("POST", "/units/join", {
+    token: u3.token,
+    body: { code: unit.data.invite.code },
   });
 
   // 같은 날짜에 3명이 휴가 → 직접 지정한 2명 초과
@@ -567,7 +574,12 @@ test("적립분 CRUD — 만기 있는 건과 없는 건을 따로 들고 고친
 
   const dated = await req("POST", "/leaves/grants", {
     token,
-    body: { balanceKey: "award", days: 3, expiresOn: todayShift(30), note: "사격 우수" },
+    body: {
+      balanceKey: "award",
+      days: 3,
+      expiresOn: todayShift(30),
+      note: "사격 우수",
+    },
   });
   assert.equal(dated.status, 201);
 
@@ -613,11 +625,17 @@ test("남의 적립분은 고치거나 지울 수 없다", async () => {
   const id = fundOf(created.data, "award").grants[0].id;
 
   assert.equal(
-    (await req("PATCH", `/leaves/grants/${id}`, { token: other.token, body: { days: 9 } })).status,
+    (
+      await req("PATCH", `/leaves/grants/${id}`, {
+        token: other.token,
+        body: { days: 9 },
+      })
+    ).status,
     404,
   );
   assert.equal(
-    (await req("DELETE", `/leaves/grants/${id}`, { token: other.token })).status,
+    (await req("DELETE", `/leaves/grants/${id}`, { token: other.token }))
+      .status,
     404,
   );
 });
@@ -662,7 +680,11 @@ test("만기가 지난 날짜에는 그 적립분으로 휴가를 쓸 수 없다
     body: {
       title: "만기 넘긴 포상",
       segments: [
-        { category: "award", startDate: todayShift(20), endDate: todayShift(21) },
+        {
+          category: "award",
+          startDate: todayShift(20),
+          endDate: todayShift(21),
+        },
       ],
     },
   });
@@ -727,7 +749,10 @@ test("구버전 총량 API는 만기 없는 기본 적립분만 늘리고 줄인
     base.data.balances.map((item) => [item.key, item.totalDays]),
   );
   totals.award = 7;
-  assert.equal((await req("PUT", "/leaves/balances", { token, body: { totals } })).status, 200);
+  assert.equal(
+    (await req("PUT", "/leaves/balances", { token, body: { totals } })).status,
+    200,
+  );
 
   let page = await req("GET", "/leaves/grants", { token });
   let award = fundOf(page.data, "award");
@@ -741,7 +766,10 @@ test("구버전 총량 API는 만기 없는 기본 적립분만 늘리고 줄인
     body: { balanceKey: "award", days: 3, expiresOn: todayShift(30) },
   });
   totals.award = 12;
-  assert.equal((await req("PUT", "/leaves/balances", { token, body: { totals } })).status, 200);
+  assert.equal(
+    (await req("PUT", "/leaves/balances", { token, body: { totals } })).status,
+    200,
+  );
 
   page = await req("GET", "/leaves/grants", { token });
   award = fundOf(page.data, "award");
@@ -870,7 +898,12 @@ test("남은 휴가에 앞으로 받을 주기 몫까지 들어간다", async ()
 test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", async () => {
   const { token } = await signup();
   assert.equal(
-    (await req("POST", "/leaves/grants", { token, body: { balanceKey: "award", days: 0 } })).status,
+    (
+      await req("POST", "/leaves/grants", {
+        token,
+        body: { balanceKey: "award", days: 0 },
+      })
+    ).status,
     400,
   );
   const flipped = await req("POST", "/leaves/grants", {

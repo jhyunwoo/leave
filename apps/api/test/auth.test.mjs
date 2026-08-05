@@ -81,6 +81,9 @@ test("접속 기록이 남고 /auth/activity로 열람 가능 (동의 기반 로
   assert.equal(meLog.platform, "web");
   assert.equal(meLog.appVersion, "1.2.3");
   assert.equal(meLog.method, "GET");
+  assert.ok(!Object.hasOwn(meLog, "ip"));
+  assert.ok(!Object.hasOwn(meLog, "country"));
+  assert.ok(!Object.hasOwn(meLog, "userAgent"));
 });
 
 test("계정 삭제는 인증이 필요하다", async () => {

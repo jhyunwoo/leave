@@ -42,6 +42,23 @@ export function shiftMonth(month: string, delta: number): string {
   return `${y.toString().padStart(4, "0")}-${m.toString().padStart(2, "0")}`;
 }
 
+/**
+ * 두 날짜가 걸치는 모든 달("YYYY-MM")을 순서대로 돌려준다.
+ *
+ * 달력은 달 단위로만 받아오므로, 한 달치만 들고 여러 달에 걸친 구간을 계산하면
+ * 로드되지 않은 날이 조용히 빠진다. 추천·시뮬레이션처럼 선택 구간 밖까지
+ * 살펴보는 계산은 이 목록으로 필요한 달을 모두 받아야 한다.
+ */
+export function monthsSpanning(start: ISODate, end: ISODate): string[] {
+  const first = start <= end ? start.slice(0, 7) : end.slice(0, 7);
+  const last = start <= end ? end.slice(0, 7) : start.slice(0, 7);
+  const months: string[] = [];
+  for (let month = first; month <= last; month = shiftMonth(month, 1)) {
+    months.push(month);
+  }
+  return months;
+}
+
 export interface GridCell {
   date: ISODate;
   inMonth: boolean;

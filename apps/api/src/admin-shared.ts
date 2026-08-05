@@ -17,5 +17,5 @@ export {
   segmentRowsFor,
   segmentsForLeaves,
 } from "./lib/leave-balances";
-export { sendExpoPush } from "./lib/push";
+export { buildNotificationPushMessage, sendExpoPush } from "./lib/push";
 export type { PushMessage, PushSendResult } from "./lib/push";

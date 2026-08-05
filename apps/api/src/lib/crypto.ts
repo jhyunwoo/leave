@@ -59,6 +59,11 @@ export function generateSessionToken(): string {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
+/** 그룹 초대코드: 192비트 CSPRNG 값. 원문은 발급 응답 외에는 보존하지 않는다. */
+export function generateInviteCode(): string {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(24)));
+}
+
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     "SHA-256",

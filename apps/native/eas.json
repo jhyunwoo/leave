@@ -21,6 +21,13 @@
         "EXPO_PUBLIC_API_URL": "https://leave-api.moveto.workers.dev"
       }
     },
+    "closed": {
+      "channel": "closed-test",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://leave-api.moveto.workers.dev"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,
@@ -30,9 +37,16 @@
     }
   },
   "submit": {
+    "closed": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed"
+      }
+    },
     "production": {
       "android": {
-        "track": "internal"
+        "track": "production",
+        "releaseStatus": "draft"
       },
       "ios": {}
     }

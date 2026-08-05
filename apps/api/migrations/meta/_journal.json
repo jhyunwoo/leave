@@ -85,6 +85,41 @@
       "when": 1785850800000,
       "tag": "0011_unit_max_leave_count",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785854400000,
+      "tag": "0012_secure_unit_invites_and_minimal_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1785858000000,
+      "tag": "0013_unit_return_day_and_blackouts",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785861600000,
+      "tag": "0014_leave_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1785865200000,
+      "tag": "0015_notification_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1785868800000,
+      "tag": "0016_reports_and_blocks",
+      "breakpoints": true
     }
   ]
 }

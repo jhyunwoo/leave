@@ -20,7 +20,6 @@ export type EditableResource =
   | "users"
   | "units"
   | "leaves"
-  | "join-requests"
   | "notifications"
   | "admins";
 
@@ -138,12 +137,6 @@ export function RecordForm({
           reason: nullable(form, "reason"),
           segments: draftsToSegments(leaveStart, drafts),
           sendNotifications: sendChecked,
-        });
-        break;
-      case "join-requests":
-        onSubmit({
-          userId: value(form, "userId"),
-          unitId: value(form, "unitId"),
         });
         break;
       case "notifications":
@@ -425,13 +418,6 @@ export function RecordForm({
             <span>변경 후 최대 출타 인원 초과 알림을 발송합니다</span>
           </label>
         </>
-      ) : null}
-
-      {resource === "join-requests" ? (
-        <div className="form-grid">
-          <Field label="사용자 ID" name="userId" required initial={initial} />
-          <Field label="부대 ID" name="unitId" required initial={initial} />
-        </div>
       ) : null}
 
       {resource === "notifications" ? (

@@ -44,11 +44,7 @@ export function AppLayout(props: { me: Me }) {
             aria-label="프로필"
             className="app-profile-link"
           >
-            <Avatar
-              name={props.me.user.name}
-              imageKey={props.me.user.profileImageKey}
-              size={36}
-            />
+            <Avatar name={props.me.user.name} size={36} />
           </NavLink>
         </div>
       </nav>
