@@ -48,8 +48,12 @@ function AuthenticatedApp({
             <Route path="units" element={<EntityPage resource="units" />} />
             <Route path="leaves" element={<EntityPage resource="leaves" />} />
             <Route
-              path="join-requests"
-              element={<EntityPage resource="join-requests" />}
+              path="unit-invites"
+              element={<EntityPage resource="unit-invites" />}
+            />
+            <Route
+              path="content-reports"
+              element={<EntityPage resource="content-reports" />}
             />
             <Route
               path="notifications"

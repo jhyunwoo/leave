@@ -2,9 +2,10 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { createApp } from "./lib/app";
 import { accessLogMiddleware } from "./middleware/access-log";
+import { minVersionMiddleware } from "./middleware/min-version";
 import { authRoutes } from "./routes/auth";
-import { imageRoutes } from "./routes/images";
 import { leaveRoutes } from "./routes/leaves";
+import { moderationRoutes } from "./routes/moderation";
 import { notificationRoutes } from "./routes/notifications";
 import { pushRoutes } from "./routes/push";
 import { unitRoutes } from "./routes/units";
@@ -28,6 +29,16 @@ app.use("*", async (c, next) => {
   })(c, next);
 });
 
+// 지원하지 않는 구버전 앱은 어떤 데이터도 받아가지 못하게 여기서 끊는다.
+// /meta와 문서는 업데이트 안내를 받아야 하므로 예외로 둔다.
+app.use("*", async (c, next) => {
+  const path = new URL(c.req.url).pathname;
+  if (path === "/" || path === "/meta" || path.startsWith("/docs") || path === "/openapi.json") {
+    return next();
+  }
+  return minVersionMiddleware(c, next);
+});
+
 app.onError((err, c) => {
   console.error("unhandled error", err);
   return c.json({ error: "서버 오류가 발생했습니다" }, 500);
@@ -43,12 +54,19 @@ app.openAPIRegistry.registerComponent("securitySchemes", "Bearer", {
 
 const routes = app
   .get("/", (c) => c.json({ name: "Leave API", status: "ok" }))
+  // 앱이 차단당했을 때 무엇을 해야 하는지 알려면 인증 없이 읽을 수 있어야 한다.
+  .get("/meta", (c) =>
+    c.json({
+      minSupportedVersion: c.env.MIN_APP_VERSION ?? null,
+      latestVersion: c.env.LATEST_APP_VERSION ?? null,
+    }),
+  )
   .route("/auth", authRoutes)
   .route("/units", unitRoutes)
   .route("/leaves", leaveRoutes)
   .route("/notifications", notificationRoutes)
   .route("/push", pushRoutes)
-  .route("/images", imageRoutes);
+  .route("/moderation", moderationRoutes);
 
 app.doc("/openapi.json", {
   openapi: "3.1.0",
@@ -56,7 +74,7 @@ app.doc("/openapi.json", {
     title: "Leave API",
     version: "1.0.0",
     description:
-      "군 휴가 계획/공유 서비스 API. 부대별 휴가 등록과 일별 최대 출타 인원 초과 확인을 제공합니다.",
+      "비식별 공유 그룹의 휴가 계획을 바탕으로 출타율 추정 신호를 제공하는 비공식 참고용 API입니다.",
   },
 });
 

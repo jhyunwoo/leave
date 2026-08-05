@@ -30,8 +30,6 @@ type AccessRow = {
   path: string;
   status: number;
   platform: string | null;
-  ip: string | null;
-  country: string | null;
   durationMs: number | null;
   createdAt: string;
 };
@@ -115,7 +113,6 @@ export function OverviewPage() {
       label: "플랫폼",
       render: (row) => row.platform ?? "—",
     },
-    { key: "ip", label: "IP", render: (row) => row.ip ?? "—" },
     {
       key: "duration",
       label: "응답 시간",

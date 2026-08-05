@@ -2,12 +2,14 @@ import {
   BALANCE_KEYS,
   BRANCHES,
   LEAVE_CATEGORIES,
+  LEAVE_STATUSES,
   OVERNIGHT_KINDS,
   RANKS,
 } from "@leave/shared";
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -53,8 +55,19 @@ export const units = sqliteTable("units", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  // 실제 부대 정원이 아닌, 관리자가 계산 기준으로 지정한 임의의 값.
+  referenceMemberTotal: integer("reference_member_total"),
   // 부대 관리자가 지정한 하루 최대 출타 인원.
   maxLeaveCount: integer("max_leave_count").notNull(),
+  /**
+   * 복귀일을 출타 인원으로 셀지. 부대마다 "복귀일 오전 복귀 = 그날은 출타 아님"인
+   * 곳과 아닌 곳이 갈려 하드코딩할 수 없다. 당일 외출(시작=종료)은 이 값과
+   * 무관하게 항상 하루로 센다.
+   */
+  returnDayCounts: integer("return_day_counts", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  lastTotalUpdatedAt: text("last_total_updated_at"),
   creatorId: text("creator_id").notNull(),
   // 부대 관리자. 생성 시 생성자로 초기화되며 이관으로 바뀔 수 있다.
   adminId: text("admin_id").notNull(),
@@ -64,19 +77,27 @@ export const units = sqliteTable("units", {
 });
 
 /**
- * 부대 가입 신청 — 관리자 승인 전까지 대기 상태로 존재한다.
- * 승인되면 users.unitId가 설정되고 이 행은 삭제된다. 거절 시에도 삭제된다.
+ * 그룹 초대코드. 원문은 발급 응답에서 한 번만 보여주며 DB에는 SHA-256 해시만 저장한다.
  */
-export const unitJoinRequests = sqliteTable(
-  "unit_join_requests",
+export const unitInvites = sqliteTable(
+  "unit_invites",
   {
     id: text("id").primaryKey(),
-    unitId: text("unit_id").notNull(),
-    // 사용자당 동시에 하나의 대기 신청만 허용한다.
-    userId: text("user_id").notNull().unique(),
+    unitId: text("unit_id")
+      .notNull()
+      .references(() => units.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull().unique(),
+    expiresAt: text("expires_at").notNull(),
+    maxUses: integer("max_uses").notNull(),
+    usedCount: integer("used_count").notNull().default(0),
+    revokedAt: text("revoked_at"),
+    createdBy: text("created_by").notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [index("unit_join_requests_unit_idx").on(t.unitId)],
+  (t) => [
+    index("unit_invites_unit_idx").on(t.unitId),
+    index("unit_invites_expires_idx").on(t.expiresAt),
+  ],
 );
 
 export const leaves = sqliteTable(
@@ -90,11 +111,37 @@ export const leaves = sqliteTable(
     startDate: text("start_date").notNull(),
     endDate: text("end_date").notNull(),
     reason: text("reason"),
+    // draft는 나만 보이고 집계에서 빠진다. 자세한 규칙은 shared의 LEAVE_STATUSES 참고.
+    status: text("status", { enum: LEAVE_STATUSES }).notNull().default("shared"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
     index("leaves_user_idx").on(t.userId),
     index("leaves_dates_idx").on(t.startDate, t.endDate),
+    index("leaves_status_idx").on(t.status),
+  ],
+);
+
+/**
+ * 검열·훈련처럼 출타율과 무관하게 지휘관이 휴가를 제한할 수 있는 기간.
+ * 이게 없으면 앱은 "가능"이라 했는데 현실은 불가인 상황이 반복된다.
+ */
+export const unitBlackouts = sqliteTable(
+  "unit_blackouts",
+  {
+    id: text("id").primaryKey(),
+    unitId: text("unit_id")
+      .notNull()
+      .references(() => units.id, { onDelete: "cascade" }),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    reason: text("reason"),
+    createdBy: text("created_by").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("unit_blackouts_unit_idx").on(t.unitId),
+    index("unit_blackouts_dates_idx").on(t.startDate, t.endDate),
   ],
 );
 
@@ -227,10 +274,6 @@ export const accessLogs = sqliteTable(
     platform: text("platform"),
     // 클라이언트가 보낸 X-Client-Version 헤더
     appVersion: text("app_version"),
-    userAgent: text("user_agent"),
-    // Cloudflare가 부여하는 접속 IP(CF-Connecting-IP)와 국가 코드(CF-IPCountry)
-    ip: text("ip"),
-    country: text("country"),
     durationMs: integer("duration_ms"),
     createdAt: text("created_at").notNull(),
   },
@@ -254,12 +297,8 @@ export const pushLogs = sqliteTable(
     direction: text("direction", {
       enum: ["send", "receipt", "open"],
     }).notNull(),
-    title: text("title"),
-    body: text("body"),
-    dataJson: text("data_json"),
     // ok | error | skipped
     status: text("status"),
-    detail: text("detail"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
@@ -331,9 +370,66 @@ export const adminAuditLogs = sqliteTable(
   ],
 );
 
+/** 알림 종류별 수신 설정. 행이 없으면 전부 켜진 것으로 본다. */
+export const userNotificationPrefs = sqliteTable("user_notification_prefs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  overage: integer("overage", { mode: "boolean" }).notNull().default(true),
+  blackout: integer("blackout", { mode: "boolean" }).notNull().default(true),
+  unitNotice: integer("unit_notice", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/**
+ * 자유 입력(그룹 별칭·설명, 참여자 별칭) 신고. 신고자가 탈퇴해도 접수 건은
+ * 남겨야 하므로 reporterId는 nullable이고 외래키를 걸지 않는다.
+ */
+export const contentReports = sqliteTable(
+  "content_reports",
+  {
+    id: text("id").primaryKey(),
+    reporterId: text("reporter_id"),
+    targetType: text("target_type", { enum: ["unit", "member"] }).notNull(),
+    targetId: text("target_id").notNull(),
+    reason: text("reason").notNull(),
+    detail: text("detail"),
+    status: text("status", { enum: ["open", "reviewing", "resolved"] })
+      .notNull()
+      .default("open"),
+    resolvedAt: text("resolved_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("content_reports_status_idx").on(t.status),
+    index("content_reports_target_idx").on(t.targetType, t.targetId),
+  ],
+);
+
+/** 차단은 목록 표시에만 영향을 준다. 출타 집계에서는 빼지 않는다. */
+export const userBlocks = sqliteTable(
+  "user_blocks",
+  {
+    userId: text("user_id").notNull(),
+    blockedUserId: text("blocked_user_id").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.blockedUserId] }),
+    index("user_blocks_user_idx").on(t.userId),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
-export type UnitJoinRequestRow = typeof unitJoinRequests.$inferSelect;
+export type UnitInviteRow = typeof unitInvites.$inferSelect;
+export type UnitBlackoutRow = typeof unitBlackouts.$inferSelect;
+export type UserNotificationPrefsRow =
+  typeof userNotificationPrefs.$inferSelect;
+export type ContentReportRow = typeof contentReports.$inferSelect;
+export type UserBlockRow = typeof userBlocks.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;

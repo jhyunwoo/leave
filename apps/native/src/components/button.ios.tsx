@@ -51,7 +51,7 @@ export function Button(props: {
     ),
     controlSize(size === "sm" ? "regular" : "large"),
     buttonBorderShape("capsule"),
-    frame({ minHeight: size === "sm" ? 42 : 48, maxWidth: Infinity }),
+    frame({ minHeight: size === "sm" ? 44 : 48, maxWidth: Infinity }),
     tint(variant === "danger" ? colors.negative : colors.brand),
   ];
 
@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
     minWidth: 44,
     alignSelf: "stretch",
   },
-  sm: { minHeight: 42 },
+  sm: { minHeight: 44 },
 });

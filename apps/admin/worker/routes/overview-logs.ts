@@ -85,8 +85,6 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
           path: accessLogs.path,
           status: accessLogs.status,
           platform: accessLogs.platform,
-          ip: accessLogs.ip,
-          country: accessLogs.country,
           durationMs: accessLogs.durationMs,
           createdAt: accessLogs.createdAt,
         })
@@ -127,9 +125,9 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
     const to = c.req.query("to");
     if (q) {
       conditions.push(
+        // IP·User-Agent는 더 이상 저장하지 않으므로 경로와 계정으로만 찾는다.
         or(
           like(accessLogs.path, `%${q}%`),
-          like(accessLogs.ip, `%${q}%`),
           like(users.name, `%${q}%`),
           like(users.email, `%${q}%`),
         )!,
@@ -153,9 +151,6 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
           status: accessLogs.status,
           platform: accessLogs.platform,
           appVersion: accessLogs.appVersion,
-          userAgent: accessLogs.userAgent,
-          ip: accessLogs.ip,
-          country: accessLogs.country,
           durationMs: accessLogs.durationMs,
           createdAt: accessLogs.createdAt,
         })
@@ -189,9 +184,6 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
         status: accessLogs.status,
         platform: accessLogs.platform,
         appVersion: accessLogs.appVersion,
-        userAgent: accessLogs.userAgent,
-        ip: accessLogs.ip,
-        country: accessLogs.country,
         durationMs: accessLogs.durationMs,
         createdAt: accessLogs.createdAt,
       })
@@ -210,10 +202,9 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
     const status = c.req.query("status");
     if (q) {
       conditions.push(
+        // 메시지 원문·데이터·오류 상세는 더 이상 저장하지 않는다.
         or(
-          like(pushLogs.title, `%${q}%`),
-          like(pushLogs.body, `%${q}%`),
-          like(pushLogs.detail, `%${q}%`),
+          like(pushLogs.notificationId, `%${q}%`),
           like(users.name, `%${q}%`),
           like(users.email, `%${q}%`),
         )!,
@@ -231,11 +222,7 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
           userEmail: users.email,
           notificationId: pushLogs.notificationId,
           direction: pushLogs.direction,
-          title: pushLogs.title,
-          body: pushLogs.body,
-          dataJson: pushLogs.dataJson,
           status: pushLogs.status,
-          detail: pushLogs.detail,
           createdAt: pushLogs.createdAt,
         })
         .from(pushLogs)
@@ -253,14 +240,7 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
         .get()
         .then((row) => row?.count ?? 0),
     ]);
-    return c.json({
-      items: items.map((item) => ({
-        ...item,
-        data: parseJsonObject(item.dataJson),
-        dataJson: undefined,
-      })),
-      meta: listMeta(page, pageSize, total),
-    });
+    return c.json({ items, meta: listMeta(page, pageSize, total) });
   })
   .get("/push-logs/export", async (c) => {
     const db = drizzle(c.env.DB);
@@ -272,11 +252,7 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
         userEmail: users.email,
         notificationId: pushLogs.notificationId,
         direction: pushLogs.direction,
-        title: pushLogs.title,
-        body: pushLogs.body,
-        dataJson: pushLogs.dataJson,
         status: pushLogs.status,
-        detail: pushLogs.detail,
         createdAt: pushLogs.createdAt,
       })
       .from(pushLogs)

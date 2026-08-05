@@ -6,6 +6,7 @@ import { colors, spacing } from "@/theme";
 export function LeaveLimitFields(props: {
   count: string;
   onCountChange: (value: string) => void;
+  testID?: string;
 }) {
   const count = Number(props.count);
   const hint = Number.isFinite(count)
@@ -21,6 +22,7 @@ export function LeaveLimitFields(props: {
           keyboardType="number-pad"
           style={styles.countInput}
           accessibilityLabel="하루 최대 출타 인원"
+          testID={props.testID}
         />
         <Text style={styles.unit}>명</Text>
       </View>

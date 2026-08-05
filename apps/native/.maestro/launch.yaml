@@ -1,15 +1,14 @@
-# 앱 기동 스모크 테스트 — 로그인 화면이 뜨고, 가입 화면으로 오갈 수 있는지 확인.
-# 실행: apps/native/.maestro/README.md 참고
+# 앱 기동 스모크 — 가입 전에 가치 데모와 비공식 고지가 보이는지 확인한다.
 appId: app.leave.mobile
 ---
 - launchApp:
     clearState: true
 - assertVisible: "리브"
+- assertVisible: "가입 전 미리보기"
+- assertVisible: "공식 승인과 무관"
 - assertVisible: "로그인"
-# 가입 화면으로 이동
 - tapOn: "가입하기"
-- assertVisible: "가입하기"
-- assertVisible: "이메일"
-# 다시 로그인으로
+- assertVisible: "60초 안에 시작하기"
+- assertVisible: "실제 이름·군번·계급·부대명·사진은 받지 않아요."
 - tapOn: "로그인"
-- assertVisible: "로그인"
+- assertVisible: "가입 전 미리보기"

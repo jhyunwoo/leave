@@ -1,4 +1,5 @@
 import {
+  availabilitySignal,
   BALANCE_LABELS,
   cycleColor,
   getHoliday,
@@ -39,12 +40,6 @@ export function MonthCalendar(props: {
     () => new Map(calendar.days.map((d) => [d.date, d])),
     [calendar.days],
   );
-  const namesById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const l of calendar.leaves) map.set(l.userId, l.userName);
-    return map;
-  }, [calendar.leaves]);
-
   return (
     <div
       className="cal"
@@ -68,15 +63,18 @@ export function MonthCalendar(props: {
         <div key={wi} className="cal-week" role="row">
           {week.map((cell) => {
             const stat = cell.inMonth ? statByDate.get(cell.date) : undefined;
+            // 절대 인원 대신 상태 신호만 보여준다. 누가 나가는지도 드러내지 않는다.
+            const signal = stat
+              ? availabilitySignal(stat.count, stat.allowed)
+              : null;
             const isToday = cell.date === today;
             const isSelected = cell.date === selectedDate;
-            const exceeded = stat?.exceeded ?? false;
+            const exceeded = signal?.key === "exceeded";
+            // 블랙아웃은 출타율과 무관하게 제한될 수 있는 날이다.
+            const blocked = stat?.blocked ?? false;
             const dayNum = Number(cell.date.slice(8));
             const sunday = new Date(cell.date).getUTCDay() === 0;
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
-            const names = (stat?.userIds ?? [])
-              .map((id) => namesById.get(id))
-              .filter((n): n is string => !!n);
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
             const inCycle =
               cell.inMonth &&
@@ -97,7 +95,11 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]}` : ""}, 출타 ${stat?.count ?? 0}명 허용 ${stat?.allowed ?? 0}명${exceeded ? ", 최대 출타 인원 초과" : ""}`
+                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}, ${
+                        signal?.percent == null
+                          ? "출타 기준 미설정"
+                          : `출타율 ${signal.percent}퍼센트, ${signal.label}`
+                      }${blocked ? ", 제한 가능 기간" : ""}`
                     : undefined
                 }
                 className={[
@@ -124,47 +126,40 @@ export function MonthCalendar(props: {
                     {holiday}
                   </span>
                 )}
-                {cell.inMonth && names.length > 0 && (
-                  <span className="cal-chips">
-                    {names.slice(0, 2).map((n) => (
-                      <span
-                        key={n}
-                        className={`cal-chip ${exceeded ? "is-exceeded" : ""}`}
-                      >
-                        {n}
-                      </span>
-                    ))}
-                    {names.length > 2 && (
-                      <span className="cal-chip is-more">
-                        +{names.length - 2}
-                      </span>
-                    )}
-                  </span>
-                )}
                 {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
                 {cell.inMonth && mine && (
                   <span
                     className={[
                       "cal-mine",
+                      // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
+                      mine.isConfirmed ? "is-confirmed" : "is-tentative",
                       mine.isSegmentStart ? "" : "is-joined-left",
                       mine.isSegmentEnd ? "" : "is-joined-right",
                     ].join(" ")}
                     data-balance={mine.key}
                   >
-                    {mine.isSegmentStart ? BALANCE_LABELS[mine.key] : ""}
+                    {mine.isSegmentStart
+                      ? `${mine.isDraft ? "초안 " : ""}${BALANCE_LABELS[mine.key]}`
+                      : ""}
                   </span>
                 )}
-                {/* 부대 출타 인원은 날짜를 열어보지 않아도 되게 늘 보여준다.
-                    아무도 안 나간 날은 흐리게 깔아 그리드를 조용히 둔다. */}
-                {cell.inMonth && stat && (
+                {/* 혼잡도는 날짜를 열어보지 않아도 되게 늘 보여준다.
+                    색만으로 구분하지 않도록 라벨과 비율을 함께 적는다. */}
+                {cell.inMonth && blocked && (
+                  <span className="cal-count is-blocked">제한</span>
+                )}
+                {cell.inMonth && signal && (
                   <span
                     className={[
                       "cal-count",
-                      stat.count === 0 ? "is-empty" : "",
+                      signal.percent === 0 ? "is-empty" : "",
+                      signal.key === "near" ? "is-near" : "",
                       exceeded ? "is-exceeded" : "",
                     ].join(" ")}
                   >
-                    {stat.count}/{stat.allowed}
+                    {signal.percent == null
+                      ? signal.label
+                      : `${signal.label} ${signal.percent}%`}
                   </span>
                 )}
                 {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}

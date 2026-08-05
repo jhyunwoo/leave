@@ -4,7 +4,7 @@ import {
   leaves,
   notifications,
   sessions,
-  unitJoinRequests,
+  unitInvites,
   units,
   users,
 } from "@leave/api/server";
@@ -266,7 +266,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       await db.update(users).set(patch).where(eq(users.id, id));
     }
     if (input.data.unitId !== undefined) {
-      await db.delete(unitJoinRequests).where(eq(unitJoinRequests.userId, id));
       if (before.unitId) await bumpUnitVersion(c.env.CACHE, before.unitId);
       if (input.data.unitId) {
         await bumpUnitVersion(c.env.CACHE, input.data.unitId);
@@ -305,7 +304,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
         409,
       );
     }
-    await db.delete(unitJoinRequests).where(eq(unitJoinRequests.userId, id));
     await db.delete(leaves).where(eq(leaves.userId, id));
     await db.delete(notifications).where(eq(notifications.userId, id));
     await db.delete(sessions).where(eq(sessions.userId, id));
@@ -363,15 +361,8 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       );
     }
     const db = drizzle(c.env.DB);
-    if (
-      await db
-        .select({ id: units.id })
-        .from(units)
-        .where(eq(units.name, input.data.name))
-        .get()
-    ) {
-      return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
-    }
+    // 그룹 표시명은 검색·색인되지 않는 내부 라벨이라 중복을 허용한다.
+    // 이름으로 그룹을 특정할 수 있으면 부대 식별 경로가 다시 열린다.
     const [creator, admin] = await Promise.all([
       ensureUser(db, input.data.creatorId),
       ensureUser(db, input.data.adminId),
@@ -394,9 +385,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       .update(users)
       .set({ unitId: unit.id })
       .where(eq(users.id, admin.id));
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, admin.id));
     await bumpUnitVersion(c.env.CACHE, unit.id);
     await writeAudit(c, {
       action: "create",
@@ -420,16 +408,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     const id = c.req.param("id");
     const before = await db.select().from(units).where(eq(units.id, id)).get();
     if (!before) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (
-      input.data.name &&
-      (await db
-        .select({ id: units.id })
-        .from(units)
-        .where(and(eq(units.name, input.data.name), ne(units.id, id)))
-        .get())
-    ) {
-      return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
-    }
     if (input.data.adminId && !(await ensureUser(db, input.data.adminId))) {
       return c.json({ error: "관리자를 찾을 수 없습니다" }, 400);
     }
@@ -439,9 +417,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
         .update(users)
         .set({ unitId: id })
         .where(eq(users.id, input.data.adminId));
-      await db
-        .delete(unitJoinRequests)
-        .where(eq(unitJoinRequests.userId, input.data.adminId));
     }
     await bumpUnitVersion(c.env.CACHE, id);
     const after = (await db
@@ -463,7 +438,8 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     const id = c.req.param("id");
     const before = await db.select().from(units).where(eq(units.id, id)).get();
     if (!before) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    await db.delete(unitJoinRequests).where(eq(unitJoinRequests.unitId, id));
+    // 그룹이 사라진 뒤에도 유효한 초대코드가 남지 않도록 함께 폐기한다.
+    await db.delete(unitInvites).where(eq(unitInvites.unitId, id));
     await db.update(users).set({ unitId: null }).where(eq(users.unitId, id));
     await db.delete(units).where(eq(units.id, id));
     if (before.imageKey) {

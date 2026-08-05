@@ -26,6 +26,6 @@ export function NativeSegmentedControl<T extends string>(props: {
 }
 
 const styles = StyleSheet.create({
-  host: { minHeight: 36, justifyContent: "center" },
-  control: { minHeight: 34 },
+  host: { minHeight: 44, justifyContent: "center" },
+  control: { minHeight: 44 },
 });

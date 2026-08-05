@@ -1,55 +1,101 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  blackoutCreateSchema,
   computeDayStats,
+  isCountedLeaveStatus,
   monthBounds,
   monthSchema,
+  shiftMonth,
+  todayInSeoul,
   unitCreateSchema,
+  unitInviteCreateSchema,
+  unitJoinSchema,
   unitTransferSchema,
   unitUpdateSchema,
 } from "@leave/shared";
-import { and, asc, eq, gte, inArray, like, lte, ne, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
-import { leaves, unitJoinRequests, units, users } from "../db/schema";
-import { createApp } from "../lib/app";
 import {
-  bumpUnitVersion,
-  getCachedCalendar,
-  putCachedCalendar,
-} from "../lib/cache";
+  and,
+  asc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  sql,
+} from "drizzle-orm";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import {
+  leaves,
+  unitBlackouts,
+  unitInvites,
+  units,
+  userBlocks,
+  users,
+} from "../db/schema";
+import { createApp } from "../lib/app";
+import { bumpUnitVersion } from "../lib/cache";
 import { segmentsForLeaves } from "../lib/leave-balances";
 import {
+  blackoutSchema,
   calendarSchema,
   errorResponse,
+  issuedUnitInviteSchema,
   jsonContent,
-  joinRequestSchema,
   memberSchema,
   okSchema,
   unitSchema,
 } from "../lib/responses";
+import { generateInviteCode, sha256Hex } from "../lib/crypto";
 import { serializeMember, serializeUnit } from "../lib/serialize";
 import { authMiddleware } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
 
 const idParam = z.object({ id: z.string() });
 const memberParam = z.object({ id: z.string(), userId: z.string() });
 
-const listRoute = createRoute({
-  method: "get",
-  path: "/",
-  tags: ["부대"],
-  summary: "부대 검색",
-  security: [{ Bearer: [] }],
-  request: { query: z.object({ q: z.string().optional() }) },
-  responses: {
-    200: jsonContent(z.object({ units: z.array(unitSchema) }), "부대 목록"),
-    401: errorResponse("인증 실패"),
+const DEFAULT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_INVITE_MAX_USES = 100;
+
+async function createInvite(
+  db: DrizzleD1Database,
+  input: {
+    unitId: string;
+    createdBy: string;
+    expiresAt: string;
+    maxUses: number;
   },
-});
+) {
+  const code = generateInviteCode();
+  const row = {
+    id: crypto.randomUUID(),
+    unitId: input.unitId,
+    codeHash: await sha256Hex(code),
+    expiresAt: input.expiresAt,
+    maxUses: input.maxUses,
+    usedCount: 0,
+    revokedAt: null,
+    createdBy: input.createdBy,
+    createdAt: new Date().toISOString(),
+  };
+  await db.insert(unitInvites).values(row);
+  return {
+    code,
+    expiresAt: row.expiresAt,
+    maxUses: row.maxUses,
+    usedCount: row.usedCount,
+  };
+}
 
 const createUnitRoute = createRoute({
   method: "post",
   path: "/",
   tags: ["부대"],
-  summary: "부대 생성 (생성자는 자동 가입·관리자)",
+  summary: "비식별 그룹 생성 (생성자는 자동 가입·관리자)",
+  description:
+    "이름과 설명에 실제 부대명·부대번호·주소·위치, 병력 현황, 작전·훈련 정보를 입력하면 안 됩니다. 그룹 이름은 검색·색인되지 않으며 중복될 수 있습니다.",
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -58,10 +104,13 @@ const createUnitRoute = createRoute({
     },
   },
   responses: {
-    201: jsonContent(z.object({ unit: unitSchema }), "생성된 부대"),
+    201: jsonContent(
+      z.object({ unit: unitSchema, invite: issuedUnitInviteSchema }),
+      "생성된 그룹과 한 번만 노출되는 초대코드",
+    ),
     400: errorResponse("입력값 오류"),
     401: errorResponse("인증 실패"),
-    409: errorResponse("같은 이름의 부대가 이미 존재"),
+    409: errorResponse("이미 다른 그룹 소속"),
   },
 });
 
@@ -75,6 +124,7 @@ const getUnitRoute = createRoute({
   responses: {
     200: jsonContent(z.object({ unit: unitSchema }), "부대 정보"),
     401: errorResponse("인증 실패"),
+    403: errorResponse("현재 부대원만 조회 가능"),
     404: errorResponse("부대 없음"),
   },
 });
@@ -98,87 +148,55 @@ const updateUnitRoute = createRoute({
     401: errorResponse("인증 실패"),
     403: errorResponse("관리자만 수정 가능"),
     404: errorResponse("부대 없음"),
-    409: errorResponse("같은 이름의 부대가 이미 존재"),
   },
 });
 
 const joinRoute = createRoute({
   method: "post",
-  path: "/{id}/join",
+  path: "/join",
   tags: ["부대"],
-  summary: "부대 가입 신청 (관리자 승인 필요, 빈 부대는 즉시 가입)",
+  summary: "초대코드로 그룹에 즉시 가입",
   description:
-    "부대원이 아무도 없는 부대에는 승인해 줄 관리자가 없으므로, 처음 들어온 사람이 즉시 가입되고 관리자가 됩니다.",
+    "그룹 이름이나 UUID로는 가입할 수 없습니다. 유효하고 만료·소진·폐기되지 않은 초대코드만 사용할 수 있습니다.",
   security: [{ Bearer: [] }],
-  request: { params: idParam },
+  request: {
+    body: {
+      content: { "application/json": { schema: unitJoinSchema } },
+      required: true,
+    },
+  },
   responses: {
     200: jsonContent(
-      z.object({ requested: z.boolean(), joined: z.boolean() }),
-      "가입 신청 완료(requested) 또는 즉시 가입·관리자 등극(joined)",
+      z.object({ joined: z.literal(true), unit: unitSchema }),
+      "즉시 가입 완료",
     ),
+    400: errorResponse("유효하지 않은 초대코드"),
     401: errorResponse("인증 실패"),
-    404: errorResponse("부대 없음"),
-    409: errorResponse("이미 이 부대 소속"),
+    409: errorResponse("이미 다른 그룹 소속"),
   },
 });
 
-const cancelJoinRoute = createRoute({
+const rotateInviteRoute = createRoute({
   method: "post",
-  path: "/join/cancel",
+  path: "/{id}/invite",
   tags: ["부대"],
-  summary: "내 가입 신청 취소",
+  summary: "초대코드 회전·재발급 (관리자 전용)",
   security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(okSchema, "취소 완료"),
-    401: errorResponse("인증 실패"),
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: unitInviteCreateSchema } },
+      required: true,
+    },
   },
-});
-
-const requestsRoute = createRoute({
-  method: "get",
-  path: "/{id}/requests",
-  tags: ["부대"],
-  summary: "대기 중인 가입 신청 목록 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: { params: idParam },
   responses: {
-    200: jsonContent(
-      z.object({ requests: z.array(joinRequestSchema) }),
-      "가입 신청 목록",
+    201: jsonContent(
+      z.object({ invite: issuedUnitInviteSchema }),
+      "재발급된 초대코드",
     ),
+    400: errorResponse("입력값 오류"),
     401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 조회 가능"),
-    404: errorResponse("부대 없음"),
-  },
-});
-
-const approveRoute = createRoute({
-  method: "post",
-  path: "/{id}/requests/{userId}/approve",
-  tags: ["부대"],
-  summary: "가입 신청 승인 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: { params: memberParam },
-  responses: {
-    200: jsonContent(okSchema, "승인 완료"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 가능"),
-    404: errorResponse("신청 없음"),
-  },
-});
-
-const rejectRoute = createRoute({
-  method: "post",
-  path: "/{id}/requests/{userId}/reject",
-  tags: ["부대"],
-  summary: "가입 신청 거절 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: { params: memberParam },
-  responses: {
-    200: jsonContent(okSchema, "거절 완료"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 가능"),
-    404: errorResponse("신청 없음"),
+    403: errorResponse("현재 그룹 관리자만 가능"),
   },
 });
 
@@ -266,68 +284,136 @@ const calendarRoute = createRoute({
   },
 });
 
+const blackoutsRoute = createRoute({
+  method: "get",
+  path: "/{id}/blackouts",
+  tags: ["부대"],
+  summary: "블랙아웃 기간 목록",
+  description:
+    "검열·훈련 등으로 출타율과 무관하게 휴가가 제한될 수 있는 기간입니다.",
+  security: [{ Bearer: [] }],
+  request: { params: idParam },
+  responses: {
+    200: jsonContent(
+      z.object({ blackouts: z.array(blackoutSchema) }),
+      "블랙아웃 목록",
+    ),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("부대원만 조회 가능"),
+  },
+});
+
+const createBlackoutRoute = createRoute({
+  method: "post",
+  path: "/{id}/blackouts",
+  tags: ["부대"],
+  summary: "블랙아웃 기간 등록 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: blackoutCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: jsonContent(z.object({ blackout: blackoutSchema }), "등록된 기간"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 등록 가능"),
+  },
+});
+
+const deleteBlackoutRoute = createRoute({
+  method: "delete",
+  path: "/{id}/blackouts/{blackoutId}",
+  tags: ["부대"],
+  summary: "블랙아웃 기간 삭제 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: z.object({ id: z.string(), blackoutId: z.string() }),
+  },
+  responses: {
+    200: jsonContent(okSchema, "삭제 완료"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 삭제 가능"),
+    404: errorResponse("기간 없음"),
+  },
+});
+
 const app = createApp();
 app.use("*", authMiddleware);
+// 초대코드를 무차별 대입으로 찾아내지 못하게 막는 마지막 방어선.
+// (코드 자체가 192비트라 현실적으로 불가능하지만, 시도 비용을 0으로 두지 않는다.)
+app.use("/join", rateLimit({ name: "unit-join", limit: 5, windowSeconds: 600 }));
+// 넓은 날짜 범위를 훑어 그룹 시계열을 통째로 긁어가는 것을 막는다.
+app.use(
+  "/:id/calendar",
+  rateLimit({ name: "calendar", limit: 120, windowSeconds: 60 }),
+);
 
 export const unitRoutes = app
-  .openapi(listRoute, async (c) => {
-    const { q } = c.req.valid("query");
-    const db = drizzle(c.env.DB);
-    const keyword = q?.trim();
-    const rows = await db
-      .select({
-        unit: units,
-        memberCount: sql<number>`cast(count(${users.id}) as integer)`,
-      })
-      .from(units)
-      .leftJoin(users, eq(users.unitId, units.id))
-      .where(keyword ? like(units.name, `%${keyword}%`) : undefined)
-      .groupBy(units.id)
-      .orderBy(asc(units.name))
-      .limit(30)
-      .all();
-    return c.json(
-      { units: rows.map((r) => serializeUnit(r.unit, r.memberCount)) },
-      200,
-    );
-  })
   .openapi(createUnitRoute, async (c) => {
     const input = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-
-    const dup = await db
-      .select({ id: units.id })
-      .from(units)
-      .where(eq(units.name, input.name))
-      .get();
-    if (dup) {
-      return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
+    if (user.unitId) {
+      return c.json(
+        { error: "현재 그룹에서 나간 뒤 새 그룹을 만들 수 있습니다" },
+        409,
+      );
     }
 
+    const now = new Date().toISOString();
+    const inviteExpiresAt =
+      input.inviteExpiresAt !== undefined
+        ? new Date(input.inviteExpiresAt).toISOString()
+        : new Date(Date.now() + DEFAULT_INVITE_TTL_MS).toISOString();
+    if (inviteExpiresAt <= now) {
+      return c.json(
+        { error: "초대코드 만료 시각은 현재보다 뒤여야 합니다" },
+        400,
+      );
+    }
+    const referenceMemberTotal = input.referenceMemberTotal ?? null;
+    const lastTotalUpdatedAt =
+      input.lastTotalUpdatedAt !== undefined
+        ? input.lastTotalUpdatedAt
+        : referenceMemberTotal === null
+          ? null
+          : now;
     const unit = {
       id: crypto.randomUUID(),
       name: input.name,
       description: input.description ?? null,
+      referenceMemberTotal,
       maxLeaveCount: input.maxLeaveCount,
+      returnDayCounts: input.returnDayCounts ?? true,
+      lastTotalUpdatedAt,
       creatorId: user.id,
       adminId: user.id,
       imageKey: null,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
     };
     await db.insert(units).values(unit);
+    const invite = await createInvite(db, {
+      unitId: unit.id,
+      createdBy: user.id,
+      expiresAt: inviteExpiresAt,
+      maxUses: input.inviteMaxUses ?? DEFAULT_INVITE_MAX_USES,
+    });
     await db
       .update(users)
       .set({ unitId: unit.id })
       .where(eq(users.id, user.id));
-    // 생성자는 바로 가입되므로 남아있던 다른 대기 신청은 정리한다.
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, user.id));
-    return c.json({ unit: serializeUnit(unit, 1) }, 201);
+    return c.json({ unit: serializeUnit(unit, 1), invite }, 201);
   })
   .openapi(getUnitRoute, async (c) => {
     const { id } = c.req.valid("param");
+    const user = c.get("user");
+    if (user.unitId !== id) {
+      return c.json({ error: "현재 그룹의 부대원만 조회할 수 있습니다" }, 403);
+    }
     const db = drizzle(c.env.DB);
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
@@ -340,27 +426,34 @@ export const unitRoutes = app
     const user = c.get("user");
     const db = drizzle(c.env.DB);
 
+    if (user.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 수정할 수 있습니다" }, 403);
+    }
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     if (unit.adminId !== user.id) {
       return c.json({ error: "부대 관리자만 수정할 수 있습니다" }, 403);
     }
 
-    if (input.name && input.name !== unit.name) {
-      const dup = await db
-        .select({ id: units.id })
-        .from(units)
-        .where(and(eq(units.name, input.name), ne(units.id, id)))
-        .get();
-      if (dup)
-        return c.json({ error: "같은 이름의 부대가 이미 있습니다" }, 409);
-    }
-
     const patch: Partial<typeof units.$inferInsert> = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
+    if (input.referenceMemberTotal !== undefined) {
+      patch.referenceMemberTotal = input.referenceMemberTotal;
+      patch.lastTotalUpdatedAt =
+        input.lastTotalUpdatedAt !== undefined
+          ? input.lastTotalUpdatedAt
+          : input.referenceMemberTotal === null
+            ? null
+            : new Date().toISOString();
+    } else if (input.lastTotalUpdatedAt !== undefined) {
+      patch.lastTotalUpdatedAt = input.lastTotalUpdatedAt;
+    }
     if (input.maxLeaveCount !== undefined) {
       patch.maxLeaveCount = input.maxLeaveCount;
+    }
+    if (input.returnDayCounts !== undefined) {
+      patch.returnDayCounts = input.returnDayCounts;
     }
 
     if (Object.keys(patch).length > 0) {
@@ -374,149 +467,123 @@ export const unitRoutes = app
     return c.json({ unit: serializeUnit(updated!, memberCount) }, 200);
   })
   .openapi(joinRoute, async (c) => {
-    const { id } = c.req.valid("param");
+    const { code } = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (user.unitId === id) {
-      return c.json({ error: "이미 이 부대의 부대원입니다" }, 409);
+    if (user.unitId) {
+      return c.json(
+        {
+          error: "이미 그룹에 소속되어 있습니다. 먼저 현재 그룹에서 나가주세요",
+        },
+        409,
+      );
     }
 
-    // 사용자당 대기 신청은 하나만 유지 — 기존 신청을 교체한다.
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, user.id));
-
-    // 부대원이 아무도 없으면 승인해 줄 관리자가 없다.
-    // 이 경우 처음 들어온 사람이 바로 가입되고 관리자를 맡는다.
-    const memberCount = await db.$count(users, eq(users.unitId, id));
-    if (memberCount === 0) {
-      // 이미 다른 부대 소속이면 즉시 옮기지 않는다.
-      // (관리자였다면 원래 부대가 관리자 없이 남게 되므로 먼저 정리하도록 안내)
-      if (user.unitId) {
-        return c.json(
-          { error: "지금 부대에서 나간 뒤에 가입할 수 있습니다" },
-          409,
-        );
-      }
-      await db.update(users).set({ unitId: id }).where(eq(users.id, user.id));
-      await db.update(units).set({ adminId: user.id }).where(eq(units.id, id));
-      await bumpUnitVersion(c.env.CACHE, id);
-      return c.json({ requested: false, joined: true }, 200);
-    }
-
-    await db.insert(unitJoinRequests).values({
-      id: crypto.randomUUID(),
-      unitId: id,
-      userId: user.id,
-      createdAt: new Date().toISOString(),
-    });
-    return c.json({ requested: true, joined: false }, 200);
-  })
-  .openapi(cancelJoinRoute, async (c) => {
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, user.id));
-    return c.json({ ok: true as const }, 200);
-  })
-  .openapi(requestsRoute, async (c) => {
-    const { id } = c.req.valid("param");
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== user.id) {
-      return c.json({ error: "부대 관리자만 조회할 수 있습니다" }, 403);
-    }
-    const rows = await db
-      .select({ req: unitJoinRequests, user: users })
-      .from(unitJoinRequests)
-      .innerJoin(users, eq(users.id, unitJoinRequests.userId))
-      .where(eq(unitJoinRequests.unitId, id))
-      .orderBy(asc(unitJoinRequests.createdAt))
-      .all();
-    const requests = rows.map((r) => {
-      const m = serializeMember(r.user);
-      return {
-        userId: r.user.id,
-        name: m.name,
-        branch: m.branch,
-        branchLabel: m.branchLabel,
-        rank: m.rank,
-        rankLabel: m.rankLabel,
-        profileImageKey: m.profileImageKey,
-        createdAt: r.req.createdAt,
-      };
-    });
-    return c.json({ requests }, 200);
-  })
-  .openapi(approveRoute, async (c) => {
-    const { id, userId } = c.req.valid("param");
-    const admin = c.get("user");
-    const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== admin.id) {
-      return c.json({ error: "부대 관리자만 승인할 수 있습니다" }, 403);
-    }
-    const req = await db
+    const now = new Date().toISOString();
+    const codeHash = await sha256Hex(code);
+    const invite = await db
       .select()
-      .from(unitJoinRequests)
+      .from(unitInvites)
+      .where(eq(unitInvites.codeHash, codeHash))
+      .get();
+    if (
+      !invite ||
+      invite.revokedAt !== null ||
+      invite.expiresAt <= now ||
+      invite.usedCount >= invite.maxUses
+    ) {
+      return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
+    }
+
+    const consumed = await db
+      .update(unitInvites)
+      .set({ usedCount: sql`${unitInvites.usedCount} + 1` })
       .where(
         and(
-          eq(unitJoinRequests.unitId, id),
-          eq(unitJoinRequests.userId, userId),
-        ),
-      )
-      .get();
-    if (!req) return c.json({ error: "가입 신청을 찾을 수 없습니다" }, 404);
-
-    const target = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .get();
-    const previousUnitId = target?.unitId ?? null;
-    await db.update(users).set({ unitId: id }).where(eq(users.id, userId));
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, userId));
-    await bumpUnitVersion(c.env.CACHE, id);
-    if (previousUnitId && previousUnitId !== id) {
-      await bumpUnitVersion(c.env.CACHE, previousUnitId);
-    }
-    return c.json({ ok: true as const }, 200);
-  })
-  .openapi(rejectRoute, async (c) => {
-    const { id, userId } = c.req.valid("param");
-    const admin = c.get("user");
-    const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== admin.id) {
-      return c.json({ error: "부대 관리자만 거절할 수 있습니다" }, 403);
-    }
-    const res = await db
-      .delete(unitJoinRequests)
-      .where(
-        and(
-          eq(unitJoinRequests.unitId, id),
-          eq(unitJoinRequests.userId, userId),
+          eq(unitInvites.id, invite.id),
+          isNull(unitInvites.revokedAt),
+          gt(unitInvites.expiresAt, now),
+          lt(unitInvites.usedCount, unitInvites.maxUses),
         ),
       )
       .run();
-    if (res.meta.changes === 0) {
-      return c.json({ error: "가입 신청을 찾을 수 없습니다" }, 404);
+    if (consumed.meta.changes !== 1) {
+      return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
-    return c.json({ ok: true as const }, 200);
+
+    const joined = await db
+      .update(users)
+      .set({ unitId: invite.unitId })
+      .where(and(eq(users.id, user.id), isNull(users.unitId)))
+      .run();
+    if (joined.meta.changes !== 1) {
+      // 같은 사용자의 동시 요청이 코드를 불필요하게 소진하지 않도록 보상한다.
+      await db
+        .update(unitInvites)
+        .set({ usedCount: sql`${unitInvites.usedCount} - 1` })
+        .where(and(eq(unitInvites.id, invite.id), gt(unitInvites.usedCount, 0)))
+        .run();
+      return c.json({ error: "이미 그룹에 소속되어 있습니다" }, 409);
+    }
+
+    const unit = await db
+      .select()
+      .from(units)
+      .where(eq(units.id, invite.unitId))
+      .get();
+    if (!unit) {
+      return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
+    }
+    const memberCount = await db.$count(users, eq(users.unitId, unit.id));
+    await bumpUnitVersion(c.env.CACHE, unit.id);
+    return c.json(
+      { joined: true as const, unit: serializeUnit(unit, memberCount) },
+      200,
+    );
+  })
+  .openapi(rotateInviteRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    if (user.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 재발급할 수 있습니다" }, 403);
+    }
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit || unit.adminId !== user.id) {
+      return c.json({ error: "현재 그룹 관리자만 재발급할 수 있습니다" }, 403);
+    }
+
+    const now = new Date().toISOString();
+    const expiresAt =
+      input.expiresAt !== undefined
+        ? new Date(input.expiresAt).toISOString()
+        : new Date(Date.now() + DEFAULT_INVITE_TTL_MS).toISOString();
+    if (expiresAt <= now) {
+      return c.json(
+        { error: "초대코드 만료 시각은 현재보다 뒤여야 합니다" },
+        400,
+      );
+    }
+    await db
+      .update(unitInvites)
+      .set({ revokedAt: now })
+      .where(and(eq(unitInvites.unitId, id), isNull(unitInvites.revokedAt)));
+    const invite = await createInvite(db, {
+      unitId: id,
+      createdBy: user.id,
+      expiresAt,
+      maxUses: input.maxUses ?? DEFAULT_INVITE_MAX_USES,
+    });
+    return c.json({ invite }, 201);
   })
   .openapi(removeMemberRoute, async (c) => {
     const { id, userId } = c.req.valid("param");
     const admin = c.get("user");
     const db = drizzle(c.env.DB);
+    if (admin.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 제거할 수 있습니다" }, 403);
+    }
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     if (unit.adminId !== admin.id) {
@@ -542,6 +609,9 @@ export const unitRoutes = app
     const { userId } = c.req.valid("json");
     const admin = c.get("user");
     const db = drizzle(c.env.DB);
+    if (admin.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 이관할 수 있습니다" }, 403);
+    }
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     if (unit.adminId !== admin.id) {
@@ -584,11 +654,9 @@ export const unitRoutes = app
           409,
         );
       }
-      // 혼자 남은 관리자가 나가면 빈 부대·대기 신청·이미지를 정리한다.
+      // 혼자 남은 관리자가 나가면 빈 그룹·초대코드·이미지를 정리한다.
       await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
-      await db
-        .delete(unitJoinRequests)
-        .where(eq(unitJoinRequests.unitId, unitId));
+      await db.delete(unitInvites).where(eq(unitInvites.unitId, unitId));
       await db.delete(units).where(eq(units.id, unitId));
       if (unit.imageKey) {
         c.executionCtx.waitUntil(c.env.BUCKET.delete(unit.imageKey));
@@ -614,7 +682,108 @@ export const unitRoutes = app
       .where(eq(users.unitId, id))
       .orderBy(asc(users.name))
       .all();
-    return c.json({ members: rows.map((m) => serializeMember(m)) }, 200);
+    // 차단은 이 목록에서만 숨긴다. 출타 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
+    const blocked = new Set(
+      (
+        await db
+          .select({ id: userBlocks.blockedUserId })
+          .from(userBlocks)
+          .where(eq(userBlocks.userId, user.id))
+          .all()
+      ).map((row) => row.id),
+    );
+    return c.json(
+      {
+        members: rows
+          .filter((m) => !blocked.has(m.id))
+          .map((m) => serializeMember(m)),
+      },
+      200,
+    );
+  })
+  .openapi(blackoutsRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const user = c.get("user");
+    if (user.unitId !== id) {
+      return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
+    }
+    const db = drizzle(c.env.DB);
+    const rows = await db
+      .select()
+      .from(unitBlackouts)
+      .where(eq(unitBlackouts.unitId, id))
+      .orderBy(asc(unitBlackouts.startDate))
+      .all();
+    return c.json(
+      {
+        blackouts: rows.map((b) => ({
+          id: b.id,
+          startDate: b.startDate,
+          endDate: b.endDate,
+          reason: b.reason,
+        })),
+      },
+      200,
+    );
+  })
+  .openapi(createBlackoutRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    if (user.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 등록할 수 있습니다" }, 403);
+    }
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit || unit.adminId !== user.id) {
+      return c.json({ error: "현재 그룹 관리자만 등록할 수 있습니다" }, 403);
+    }
+    const row = {
+      id: crypto.randomUUID(),
+      unitId: id,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      reason: input.reason ?? null,
+      createdBy: user.id,
+      createdAt: new Date().toISOString(),
+    };
+    await db.insert(unitBlackouts).values(row);
+    // 달력의 blocked 표시가 바뀌므로 캐시를 무효화한다.
+    await bumpUnitVersion(c.env.CACHE, id);
+    return c.json(
+      {
+        blackout: {
+          id: row.id,
+          startDate: row.startDate,
+          endDate: row.endDate,
+          reason: row.reason,
+        },
+      },
+      201,
+    );
+  })
+  .openapi(deleteBlackoutRoute, async (c) => {
+    const { id, blackoutId } = c.req.valid("param");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    if (user.unitId !== id) {
+      return c.json({ error: "현재 그룹 관리자만 삭제할 수 있습니다" }, 403);
+    }
+    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    if (!unit || unit.adminId !== user.id) {
+      return c.json({ error: "현재 그룹 관리자만 삭제할 수 있습니다" }, 403);
+    }
+    const removed = await db
+      .delete(unitBlackouts)
+      .where(
+        and(eq(unitBlackouts.id, blackoutId), eq(unitBlackouts.unitId, id)),
+      )
+      .run();
+    if (removed.meta.changes === 0) {
+      return c.json({ error: "블랙아웃 기간을 찾을 수 없습니다" }, 404);
+    }
+    await bumpUnitVersion(c.env.CACHE, id);
+    return c.json({ ok: true as const }, 200);
   })
   .openapi(calendarRoute, async (c) => {
     const { id } = c.req.valid("param");
@@ -623,14 +792,16 @@ export const unitRoutes = app
     if (user.unitId !== id) {
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
-
-    // KV 캐시 히트 시 D1 조회·출타 인원 계산 없이 즉시 반환한다.
-    const cached = await getCachedCalendar<z.infer<typeof calendarSchema>>(
-      c.env.CACHE,
-      id,
-      month,
-    );
-    if (cached) return c.json(cached, 200);
+    const currentMonth = todayInSeoul().slice(0, 7);
+    if (
+      month < shiftMonth(currentMonth, -3) ||
+      month > shiftMonth(currentMonth, 3)
+    ) {
+      return c.json(
+        { error: "달력은 현재 월 기준 앞뒤 3개월만 조회할 수 있습니다" },
+        400,
+      );
+    }
 
     const db = drizzle(c.env.DB);
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
@@ -641,7 +812,6 @@ export const unitRoutes = app
       .from(users)
       .where(eq(users.unitId, id))
       .all();
-    const membersById = new Map(members.map((m) => [m.id, m]));
     const { start, end } = monthBounds(month);
 
     const memberIds = members.map((m) => m.id);
@@ -661,47 +831,69 @@ export const unitRoutes = app
             .all()
         : [];
 
+    const blackouts = await db
+      .select()
+      .from(unitBlackouts)
+      .where(
+        and(
+          eq(unitBlackouts.unitId, id),
+          lte(unitBlackouts.startDate, end),
+          gte(unitBlackouts.endDate, start),
+        ),
+      )
+      .orderBy(asc(unitBlackouts.startDate))
+      .all();
+    const isBlocked = (date: string) =>
+      blackouts.some((b) => b.startDate <= date && date <= b.endDate);
+
     const days = computeDayStats({
-      leaves: rows.map((l) => ({
-        userId: l.userId,
-        startDate: l.startDate,
-        endDate: l.endDate,
-      })),
+      // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
+      leaves: rows
+        .filter((l) => isCountedLeaveStatus(l.status))
+        .map((l) => ({
+          userId: l.userId,
+          startDate: l.startDate,
+          endDate: l.endDate,
+        })),
       maxCount: unit.maxLeaveCount,
       rangeStart: start,
       rangeEnd: end,
-    });
+      returnDayCounts: unit.returnDayCounts,
+    }).map((day) => ({
+      date: day.date,
+      count: day.count,
+      allowed: day.allowed,
+      exceeded: day.exceeded,
+      blocked: isBlocked(day.date),
+    }));
+    const ownRows = rows.filter((row) => row.userId === user.id);
     const segmentMap = await segmentsForLeaves(
       db,
-      rows.map((row) => row.id),
+      ownRows.map((row) => row.id),
     );
 
-    const calendarLeaves = rows.map((l) => {
-      const owner = membersById.get(l.userId);
-      const member = owner ? serializeMember(owner) : null;
-      return {
-        id: l.id,
-        userId: l.userId,
-        userName: member?.name ?? "(알 수 없음)",
-        userRankLabel: member?.rankLabel ?? "",
-        userProfileImageKey: member?.profileImageKey ?? null,
-        title: l.title,
-        startDate: l.startDate,
-        endDate: l.endDate,
-        reason: l.reason,
-        segments: segmentMap.get(l.id) ?? [],
-      };
-    });
+    // 타인의 일정은 days 집계에만 반영하고 상세 레코드는 반환하지 않는다.
+    const calendarLeaves = ownRows.map((l) => ({
+      id: l.id,
+      title: l.title,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      reason: l.reason,
+      status: l.status,
+      segments: segmentMap.get(l.id) ?? [],
+    }));
 
     const payload = {
       month,
       unit: serializeUnit(unit, members.length),
       days,
       leaves: calendarLeaves,
+      blackouts: blackouts.map((b) => ({
+        id: b.id,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        reason: b.reason,
+      })),
     };
-    // 계산 결과를 캐싱(응답을 막지 않도록 백그라운드로).
-    c.executionCtx.waitUntil(
-      putCachedCalendar(c.env.CACHE, id, month, payload),
-    );
     return c.json(payload, 200);
   });

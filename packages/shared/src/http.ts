@@ -6,7 +6,7 @@
  */
 
 /** 스탠드얼론(스토어·OTA) 클라이언트가 붙을 기본 API 주소. */
-export const PRODUCTION_API_URL = "https://leave-api.moveto.workers.dev";
+export const PRODUCTION_API_URL = "https://api.leave.moveto.kr";
 
 /**
  * 클라이언트가 붙을 API 주소를 정한다.
@@ -62,12 +62,4 @@ export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
     throw new ApiError(message, res.status);
   }
   return data as T;
-}
-
-/** API_URL과 이미지 key로 이미지 URL을 만든다 (key 없으면 null). */
-export function buildImageUrl(
-  apiUrl: string,
-  key: string | null | undefined,
-): string | null {
-  return key ? `${apiUrl}/images/${key}` : null;
 }

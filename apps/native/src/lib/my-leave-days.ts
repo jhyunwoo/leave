@@ -1,5 +1,6 @@
 import {
   eachDate,
+  isConfirmedLeaveStatus,
   segmentBalanceKey,
   type BalanceKey,
   type ISODate,
@@ -12,6 +13,13 @@ export type MyLeaveDay = {
   /** 같은 재원 구간의 첫날/마지막날. 달력에서 칩을 이어 붙여 그릴 때 쓴다. */
   isSegmentStart: boolean;
   isSegmentEnd: boolean;
+  /**
+   * 확정(승인·복귀완료)인지. 희망 일정을 확정으로 오해하면 계획 전체가 어긋나므로
+   * 색 외의 수단(테두리)으로도 구분한다.
+   */
+  isConfirmed: boolean;
+  /** 초안은 나만 보이고 그룹 집계에 들어가지 않는다. */
+  isDraft: boolean;
 };
 
 /**
@@ -31,6 +39,8 @@ export function buildMyLeaveDayMap(
           title: leave.title,
           isSegmentStart: date === segment.startDate,
           isSegmentEnd: date === segment.endDate,
+          isConfirmed: isConfirmedLeaveStatus(leave.status),
+          isDraft: leave.status === "draft",
         });
       }
     }

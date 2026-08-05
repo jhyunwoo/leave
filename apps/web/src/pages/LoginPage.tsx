@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router";
 import { useLogin } from "../api/queries";
 import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
+import { LegalLinks } from "../components/LegalLinks";
+import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -56,6 +58,7 @@ export function LoginPage() {
         }}
       >
         <h1 className="display-xs">로그인</h1>
+        <OfficialDisclaimer />
         <Field label="이메일">
           <input
             className="input"
@@ -96,6 +99,7 @@ export function LoginPage() {
           </Link>
         </p>
       </form>
+      <LegalLinks />
     </div>
   );
 }

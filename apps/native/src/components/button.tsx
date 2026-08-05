@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "transparent",
   },
-  sm: { minHeight: 42, paddingHorizontal: 16 },
+  sm: { minHeight: 44, paddingHorizontal: 16 },
   primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.canvas,

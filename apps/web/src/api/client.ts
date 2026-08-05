@@ -1,5 +1,4 @@
 import type { AppType } from "@leave/api";
-import { buildImageUrl } from "@leave/shared";
 import { hc } from "hono/client";
 
 // 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
@@ -33,7 +32,3 @@ export const api = hc<AppType>(API_URL, {
     ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
   }),
 });
-
-export function imageUrl(key: string | null | undefined): string | null {
-  return buildImageUrl(API_URL, key);
-}

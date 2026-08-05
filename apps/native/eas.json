@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://leave-api.moveto.workers.dev"
+        "EXPO_PUBLIC_API_URL": "https://api.leave.moveto.kr"
       }
     },
     "preview": {
@@ -18,21 +18,35 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://leave-api.moveto.workers.dev"
+        "EXPO_PUBLIC_API_URL": "https://api.leave.moveto.kr"
+      }
+    },
+    "closed": {
+      "channel": "closed-test",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.leave.moveto.kr"
       }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://leave-api.moveto.workers.dev"
+        "EXPO_PUBLIC_API_URL": "https://api.leave.moveto.kr"
       }
     }
   },
   "submit": {
+    "closed": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed"
+      }
+    },
     "production": {
       "android": {
-        "track": "internal"
+        "track": "production",
+        "releaseStatus": "draft"
       },
       "ios": {}
     }

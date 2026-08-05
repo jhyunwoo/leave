@@ -1,37 +1,21 @@
-import { imageUrl } from "../api/client";
-
 const PALETTE = ["#ffedd5", "#fce7f3", "#ede9fe", "#d1fae5", "#dbeafe"];
 
-export function Avatar(props: {
-  name: string;
-  imageKey?: string | null;
-  size?: number;
-}) {
+/**
+ * 별칭 이니셜만 그린다. 사진 업로드·열람 경로를 없앴으므로 이미지 분기도 없다.
+ * 군사시설 촬영 위험과 사진 권한 요구를 애초에 만들지 않기 위한 선택이다.
+ */
+export function Avatar(props: { name: string; size?: number }) {
   const size = props.size ?? 36;
-  const url = imageUrl(props.imageKey);
   const bg = PALETTE[props.name.charCodeAt(0) % PALETTE.length];
 
-  const style = {
-    width: size,
-    height: size,
-    borderRadius: "50%",
-    flexShrink: 0,
-  } as const;
-
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt={props.name}
-        style={{ ...style, objectFit: "cover" }}
-      />
-    );
-  }
   return (
     <div
       aria-hidden="true"
       style={{
-        ...style,
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flexShrink: 0,
         background: bg,
         color: "var(--ink-deep)",
         display: "flex",

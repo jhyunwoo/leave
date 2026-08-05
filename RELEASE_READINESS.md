@@ -1,0 +1,139 @@
+# 리브 출시 준비 상태
+
+**기준일: 2026-08-05 · 현재 결론: 출시 불가(BLOCKED)**
+
+이 문서는 저장소 안에서 완료한 설정과 사람이 콘솔·법무·보안·실기기에서 끝내야 하는 작업을 구분합니다. 체크되지 않은 **출시 차단** 항목이 하나라도 남아 있으면 프로덕션 심사를 제출하지 않습니다.
+
+> **가장 큰 남은 차단 항목**은 §2의 계급·군종·입대/전역일 필수 수집입니다. 스키마·API·양쪽 클라이언트에 그대로 남아 있고, 가입 화면은 사용자에게 묻지 않는 대신 **고정 더미값**을 보내 회피하고 있습니다. 이 구조는 정기외박 자동 적립 등 복무일 기반 로직과 얽혀 있어 별도 설계 결정이 필요합니다.
+
+## 1. 저장소에서 완료한 출시 설정
+
+- [x] Expo SDK 57 의존성을 SDK 권장 패치 버전으로 정렬하고 Node 엔진을 `>=22.13.0`으로 지정
+- [x] `expo-build-properties`로 Android `compileSdkVersion`/`targetSdkVersion`을 36으로 명시
+- [x] 앱 설정의 직접 추가 Android 권한을 빈 배열로 변경
+- [x] 카메라·마이크·위치·연락처·광범위 사진/미디어/외부 저장소 권한을 `blockedPermissions`로 차단
+- [x] `expo-image-picker` 의존성과 plugin을 제거해 사진 보관함·카메라·마이크 권한 경로 제거
+- [x] iOS Privacy Manifest에 현재 수집 데이터, 사용자 연결 여부, 추적 안 함, 이용 목적을 선언
+- [x] Play 비공개 테스트용 EAS Build/Submit `closed` 프로필과 `alpha` 트랙 구성
+- [x] 프로덕션 제출 프로필을 Play `production` draft로 분리
+- [x] 오프라인 캐시 연결용 `expo-sqlite`, NetInfo, TanStack Query persist client 의존성 추가
+- [x] 저장소의 평문 심사 비밀번호 제거 및 비밀번호 회전 필요성 문서화
+- [x] 개인정보 처리방침·이용약관·지원·계정 삭제 공개 정적 문서 추가
+- [x] App Store/Google Play 설명을 비공식 참고용·민감 군 정보 입력 금지 문구로 정렬
+- [x] Data Safety/App Privacy 초안을 실제 API 스키마와 Expo SDK 기준으로 갱신
+- [x] 스토어 합성 이미지 생성기의 실제 부대명·실명·계급·군 상징·절대 인원 샘플 제거
+- [x] 초대코드 전용 가입(SHA-256 해시만 저장, 만료·사용횟수·폐기), 그룹 검색·열거·UUID 가입 경로 제거
+- [x] 달력 응답 익명화(타인 신원 필드·`userIds` 제거)와 현재 월 ±3개월 조회 제한
+- [x] 접속 로그의 IP·국가·User-Agent와 푸시 로그의 제목·본문·데이터·오류 상세를 마이그레이션으로 물리 삭제
+- [x] 인증·초대코드·달력 조회 rate limit (KV 고정 창, 식별자는 해시만 사용)
+- [x] 강제 최소 지원 버전 차단(426)과 인증 없이 열리는 `GET /meta`
+- [x] 블랙아웃(제한 기간) 등록·표시와 휴가 폼 경고
+- [x] 휴가 상태 모델(초안/희망/신청/확정/반려/취소/복귀완료) — 초안은 집계 제외, 희망·확정은 색 외의 수단으로 구분
+- [x] 복귀일 계산 여부를 그룹 설정으로 노출하고 서버·클라이언트가 같은 규칙 사용
+- [x] 알림 종류별 on/off(초과·블랙아웃·그룹 안내)와 발송 시 반영
+- [x] UGC 인앱 신고·차단, 관리자 신고 처리 큐, 지원 페이지의 24시간 대응 SLA
+- [x] 공개 API에서 이미지 업로드·조회 경로 제거(사진 권한 요구 자체를 없앰)
+- [x] 사용자 웹앱·관리자앱을 새 API·스키마에 맞춰 정비하고 `pnpm build`/`check-types`/`test` 전체 통과
+
+> Android 최종 앱에는 카메라·마이크·위치·연락처 권한이 없어야 합니다. 알림 기능의 `POST_NOTIFICATIONS`, 진동/부팅 수신과 앱 통신의 `INTERNET`은 기능상 별개이며 프로덕션 AAB에서 최종 확인합니다.
+>
+> `MIN_APP_VERSION`은 **출타 계산 규칙이 바뀐 릴리스에서만** 올립니다. 구버전이 같은 데이터로 다른 숫자를 보여주는 상태가 이 앱에서는 곧 잘못된 계획이 됩니다.
+
+## 2. 출시 차단 — 군사보안·데이터 최소화
+
+- [ ] 소속 부대 보안담당관 또는 정보보안 부서에 사용·배포 가능 여부를 서면 문의
+- [ ] 군사보안 및 개인정보 전문 변호사/전문가가 데이터 흐름·약관·국외 이전 고지를 검토
+- [ ] 서버 스키마와 API에서 실제 부대명, 검색 가능한 부대 목록, 실명 유도, 계급·군종·입대/전역일의 필수 수집을 제거하거나 별도 위험 승인을 획득
+- [x] 그룹을 추측 불가능한 초대코드와 무의미한 UUID로만 참여하게 하고, 서버 검색·색인·대량 열람 경로 제거
+- [x] 절대 총원·출타 인원 대신 그룹 내부의 최소 집계 신호를 기본값으로 제공하고 광범위한 날짜 범위 조회 제한
+- [x] 그룹 조회 범위를 ±3개월로 제한하고 인증·초대·조회별 rate limit 적용 (이상 조회 탐지·알림은 운영 도구에서 별도 구성 필요)
+- [ ] 그룹 이름·일정·푸시 본문·로그에 군 관련 민감 정보가 들어오지 않도록 최소화·필터·운영 대응 구성
+- [ ] 프로덕션 DB·KV·로그·백업의 실제 저장 지역을 확인하고 국내 저장 요건 또는 국외 이전 고지를 확정
+
+레거시 스키마·마이그레이션·웹/관리자 경로에 이미지 또는 복무정보 필드가 남아 있으면 제거·무효화하고 기존 값을 파기해야 합니다. 정책 문서는 사진·위치 수집이 제거된 최종 릴리스를 전제로 하므로, 실제 프로덕션 동작과 다르면 제출할 수 없습니다.
+
+## 3. 출시 차단 — 제품·정책 기능
+
+- [x] 앱 전 화면의 출타율/혼잡도 근처에 “사용자 입력 기반 추정치·공식 승인 아님” 고지 배치 (앱/웹 모두. 실기기 최종 검수는 남음)
+- [ ] 가입 전 데모, 60초 내 가입, 별칭 권장, 민감 군 정보 금지 안내를 실제 iOS/Android에서 검수
+- [x] 휴가 상태(초안/공유/신청/승인/반려/복귀), 비공개 계획(초안), 블랙아웃, 참여율·기준값 갱신 시각을 제품 정의와 일치시킴
+- [x] UGC가 가능한 표시명·그룹명/설명에 인앱 신고, 사용자 차단, 운영자 검토 큐, 연락처 및 24시간 대응 SLA 구현
+- [x] 이용약관 동의와 개인정보 필수/선택 동의를 분리하고 거부권·불이익을 함께 고지 (앱/웹 가입 화면)
+- [ ] 만 14세 미만 차단은 가입 화면에 구현 — 스토어 대상 연령 18+ 설정과 콘솔 값 일치는 제출 시 확인
+- [ ] 공개 법적 문서 링크는 로그인 전·설정에서 접근 가능 — 오픈소스 라이선스 고지 화면은 미구현
+- [x] 알림 종류별 on/off와 Android 13+ 권한의 가치 설명 후 요청 흐름 구현 (실기기 검증은 남음)
+
+관련 정책: [Apple App Review Guidelines 1.2, 5.1.1](https://developer.apple.com/app-store/review/guidelines/), [Google Play UGC 정책](https://support.google.com/googleplay/android-developer/answer/9876937?hl=ko), [Google Play 개인정보 정책](https://support.google.com/googleplay/android-developer/answer/10144311?hl=ko).
+
+## 4. 출시 차단 — 개인정보·계정 삭제 운영
+
+- [ ] `DELETE /auth/account`가 사용자·세션·휴가와 하위 구간·잔여량/부여/주기 설정·알림·로그·알림 설정·차단·신고자 식별자를 모두 정리하는지 프로덕션과 동일한 환경에서 검증 (통합 테스트는 통과)
+- [x] 탈퇴한 관리자의 그룹 승계/빈 그룹 삭제, 초대코드 폐기, 캐시 무효화 (관리자앱의 그룹 삭제 경로 포함)
+- [ ] 접속·푸시 로그를 수집일부터 12개월 뒤 자동 또는 정기 파기하는 작업과 증적 구성
+- [ ] 백업·D1 Time Travel 복구본의 보존기간과 탈퇴 데이터 파기 절차 확정
+- [ ] 관리자 계정 2단계 인증, 최소권한, 프로덕션 DB 직접 조회 통제 및 접속기록 위·변조 방지 적용
+- [ ] 침해사고 인지→이용자 통지→개인정보보호위원회/KISA 신고 판단→증적 보존 절차 문서화·리허설
+- [ ] 처리업체, 하위처리자, 이전 국가, 연락처를 법률 검토 후 공개 방침과 콘솔에 최종 반영
+- [ ] `privacy`, `terms`, `support`, `delete-account` 정적 페이지를 프로덕션에 배포하고 로그인 없이 HTTP 200으로 열리는지 확인
+
+Google은 계정 생성 앱에 앱 안의 삭제 경로와 외부 웹 삭제 요청 경로를 모두 요구합니다: [Google Play 계정 삭제 요건](https://support.google.com/googleplay/android-developer/answer/13327111?hl=ko). Apple도 앱 내 계정 삭제를 요구합니다: [App Review Guidelines 5.1.1(v)](https://developer.apple.com/app-store/review/guidelines/#privacy).
+
+## 5. 빌드·플랫폼 확인
+
+- [ ] Node 22.13+와 고정된 pnpm 버전으로 CI/EAS 설치 재현
+- [ ] `expo-doctor` 전 항목 통과 및 `expo install --check` 불일치 0건
+- [ ] EAS `auto`/SDK 57 이미지가 Android API 36, Xcode 26.4+ 및 iOS 26 SDK를 사용하는지 각 빌드 로그에서 확인
+- [ ] Android production AAB의 `targetSdkVersion=36` 및 최종 merged permissions 확인
+- [ ] iOS archive의 `PrivacyInfo.xcprivacy`와 Xcode Privacy Report에서 앱+모든 SDK 선언 확인
+- [ ] App Store Connect Privacy와 Play Data Safety를 `store/metadata/data-safety-and-ratings.md` 및 실제 트래픽과 대조
+- [ ] Privacy Manifest나 네이티브 권한 변경은 OTA가 아닌 새 스토어 빌드로 배포
+- [ ] 프로덕션/프리뷰/비공개 테스트 채널 분리와 롤백 리허설
+
+Expo SDK 57은 Android compile/target SDK 36과 Xcode 26.4+ 환경을 대상으로 합니다: [Expo SDK 57 문서](https://docs.expo.dev/versions/v57.0.0/), [EAS Build 인프라](https://docs.expo.dev/build-reference/infrastructure/). Google은 2026-08-31부터 신규 앱·업데이트에 API 36을 요구합니다: [Target API 요건](https://support.google.com/googleplay/android-developer/answer/11926878?hl=ko). Apple은 2026-04-28부터 Xcode 26+와 iOS 26 SDK 빌드를 요구합니다: [Apple Upcoming Requirements](https://developer.apple.com/news/upcoming-requirements/).
+
+## 6. Google Play 계정·테스트
+
+- [ ] 개발자 계정이 개인/조직인지, 개인이면 생성일이 2023-11-13 이후인지 확인
+- [ ] 해당 개인 계정이면 비공개 테스트 트랙에서 실제 테스터 12명이 14일 연속 opt-in 상태 유지
+- [ ] 테스트 피드백과 앱 준비 답변으로 프로덕션 액세스 신청 및 승인 획득
+- [ ] 개발자 신원확인·2단계 인증·Android Developer Verification 상태 확인
+- [ ] Play App Signing 활성화, AAB 업로드, 데이터 안전·콘텐츠 등급·앱 액세스·대상 연령 설문 제출
+
+내부 테스트는 12명×14일 요건에 포함되지 않습니다. 공식 안내: [신규 개인 개발자 테스트 요건](https://support.google.com/googleplay/android-developer/answer/14151465?hl=ko), [Android Developer Verification](https://developer.android.com/developer-verification/guides).
+
+## 7. Apple·Google 심사 자료
+
+- [ ] 저장소에 노출됐던 심사 비밀번호를 원격 인증 시스템에서 즉시 회전
+- [ ] 회전된 자격 증명을 App Store Connect/Play Console의 보안 심사 입력란에만 저장
+- [ ] 가상 별칭·가상 그룹·고정 샘플 일정이 있는 살아 있는 데모 계정 준비
+- [ ] 데모에는 실제 군 식별·병력·일정 정보가 전혀 없는지 2인 검토
+- [ ] 지원 URL, 개인정보 URL, 삭제 URL, 문의 이메일을 외부 네트워크에서 확인
+- [ ] 합성 이미지를 같은 production 후보 빌드의 실제 기기 캡처로 교체하고 상태바·문구·기능을 실제 동작과 일치시킴
+- [ ] 앱 이름·아이콘·스크린샷에 태극·부대마크·국방부/각 군 로고나 공식 앱 오인 요소가 없는지 재검수
+- [ ] 마케팅 URL은 유효한 별도 페이지가 없으면 비워 둠
+- [ ] 최신 연령등급 설문에서 UGC·사용자 상호작용을 사실대로 신고
+
+Apple의 심사 접근성, 지원 URL, 사칭, 최소 기능, 개인정보 요건은 [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)를 기준으로 합니다.
+
+## 8. 테스트·운영
+
+- [x] 날짜 계산 테스트: 당일, 복귀일 포함/미포함, 월·연도 경계, 중복 일정, 총원 0/초과, 블랙아웃, 탈퇴자, 윤년
+- [ ] 오프라인 캐시·낙관적 큐·재연결 충돌·서버 승리 알림·마지막 갱신 시각을 비행기 모드/저속망에서 검증
+- [ ] 온보딩→그룹 참여→일정 등록→혼잡도 확인→계정 삭제 E2E를 iOS/Android에서 통과
+- [ ] 색+텍스트+아이콘, 스크린리더 라벨, 200% 글꼴, 44×44pt 터치 타깃, 다크모드 검수
+- [ ] 평일 18~21시 집중 피크 부하와 콜드 스타트, rate limit, DB/캐시 병목 테스트
+- [ ] 프로덕션 백업 복구·롤백 리허설 (강제 최소 버전 차단은 구현·테스트 완료, 실제 릴리스 리허설은 남음)
+- [ ] 출시 후 2주간 크래시/ANR, 피크 지표, 문의·UGC 신고, 그룹 참여율 일일 모니터링 담당 지정
+
+## 최종 승인 기준
+
+프로덕션 제출은 다음 증거가 모두 있을 때만 진행합니다.
+
+1. 군사보안·법률 검토 결과와 허용 범위
+2. 최소수집 데이터 모델과 대량수집 방지 검증
+3. UGC 신고·차단·운영 대응 및 완전한 계정 삭제 검증
+4. API 36 AAB, Xcode 26/iOS 26 archive, Privacy Report
+5. Play 개인 계정 해당 시 12명×14일 비공개 테스트와 프로덕션 액세스 승인
+6. 공개 정책 URL·지원 채널·회전된 데모 계정·실제 빌드 스크린샷
+
+이 체크리스트는 법률 자문을 대체하지 않습니다. 법령·군 내부 규정·스토어 정책은 제출 당일 다시 확인합니다.

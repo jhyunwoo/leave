@@ -13,6 +13,8 @@ import { useLogin } from "@/api/queries";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
+import { LegalLinks } from "@/components/legal-links";
+import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { colors, spacing } from "@/theme";
 
 export function LoginScreen() {
@@ -51,8 +53,37 @@ export function LoginScreen() {
             style={styles.logoMark}
           />
           <Text style={styles.logoText}>리브</Text>
-          <Text style={styles.tagline}>부대 휴가, 겹치기 전에 미리 보기.</Text>
+          <Text style={styles.tagline}>
+            휴가 계획, 겹치기 전에 참고로 미리 보기.
+          </Text>
         </View>
+
+        <ContentPanel tone="accent" style={styles.demoCard}>
+          <Text selectable style={styles.demoEyebrow}>
+            가입 전 미리보기
+          </Text>
+          <Text selectable style={styles.demoTitle}>
+            날짜별 혼잡도를 신호로 확인해요
+          </Text>
+          <View style={styles.demoSignals}>
+            {[
+              ["8/14", "여유 25%"],
+              ["8/15", "보통 60%"],
+              ["8/16", "임박 85%"],
+              ["8/17", "초과 110%"],
+            ].map(([date, signal]) => (
+              <View key={date} style={styles.demoSignal}>
+                <Text selectable style={styles.demoDate}>
+                  {date}
+                </Text>
+                <Text selectable style={styles.demoValue}>
+                  {signal}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <OfficialDisclaimer />
+        </ContentPanel>
 
         <ContentPanel style={styles.card}>
           <Text style={styles.cardTitle}>로그인</Text>
@@ -92,6 +123,7 @@ export function LoginScreen() {
             </Link>
           </Text>
         </ContentPanel>
+        <LegalLinks />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -121,6 +153,26 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignSelf: "center",
   },
+  demoCard: {
+    padding: spacing.xl,
+    gap: spacing.md,
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+  },
+  demoEyebrow: { fontSize: 12, fontWeight: "700", color: colors.body },
+  demoTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
+  demoSignals: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  demoSignal: {
+    minWidth: 88,
+    flexGrow: 1,
+    padding: spacing.sm,
+    gap: 2,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: 12,
+  },
+  demoDate: { fontSize: 12, color: colors.body },
+  demoValue: { fontSize: 13, fontWeight: "700", color: colors.ink },
   cardTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },

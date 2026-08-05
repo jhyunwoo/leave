@@ -6,11 +6,14 @@ import {
   accessLogs,
   leaveGrants,
   leaves,
+  contentReports,
   notifications,
   pushLogs,
   sessions,
-  unitJoinRequests,
+  unitInvites,
   units,
+  userBlocks,
+  userNotificationPrefs,
   users,
   type UserRow,
 } from "../db/schema";
@@ -34,6 +37,7 @@ import {
 } from "../lib/responses";
 import { serializeUnit, serializeUser } from "../lib/serialize";
 import { authMiddleware } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -148,6 +152,15 @@ const deleteAccountRoute = createRoute({
 });
 
 const app = createApp();
+// 비밀번호 무차별 대입과 이메일 열거를 막는다. 계정 생성도 같은 이유로 제한한다.
+app.use(
+  "/login",
+  rateLimit({ name: "login", limit: 10, windowSeconds: 600 }),
+);
+app.use(
+  "/signup",
+  rateLimit({ name: "signup", limit: 10, windowSeconds: 600 }),
+);
 app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/activity", authMiddleware);
@@ -213,7 +226,11 @@ export const authRoutes = app
       .get();
     if (
       !user ||
-      !(await verifyPassword(input.password, user.passwordSalt, user.passwordHash))
+      !(await verifyPassword(
+        input.password,
+        user.passwordSalt,
+        user.passwordHash,
+      ))
     ) {
       return c.json({ error: "이메일 또는 비밀번호가 올바르지 않습니다" }, 401);
     }
@@ -247,23 +264,8 @@ export const authRoutes = app
       }
     }
 
-    // 소속이 없을 때만 대기 중인 가입 신청을 노출한다.
-    let joinRequest = null;
-    if (!user.unitId) {
-      const reqRow = await db
-        .select({ req: unitJoinRequests, unit: units })
-        .from(unitJoinRequests)
-        .innerJoin(units, eq(units.id, unitJoinRequests.unitId))
-        .where(eq(unitJoinRequests.userId, user.id))
-        .get();
-      if (reqRow) {
-        joinRequest = {
-          unitId: reqRow.unit.id,
-          unitName: reqRow.unit.name,
-          createdAt: reqRow.req.createdAt,
-        };
-      }
-    }
+    // 초대코드 가입은 즉시 완료되므로 대기 상태는 더 이상 만들지 않는다.
+    const joinRequest = null;
     return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
   })
   .openapi(activityRoute, async (c) => {
@@ -294,8 +296,6 @@ export const authRoutes = app
           status: r.status,
           platform: r.platform,
           appVersion: r.appVersion,
-          ip: r.ip,
-          country: r.country,
           durationMs: r.durationMs,
           createdAt: r.createdAt,
         })),
@@ -303,8 +303,6 @@ export const authRoutes = app
           id: r.id,
           notificationId: r.notificationId,
           direction: r.direction,
-          title: r.title,
-          body: r.body,
           status: r.status,
           createdAt: r.createdAt,
         })),
@@ -343,8 +341,8 @@ export const authRoutes = app
             .where(eq(units.id, user.unitId));
         } else {
           await db
-            .delete(unitJoinRequests)
-            .where(eq(unitJoinRequests.unitId, user.unitId));
+            .delete(unitInvites)
+            .where(eq(unitInvites.unitId, user.unitId));
           await db.delete(units).where(eq(units.id, user.unitId));
           if (unit.imageKey) {
             await c.env.BUCKET.delete(unit.imageKey).catch(() => {});
@@ -355,14 +353,22 @@ export const authRoutes = app
 
     // 관련 데이터를 명시적으로 모두 삭제한다.
     // (Cloudflare D1은 외래키 ON DELETE CASCADE 적용을 보장하지 않으므로 직접 지운다.)
-    await db
-      .delete(unitJoinRequests)
-      .where(eq(unitJoinRequests.userId, user.id));
     await db.delete(leaves).where(eq(leaves.userId, user.id));
     await db.delete(notifications).where(eq(notifications.userId, user.id));
     await db.delete(sessions).where(eq(sessions.userId, user.id));
     await db.delete(accessLogs).where(eq(accessLogs.userId, user.id));
     await db.delete(pushLogs).where(eq(pushLogs.userId, user.id));
+    await db
+      .delete(userNotificationPrefs)
+      .where(eq(userNotificationPrefs.userId, user.id));
+    // 내가 건 차단과 남이 나를 건 차단 모두 지운다. 남으면 없는 id를 계속 숨긴다.
+    await db.delete(userBlocks).where(eq(userBlocks.userId, user.id));
+    await db.delete(userBlocks).where(eq(userBlocks.blockedUserId, user.id));
+    // 접수된 신고 자체는 운영 증적으로 남기되 신고자 식별자는 끊는다.
+    await db
+      .update(contentReports)
+      .set({ reporterId: null })
+      .where(eq(contentReports.reporterId, user.id));
     await db.delete(users).where(eq(users.id, user.id));
 
     // 부대원 수 변동 → 해당 부대 달력 통계 캐시 무효화

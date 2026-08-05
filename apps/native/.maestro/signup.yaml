@@ -1,16 +1,12 @@
-# 동의 기반 회원가입 흐름.
-# 참고: 2단계의 입대일/전역일은 네이티브 DatePicker라 기기/OS별로 조작이 달라
-#       환경에 맞춰 tapOn 좌표나 값을 조정해야 할 수 있다. 안정적인 자동화를 위해
-#       입력 필드에 testID를 부여하는 것을 권장한다(현재는 문구/placeholder 기반).
+# 최소수집 가입 → 비식별 그룹 생성 → 일정 시뮬레이션 → 계정 삭제 핵심 흐름.
 appId: app.leave.mobile
 env:
-  PASSWORD: "password123"
+  PASSWORD: "test-only-password-123"
 ---
 - launchApp:
     clearState: true
 - tapOn: "가입하기"
 
-# 1단계: 계정
 - tapOn:
     id: "signup-email"
 - inputRandomEmail
@@ -22,25 +18,46 @@ env:
 - inputText: ${PASSWORD}
 - tapOn:
     id: "signup-name"
-- inputText: "이순신"
+- inputText: "lime-whale"
 - tapOn:
-    id: "signup-next"
-
-# 2단계: 군 정보 (기본값 육군/이병 사용, 날짜는 환경에 맞게 조정)
-- assertVisible: "입대일"
-# TODO: DatePicker 조작 — 기기별로 상이. 예시:
-# - tapOn: "입대일"
-# - ... (날짜 선택) ...
-- tapOn:
-    id: "signup-next"
-
-# 3단계: 동의 후 가입
-- assertVisible:
-    text: "동의합니다"
+    id: "signup-terms-consent"
 - tapOn:
     id: "signup-data-consent"
 - tapOn:
+    id: "signup-age-confirmation"
+- tapOn:
     id: "signup-next"
 
-# 가입 성공 시 탭 화면(부대/달력 등)으로 진입
-- assertVisible: "부대"
+- assertVisible: "아직 공유 그룹이 없어요"
+- tapOn: "그룹 참여·만들기"
+- tapOn:
+    id: "create-unit-open"
+- tapOn:
+    id: "create-unit-name"
+- inputText: "summer-room"
+- tapOn:
+    id: "create-unit-reference-total"
+- inputText: "20"
+- tapOn:
+    id: "create-unit-max-out"
+- eraseText
+- inputText: "4"
+- tapOn:
+    id: "create-unit-submit"
+- assertVisible: "지금 초대코드를 보관하세요"
+
+# form-sheet를 닫고 달력에서 기본 날짜를 시뮬레이션·저장한다.
+- back
+- assertVisible: "참고용 추정치"
+- tapOn: "휴가 등록"
+- assertVisible: "이 계획을 더하면"
+- tapOn:
+    id: "leave-form-submit"
+
+# 인앱 영구 삭제 경로가 실제로 노출되고 확인을 요구하는지 검증한다.
+- tapOn: "프로필"
+- tapOn:
+    id: "delete-account"
+- assertVisible: "계정과 데이터 영구 삭제"
+- tapOn: "영구 삭제"
+- assertVisible: "로그인"

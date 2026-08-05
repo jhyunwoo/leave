@@ -3,6 +3,7 @@ import {
   BALANCE_KEYS,
   BRANCHES,
   LEAVE_CATEGORIES,
+  LEAVE_STATUSES,
   OVERNIGHT_KINDS,
   RANKS,
 } from "@leave/shared";
@@ -51,8 +52,13 @@ export const unitSchema = z
     id: z.string(),
     name: z.string(),
     description: z.string().nullable(),
+    // 실제 정원이 아닌, 관리자가 출타 계산 기준으로 지정한 값.
+    referenceMemberTotal: z.number().nullable(),
     // 부대 관리자가 지정한 하루 최대 출타 인원.
     maxLeaveCount: z.number(),
+    // 복귀일을 출타로 셀지. 부대마다 달라 그룹 설정으로 노출한다.
+    returnDayCounts: z.boolean(),
+    lastTotalUpdatedAt: z.string().nullable(),
     // 앱 가입자 수.
     memberCount: z.number(),
     // 부대 관리자 사용자 id.
@@ -63,19 +69,15 @@ export const unitSchema = z
   })
   .openapi("Unit");
 
-/** 대기 중인 부대 가입 신청(관리자 조회용). */
-export const joinRequestSchema = z
+/** 초대코드 원문은 발급 응답에서만 한 번 반환한다. */
+export const issuedUnitInviteSchema = z
   .object({
-    userId: z.string(),
-    name: z.string(),
-    branch: z.enum(BRANCHES),
-    branchLabel: z.string(),
-    rank: z.enum(RANKS),
-    rankLabel: z.string(),
-    profileImageKey: z.string().nullable(),
-    createdAt: z.string(),
+    code: z.string(),
+    expiresAt: z.string(),
+    maxUses: z.number(),
+    usedCount: z.number(),
   })
-  .openapi("JoinRequest");
+  .openapi("IssuedUnitInvite");
 
 /** 내가 낸 가입 신청 요약(/auth/me). */
 export const myJoinRequestSchema = z
@@ -103,6 +105,7 @@ export const leaveSchema = z
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    status: z.enum(LEAVE_STATUSES),
     segments: z.array(leaveSegmentResponseSchema),
     createdAt: z.string(),
   })
@@ -111,14 +114,11 @@ export const leaveSchema = z
 export const calendarLeaveSchema = z
   .object({
     id: z.string(),
-    userId: z.string(),
-    userName: z.string(),
-    userRankLabel: z.string(),
-    userProfileImageKey: z.string().nullable(),
     title: z.string(),
     startDate: z.string(),
     endDate: z.string(),
     reason: z.string().nullable(),
+    status: z.enum(LEAVE_STATUSES),
     segments: z.array(leaveSegmentResponseSchema),
   })
   .openapi("CalendarLeave");
@@ -126,12 +126,22 @@ export const calendarLeaveSchema = z
 export const dayStatSchema = z
   .object({
     date: z.string(),
-    userIds: z.array(z.string()),
     count: z.number(),
     allowed: z.number(),
     exceeded: z.boolean(),
+    // 블랙아웃 기간이면 출타율과 무관하게 제한될 수 있다.
+    blocked: z.boolean(),
   })
   .openapi("DayStat");
+
+export const blackoutSchema = z
+  .object({
+    id: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    reason: z.string().nullable(),
+  })
+  .openapi("UnitBlackout");
 
 export const calendarSchema = z
   .object({
@@ -139,8 +149,40 @@ export const calendarSchema = z
     unit: unitSchema,
     days: z.array(dayStatSchema),
     leaves: z.array(calendarLeaveSchema),
+    blackouts: z.array(blackoutSchema),
   })
   .openapi("UnitCalendar");
+
+export const reportSchema = z
+  .object({
+    id: z.string(),
+    targetType: z.enum(["unit", "member"]),
+    targetId: z.string(),
+    reason: z.string(),
+    status: z.enum(["open", "reviewing", "resolved"]),
+    createdAt: z.string(),
+  })
+  .openapi("ContentReport");
+
+export const blockedUserSchema = z
+  .object({
+    userId: z.string(),
+    // 이미 탈퇴한 사용자면 별칭이 없다.
+    name: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("BlockedUser");
+
+export const notificationPrefsResponseSchema = z
+  .object({
+    // 내 계획 날짜가 최대 출타 인원을 넘겼을 때
+    overage: z.boolean(),
+    // 내 계획 기간에 블랙아웃이 등록됐을 때
+    blackout: z.boolean(),
+    // 그룹 설정·관리자 변경 안내
+    unitNotice: z.boolean(),
+  })
+  .openapi("NotificationPreferences");
 
 export const notificationSchema = z
   .object({
@@ -276,8 +318,6 @@ export const accessLogSchema = z
     status: z.number(),
     platform: z.string().nullable(),
     appVersion: z.string().nullable(),
-    ip: z.string().nullable(),
-    country: z.string().nullable(),
     durationMs: z.number().nullable(),
     createdAt: z.string(),
   })
@@ -288,8 +328,6 @@ export const pushLogSchema = z
     id: z.string(),
     notificationId: z.string().nullable(),
     direction: z.enum(["send", "receipt", "open"]),
-    title: z.string().nullable(),
-    body: z.string().nullable(),
     status: z.string().nullable(),
     createdAt: z.string(),
   })

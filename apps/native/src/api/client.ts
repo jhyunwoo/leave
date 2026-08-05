@@ -1,6 +1,5 @@
 import type { AppType } from "@leave/api";
 import {
-  buildImageUrl,
   resolveApiUrl,
   unwrap as unwrapResponse,
   type UnwrappableResponse,
@@ -65,10 +64,6 @@ export const api = hc<AppType>(API_URL, {
     ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
   }),
 });
-
-export function imageUrl(key: string | null | undefined): string | null {
-  return buildImageUrl(API_URL, key);
-}
 
 /**
  * 세션이 더 이상 유효하지 않을 때(토큰 만료·삭제·서버에서 세션 소멸) 부를 콜백.

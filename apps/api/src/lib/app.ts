@@ -8,6 +8,12 @@ export type AppBindings = {
   // 성능 최적화용 캐시(부대 달력·검색 결과 등). 로컬 dev는 자동으로 로컬 KV를 사용.
   CACHE: KVNamespace;
   CORS_ORIGIN?: string;
+  /** 이 버전 미만의 앱은 426으로 막는다. 비우면 차단하지 않는다. */
+  MIN_APP_VERSION?: string;
+  /** 스토어에 올라간 최신 앱 버전. 업데이트 안내 문구에만 쓴다. */
+  LATEST_APP_VERSION?: string;
+  /** 카운터별 rate limit 상한 덮어쓰기 JSON (예: `{"signup":10000}`). */
+  RATE_LIMITS?: string;
 };
 
 export type AppEnv = {

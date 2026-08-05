@@ -1,4 +1,5 @@
 import {
+  availabilitySignal,
   BALANCE_LABELS,
   fmtDateK,
   fmtRange,
@@ -11,32 +12,32 @@ import {
 } from "@leave/shared";
 import { StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@/api/queries";
-import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
+import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
 export function DayPanel(props: {
   calendar: Calendar;
   date: ISODate;
   onAddLeave: () => void;
-  /** 내 사용자 id. 내 휴가를 맨 위로 올려 강조한다. */
+  /** 이전 응답과의 호출 호환용. 서버는 이제 내 일정 상세만 내려준다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
-  const dayLeaves = calendar.leaves
-    .filter((l) => l.startDate <= date && date <= l.endDate)
-    .sort((a, b) =>
-      a.userId === props.myUserId ? -1 : b.userId === props.myUserId ? 1 : 0,
-    );
+  const dayLeaves = calendar.leaves.filter(
+    (leave) => leave.startDate <= date && date <= leave.endDate,
+  );
   const exceeded = stat?.exceeded ?? false;
+  const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
   const holiday = getHoliday(date);
-  // 이 날 더 나갈 수 있는 인원. 초과한 날은 음수가 되므로 0에서 끊는다.
-  const remaining = stat ? Math.max(stat.allowed - stat.count, 0) : 0;
+  const blackout = calendar.blackouts.find(
+    (b) => b.startDate <= date && date <= b.endDate,
+  );
 
   return (
     <View style={styles.card}>
@@ -47,18 +48,31 @@ export function DayPanel(props: {
       {stat && (
         <View style={styles.statusRow}>
           <Badge
-            text={`출타 ${stat.count}명 / 허용 ${stat.allowed}명`}
+            text={
+              signal?.percent == null
+                ? "기준 미설정"
+                : `${signal.label} ${signal.percent}%`
+            }
             kind={exceeded ? "negative" : "positive"}
           />
-          <Badge
-            text={remaining > 0 ? `잔여 ${remaining}명` : "잔여 없음"}
-            kind="neutral"
-          />
-          {exceeded && (
-            <Text style={styles.exceededText}>최대 출타 인원 초과</Text>
-          )}
+          {exceeded && <Text style={styles.exceededText}>참고 기준 초과</Text>}
         </View>
       )}
+
+      {blackout ? (
+        <ContentPanel tone="danger" style={styles.blackoutCard}>
+          <Text selectable style={styles.blackoutTitle}>
+            제한 가능 기간
+          </Text>
+          <Text selectable style={styles.emptyCaption}>
+            {blackout.reason ??
+              "관리자가 등록한 기간입니다."}{" "}
+            출타율과 무관하게 지휘관이 휴가를 제한할 수 있어요.
+          </Text>
+        </ContentPanel>
+      ) : null}
+
+      <OfficialDisclaimer />
 
       {props.cycle && (
         <Text style={styles.cycleLine}>
@@ -69,29 +83,32 @@ export function DayPanel(props: {
 
       {dayLeaves.length === 0 ? (
         <ContentPanel tone="grouped" style={styles.empty}>
-          <Text style={styles.emptyTitle}>이 날은 아무도 휴가가 아니에요.</Text>
-          <Text style={styles.emptyCaption}>가장 먼저 휴가를 잡아보세요.</Text>
+          <Text style={styles.emptyTitle}>공유된 계획이 아직 없어요.</Text>
+          <Text style={styles.emptyCaption}>
+            내 계획을 먼저 시뮬레이션해보세요.
+          </Text>
         </ContentPanel>
       ) : (
         <View style={{ gap: spacing.md }}>
+          <ContentPanel tone="grouped" style={styles.anonymousSummary}>
+            <Text style={styles.anonymousTitle}>
+              다른 참여자는 집계로만 표시
+            </Text>
+            <Text style={styles.emptyCaption}>
+              사회적 압력을 줄이기 위해 이름·계급·일정 상세·사유는 내려받지
+              않아요.
+            </Text>
+          </ContentPanel>
           {dayLeaves.map((l) => {
             // 이제 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
             const segment = segmentOnDate(l.segments, date);
             const key = segment ? segmentBalanceKey(segment) : null;
             const tone = key ? BALANCE_COLORS[key] : null;
-            const mine = l.userId === props.myUserId;
             return (
-              <View
-                key={l.id}
-                style={[styles.leaveRow, mine && styles.myLeaveRow]}
-              >
-                <Avatar name={l.userName} imageKey={l.userProfileImageKey} />
+              <View key={l.id} style={[styles.leaveRow, styles.myLeaveRow]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={styles.leaveUserRow}>
-                    <Text style={styles.leaveUser}>
-                      {l.userRankLabel} {l.userName}
-                      {mine ? " (나)" : ""}
-                    </Text>
+                    <Text style={styles.leaveUser}>내 계획</Text>
                     {key && tone && (
                       <View
                         style={[styles.typeChip, { backgroundColor: tone.bg }]}
@@ -103,11 +120,8 @@ export function DayPanel(props: {
                     )}
                   </View>
                   <Text style={styles.leaveMeta}>
-                    {l.title} · {fmtRange(l.startDate, l.endDate)}
+                    {fmtRange(l.startDate, l.endDate)}
                   </Text>
-                  {l.reason ? (
-                    <Text style={styles.leaveReason}>{l.reason}</Text>
-                  ) : null}
                 </View>
               </View>
             );
@@ -152,6 +166,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 14, color: colors.body },
   emptyCaption: { fontSize: 12, color: colors.mute },
+  anonymousSummary: { padding: spacing.lg, gap: spacing.xs },
+  blackoutCard: { padding: spacing.lg, gap: spacing.xs },
+  blackoutTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.warningContent,
+  },
+  anonymousTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   cycleLine: { fontSize: 12, color: colors.body, marginTop: -spacing.sm },
   leaveRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
   myLeaveRow: {
@@ -174,5 +196,4 @@ const styles = StyleSheet.create({
   },
   typeChipText: { fontSize: 10, fontWeight: "700" },
   leaveMeta: { fontSize: 12, color: colors.mute, marginTop: 1 },
-  leaveReason: { fontSize: 12, color: colors.body, marginTop: 2 },
 });

@@ -1,19 +1,18 @@
 import {
   BALANCE_LABELS,
   fmtRangeTiny,
+  REPORT_REASON_LABELS,
   segmentBalanceKey,
   type LeaveSegment,
 } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Check,
   ImagePlus,
   KeyRound,
   LoaderCircle,
   Pencil,
   ShieldOff,
   Trash2,
-  X,
 } from "lucide-react";
 import {
   useDeferredValue,
@@ -42,6 +41,8 @@ import {
 
 export type EntityResource =
   | EditableResource
+  | "unit-invites"
+  | "content-reports"
   | "access-logs"
   | "push-logs"
   | "sessions"
@@ -81,6 +82,24 @@ function text(value: unknown): string {
   return value === null || value === undefined || value === ""
     ? "—"
     : String(value);
+}
+
+const REPORT_STATUS_LABELS: Record<string, string> = {
+  open: "미처리",
+  reviewing: "확인 중",
+  resolved: "처리 완료",
+};
+
+/** 초대코드는 폐기·만료·소진 중 어느 이유로 못 쓰는지가 운영에서 중요하다. */
+function inviteStatusLabel(item: Entity): string {
+  if (item.revokedAt) return "폐기";
+  if (typeof item.expiresAt === "string" && item.expiresAt <= new Date().toISOString()) {
+    return "만료";
+  }
+  const used = Number(item.usedCount ?? 0);
+  const max = Number(item.maxUses ?? 0);
+  if (max > 0 && used >= max) return "소진";
+  return "유효";
 }
 
 function person(item: Entity): ReactNode {
@@ -214,27 +233,73 @@ const configs: Record<EntityResource, ResourceConfig> = {
       },
     ],
   },
-  "join-requests": {
-    title: "가입 요청",
-    description: "모든 부대 가입 요청을 확인하고 승인하거나 거절합니다.",
-    createLabel: "가입 요청 추가",
+  "unit-invites": {
+    title: "초대코드",
+    description:
+      "발급된 그룹 초대코드의 유효 상태를 확인하고 폐기합니다. 코드 원문은 저장하지 않아 조회할 수 없습니다.",
+    deletable: true,
     columns: [
-      { key: "user", label: "사용자", render: person },
+      { key: "unit", label: "그룹", render: (item) => text(item.unitName) },
+      { key: "unitId", label: "그룹 ID", render: (item) => text(item.unitId) },
       {
-        key: "unit",
-        label: "신청 부대",
-        render: (item) => text(item.unitName),
+        key: "uses",
+        label: "사용",
+        render: (item) => `${item.usedCount ?? 0} / ${item.maxUses ?? 0}`,
       },
-      { key: "unitId", label: "부대 ID", render: (item) => text(item.unitId) },
       {
-        key: "created",
-        label: "신청일",
-        render: (item) => formatTime(item.createdAt),
+        key: "expires",
+        label: "만료",
+        render: (item) => formatTime(item.expiresAt),
       },
       {
         key: "status",
         label: "상태",
-        render: () => <StatusBadge value="대기" />,
+        render: (item) => (
+          <StatusBadge value={inviteStatusLabel(item)} />
+        ),
+      },
+      {
+        key: "created",
+        label: "발급일",
+        render: (item) => formatTime(item.createdAt),
+      },
+    ],
+  },
+  "content-reports": {
+    title: "신고",
+    description:
+      "그룹 이름·설명과 참여자 별칭 신고를 처리합니다. 미처리 건이 위로 옵니다. 접수 후 24시간 안에 조치해야 합니다.",
+    columns: [
+      {
+        key: "status",
+        label: "상태",
+        render: (item) => (
+          <StatusBadge value={REPORT_STATUS_LABELS[String(item.status)] ?? "—"} />
+        ),
+      },
+      {
+        key: "target",
+        label: "대상",
+        render: (item) => (
+          <span className="person-cell">
+            <strong>{item.targetType === "unit" ? "그룹" : "참여자"}</strong>
+            <small>{text(item.targetId)}</small>
+          </span>
+        ),
+      },
+      {
+        key: "reason",
+        label: "사유",
+        render: (item) =>
+          REPORT_REASON_LABELS[
+            String(item.reason) as keyof typeof REPORT_REASON_LABELS
+          ] ?? text(item.reason),
+      },
+      { key: "detail", label: "내용", render: (item) => text(item.detail) },
+      {
+        key: "created",
+        label: "접수",
+        render: (item) => formatTime(item.createdAt),
       },
     ],
   },
@@ -270,7 +335,8 @@ const configs: Record<EntityResource, ResourceConfig> = {
   },
   "access-logs": {
     title: "접속 로그",
-    description: "전체 사용자와 비로그인 요청의 접속 메타데이터를 확인합니다.",
+    description:
+      "접속 시각·경로·상태·앱 플랫폼/버전만 남깁니다. IP·국가·User-Agent는 저장하지 않습니다.",
     exportPath: "/access-logs/export",
     columns: [
       {
@@ -295,7 +361,11 @@ const configs: Record<EntityResource, ResourceConfig> = {
         label: "플랫폼",
         render: (item) => text(item.platform),
       },
-      { key: "ip", label: "IP", render: (item) => text(item.ip) },
+      {
+        key: "appVersion",
+        label: "앱 버전",
+        render: (item) => text(item.appVersion),
+      },
       {
         key: "duration",
         label: "응답 시간",
@@ -311,7 +381,8 @@ const configs: Record<EntityResource, ResourceConfig> = {
   },
   "push-logs": {
     title: "푸시 로그",
-    description: "푸시 알림 발송·수신·열람 이벤트와 처리 결과를 확인합니다.",
+    description:
+      "푸시 발송·수신·열람 이벤트와 결과만 남깁니다. 메시지 원문과 데이터는 저장하지 않습니다.",
     exportPath: "/push-logs/export",
     columns: [
       {
@@ -326,21 +397,16 @@ const configs: Record<EntityResource, ResourceConfig> = {
         render: (item) => <StatusBadge value={item.direction as string} />,
       },
       {
-        key: "title",
-        label: "알림",
-        render: (item) => (
-          <span className="person-cell">
-            <strong>{text(item.title)}</strong>
-            <small>{text(item.body)}</small>
-          </span>
-        ),
+        key: "notificationId",
+        label: "알림 ID",
+        className: "mono-cell",
+        render: (item) => text(item.notificationId),
       },
       {
         key: "status",
         label: "결과",
         render: (item) => <StatusBadge value={item.status as string} />,
       },
-      { key: "detail", label: "상세", render: (item) => text(item.detail) },
     ],
   },
   sessions: {
@@ -593,11 +659,15 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
 
   const action = useMutation({
     mutationFn: async (
-      name: "approve" | "reject" | "revoke" | "reset-password",
+      name: "revoke" | "reset-password" | "reviewing" | "resolved",
     ) => {
+      if (resource === "content-reports") {
+        if (!selected) throw new Error("선택된 레코드가 없습니다");
+        return api.patch(`/content-reports/${selected.id}`, { status: name });
+      }
       if (!selected) throw new Error("선택된 레코드가 없습니다");
-      if (resource === "join-requests") {
-        return api.post(`/${resource}/${selected.id}/${name}`);
+      if (resource === "unit-invites" && name === "revoke") {
+        return api.post(`/${resource}/${selected.id}/revoke`);
       }
       if (resource === "sessions" && name === "revoke") {
         return api.delete(`/${resource}/${selected.id}`);
@@ -624,14 +694,18 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
         setSelected(null);
       }
       void invalidate();
+      if (name === "reviewing" || name === "resolved") {
+        toast.success(
+          name === "reviewing" ? "확인 중으로 바꿨습니다" : "처리 완료했습니다",
+        );
+        return;
+      }
       toast.success(
-        name === "approve"
-          ? "가입 요청을 승인했습니다"
-          : name === "reject"
-            ? "가입 요청을 거절했습니다"
-            : name === "revoke"
-              ? "세션을 만료시켰습니다"
-              : "임시 비밀번호를 발급했습니다",
+        name === "revoke"
+          ? resource === "unit-invites"
+            ? "초대코드를 폐기했습니다"
+            : "세션을 만료시켰습니다"
+          : "임시 비밀번호를 발급했습니다",
       );
     },
     onError: (error) =>
@@ -747,25 +821,35 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
                   <Pencil size={17} /> 편집
                 </button>
               ) : null}
-              {resource === "join-requests" ? (
+              {resource === "content-reports" ? (
                 <>
                   <button
                     className="button secondary"
                     type="button"
-                    disabled={action.isPending}
-                    onClick={() => action.mutate("reject")}
+                    disabled={action.isPending || selected.status === "reviewing"}
+                    onClick={() => action.mutate("reviewing")}
                   >
-                    <X size={17} /> 거절
+                    확인 중
                   </button>
                   <button
                     className="button primary"
                     type="button"
-                    disabled={action.isPending}
-                    onClick={() => action.mutate("approve")}
+                    disabled={action.isPending || selected.status === "resolved"}
+                    onClick={() => action.mutate("resolved")}
                   >
-                    <Check size={17} /> 승인
+                    처리 완료
                   </button>
                 </>
+              ) : null}
+              {resource === "unit-invites" && !selected.revokedAt ? (
+                <button
+                  className="button danger"
+                  type="button"
+                  disabled={action.isPending}
+                  onClick={() => action.mutate("revoke")}
+                >
+                  <ShieldOff size={17} /> 초대코드 폐기
+                </button>
               ) : null}
               {resource === "sessions" || resource === "admin-sessions" ? (
                 <button
@@ -806,7 +890,6 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
           "users",
           "units",
           "leaves",
-          "join-requests",
           "notifications",
           "admins",
         ].includes(resource) ? (

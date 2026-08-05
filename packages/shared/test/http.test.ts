@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, buildImageUrl, unwrap } from "../src";
+import { ApiError, unwrap } from "../src";
 
 function fakeRes(ok: boolean, status: number, body: unknown) {
   return { ok, status, json: async () => body };
@@ -25,15 +25,5 @@ describe("unwrap", () => {
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).message).toBe("요청을 처리하지 못했습니다");
     }
-  });
-});
-
-describe("buildImageUrl", () => {
-  it("key가 있으면 URL, 없으면 null", () => {
-    expect(buildImageUrl("http://api.test", "abc")).toBe(
-      "http://api.test/images/abc",
-    );
-    expect(buildImageUrl("http://api.test", null)).toBe(null);
-    expect(buildImageUrl("http://api.test", undefined)).toBe(null);
   });
 });

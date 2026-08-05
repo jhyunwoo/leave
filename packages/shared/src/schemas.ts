@@ -3,6 +3,7 @@ import { addDays, isValidISODate } from "./dates";
 import {
   BALANCE_KEYS,
   LEAVE_CATEGORIES,
+  LEAVE_STATUSES,
   OVERNIGHT_KINDS,
   sortSegments,
 } from "./leave";
@@ -51,22 +52,65 @@ const maxLeaveCountSchema = z
   .min(0, "최대 출타 인원은 0명 이상이어야 합니다")
   .max(100000, "최대 출타 인원이 너무 큽니다");
 
+/** 실제 편제·정원이 아닌, 관리자가 계산 기준으로 정한 임의의 인원 값. */
+const referenceMemberTotalSchema = z
+  .int("기준 인원을 입력해주세요")
+  .min(1, "기준 인원은 1명 이상이어야 합니다")
+  .max(100000, "기준 인원이 너무 큽니다");
+
+const unitDisplayNameSchema = z
+  .string()
+  .trim()
+  .min(2, "그룹 이름은 2자 이상이어야 합니다")
+  .max(80)
+  .describe(
+    "검색되지 않는 그룹 내부 표시명입니다. 실제 부대명·부대번호·주소·위치 등 식별 정보를 입력하면 안 됩니다.",
+  );
+
+const unitDescriptionSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .describe(
+    "실제 부대명·부대번호·주소·위치, 병력 현황, 작전·훈련 정보를 입력하면 안 됩니다.",
+  );
+
+const inviteExpiresAtSchema = z.iso.datetime({ offset: true });
+const inviteMaxUsesSchema = z
+  .int("초대코드 사용 가능 횟수를 입력해주세요")
+  .min(1, "초대코드는 한 번 이상 사용할 수 있어야 합니다")
+  .max(10000, "초대코드 사용 가능 횟수가 너무 큽니다");
+
 export const unitCreateSchema = z.object({
-  name: z.string().trim().min(2, "부대 이름은 2자 이상이어야 합니다").max(80),
-  description: z.string().trim().max(200).optional(),
+  name: unitDisplayNameSchema,
+  description: unitDescriptionSchema.optional(),
+  referenceMemberTotal: referenceMemberTotalSchema.nullable().optional(),
   maxLeaveCount: maxLeaveCountSchema,
+  returnDayCounts: z.boolean().optional(),
+  lastTotalUpdatedAt: inviteExpiresAtSchema.nullable().optional(),
+  inviteExpiresAt: inviteExpiresAtSchema.optional(),
+  inviteMaxUses: inviteMaxUsesSchema.optional(),
 });
 
 /** 부대 정보 수정(관리자). 전 필드 선택적. */
 export const unitUpdateSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "부대 이름은 2자 이상이어야 합니다")
-    .max(80)
-    .optional(),
-  description: z.string().trim().max(200).nullable().optional(),
+  name: unitDisplayNameSchema.optional(),
+  description: unitDescriptionSchema.nullable().optional(),
+  referenceMemberTotal: referenceMemberTotalSchema.nullable().optional(),
   maxLeaveCount: maxLeaveCountSchema.optional(),
+  returnDayCounts: z.boolean().optional(),
+  lastTotalUpdatedAt: inviteExpiresAtSchema.nullable().optional(),
+});
+
+/** 초대코드는 검색 가능한 그룹 식별자 대신 사용하는 고엔트로피 비밀값이다. */
+export const unitJoinSchema = z.object({
+  code: z.string().trim().min(32, "올바른 초대코드를 입력해주세요").max(200),
+});
+
+/** 관리자가 현재 코드를 폐기하고 새 코드를 발급할 때 지정하는 제한. */
+export const unitInviteCreateSchema = z.object({
+  expiresAt: inviteExpiresAtSchema.optional(),
+  maxUses: inviteMaxUsesSchema.optional(),
 });
 
 /** 관리자 이관 대상. */
@@ -125,6 +169,8 @@ export const leaveCreateSchema = z
   .object({
     title: z.string().trim().min(1, "휴가 제목을 입력해주세요").max(80),
     reason: z.string().trim().max(500).optional(),
+    // 생략하면 기존 동작대로 "희망"(집계 반영)으로 저장한다.
+    status: z.enum(LEAVE_STATUSES).optional(),
     segments: z
       .array(leaveSegmentSchema)
       .min(1, "휴가 구간을 하나 이상 입력해주세요")
@@ -215,6 +261,57 @@ export const profileUpdateSchema = z.object({
   rank: z.enum(RANKS).optional(),
 });
 
+/** 검열·훈련 등 출타율과 무관하게 휴가가 제한될 수 있는 기간(관리자 등록). */
+export const blackoutCreateSchema = z
+  .object({
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    reason: z.string().trim().max(200).optional(),
+  })
+  .refine((value) => value.startDate <= value.endDate, {
+    path: ["endDate"],
+    message: "종료일은 시작일과 같거나 뒤여야 합니다",
+  });
+
+export const REPORT_REASONS = [
+  "military_info",
+  "personal_info",
+  "abuse",
+  "spam",
+  "other",
+] as const;
+
+export const REPORT_REASON_LABELS: Record<
+  (typeof REPORT_REASONS)[number],
+  string
+> = {
+  military_info: "부대·병력·작전 정보 입력",
+  personal_info: "실명·군번·계급 등 개인정보",
+  abuse: "욕설·괴롭힘",
+  spam: "스팸·광고",
+  other: "기타",
+};
+
+export const reportCreateSchema = z.object({
+  targetType: z.enum(["unit", "member"]),
+  targetId: z.string().min(1).max(100),
+  reason: z.enum(REPORT_REASONS),
+  detail: z.string().trim().max(500).optional(),
+});
+
+export const blockCreateSchema = z.object({
+  userId: z.string().min(1).max(100),
+});
+
+/** 알림 종류별 수신 설정. 보낸 항목만 바꾼다. */
+export const notificationPrefsSchema = z.object({
+  overage: z.boolean().optional(),
+  blackout: z.boolean().optional(),
+  unitNotice: z.boolean().optional(),
+});
+
+export const leaveStatusSchema = z.enum(LEAVE_STATUSES);
+
 export const pushTokenSchema = z.object({
   token: z.string().min(1).max(200),
 });
@@ -226,9 +323,6 @@ export const pushTokenSchema = z.object({
 export const pushEventSchema = z.object({
   direction: z.enum(["receipt", "open"]),
   notificationId: z.string().max(100).optional(),
-  title: z.string().max(200).optional(),
-  body: z.string().max(500).optional(),
-  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
@@ -236,7 +330,13 @@ export type PushEventInput = z.infer<typeof pushEventSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UnitCreateInput = z.infer<typeof unitCreateSchema>;
 export type UnitUpdateInput = z.infer<typeof unitUpdateSchema>;
+export type UnitJoinInput = z.infer<typeof unitJoinSchema>;
+export type UnitInviteCreateInput = z.infer<typeof unitInviteCreateSchema>;
 export type UnitTransferInput = z.infer<typeof unitTransferSchema>;
+export type BlackoutCreateInput = z.infer<typeof blackoutCreateSchema>;
+export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
+export type BlockCreateInput = z.infer<typeof blockCreateSchema>;
+export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
 export type LeaveGrantCreateInput = z.infer<typeof leaveGrantCreateSchema>;

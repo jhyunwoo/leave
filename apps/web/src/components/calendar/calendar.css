@@ -122,6 +122,7 @@
 .cal-cell.is-selected .cal-daynum.is-exceeded,
 .cal-cell.is-selected .cal-holiday,
 .cal-cell.is-selected .cal-count,
+.cal-cell.is-selected .cal-count.is-near,
 .cal-cell.is-selected .cal-count.is-exceeded {
   color: var(--ink);
 }
@@ -164,55 +165,38 @@
   line-height: 1.2;
 }
 
-.cal-chips {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  overflow: hidden;
-}
-.cal-chip {
-  display: block;
+/* 혼잡도 신호 — 색만으로 구분하지 않도록 라벨과 비율을 함께 적는다. */
+.cal-count {
+  margin-top: auto;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border-radius: var(--r-sm);
   background: var(--canvas-soft);
-  color: var(--body);
-  font-size: 12px;
-  font-weight: 600;
-}
-.cal-chip.is-exceeded {
-  background: #fee2e2;
-  color: var(--negative-deep);
-}
-.cal-chip.is-more {
-  background: var(--canvas-soft);
-  color: var(--body);
-  width: fit-content;
-}
-
-.cal-count {
-  position: absolute;
-  right: 8px;
-  top: 10px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--mute);
+  color: var(--ink-deep);
 }
 /* 아무도 안 나간 날은 흐리게 깔아 그리드를 조용히 둔다. */
 .cal-count.is-empty {
+  background: transparent;
   color: var(--muted-soft);
   font-weight: 500;
+}
+.cal-count.is-blocked {
+  background: var(--warning, #fef3c7);
+  color: var(--warning-content, #92400e);
+  margin-top: auto;
+}
+.cal-count.is-near {
+  background: var(--warning, #fef3c7);
+  color: var(--warning-content, #92400e);
 }
 .cal-count.is-exceeded {
   color: #fff;
   background: var(--negative);
-  padding: 1px 7px;
-  border-radius: var(--r-pill);
-  top: 8px;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -230,13 +214,6 @@
   .cal-cell {
     min-height: 64px;
     padding: 5px;
-  }
-  .cal-chips {
-    display: none;
-  }
-  .cal-cell .cal-count {
-    position: static;
-    margin-top: auto;
   }
   .cal-daynum {
     min-width: 22px;
@@ -330,4 +307,13 @@
 .cal-cycle-banner.is-pending {
   background: var(--surface-card);
   color: var(--mute);
+}
+
+/* 희망과 확정을 색이 아닌 테두리로도 구분한다.
+   남의 희망 일정을 확정으로 오해하면 계획 전체가 어긋난다. */
+.cal-mine.is-confirmed {
+  border: 1px solid currentColor;
+}
+.cal-mine.is-tentative {
+  border: 1px dashed currentColor;
 }

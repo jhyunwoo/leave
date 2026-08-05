@@ -22,7 +22,8 @@ function runAfter(
 /**
  * 접속 기록 미들웨어 — 모든 요청(프리플라이트 제외)의 메타데이터를 D1 access_logs에 저장한다.
  * 가장 바깥에서 실행되므로 next() 이후에는 인증 미들웨어가 설정한 c.var.user를 읽을 수 있다.
- * 수집 범위는 접속 시각·경로·상태·플랫폼 등으로 한정하며, 요청 본문이나 비밀번호는 담지 않는다.
+ * 수집 범위는 접속 시각·경로·상태·명시적 앱 플랫폼/버전으로 한정한다.
+ * IP·국가·User-Agent·요청 본문은 저장하지 않는다.
  */
 export const accessLogMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const startedAt = Date.now();
@@ -54,9 +55,6 @@ export const accessLogMiddleware = createMiddleware<AppEnv>(async (c, next) => {
         status: c.res.status,
         platform: req.header("X-Client-Platform") ?? null,
         appVersion: req.header("X-Client-Version") ?? null,
-        userAgent: req.header("User-Agent") ?? null,
-        ip: req.header("CF-Connecting-IP") ?? null,
-        country: req.header("CF-IPCountry") ?? null,
         durationMs,
         createdAt: new Date().toISOString(),
       });

@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { type ErrorBoundaryProps, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -7,11 +8,18 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStoredToken, setUnauthorizedHandler } from "@/api/client";
 import { ErrorScreen } from "@/components/error-screen";
 import { persistFatalError, toFatalRecord } from "@/lib/fatal-error";
+import {
+  clearPersistedQueryCache,
+  configureQueryOnlineManager,
+  QUERY_CACHE_MAX_AGE,
+  queryPersistenceOptions,
+} from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { setSessionAtom, tokenAtom } from "@/state/auth";
 import { colors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
+configureQueryOnlineManager();
 
 /**
  * 라우트 트리 안에서 난 렌더 오류를 잡는다. 이게 없으면 프로덕션에서 렌더 오류가
@@ -39,7 +47,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 15_000 },
+    queries: {
+      staleTime: 15_000,
+      gcTime: QUERY_CACHE_MAX_AGE,
+      networkMode: "offlineFirst",
+    },
   },
 });
 
@@ -62,6 +74,7 @@ function RootNavigator() {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       queryClient.clear();
+      void clearPersistedQueryCache();
       void setSession(null);
     });
     return () => setUnauthorizedHandler(null);
@@ -87,7 +100,7 @@ function RootNavigator() {
           options={{
             presentation: "formSheet",
             headerShown: true,
-            title: "부대 찾기",
+            title: "그룹 참여",
             headerTransparent: process.env.EXPO_OS !== "web",
             headerShadowVisible: false,
             sheetGrabberVisible: true,
@@ -106,7 +119,7 @@ function RootNavigator() {
           options={{
             presentation: "formSheet",
             headerShown: true,
-            title: "부대 관리",
+            title: "그룹 관리",
             headerTransparent: process.env.EXPO_OS !== "web",
             headerShadowVisible: false,
             sheetGrabberVisible: true,
@@ -143,9 +156,12 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={queryPersistenceOptions}
+    >
       <StatusBar style="auto" />
       <RootNavigator />
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
