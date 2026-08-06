@@ -345,12 +345,28 @@ const app = createApp();
 app.use("*", authMiddleware);
 // 초대코드를 무차별 대입으로 찾아내지 못하게 막는 마지막 방어선.
 // (코드 자체가 192비트라 현실적으로 불가능하지만, 시도 비용을 0으로 두지 않는다.)
-app.use("/join", rateLimit({ name: "unit-join", limit: 5, windowSeconds: 600 }));
+app.use(
+  "/join",
+  rateLimit({ name: "unit-join", limit: 5, windowSeconds: 600 }),
+);
 // 넓은 날짜 범위를 훑어 그룹 시계열을 통째로 긁어가는 것을 막는다.
 app.use(
   "/:id/calendar",
   rateLimit({ name: "calendar", limit: 120, windowSeconds: 60 }),
 );
+
+/**
+ * 달력을 조회할 수 있는 범위(현재 월 기준).
+ *
+ * 휴가 등록 자체에는 날짜 상한이 없으므로, 이 범위가 좁으면 등록은 되는데 그 달의
+ * 달력·추천·시뮬레이션만 비는 어긋난 상태가 된다. 복무 기간(약 18개월) 끝까지
+ * 계획할 수 있도록 미래를 넉넉히 열어 둔다.
+ *
+ * 긁어가기는 위의 rate limit이 막는다. 여기서 범위를 두는 목적은 캐시 키
+ * (`calendar2:...:{month}`)가 무한정 늘어나지 않게 하는 것뿐이다.
+ */
+const CALENDAR_PAST_MONTHS = 12;
+const CALENDAR_FUTURE_MONTHS = 24;
 
 export const unitRoutes = app
   .openapi(createUnitRoute, async (c) => {
@@ -794,11 +810,13 @@ export const unitRoutes = app
     }
     const currentMonth = todayInSeoul().slice(0, 7);
     if (
-      month < shiftMonth(currentMonth, -3) ||
-      month > shiftMonth(currentMonth, 3)
+      month < shiftMonth(currentMonth, -CALENDAR_PAST_MONTHS) ||
+      month > shiftMonth(currentMonth, CALENDAR_FUTURE_MONTHS)
     ) {
       return c.json(
-        { error: "달력은 현재 월 기준 앞뒤 3개월만 조회할 수 있습니다" },
+        {
+          error: `달력은 현재 월 기준 과거 ${CALENDAR_PAST_MONTHS}개월 ~ 미래 ${CALENDAR_FUTURE_MONTHS}개월만 조회할 수 있습니다`,
+        },
         400,
       );
     }
@@ -866,13 +884,14 @@ export const unitRoutes = app
       exceeded: day.exceeded,
       blocked: isBlocked(day.date),
     }));
+    // 집계에 들어가는 상태만 이름과 함께 공개한다. 초안은 본인 것이라도 명단에 넣지 않는다.
+    const sharedRows = rows.filter((row) => isCountedLeaveStatus(row.status));
     const ownRows = rows.filter((row) => row.userId === user.id);
-    const segmentMap = await segmentsForLeaves(
-      db,
-      ownRows.map((row) => row.id),
-    );
+    const segmentMap = await segmentsForLeaves(db, [
+      ...new Set([...sharedRows, ...ownRows].map((row) => row.id)),
+    ]);
 
-    // 타인의 일정은 days 집계에만 반영하고 상세 레코드는 반환하지 않는다.
+    // 내 일정만 제목·사유·초안까지 담아 돌려준다.
     const calendarLeaves = ownRows.map((l) => ({
       id: l.id,
       title: l.title,
@@ -883,11 +902,42 @@ export const unitRoutes = app
       segments: segmentMap.get(l.id) ?? [],
     }));
 
+    // 차단은 이 명단에서만 숨긴다. days 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
+    const blocked = new Set(
+      (
+        await db
+          .select({ id: userBlocks.blockedUserId })
+          .from(userBlocks)
+          .where(eq(userBlocks.userId, user.id))
+          .all()
+      ).map((row) => row.id),
+    );
+    const memberById = new Map(
+      members.map((m) => [m.id, serializeMember(m)] as const),
+    );
+    const attendees = sharedRows.flatMap((l) => {
+      const member = memberById.get(l.userId);
+      if (!member || blocked.has(l.userId)) return [];
+      return [
+        {
+          leaveId: l.id,
+          userId: l.userId,
+          name: member.name,
+          rankLabel: member.rankLabel,
+          startDate: l.startDate,
+          endDate: l.endDate,
+          status: l.status,
+          segments: segmentMap.get(l.id) ?? [],
+        },
+      ];
+    });
+
     const payload = {
       month,
       unit: serializeUnit(unit, members.length),
       days,
       leaves: calendarLeaves,
+      attendees,
       blackouts: blackouts.map((b) => ({
         id: b.id,
         startDate: b.startDate,

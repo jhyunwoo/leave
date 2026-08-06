@@ -8,6 +8,7 @@ import {
   draftsToSegments,
   fitDrafts,
   fmtDateShort,
+  fmtRangeTiny,
   inclusiveDays,
   isRegularOvernightCycleBased,
   isConfirmedLeaveStatus,
@@ -52,7 +53,7 @@ import { DateRangePicker } from "./date-picker";
 import { OfficialDisclaimer } from "./official-disclaimer";
 import { NativeSegmentedControl } from "./segmented-control";
 import { SegmentRow } from "./segment-row";
-import { NativeBottomSheet } from "./native-bottom-sheet";
+import { FormSheet } from "./form-sheet";
 import { SheetScaffold } from "./sheet-scaffold";
 import { colors, radius, spacing } from "@/theme";
 
@@ -84,15 +85,20 @@ export function LeaveFormModal(props: {
       : fitDrafts([], initialStartDate, initialEndDate),
   );
   const [error, setError] = useState<string | null>(null);
-  // 새 계획의 기본은 "희망"(익명 집계 반영). 초안은 나만 보고 집계에서 빠진다.
-  const [status, setStatus] = useState<LeaveStatus>(editing?.status ?? "shared");
+  // 새 계획의 기본은 "희망"(그룹에 공개). 초안은 나만 보고 집계·명단에서 빠진다.
+  const [status, setStatus] = useState<LeaveStatus>(
+    editing?.status ?? "shared",
+  );
   // 추천은 선택 구간 밖 ±RECOMMENDATION_RADIUS_DAYS까지 살펴보므로, 그 범위가
   // 걸치는 달을 모두 받아야 월초·월말 후보가 빠지지 않는다.
   const calendarMonths = useMemo(
     () =>
       monthsSpanning(
         addDays(startDate, -RECOMMENDATION_RADIUS_DAYS),
-        addDays(endDate >= startDate ? endDate : startDate, RECOMMENDATION_RADIUS_DAYS),
+        addDays(
+          endDate >= startDate ? endDate : startDate,
+          RECOMMENDATION_RADIUS_DAYS,
+        ),
       ),
     [startDate, endDate],
   );
@@ -296,9 +302,8 @@ export function LeaveFormModal(props: {
   };
 
   return (
-    <NativeBottomSheet
+    <FormSheet
       isPresented={props.visible}
-      snapPoints={[{ fraction: 0.92 }, "full"]}
       onDismiss={props.onClose}
       testID="leave-form-sheet"
     >
@@ -364,10 +369,10 @@ export function LeaveFormModal(props: {
             />
             <Text selectable style={styles.statusHint}>
               {status === "draft"
-                ? "초안은 나만 볼 수 있고 그룹 집계에 들어가지 않아요."
+                ? "초안은 나만 볼 수 있고 그룹 집계와 출타 명단에 들어가지 않아요."
                 : isConfirmedLeaveStatus(status)
-                  ? "확정된 일정이에요. 달력에서 희망 일정과 구분해 보여줍니다."
-                  : "희망 일정으로 익명 집계에 반영돼요. 누구인지는 드러나지 않습니다."}
+                  ? "확정된 일정이에요. 달력 출타 명단에 이름과 함께 보이고, 희망 일정과 구분해 표시됩니다."
+                  : "희망 일정이에요. 달력 출타 명단에 이름과 함께 같은 그룹 구성원에게 보여요."}
             </Text>
           </View>
 
@@ -388,7 +393,9 @@ export function LeaveFormModal(props: {
                 {recommendations.map((range) => (
                   <Button
                     key={`${range.startDate}-${range.endDate}`}
-                    title={`${fmtDateShort(range.startDate)} ~ ${fmtDateShort(range.endDate)} · 최고 ${range.peakPercent}%`}
+                    // 하루짜리 추천이 대부분이다. 같은 날짜를 두 번 적으면 라벨이
+                    // 길어져 버튼이 카드 밖으로 밀린다.
+                    title={`${fmtRangeTiny(range.startDate, range.endDate)} · 최고 ${range.peakPercent}%`}
                     variant="secondary"
                     size="sm"
                     onPress={() => applyRange(range.startDate, range.endDate)}
@@ -512,7 +519,7 @@ export function LeaveFormModal(props: {
           )}
         </SheetScaffold>
       </KeyboardAvoidingView>
-    </NativeBottomSheet>
+    </FormSheet>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   draftsToSegments,
   fitDrafts,
   fmtDateShort,
+  fmtRangeTiny,
   inclusiveDays,
   isRegularOvernightCycleBased,
   isConfirmedLeaveStatus,
@@ -64,8 +65,10 @@ export function LeaveFormModal(props: {
     editing?.endDate ?? props.initialDate ?? "",
   );
   const [reason, setReason] = useState(editing?.reason ?? "");
-  // 새 계획의 기본은 "희망"(익명 집계 반영). 초안은 나만 보고 집계에서 빠진다.
-  const [status, setStatus] = useState<LeaveStatus>(editing?.status ?? "shared");
+  // 새 계획의 기본은 "희망"(그룹에 공개). 초안은 나만 보고 집계·명단에서 빠진다.
+  const [status, setStatus] = useState<LeaveStatus>(
+    editing?.status ?? "shared",
+  );
   const [drafts, setDrafts] = useState<SegmentDraft[]>(() =>
     editing?.segments.length
       ? segmentsToDrafts(editing.segments)
@@ -317,10 +320,10 @@ export function LeaveFormModal(props: {
           label="계획 상태"
           hint={
             status === "draft"
-              ? "초안은 나만 볼 수 있고 그룹 집계에 들어가지 않아요."
+              ? "초안은 나만 볼 수 있고 그룹 집계와 출타 명단에 들어가지 않아요."
               : isConfirmedLeaveStatus(status)
-                ? "확정된 일정이에요. 달력에서 희망 일정과 구분해 보여줍니다."
-                : "희망 일정으로 익명 집계에 반영돼요. 누구인지는 드러나지 않습니다."
+                ? "확정된 일정이에요. 달력 출타 명단에 이름과 함께 보이고, 희망 일정과 구분해 표시됩니다."
+                : "희망 일정이에요. 달력 출타 명단에 이름과 함께 같은 그룹 구성원에게 보여요."
           }
         >
           <select
@@ -398,8 +401,8 @@ export function LeaveFormModal(props: {
                     className="btn btn-secondary btn-sm"
                     onClick={() => applyRange(range.startDate, range.endDate)}
                   >
-                    {fmtDateShort(range.startDate)} ~{" "}
-                    {fmtDateShort(range.endDate)} · 최고 {range.peakPercent}%
+                    {fmtRangeTiny(range.startDate, range.endDate)} · 최고{" "}
+                    {range.peakPercent}%
                   </button>
                 ))}
               </div>

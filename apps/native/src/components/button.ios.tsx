@@ -7,8 +7,14 @@ import {
   tint,
 } from "@expo/ui/swift-ui/modifiers";
 import type { ReactNode } from "react";
-import { StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import {
+  StyleSheet,
+  useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { colors } from "@/theme";
+import { estimateLabelWidth } from "./button-width";
 
 type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
 
@@ -23,6 +29,7 @@ export function Button(props: {
   systemImage?: string;
   testID?: string;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const variant = props.variant ?? "primary";
   const size = props.size ?? "md";
   const disabled = props.disabled || props.loading;
@@ -34,7 +41,7 @@ export function Button(props: {
       : props.loading
         ? "처리 중…"
         : "계속";
-  const minimumLabelWidth = Math.max(72, [...label].length * 15 + 36);
+  const minimumLabelWidth = estimateLabelWidth(label, windowWidth);
   const nativeVariant =
     variant === "primary"
       ? "filled"

@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createUnit, req, signup, uniq } from "./helpers.mjs";
 
+/** 서울 기준 이번 달에서 delta개월 떨어진 "YYYY-MM". */
+function monthFromNow(delta) {
+  const seoul = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const total = seoul.getUTCFullYear() * 12 + seoul.getUTCMonth() + delta;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 async function joinCreatedUnit(token, created) {
   return req("POST", "/units/join", {
     token,
@@ -196,8 +205,8 @@ test("상세·멤버·달력은 현재 멤버십을 서버에서 검증한다", 
   assert.equal(calendar.status, 403);
 });
 
-test("달력은 익명 집계와 본인 일정만 반환하고 현재 월 ±3개월로 제한한다", async () => {
-  const owner = await signup();
+test("달력은 출타 명단을 이름과 함께 주되 자유 입력값은 감추고 먼 달은 막는다", async () => {
+  const owner = await signup({ name: "김출타" });
   const created = await createUnit(owner.token, { maxLeaveCount: 1 });
   const unitId = created.data.unit.id;
   const member = await signup();
@@ -245,14 +254,76 @@ test("달력은 익명 집계와 본인 일정만 반환하고 현재 월 ±3개
     /관리자 비밀 일정|외부에 노출/,
   );
 
-  const current = new Date();
-  const farYear = current.getUTCFullYear() + 2;
+  // 명단은 이름·계급과 함께 둘 다 보여준다. 제목·사유는 여기에도 담기지 않는다.
+  assert.equal(calendar.data.attendees.length, 2);
+  const ownerEntry = calendar.data.attendees.find(
+    (a) => a.userId === owner.data.user.id,
+  );
+  assert.equal(ownerEntry.name, "김출타");
+  assert.ok(ownerEntry.rankLabel.length > 0);
+  assert.equal(ownerEntry.startDate, date);
+  assert.ok(!Object.hasOwn(ownerEntry, "title"));
+  assert.ok(!Object.hasOwn(ownerEntry, "reason"));
+
+  // 초안은 본인 것이라도 명단에 들어가지 않는다.
+  const draftDate = "2026-08-16";
+  await req("POST", "/leaves", {
+    token: member.token,
+    body: {
+      title: "초안",
+      status: "draft",
+      segments: [
+        { category: "annual", startDate: draftDate, endDate: draftDate },
+      ],
+    },
+  });
+  const withDraft = await req(
+    "GET",
+    `/units/${unitId}/calendar?month=2026-08`,
+    { token: member.token },
+  );
+  assert.equal(
+    withDraft.data.attendees.some((a) => a.startDate === draftDate),
+    false,
+  );
+  assert.equal(
+    withDraft.data.leaves.some((l) => l.startDate === draftDate),
+    true,
+  );
+
   const far = await req(
     "GET",
-    `/units/${unitId}/calendar?month=${farYear}-01`,
+    `/units/${unitId}/calendar?month=${monthFromNow(120)}`,
     { token: member.token },
   );
   assert.equal(far.status, 400);
+});
+
+test("달력은 복무 기간 전체를 계획할 만큼 앞뒤로 열려 있다", async () => {
+  const owner = await signup();
+  const created = await createUnit(owner.token);
+  const unitId = created.data.unit.id;
+
+  // 전역까지 남은 달을 훑으며 휴가를 계획한다. 이 범위가 막히면 그 달의
+  // 달력·추천·시뮬레이션이 통째로 비어 휴가를 등록할 수 없다.
+  for (const delta of [-12, -4, 0, 4, 12, 24]) {
+    const month = monthFromNow(delta);
+    const res = await req("GET", `/units/${unitId}/calendar?month=${month}`, {
+      token: owner.token,
+    });
+    assert.equal(res.status, 200, `${month}(${delta}개월)을 열지 못했다`);
+    assert.equal(res.data.month, month);
+  }
+
+  // 범위 밖은 여전히 막는다 — 캐시 키가 무한정 늘어나지 않게 한다.
+  for (const delta of [-13, 25]) {
+    const res = await req(
+      "GET",
+      `/units/${unitId}/calendar?month=${monthFromNow(delta)}`,
+      { token: owner.token },
+    );
+    assert.equal(res.status, 400, `${delta}개월은 막혀야 한다`);
+  }
 });
 
 test("휴가 등록 뒤 달력 집계와 본인 상세에 즉시 반영된다", async () => {

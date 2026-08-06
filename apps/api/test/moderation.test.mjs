@@ -119,6 +119,11 @@ test("차단은 참여자 목록에서만 숨기고 출타 집계는 그대로 �
   });
   const day = calendar.data.days.find((d) => d.date === "2026-08-10");
   assert.equal(day.count, 1);
+  // 다만 출타 명단에서는 사라진다 — 참여자 목록과 같은 규칙이다.
+  assert.equal(
+    calendar.data.attendees.some((a) => a.userId === other.data.user.id),
+    false,
+  );
 
   const list = await req("GET", "/moderation/blocks", { token: owner.token });
   assert.equal(list.data.blocks.length, 1);

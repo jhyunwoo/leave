@@ -123,6 +123,27 @@ export const calendarLeaveSchema = z
   })
   .openapi("CalendarLeave");
 
+/**
+ * 그룹 달력에 이름과 함께 노출되는 출타 일정 한 건.
+ *
+ * 집계에 들어가는 상태(`shared`~`completed`)만 담는다 — 초안과 반려·취소는 빠진다.
+ * 제목·사유 같은 자유 입력값은 담지 않는다. 다른 구성원에게 불필요한 개인정보와
+ * UGC를 만들지 않기 위해 휴가 등록 폼에서도 자유 입력을 없앤 것과 같은 이유다.
+ */
+export const calendarAttendeeSchema = z
+  .object({
+    leaveId: z.string(),
+    userId: z.string(),
+    name: z.string(),
+    // 입대일에서 자동 계산한 현재 계급 표기.
+    rankLabel: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    status: z.enum(LEAVE_STATUSES),
+    segments: z.array(leaveSegmentResponseSchema),
+  })
+  .openapi("CalendarAttendee");
+
 export const dayStatSchema = z
   .object({
     date: z.string(),
@@ -148,7 +169,10 @@ export const calendarSchema = z
     month: z.string(),
     unit: unitSchema,
     days: z.array(dayStatSchema),
+    // 내 일정만. 초안과 제목·사유가 들어 있어 나 말고는 볼 수 없다.
     leaves: z.array(calendarLeaveSchema),
+    // 이름을 붙여 그룹 전체에 공개하는 출타 명단(내 것 포함).
+    attendees: z.array(calendarAttendeeSchema),
     blackouts: z.array(blackoutSchema),
   })
   .openapi("UnitCalendar");
