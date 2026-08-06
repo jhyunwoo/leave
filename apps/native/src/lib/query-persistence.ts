@@ -9,7 +9,8 @@ import { queryCacheStorage } from "./query-cache-storage";
 
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 
-const CACHE_BUSTER = "native-offline-read-v1";
+// v2: 달력 응답에 출타 명단(attendees)이 추가됐다. 옛 캐시는 명단이 비어 보인다.
+const CACHE_BUSTER = "native-offline-read-v2";
 const CACHE_KEY = "tanstack-query-cache";
 
 // 계정·알림·관리자 데이터와 mutation은 기기에 남기지 않는다. 오프라인에서

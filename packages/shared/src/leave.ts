@@ -21,9 +21,9 @@ export type OvernightKind = (typeof OVERNIGHT_KINDS)[number];
 /**
  * 휴가 한 건의 진행 상태.
  *
- * `draft`는 나만 보는 시뮬레이션이라 그룹 집계에 들어가지 않는다. `shared`부터
- * `approved`까지는 **익명으로** 집계에 반영된다 — 달력이 이미 집계값과 내 일정만
- * 내려주므로, 공유해도 누가 언제 나가는지는 드러나지 않는다.
+ * `draft`는 나만 보는 시뮬레이션이라 그룹 집계에도, 출타 명단에도 들어가지 않는다.
+ * `shared`부터 `completed`까지는 집계에 반영되고, 같은 그룹 구성원에게 **이름·계급과
+ * 함께** 날짜별 출타 명단으로 보인다(제목·사유 같은 자유 입력값은 공개하지 않는다).
  * `rejected`와 `cancelled`는 실제로 나가지 않으므로 집계에서 뺀다.
  */
 export const LEAVE_STATUSES = [

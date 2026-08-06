@@ -25,7 +25,7 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
-import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { FormSheet } from "@/components/form-sheet";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { colors, layout, radius, spacing } from "@/theme";
@@ -272,9 +272,8 @@ function CreateUnitModal(props: {
   };
 
   return (
-    <NativeBottomSheet
+    <FormSheet
       isPresented={props.visible}
-      snapPoints={[{ fraction: 0.78 }, "full"]}
       onDismiss={props.onClose}
       testID="create-unit-sheet"
     >
@@ -331,7 +330,7 @@ function CreateUnitModal(props: {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </SheetScaffold>
       </KeyboardAvoidingView>
-    </NativeBottomSheet>
+    </FormSheet>
   );
 }
 

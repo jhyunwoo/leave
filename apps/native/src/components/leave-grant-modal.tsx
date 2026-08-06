@@ -21,7 +21,7 @@ import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@/api/queries";
 import { Button } from "@/components/button";
 import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
-import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { FormSheet } from "@/components/form-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { colors, spacing } from "@/theme";
 
@@ -92,9 +92,8 @@ export function LeaveGrantModal(props: {
   };
 
   return (
-    <NativeBottomSheet
+    <FormSheet
       isPresented={props.visible}
-      snapPoints={[{ fraction: 0.82 }, "full"]}
       onDismiss={props.onClose}
       testID="leave-grant-sheet"
     >
@@ -205,7 +204,7 @@ export function LeaveGrantModal(props: {
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </SheetScaffold>
       </KeyboardAvoidingView>
-    </NativeBottomSheet>
+    </FormSheet>
   );
 }
 

@@ -142,7 +142,7 @@ export function CalendarScreen() {
   const syncStatusLabel = `${isOffline ? "오프라인 · " : ""}마지막 갱신 ${lastUpdatedLabel}`;
 
   // 재원 정보가 있어야 주기 표시선·배너를 처음부터 함께 그릴 수 있다. 함께 기다린다.
-  if (isRestoring || ((me.isPending && !unit) || balances.isPending)) {
+  if (isRestoring || (me.isPending && !unit) || balances.isPending) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} size="large" />
@@ -192,8 +192,8 @@ export function CalendarScreen() {
         <ContentPanel style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>아직 공유 그룹이 없어요</Text>
           <Text style={styles.emptyBody}>
-            초대코드로 그룹에 참여하거나 새 그룹을 만들면 익명 집계 달력이
-            열려요. 그룹 이름에는 실제 부대명을 입력하지 마세요.
+            초대코드로 그룹에 참여하거나 새 그룹을 만들면 누가 언제 나가는지
+            보이는 달력이 열려요. 그룹 이름에는 실제 부대명을 입력하지 마세요.
           </Text>
           <Button
             title="그룹 참여·만들기"
@@ -309,7 +309,9 @@ export function CalendarScreen() {
       {/* 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
       <NativeBottomSheet
         isPresented={selectedDate != null}
-        snapPoints={["half", "full"]}
+        // 디텐트는 하나만 준다. 여러 개면 SwiftUI가 콘텐츠를 최대 디텐트 기준으로
+        // 배치해 RN 루트가 보이는 시트보다 커지고, 안쪽 스크롤이 바닥에 닿지 못한다.
+        snapPoints={[{ fraction: 0.75 }]}
         testID="calendar-day-sheet"
         onDismiss={() => {
           setSelectedDate(null);

@@ -5,6 +5,8 @@ import {
   fmtRange,
   fmtRangeTiny,
   getHoliday,
+  isConfirmedLeaveStatus,
+  LEAVE_STATUS_LABELS,
   segmentBalanceKey,
   segmentOnDate,
   type ISODate,
@@ -12,6 +14,7 @@ import {
 } from "@leave/shared";
 import { StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@/api/queries";
+import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -22,15 +25,16 @@ export function DayPanel(props: {
   calendar: Calendar;
   date: ISODate;
   onAddLeave: () => void;
-  /** 이전 응답과의 호출 호환용. 서버는 이제 내 일정 상세만 내려준다. */
+  /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
-  const dayLeaves = calendar.leaves.filter(
-    (leave) => leave.startDate <= date && date <= leave.endDate,
+  // 명단에는 내 일정도 함께 들어 있다. 초안은 서버가 애초에 내려주지 않는다.
+  const dayAttendees = calendar.attendees.filter(
+    (attendee) => attendee.startDate <= date && date <= attendee.endDate,
   );
   const exceeded = stat?.exceeded ?? false;
   const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
@@ -65,9 +69,8 @@ export function DayPanel(props: {
             제한 가능 기간
           </Text>
           <Text selectable style={styles.emptyCaption}>
-            {blackout.reason ??
-              "관리자가 등록한 기간입니다."}{" "}
-            출타율과 무관하게 지휘관이 휴가를 제한할 수 있어요.
+            {blackout.reason ?? "관리자가 등록한 기간입니다."} 출타율과 무관하게
+            지휘관이 휴가를 제한할 수 있어요.
           </Text>
         </ContentPanel>
       ) : null}
@@ -81,34 +84,39 @@ export function DayPanel(props: {
         </Text>
       )}
 
-      {dayLeaves.length === 0 ? (
+      {dayAttendees.length === 0 ? (
         <ContentPanel tone="grouped" style={styles.empty}>
-          <Text style={styles.emptyTitle}>공유된 계획이 아직 없어요.</Text>
+          <Text style={styles.emptyTitle}>
+            이 날 출타 예정인 사람이 없어요.
+          </Text>
           <Text style={styles.emptyCaption}>
             내 계획을 먼저 시뮬레이션해보세요.
           </Text>
         </ContentPanel>
       ) : (
         <View style={{ gap: spacing.md }}>
-          <ContentPanel tone="grouped" style={styles.anonymousSummary}>
-            <Text style={styles.anonymousTitle}>
-              다른 참여자는 집계로만 표시
-            </Text>
-            <Text style={styles.emptyCaption}>
-              사회적 압력을 줄이기 위해 이름·계급·일정 상세·사유는 내려받지
-              않아요.
-            </Text>
-          </ContentPanel>
-          {dayLeaves.map((l) => {
-            // 이제 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
-            const segment = segmentOnDate(l.segments, date);
+          <Text style={styles.rosterTitle} selectable>
+            이 날 출타 {dayAttendees.length}명
+          </Text>
+          {dayAttendees.map((attendee) => {
+            // 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
+            const segment = segmentOnDate(attendee.segments, date);
             const key = segment ? segmentBalanceKey(segment) : null;
             const tone = key ? BALANCE_COLORS[key] : null;
+            const isMine = attendee.userId === props.myUserId;
             return (
-              <View key={l.id} style={[styles.leaveRow, styles.myLeaveRow]}>
+              <View
+                key={attendee.leaveId}
+                style={[styles.leaveRow, isMine && styles.myLeaveRow]}
+              >
+                <Avatar name={attendee.name} size={36} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={styles.leaveUserRow}>
-                    <Text style={styles.leaveUser}>내 계획</Text>
+                    <Text style={styles.leaveUser} numberOfLines={1}>
+                      {isMine
+                        ? "내 계획"
+                        : `${attendee.rankLabel} ${attendee.name}`}
+                    </Text>
                     {key && tone && (
                       <View
                         style={[styles.typeChip, { backgroundColor: tone.bg }]}
@@ -118,9 +126,16 @@ export function DayPanel(props: {
                         </Text>
                       </View>
                     )}
+                    {!isConfirmedLeaveStatus(attendee.status) && (
+                      <View style={styles.statusChip}>
+                        <Text style={styles.statusChipText}>
+                          {LEAVE_STATUS_LABELS[attendee.status]}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.leaveMeta}>
-                    {fmtRange(l.startDate, l.endDate)}
+                    {fmtRange(attendee.startDate, attendee.endDate)}
                   </Text>
                 </View>
               </View>
@@ -166,22 +181,24 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 14, color: colors.body },
   emptyCaption: { fontSize: 12, color: colors.mute },
-  anonymousSummary: { padding: spacing.lg, gap: spacing.xs },
+  rosterTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   blackoutCard: { padding: spacing.lg, gap: spacing.xs },
   blackoutTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: colors.warningContent,
   },
-  anonymousTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   cycleLine: { fontSize: 12, color: colors.body, marginTop: -spacing.sm },
-  leaveRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
-  myLeaveRow: {
-    backgroundColor: colors.primaryPale,
+  // 명단 행은 내 것이든 아니든 같은 크기여야 한다. 배경색만 달라진다.
+  leaveRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    alignItems: "center",
     borderRadius: radius.lg,
     padding: spacing.sm,
     marginHorizontal: -spacing.sm,
   },
+  myLeaveRow: { backgroundColor: colors.primaryPale },
   leaveUserRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -195,5 +212,14 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   typeChipText: { fontSize: 10, fontWeight: "700" },
+  // 확정이 아닌 계획(희망·신청함)만 상태를 덧붙여 확정과 헷갈리지 않게 한다.
+  statusChip: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  statusChipText: { fontSize: 10, fontWeight: "600", color: colors.mute },
   leaveMeta: { fontSize: 12, color: colors.mute, marginTop: 1 },
 });
