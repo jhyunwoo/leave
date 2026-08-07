@@ -1,3 +1,5 @@
+/** 로그인 화면(네이티브). 성공하면 토큰이 SecureStore에 저장되고 탭으로 넘어간다. */
+
 import { Link } from "expo-router";
 import { useState } from "react";
 import {
@@ -9,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLogin } from "@/api/queries";
+import { useLogin } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";

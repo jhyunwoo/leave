@@ -220,7 +220,9 @@ export function allocateBalanceGrants(
       unusedDays,
       availableDays,
       status,
-      daysUntilExpiry: grant.expiresOn ? diffDays(today, grant.expiresOn) : null,
+      daysUntilExpiry: grant.expiresOn
+        ? diffDays(today, grant.expiresOn)
+        : null,
     };
   });
 

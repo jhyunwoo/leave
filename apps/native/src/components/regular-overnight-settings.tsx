@@ -1,7 +1,12 @@
+/**
+ * 정기외박 자동 적립 설정(네이티브).
+ * 사용처: 보유 휴가 화면. 잔여량이 이 설정에서 파생하므로 육군에서는 쓰지 않는다.
+ */
+
 import { useState } from "react";
 import { Alert, StyleSheet, Switch, Text, View } from "react-native";
-import type { LeaveGrantsPage } from "@/api/queries";
-import { useUpdateRegularOvernight } from "@/api/queries";
+import type { LeaveGrantsPage } from "@leave/client";
+import { useUpdateRegularOvernight } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";

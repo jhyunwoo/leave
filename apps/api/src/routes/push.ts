@@ -1,3 +1,11 @@
+/**
+ * 푸시 토큰 등록과 수신·열람 이벤트 보고 라우트.
+ *
+ * 마운트 위치: `/push` (apps/api/src/index.ts).
+ * 앱이 발급받은 Expo 토큰을 사용자에 묶고, 실제 도달 여부를 로그로 남긴다.
+ * 메시지 원문은 저장하지 않는다(알림 id만 남긴다).
+ */
+
 import { createRoute } from "@hono/zod-openapi";
 import { pushEventSchema, pushTokenSchema } from "@leave/shared";
 import { eq } from "drizzle-orm";

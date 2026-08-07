@@ -141,7 +141,8 @@ let installed = false;
  * 부르지 않는다. 앱은 살아 있고, 구독한 화면이 내용을 보여준다.
  */
 export function installFatalErrorHandler(): void {
-  const errorUtils = (globalThis as { ErrorUtils?: ErrorUtilsShape }).ErrorUtils;
+  const errorUtils = (globalThis as { ErrorUtils?: ErrorUtilsShape })
+    .ErrorUtils;
   if (installed || !errorUtils) return;
   installed = true;
 

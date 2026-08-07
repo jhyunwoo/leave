@@ -1,10 +1,14 @@
+/**
+ * 프로필 화면 — 내 정보와 복무 진행률, 로그아웃·회원 탈퇴.
+ */
+
 import { Link, useNavigate } from "react-router";
-import type { Me } from "../api/queries";
-import { useDeleteAccount, useLogout } from "../api/queries";
+import type { Me } from "@leave/client";
+import { useDeleteAccount, useLogout } from "@leave/client";
 import { Avatar } from "../components/Avatar";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
-import { fmtDateShort } from "../lib/format";
+import { fmtDateShort } from "@leave/shared";
 
 export function ProfilePage(props: { me: Me }) {
   const { user, unit } = props.me;

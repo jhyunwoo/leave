@@ -1,3 +1,8 @@
+/**
+ * 콘텐츠 계층의 표준 표면(카드).
+ * 사용처: 네이티브 화면의 거의 모든 정보 블록.
+ */
+
 import type { ReactNode } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { colors, radius } from "@/theme";

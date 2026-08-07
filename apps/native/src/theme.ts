@@ -1,3 +1,11 @@
+/**
+ * 네이티브 디자인 토큰 — 색·간격·모서리.
+ *
+ * 사용처: apps/native/src 의 모든 컴포넌트.
+ * 값을 화면에 직접 적지 않고 여기를 거치면, 라이트/다크 모드와 플랫폼별 시스템
+ * 색 대응이 한곳에서 끝난다.
+ */
+
 import { DynamicColorIOS, PlatformColor, type ColorValue } from "react-native";
 
 function systemColor(ios: string, android: string, web: string): ColorValue {

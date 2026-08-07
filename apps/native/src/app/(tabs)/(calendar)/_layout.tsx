@@ -1,3 +1,5 @@
+/** 달력 탭의 스택 레이아웃(헤더 스타일만 정한다). */
+
 import { Stack } from "expo-router/stack";
 import { colors } from "@/theme";
 

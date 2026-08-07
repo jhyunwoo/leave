@@ -1,345 +1,59 @@
-import { createRoute, z } from "@hono/zod-openapi";
-import {
-  blackoutCreateSchema,
-  computeDayStats,
-  isCountedLeaveStatus,
-  monthBounds,
-  monthSchema,
-  shiftMonth,
-  todayInSeoul,
-  unitCreateSchema,
-  unitInviteCreateSchema,
-  unitJoinSchema,
-  unitTransferSchema,
-  unitUpdateSchema,
-} from "@leave/shared";
-import {
-  and,
-  asc,
-  eq,
-  gt,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  lte,
-  ne,
-  sql,
-} from "drizzle-orm";
-import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
-import {
-  leaves,
-  unitBlackouts,
-  unitInvites,
-  units,
-  userBlocks,
-  users,
-} from "../db/schema";
+/**
+ * 그룹(부대) 라우트 핸들러.
+ *
+ * 마운트 위치: `/units` (apps/api/src/index.ts).
+ * 명세는 ./units.routes.ts, 공용 규칙은 아래 lib에 있다.
+ *  - 권한 판정      → lib/unit-access.ts
+ *  - 초대코드 발급  → lib/invites.ts
+ *  - 달력 조립      → lib/calendar.ts
+ *
+ * 여기 남긴 것은 "요청을 받아 권한을 확인하고 DB를 바꾸고 응답을 고르는" 흐름뿐이다.
+ */
+import { and, asc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
+import { unitBlackouts, unitInvites, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
-import { segmentsForLeaves } from "../lib/leave-balances";
+import { buildCalendarPayload, listVisibleMembers } from "../lib/calendar";
+import { sha256Hex } from "../lib/crypto";
 import {
-  blackoutSchema,
-  calendarSchema,
-  errorResponse,
-  issuedUnitInviteSchema,
-  jsonContent,
-  memberSchema,
-  okSchema,
-  unitSchema,
-} from "../lib/responses";
-import { generateInviteCode, sha256Hex } from "../lib/crypto";
-import { serializeMember, serializeUnit } from "../lib/serialize";
+  createInvite,
+  DEFAULT_INVITE_MAX_USES,
+  resolveInviteExpiry,
+} from "../lib/invites";
+import { serializeUnit } from "../lib/serialize";
+import { checkUnitAdmin, serializeUnitById } from "../lib/unit-access";
 import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
+import { shiftMonth, todayInSeoul } from "@leave/shared";
+import {
+  blackoutsRoute,
+  calendarRoute,
+  createBlackoutRoute,
+  createUnitRoute,
+  deleteBlackoutRoute,
+  getUnitRoute,
+  joinRoute,
+  leaveUnitRoute,
+  membersRoute,
+  removeMemberRoute,
+  rotateInviteRoute,
+  transferRoute,
+  updateUnitRoute,
+} from "./units.routes";
 
-const idParam = z.object({ id: z.string() });
-const memberParam = z.object({ id: z.string(), userId: z.string() });
-
-const DEFAULT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_INVITE_MAX_USES = 100;
-
-async function createInvite(
-  db: DrizzleD1Database,
-  input: {
-    unitId: string;
-    createdBy: string;
-    expiresAt: string;
-    maxUses: number;
-  },
-) {
-  const code = generateInviteCode();
-  const row = {
-    id: crypto.randomUUID(),
-    unitId: input.unitId,
-    codeHash: await sha256Hex(code),
-    expiresAt: input.expiresAt,
-    maxUses: input.maxUses,
-    usedCount: 0,
-    revokedAt: null,
-    createdBy: input.createdBy,
-    createdAt: new Date().toISOString(),
-  };
-  await db.insert(unitInvites).values(row);
-  return {
-    code,
-    expiresAt: row.expiresAt,
-    maxUses: row.maxUses,
-    usedCount: row.usedCount,
-  };
-}
-
-const createUnitRoute = createRoute({
-  method: "post",
-  path: "/",
-  tags: ["부대"],
-  summary: "비식별 그룹 생성 (생성자는 자동 가입·관리자)",
-  description:
-    "이름과 설명에 실제 부대명·부대번호·주소·위치, 병력 현황, 작전·훈련 정보를 입력하면 안 됩니다. 그룹 이름은 검색·색인되지 않으며 중복될 수 있습니다.",
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: unitCreateSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    201: jsonContent(
-      z.object({ unit: unitSchema, invite: issuedUnitInviteSchema }),
-      "생성된 그룹과 한 번만 노출되는 초대코드",
-    ),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-    409: errorResponse("이미 다른 그룹 소속"),
-  },
-});
-
-const getUnitRoute = createRoute({
-  method: "get",
-  path: "/{id}",
-  tags: ["부대"],
-  summary: "부대 상세",
-  security: [{ Bearer: [] }],
-  request: { params: idParam },
-  responses: {
-    200: jsonContent(z.object({ unit: unitSchema }), "부대 정보"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("현재 부대원만 조회 가능"),
-    404: errorResponse("부대 없음"),
-  },
-});
-
-const updateUnitRoute = createRoute({
-  method: "patch",
-  path: "/{id}",
-  tags: ["부대"],
-  summary: "부대 정보 수정 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: idParam,
-    body: {
-      content: { "application/json": { schema: unitUpdateSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(z.object({ unit: unitSchema }), "수정된 부대"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 수정 가능"),
-    404: errorResponse("부대 없음"),
-  },
-});
-
-const joinRoute = createRoute({
-  method: "post",
-  path: "/join",
-  tags: ["부대"],
-  summary: "초대코드로 그룹에 즉시 가입",
-  description:
-    "그룹 이름이나 UUID로는 가입할 수 없습니다. 유효하고 만료·소진·폐기되지 않은 초대코드만 사용할 수 있습니다.",
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: unitJoinSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(
-      z.object({ joined: z.literal(true), unit: unitSchema }),
-      "즉시 가입 완료",
-    ),
-    400: errorResponse("유효하지 않은 초대코드"),
-    401: errorResponse("인증 실패"),
-    409: errorResponse("이미 다른 그룹 소속"),
-  },
-});
-
-const rotateInviteRoute = createRoute({
-  method: "post",
-  path: "/{id}/invite",
-  tags: ["부대"],
-  summary: "초대코드 회전·재발급 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: idParam,
-    body: {
-      content: { "application/json": { schema: unitInviteCreateSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    201: jsonContent(
-      z.object({ invite: issuedUnitInviteSchema }),
-      "재발급된 초대코드",
-    ),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("현재 그룹 관리자만 가능"),
-  },
-});
-
-const removeMemberRoute = createRoute({
-  method: "post",
-  path: "/{id}/members/{userId}/remove",
-  tags: ["부대"],
-  summary: "부대원 제거 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: { params: memberParam },
-  responses: {
-    200: jsonContent(okSchema, "제거 완료"),
-    400: errorResponse("자기 자신은 제거 불가"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 가능"),
-    404: errorResponse("부대원 없음"),
-  },
-});
-
-const transferRoute = createRoute({
-  method: "post",
-  path: "/{id}/transfer",
-  tags: ["부대"],
-  summary: "관리자 이관 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: idParam,
-    body: {
-      content: { "application/json": { schema: unitTransferSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(z.object({ unit: unitSchema }), "이관 완료"),
-    400: errorResponse("대상이 부대원이 아님"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 가능"),
-    404: errorResponse("부대 없음"),
-  },
-});
-
-const leaveUnitRoute = createRoute({
-  method: "post",
-  path: "/leave",
-  tags: ["부대"],
-  summary: "부대 탈퇴",
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(okSchema, "탈퇴 완료"),
-    401: errorResponse("인증 실패"),
-    409: errorResponse("관리자는 이관 후 나갈 수 있음"),
-  },
-});
-
-const membersRoute = createRoute({
-  method: "get",
-  path: "/{id}/members",
-  tags: ["부대"],
-  summary: "부대원 목록 (자동 계산된 계급 포함)",
-  security: [{ Bearer: [] }],
-  request: { params: idParam },
-  responses: {
-    200: jsonContent(z.object({ members: z.array(memberSchema) }), "부대원"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("부대원만 조회 가능"),
-  },
-});
-
-const calendarRoute = createRoute({
-  method: "get",
-  path: "/{id}/calendar",
-  tags: ["부대"],
-  summary: "부대 월별 휴가 달력 (일별 출타 인원·초과 여부 포함)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: idParam,
-    query: z.object({ month: monthSchema }),
-  },
-  responses: {
-    200: jsonContent(calendarSchema, "달력 데이터"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("부대원만 조회 가능"),
-    404: errorResponse("부대 없음"),
-  },
-});
-
-const blackoutsRoute = createRoute({
-  method: "get",
-  path: "/{id}/blackouts",
-  tags: ["부대"],
-  summary: "블랙아웃 기간 목록",
-  description:
-    "검열·훈련 등으로 출타율과 무관하게 휴가가 제한될 수 있는 기간입니다.",
-  security: [{ Bearer: [] }],
-  request: { params: idParam },
-  responses: {
-    200: jsonContent(
-      z.object({ blackouts: z.array(blackoutSchema) }),
-      "블랙아웃 목록",
-    ),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("부대원만 조회 가능"),
-  },
-});
-
-const createBlackoutRoute = createRoute({
-  method: "post",
-  path: "/{id}/blackouts",
-  tags: ["부대"],
-  summary: "블랙아웃 기간 등록 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: idParam,
-    body: {
-      content: { "application/json": { schema: blackoutCreateSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    201: jsonContent(z.object({ blackout: blackoutSchema }), "등록된 기간"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 등록 가능"),
-  },
-});
-
-const deleteBlackoutRoute = createRoute({
-  method: "delete",
-  path: "/{id}/blackouts/{blackoutId}",
-  tags: ["부대"],
-  summary: "블랙아웃 기간 삭제 (관리자 전용)",
-  security: [{ Bearer: [] }],
-  request: {
-    params: z.object({ id: z.string(), blackoutId: z.string() }),
-  },
-  responses: {
-    200: jsonContent(okSchema, "삭제 완료"),
-    401: errorResponse("인증 실패"),
-    403: errorResponse("관리자만 삭제 가능"),
-    404: errorResponse("기간 없음"),
-  },
-});
+/**
+ * 달력을 조회할 수 있는 범위(현재 월 기준).
+ *
+ * 휴가 등록 자체에는 날짜 상한이 없으므로, 이 범위가 좁으면 등록은 되는데 그 달의
+ * 달력·추천·시뮬레이션만 비는 어긋난 상태가 된다. 복무 기간(약 18개월) 끝까지
+ * 계획할 수 있도록 미래를 넉넉히 열어 둔다.
+ *
+ * 긁어가기는 아래 rate limit이 막는다. 여기서 범위를 두는 목적은 캐시 키
+ * (`calendar2:...:{month}`)가 무한정 늘어나지 않게 하는 것뿐이다.
+ */
+const CALENDAR_PAST_MONTHS = 12;
+const CALENDAR_FUTURE_MONTHS = 24;
 
 const app = createApp();
 app.use("*", authMiddleware);
@@ -355,19 +69,6 @@ app.use(
   rateLimit({ name: "calendar", limit: 120, windowSeconds: 60 }),
 );
 
-/**
- * 달력을 조회할 수 있는 범위(현재 월 기준).
- *
- * 휴가 등록 자체에는 날짜 상한이 없으므로, 이 범위가 좁으면 등록은 되는데 그 달의
- * 달력·추천·시뮬레이션만 비는 어긋난 상태가 된다. 복무 기간(약 18개월) 끝까지
- * 계획할 수 있도록 미래를 넉넉히 열어 둔다.
- *
- * 긁어가기는 위의 rate limit이 막는다. 여기서 범위를 두는 목적은 캐시 키
- * (`calendar2:...:{month}`)가 무한정 늘어나지 않게 하는 것뿐이다.
- */
-const CALENDAR_PAST_MONTHS = 12;
-const CALENDAR_FUTURE_MONTHS = 24;
-
 export const unitRoutes = app
   .openapi(createUnitRoute, async (c) => {
     const input = c.req.valid("json");
@@ -381,16 +82,16 @@ export const unitRoutes = app
     }
 
     const now = new Date().toISOString();
-    const inviteExpiresAt =
-      input.inviteExpiresAt !== undefined
-        ? new Date(input.inviteExpiresAt).toISOString()
-        : new Date(Date.now() + DEFAULT_INVITE_TTL_MS).toISOString();
+    const inviteExpiresAt = resolveInviteExpiry(input.inviteExpiresAt);
     if (inviteExpiresAt <= now) {
       return c.json(
         { error: "초대코드 만료 시각은 현재보다 뒤여야 합니다" },
         400,
       );
     }
+
+    // 기준 인원을 처음 넣는 순간이 곧 "최근 갱신 시각"이다. 인원을 비워 두면
+    // 갱신 시각도 없어야 화면에서 "언제 기준인지 모를 숫자"가 생기지 않는다.
     const referenceMemberTotal = input.referenceMemberTotal ?? null;
     const lastTotalUpdatedAt =
       input.lastTotalUpdatedAt !== undefined
@@ -422,8 +123,10 @@ export const unitRoutes = app
       .update(users)
       .set({ unitId: unit.id })
       .where(eq(users.id, user.id));
+    // 만든 사람이 곧 첫 구성원이므로 인원수는 1이다.
     return c.json({ unit: serializeUnit(unit, 1), invite }, 201);
   })
+
   .openapi(getUnitRoute, async (c) => {
     const { id } = c.req.valid("param");
     const user = c.get("user");
@@ -431,26 +134,26 @@ export const unitRoutes = app
       return c.json({ error: "현재 그룹의 부대원만 조회할 수 있습니다" }, 403);
     }
     const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
+    const unit = await serializeUnitById(db, id);
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    const memberCount = await db.$count(users, eq(users.unitId, id));
-    return c.json({ unit: serializeUnit(unit, memberCount) }, 200);
+    return c.json({ unit }, 200);
   })
+
   .openapi(updateUnitRoute, async (c) => {
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
-    const user = c.get("user");
     const db = drizzle(c.env.DB);
 
-    if (user.unitId !== id) {
+    const check = await checkUnitAdmin(db, c.get("user"), id);
+    if (check.status === "missing") {
+      return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    }
+    if (check.status !== "ok") {
       return c.json({ error: "현재 그룹 관리자만 수정할 수 있습니다" }, 403);
     }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== user.id) {
-      return c.json({ error: "부대 관리자만 수정할 수 있습니다" }, 403);
-    }
 
+    // undefined는 "안 건드림", null은 "비움"이다. 둘을 구분해야 기준 인원을
+    // 의도적으로 지우는 것과 다른 필드만 고치는 것이 섞이지 않는다.
     const patch: Partial<typeof units.$inferInsert> = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
@@ -478,10 +181,11 @@ export const unitRoutes = app
     // 최대 출타 인원 변경은 달력 통계를 바꾸므로 캐시를 무효화한다.
     await bumpUnitVersion(c.env.CACHE, id);
 
-    const updated = await db.select().from(units).where(eq(units.id, id)).get();
-    const memberCount = await db.$count(users, eq(users.unitId, id));
-    return c.json({ unit: serializeUnit(updated!, memberCount) }, 200);
+    const unit = await serializeUnitById(db, id);
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    return c.json({ unit }, 200);
   })
+
   .openapi(joinRoute, async (c) => {
     const { code } = c.req.valid("json");
     const user = c.get("user");
@@ -511,6 +215,7 @@ export const unitRoutes = app
       return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
 
+    // 사용 횟수 증가를 조건부 UPDATE로 처리해, 동시 요청이 상한을 넘겨 쓰지 못하게 한다.
     const consumed = await db
       .update(unitInvites)
       .set({ usedCount: sql`${unitInvites.usedCount} + 1` })
@@ -542,45 +247,34 @@ export const unitRoutes = app
       return c.json({ error: "이미 그룹에 소속되어 있습니다" }, 409);
     }
 
-    const unit = await db
-      .select()
-      .from(units)
-      .where(eq(units.id, invite.unitId))
-      .get();
+    const unit = await serializeUnitById(db, invite.unitId);
     if (!unit) {
       return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
-    const memberCount = await db.$count(users, eq(users.unitId, unit.id));
     await bumpUnitVersion(c.env.CACHE, unit.id);
-    return c.json(
-      { joined: true as const, unit: serializeUnit(unit, memberCount) },
-      200,
-    );
+    return c.json({ joined: true as const, unit }, 200);
   })
+
   .openapi(rotateInviteRoute, async (c) => {
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    if (user.unitId !== id) {
-      return c.json({ error: "현재 그룹 관리자만 재발급할 수 있습니다" }, 403);
-    }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit || unit.adminId !== user.id) {
+
+    const check = await checkUnitAdmin(db, user, id);
+    if (check.status !== "ok") {
       return c.json({ error: "현재 그룹 관리자만 재발급할 수 있습니다" }, 403);
     }
 
     const now = new Date().toISOString();
-    const expiresAt =
-      input.expiresAt !== undefined
-        ? new Date(input.expiresAt).toISOString()
-        : new Date(Date.now() + DEFAULT_INVITE_TTL_MS).toISOString();
+    const expiresAt = resolveInviteExpiry(input.expiresAt);
     if (expiresAt <= now) {
       return c.json(
         { error: "초대코드 만료 시각은 현재보다 뒤여야 합니다" },
         400,
       );
     }
+    // 재발급은 곧 회전이다. 기존 코드를 먼저 폐기해야 옛 코드가 계속 통하지 않는다.
     await db
       .update(unitInvites)
       .set({ revokedAt: now })
@@ -593,21 +287,23 @@ export const unitRoutes = app
     });
     return c.json({ invite }, 201);
   })
+
   .openapi(removeMemberRoute, async (c) => {
     const { id, userId } = c.req.valid("param");
     const admin = c.get("user");
     const db = drizzle(c.env.DB);
-    if (admin.unitId !== id) {
-      return c.json({ error: "현재 그룹 관리자만 제거할 수 있습니다" }, 403);
+
+    const check = await checkUnitAdmin(db, admin, id);
+    if (check.status === "missing") {
+      return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== admin.id) {
-      return c.json({ error: "부대 관리자만 제거할 수 있습니다" }, 403);
+    if (check.status !== "ok") {
+      return c.json({ error: "현재 그룹 관리자만 제거할 수 있습니다" }, 403);
     }
     if (userId === admin.id) {
       return c.json({ error: "관리자 자신은 제거할 수 없습니다" }, 400);
     }
+
     const target = await db
       .select()
       .from(users)
@@ -620,19 +316,20 @@ export const unitRoutes = app
     await bumpUnitVersion(c.env.CACHE, id);
     return c.json({ ok: true as const }, 200);
   })
+
   .openapi(transferRoute, async (c) => {
     const { id } = c.req.valid("param");
     const { userId } = c.req.valid("json");
-    const admin = c.get("user");
     const db = drizzle(c.env.DB);
-    if (admin.unitId !== id) {
+
+    const check = await checkUnitAdmin(db, c.get("user"), id);
+    if (check.status === "missing") {
+      return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    }
+    if (check.status !== "ok") {
       return c.json({ error: "현재 그룹 관리자만 이관할 수 있습니다" }, 403);
     }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    if (unit.adminId !== admin.id) {
-      return c.json({ error: "부대 관리자만 이관할 수 있습니다" }, 403);
-    }
+
     const target = await db
       .select()
       .from(users)
@@ -642,14 +339,17 @@ export const unitRoutes = app
       return c.json({ error: "대상이 이 부대의 부대원이 아닙니다" }, 400);
     }
     await db.update(units).set({ adminId: userId }).where(eq(units.id, id));
-    const updated = await db.select().from(units).where(eq(units.id, id)).get();
-    const memberCount = await db.$count(users, eq(users.unitId, id));
-    return c.json({ unit: serializeUnit(updated!, memberCount) }, 200);
+
+    const unit = await serializeUnitById(db, id);
+    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    return c.json({ unit }, 200);
   })
+
   .openapi(leaveUnitRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
     const unitId = user.unitId;
+    // 애초에 소속이 없으면 탈퇴는 이미 이뤄진 상태다.
     if (!unitId) return c.json({ ok: true as const }, 200);
 
     const unit = await db
@@ -657,6 +357,7 @@ export const unitRoutes = app
       .from(units)
       .where(eq(units.id, unitId))
       .get();
+
     if (unit && unit.adminId === user.id) {
       const otherCount = await db.$count(
         users,
@@ -685,6 +386,7 @@ export const unitRoutes = app
     await bumpUnitVersion(c.env.CACHE, unitId);
     return c.json({ ok: true as const }, 200);
   })
+
   .openapi(membersRoute, async (c) => {
     const { id } = c.req.valid("param");
     const user = c.get("user");
@@ -692,31 +394,9 @@ export const unitRoutes = app
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
     const db = drizzle(c.env.DB);
-    const rows = await db
-      .select()
-      .from(users)
-      .where(eq(users.unitId, id))
-      .orderBy(asc(users.name))
-      .all();
-    // 차단은 이 목록에서만 숨긴다. 출타 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
-    const blocked = new Set(
-      (
-        await db
-          .select({ id: userBlocks.blockedUserId })
-          .from(userBlocks)
-          .where(eq(userBlocks.userId, user.id))
-          .all()
-      ).map((row) => row.id),
-    );
-    return c.json(
-      {
-        members: rows
-          .filter((m) => !blocked.has(m.id))
-          .map((m) => serializeMember(m)),
-      },
-      200,
-    );
+    return c.json({ members: await listVisibleMembers(db, id, user.id) }, 200);
   })
+
   .openapi(blackoutsRoute, async (c) => {
     const { id } = c.req.valid("param");
     const user = c.get("user");
@@ -742,18 +422,18 @@ export const unitRoutes = app
       200,
     );
   })
+
   .openapi(createBlackoutRoute, async (c) => {
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    if (user.unitId !== id) {
+
+    const check = await checkUnitAdmin(db, user, id);
+    if (check.status !== "ok") {
       return c.json({ error: "현재 그룹 관리자만 등록할 수 있습니다" }, 403);
     }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit || unit.adminId !== user.id) {
-      return c.json({ error: "현재 그룹 관리자만 등록할 수 있습니다" }, 403);
-    }
+
     const row = {
       id: crypto.randomUUID(),
       unitId: id,
@@ -778,17 +458,16 @@ export const unitRoutes = app
       201,
     );
   })
+
   .openapi(deleteBlackoutRoute, async (c) => {
     const { id, blackoutId } = c.req.valid("param");
-    const user = c.get("user");
     const db = drizzle(c.env.DB);
-    if (user.unitId !== id) {
+
+    const check = await checkUnitAdmin(db, c.get("user"), id);
+    if (check.status !== "ok") {
       return c.json({ error: "현재 그룹 관리자만 삭제할 수 있습니다" }, 403);
     }
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit || unit.adminId !== user.id) {
-      return c.json({ error: "현재 그룹 관리자만 삭제할 수 있습니다" }, 403);
-    }
+
     const removed = await db
       .delete(unitBlackouts)
       .where(
@@ -801,6 +480,7 @@ export const unitRoutes = app
     await bumpUnitVersion(c.env.CACHE, id);
     return c.json({ ok: true as const }, 200);
   })
+
   .openapi(calendarRoute, async (c) => {
     const { id } = c.req.valid("param");
     const { month } = c.req.valid("query");
@@ -808,6 +488,7 @@ export const unitRoutes = app
     if (user.unitId !== id) {
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
+
     const currentMonth = todayInSeoul().slice(0, 7);
     if (
       month < shiftMonth(currentMonth, -CALENDAR_PAST_MONTHS) ||
@@ -825,125 +506,11 @@ export const unitRoutes = app
     const unit = await db.select().from(units).where(eq(units.id, id)).get();
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
 
-    const members = await db
-      .select()
-      .from(users)
-      .where(eq(users.unitId, id))
-      .all();
-    const { start, end } = monthBounds(month);
-
-    const memberIds = members.map((m) => m.id);
-    const rows =
-      memberIds.length > 0
-        ? await db
-            .select()
-            .from(leaves)
-            .where(
-              and(
-                inArray(leaves.userId, memberIds),
-                lte(leaves.startDate, end),
-                gte(leaves.endDate, start),
-              ),
-            )
-            .orderBy(asc(leaves.startDate))
-            .all()
-        : [];
-
-    const blackouts = await db
-      .select()
-      .from(unitBlackouts)
-      .where(
-        and(
-          eq(unitBlackouts.unitId, id),
-          lte(unitBlackouts.startDate, end),
-          gte(unitBlackouts.endDate, start),
-        ),
-      )
-      .orderBy(asc(unitBlackouts.startDate))
-      .all();
-    const isBlocked = (date: string) =>
-      blackouts.some((b) => b.startDate <= date && date <= b.endDate);
-
-    const days = computeDayStats({
-      // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
-      leaves: rows
-        .filter((l) => isCountedLeaveStatus(l.status))
-        .map((l) => ({
-          userId: l.userId,
-          startDate: l.startDate,
-          endDate: l.endDate,
-        })),
-      maxCount: unit.maxLeaveCount,
-      rangeStart: start,
-      rangeEnd: end,
-      returnDayCounts: unit.returnDayCounts,
-    }).map((day) => ({
-      date: day.date,
-      count: day.count,
-      allowed: day.allowed,
-      exceeded: day.exceeded,
-      blocked: isBlocked(day.date),
-    }));
-    // 집계에 들어가는 상태만 이름과 함께 공개한다. 초안은 본인 것이라도 명단에 넣지 않는다.
-    const sharedRows = rows.filter((row) => isCountedLeaveStatus(row.status));
-    const ownRows = rows.filter((row) => row.userId === user.id);
-    const segmentMap = await segmentsForLeaves(db, [
-      ...new Set([...sharedRows, ...ownRows].map((row) => row.id)),
-    ]);
-
-    // 내 일정만 제목·사유·초안까지 담아 돌려준다.
-    const calendarLeaves = ownRows.map((l) => ({
-      id: l.id,
-      title: l.title,
-      startDate: l.startDate,
-      endDate: l.endDate,
-      reason: l.reason,
-      status: l.status,
-      segments: segmentMap.get(l.id) ?? [],
-    }));
-
-    // 차단은 이 명단에서만 숨긴다. days 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
-    const blocked = new Set(
-      (
-        await db
-          .select({ id: userBlocks.blockedUserId })
-          .from(userBlocks)
-          .where(eq(userBlocks.userId, user.id))
-          .all()
-      ).map((row) => row.id),
-    );
-    const memberById = new Map(
-      members.map((m) => [m.id, serializeMember(m)] as const),
-    );
-    const attendees = sharedRows.flatMap((l) => {
-      const member = memberById.get(l.userId);
-      if (!member || blocked.has(l.userId)) return [];
-      return [
-        {
-          leaveId: l.id,
-          userId: l.userId,
-          name: member.name,
-          rankLabel: member.rankLabel,
-          startDate: l.startDate,
-          endDate: l.endDate,
-          status: l.status,
-          segments: segmentMap.get(l.id) ?? [],
-        },
-      ];
-    });
-
-    const payload = {
+    const payload = await buildCalendarPayload({
+      db,
+      unit,
+      viewerId: user.id,
       month,
-      unit: serializeUnit(unit, members.length),
-      days,
-      leaves: calendarLeaves,
-      attendees,
-      blackouts: blackouts.map((b) => ({
-        id: b.id,
-        startDate: b.startDate,
-        endDate: b.endDate,
-        reason: b.reason,
-      })),
-    };
+    });
     return c.json(payload, 200);
   });

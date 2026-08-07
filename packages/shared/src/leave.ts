@@ -1,3 +1,13 @@
+/**
+ * 휴가의 어휘 — 종류·상태·재원(BalanceKey)·구간(Segment)의 정의.
+ *
+ * 사용처: 서버 스키마와 저장, 앱/웹의 폼·목록·달력 전부.
+ *
+ * 휴가 한 건은 여러 "구간"으로 쪼개질 수 있다(예: 3일은 연가, 이어서 2일은
+ * 위로휴가). 화면과 잔여 계산은 휴가가 아니라 구간 단위로 움직인다.
+ * 재원 키(BalanceKey)는 그 구간이 어느 주머니에서 차감되는지를 가리킨다.
+ */
+
 import { diffDays, type ISODate } from "./dates";
 import type { Branch } from "./rank";
 

@@ -1,3 +1,13 @@
+/**
+ * 관리자 계정 관리와 이미지(R2) 라우트.
+ *
+ * 마운트 위치: `/api` (worker/index.ts).
+ *
+ * 관리자 계정 조작은 owner 역할만 할 수 있다(ownerMiddleware).
+ * 새 계정과 비밀번호 초기화는 임시 비밀번호를 발급하며, 그 원문은 응답에 한 번만
+ * 실려 나가고 저장되지 않는다.
+ */
+
 import {
   adminAccounts,
   adminSessions,

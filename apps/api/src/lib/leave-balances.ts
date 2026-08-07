@@ -1,3 +1,13 @@
+/**
+ * 재원별 보유·사용·잔여 계산과 저장.
+ *
+ * 사용처: `/leaves/balances`, 휴가 저장 전 잔여 검사, 정기외박 설정 저장.
+ *
+ * "며칠 남았는가"는 단순 뺄셈이 아니다. 적립분마다 유효기간이 다르고,
+ * 정기외박은 총량이 아니라 주기별로 따로 센다. 그 규칙을 여기 한곳에 모아
+ * 앱·웹·관리자가 같은 숫자를 보게 한다.
+ */
+
 import {
   allocateAllGrants,
   BALANCE_KEYS,
@@ -20,7 +30,6 @@ import {
   type SegmentLike,
 } from "@leave/shared";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
-import { type DrizzleD1Database } from "drizzle-orm/d1";
 import {
   leaveGrants,
   leaves,
@@ -28,6 +37,7 @@ import {
   regularOvernightConfigs,
   type RegularOvernightConfigRow,
 } from "../db/schema";
+import type { Db } from "./db";
 import {
   cycleDischargeDate,
   listGrants,
@@ -35,8 +45,6 @@ import {
   toLeaveGrant,
   userSegments,
 } from "./leave-grants";
-
-type Db = DrizzleD1Database;
 
 export type LeaveBalanceItem = {
   key: BalanceKey;
@@ -321,7 +329,11 @@ async function assertRegularOvernightAvailable(
   replacingLeaveId?: string,
 ) {
   // 수정이면 교체될 휴가의 구간은 빼야 자기 자신과 부딪히지 않는다.
-  const existing = await regularOvernightSegments(db, user.id, replacingLeaveId);
+  const existing = await regularOvernightSegments(
+    db,
+    user.id,
+    replacingLeaveId,
+  );
   const block = checkRegularOvernight({
     config,
     existing,
@@ -365,7 +377,9 @@ export async function assertSegmentsAvailable(
   const after = allocateAllGrants(grants, [...allSegments, ...segments], today);
   const cycleBased = isRegularOvernightCycleBased(config);
 
-  const requested = new Set(segments.map((segment) => segmentBalanceKey(segment)));
+  const requested = new Set(
+    segments.map((segment) => segmentBalanceKey(segment)),
+  );
   for (const key of requested) {
     // 주기 단위 재원은 총합이 아니라 주기별로 따로 확인한다.
     if (key === "regular_overnight" && cycleBased) continue;
@@ -411,7 +425,9 @@ async function userSegmentsExcluding(
     })
     .from(leaveSegments)
     .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-    .where(and(eq(leaves.userId, userId), ne(leaveSegments.leaveId, excludeLeaveId)))
+    .where(
+      and(eq(leaves.userId, userId), ne(leaveSegments.leaveId, excludeLeaveId)),
+    )
     .all();
 }
 

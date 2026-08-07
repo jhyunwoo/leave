@@ -1,10 +1,15 @@
+/**
+ * 내 휴가 목록 화면.
+ * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약을 함께 보여준다.
+ */
+
 import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
 import { useState } from "react";
 import { Link } from "react-router";
-import type { MyLeave } from "../api/queries";
-import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "../api/queries";
+import type { MyLeave } from "@leave/client";
+import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@leave/client";
 import { LeaveFormModal } from "../components/LeaveFormModal";
-import { fmtRange } from "../lib/format";
+import { fmtRange } from "@leave/shared";
 
 export function LeavesPage() {
   const leaves = useMyLeaves();
@@ -96,7 +101,10 @@ export function LeavesPage() {
             >
               남은 {holdings.remaining}일
             </span>
-            <span className="caption" style={{ display: "block", marginTop: 2 }}>
+            <span
+              className="caption"
+              style={{ display: "block", marginTop: 2 }}
+            >
               {holdings.expiringSoon > 0 || holdings.expired > 0
                 ? [
                     holdings.expiringSoon > 0
@@ -116,10 +124,7 @@ export function LeavesPage() {
       )}
 
       {visibleBalances.length > 0 && (
-        <section
-          className="metric-strip"
-          aria-label="휴가 잔여량"
-        >
+        <section className="metric-strip" aria-label="휴가 잔여량">
           {visibleBalances.map((item) => (
             <div key={item.key} className="metric-strip__item">
               <p className="caption text-mute">{item.label}</p>
@@ -186,7 +191,13 @@ export function LeavesPage() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <p className="body-lg strong">{l.title}</p>
+                <Link
+                  to={`/leaves/${l.id}`}
+                  className="body-lg strong"
+                  style={{ textDecoration: "none" }}
+                >
+                  {l.title}
+                </Link>
                 <p className="body-sm text-body" style={{ marginTop: 2 }}>
                   {fmtRange(l.startDate, l.endDate)}
                 </p>

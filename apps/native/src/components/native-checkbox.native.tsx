@@ -1,3 +1,7 @@
+/**
+ * 체크박스 — iOS/Android용 시스템 구현(@expo/ui).
+ */
+
 import { Checkbox, Host } from "@expo/ui";
 import { StyleSheet } from "react-native";
 import { colors } from "@/theme";

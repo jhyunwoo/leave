@@ -1,3 +1,13 @@
+/**
+ * 응답 스키마 모음 — OpenAPI 문서와 클라이언트 타입의 출처.
+ *
+ * 사용처: 모든 라우트 정의(`jsonContent(...)`, `errorResponse(...)`).
+ *
+ * 요청 스키마는 @leave/shared에 있고(앱도 같은 걸로 미리 검증한다),
+ * 응답 스키마는 서버만 쓰므로 여기 둔다. `.openapi("이름")`을 붙인 스키마는
+ * /docs에 재사용 가능한 컴포넌트로 나온다.
+ */
+
 import { z } from "@hono/zod-openapi";
 import {
   BALANCE_KEYS,

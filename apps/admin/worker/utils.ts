@@ -1,3 +1,10 @@
+/**
+ * 관리자 워커 공용 유틸 — 목록 페이지 파라미터, 요청 메타, 백그라운드 실행.
+ *
+ * 사용처: worker/routes/*.ts 전부.
+ * 목록 API가 열두 개라 페이지·검색어 파싱을 여기서 한 번만 정의한다.
+ */
+
 import type { Context } from "hono";
 import type { AdminAppEnv, ListMeta } from "./types";
 

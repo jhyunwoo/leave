@@ -1,3 +1,5 @@
+/** 웹 e2e 테스트 설정. 실행: `pnpm --filter @leave/web test:e2e`. */
+
 import { defineConfig, devices } from "@playwright/test";
 
 /**
@@ -20,9 +22,7 @@ export default defineConfig({
     baseURL: "http://localhost:5173",
     trace: "on-first-retry",
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   // API(8787)와 웹(5173)을 함께 기동. 이미 떠 있으면 재사용.
   webServer: [
     {

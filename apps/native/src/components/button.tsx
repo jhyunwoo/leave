@@ -1,3 +1,11 @@
+/**
+ * 버튼 — 웹(Expo Web)용 기본 구현.
+ *
+ * Metro가 플랫폼별로 파일을 바꿔 끼운다: iOS는 `button.ios.tsx`(SwiftUI),
+ * Android는 `button.native.tsx`(Compose), 그 외에는 이 RN 구현.
+ * 세 파일의 props가 같아야 화면 코드가 플랫폼을 신경 쓰지 않는다.
+ */
+
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,

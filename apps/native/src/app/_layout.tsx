@@ -1,3 +1,16 @@
+/**
+ * 네이티브 앱의 루트 레이아웃 — 프로바이더, 세션 복원, 화면 스택.
+ *
+ * expo-router가 이 파일을 모든 화면의 부모로 삼는다.
+ *
+ * 시작 순서가 화면 깜빡임을 좌우한다. SecureStore에서 토큰을 되살릴 때까지는
+ * 스플래시를 유지하고(`ready`), 그 뒤에야 Stack.Protected가 로그인 여부에 따라
+ * 갈 곳을 정한다. 먼저 그리면 로그인 화면이 한 프레임 번쩍인다.
+ *
+ * 쿼리 캐시는 디스크에 저장한다(PersistQueryClientProvider). 통신이 끊긴
+ * 훈련장·생활관에서도 마지막으로 본 달력과 내 휴가는 볼 수 있어야 한다.
+ */
+
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { type ErrorBoundaryProps, Stack } from "expo-router";
@@ -5,17 +18,17 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
-import { loadStoredToken, setUnauthorizedHandler } from "@/api/client";
+import { loadStoredToken } from "@/api/client";
+import { ApiProvider } from "@/api/provider";
 import { ErrorScreen } from "@/components/error-screen";
 import { persistFatalError, toFatalRecord } from "@/lib/fatal-error";
 import {
-  clearPersistedQueryCache,
   configureQueryOnlineManager,
   QUERY_CACHE_MAX_AGE,
   queryPersistenceOptions,
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
-import { setSessionAtom, tokenAtom } from "@/state/auth";
+import { tokenAtom } from "@/state/auth";
 import { colors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -58,9 +71,10 @@ const queryClient = new QueryClient({
 function RootNavigator() {
   const token = useAtomValue(tokenAtom);
   const setToken = useSetAtom(tokenAtom);
-  const setSession = useSetAtom(setSessionAtom);
   const [ready, setReady] = useState(false);
 
+  // SecureStore에서 토큰을 되살릴 때까지는 스플래시를 유지한다. 먼저 그리면
+  // 로그인 화면이 한 프레임 번쩍이고 나서 홈으로 넘어간다.
   useEffect(() => {
     void loadStoredToken().then((stored) => {
       setToken(stored);
@@ -68,17 +82,6 @@ function RootNavigator() {
       void SplashScreen.hideAsync();
     });
   }, [setToken]);
-
-  // 저장된 토큰이 서버에서 더는 통하지 않으면(만료·세션 삭제) 조용히 로그아웃한다.
-  // 토큰을 비우면 아래 Stack.Protected가 로그인 화면으로 돌려보낸다.
-  useEffect(() => {
-    setUnauthorizedHandler(() => {
-      queryClient.clear();
-      void clearPersistedQueryCache();
-      void setSession(null);
-    });
-    return () => setUnauthorizedHandler(null);
-  }, [setSession]);
 
   const isAuthed = token !== null && token !== undefined;
   // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)
@@ -145,6 +148,17 @@ function RootNavigator() {
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
+        {/* 알림 탭·내 휴가 탭 양쪽에서 들어오므로 돌아갈 곳을 고정하지 않는다. */}
+        <Stack.Screen
+          name="leave/[leaveId]"
+          options={{
+            headerShown: true,
+            title: "휴가 상세",
+            headerBackTitle: "뒤로",
+            headerStyle: { backgroundColor: colors.canvas },
+            headerTitleStyle: { fontWeight: "600", color: colors.ink },
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthed}>
         <Stack.Screen name="login" />
@@ -160,8 +174,11 @@ export default function RootLayout() {
       client={queryClient}
       persistOptions={queryPersistenceOptions}
     >
-      <StatusBar style="auto" />
-      <RootNavigator />
+      {/* ApiProvider는 401 처리에서 쿼리 캐시를 비우므로 QueryClient 안쪽이어야 한다. */}
+      <ApiProvider>
+        <StatusBar style="auto" />
+        <RootNavigator />
+      </ApiProvider>
     </PersistQueryClientProvider>
   );
 }

@@ -1,3 +1,15 @@
+/**
+ * 네이티브 앱의 HTTP 계층.
+ *
+ * 하는 일은 세 가지다.
+ *  1) 개발/프로덕션 서버 주소를 정한다(개발 중에는 Metro 호스트의 8787).
+ *  2) 토큰을 SecureStore에 보관하고 매 요청에 붙인다.
+ *  3) 응답이 401이면 "세션이 끊겼다"고 앱에 알린다.
+ *
+ * 실제 요청 목록(어떤 화면이 무엇을 부르는가)은 `@leave/client`에 있다.
+ * 사용처: apps/native/src/api/provider.tsx 가 이 모듈을 어댑터로 감싼다.
+ */
+
 import type { AppType } from "@leave/api";
 import {
   resolveApiUrl,
@@ -31,7 +43,7 @@ export async function loadStoredToken(): Promise<string | null> {
   try {
     authToken =
       Platform.OS === "web"
-        ? globalThis.localStorage?.getItem(TOKEN_KEY) ?? null
+        ? (globalThis.localStorage?.getItem(TOKEN_KEY) ?? null)
         : await SecureStore.getItemAsync(TOKEN_KEY);
   } catch {
     authToken = null;

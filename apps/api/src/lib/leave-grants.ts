@@ -25,7 +25,6 @@ import {
   type LeaveGrantUpdateInput,
 } from "@leave/shared";
 import { and, eq } from "drizzle-orm";
-import { type DrizzleD1Database } from "drizzle-orm/d1";
 import {
   leaveGrants,
   leaves,
@@ -34,8 +33,7 @@ import {
   type LeaveGrantRow,
   type RegularOvernightConfigRow,
 } from "../db/schema";
-
-type Db = DrizzleD1Database;
+import type { Db } from "./db";
 type User = {
   id: string;
   branch: Branch;
@@ -115,7 +113,10 @@ export function assertGrantEditable(
   balanceKey: BalanceKey,
   config: RegularOvernightConfigRow | undefined,
 ) {
-  if (balanceKey === "regular_overnight" && isRegularOvernightCycleBased(config)) {
+  if (
+    balanceKey === "regular_overnight" &&
+    isRegularOvernightCycleBased(config)
+  ) {
     throw new Error(
       "정기외박은 주기 설정에서 자동으로 계산돼 적립분을 따로 만들 수 없어요",
     );
@@ -161,8 +162,10 @@ export async function updateGrant(
     .set({
       // 재원은 바꾸지 않는다 — 옮기면 두 재원의 사용분 귀속이 조용히 뒤집힌다.
       days: input.days ?? existing.days,
-      grantedOn: input.grantedOn === undefined ? existing.grantedOn : input.grantedOn,
-      expiresOn: input.expiresOn === undefined ? existing.expiresOn : input.expiresOn,
+      grantedOn:
+        input.grantedOn === undefined ? existing.grantedOn : input.grantedOn,
+      expiresOn:
+        input.expiresOn === undefined ? existing.expiresOn : input.expiresOn,
       note: input.note === undefined ? existing.note : input.note,
       updatedAt: new Date().toISOString(),
     })

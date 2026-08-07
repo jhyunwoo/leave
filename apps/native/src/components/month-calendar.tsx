@@ -1,3 +1,11 @@
+/**
+ * 한 달치 달력 그리드(네이티브).
+ *
+ * 사용처: calendar-scroll.tsx.
+ * 웹의 `MonthCalendar.tsx`와 같은 규칙으로 그린다 — 내 휴가가 있는 날은 재원 칩,
+ * 그 밖의 날은 그룹 출타율 신호. 두 앱이 같은 날 같은 색을 보여야 한다.
+ */
+
 import {
   availabilitySignal,
   BALANCE_LABELS,
@@ -11,8 +19,8 @@ import {
 } from "@leave/shared";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { Calendar } from "@/api/queries";
-import type { MyLeaveDay } from "@/lib/my-leave-days";
+import type { Calendar } from "@leave/client";
+import type { MyLeaveDay } from "@leave/client";
 import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
 
 /** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */

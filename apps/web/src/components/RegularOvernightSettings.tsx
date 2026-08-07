@@ -1,6 +1,11 @@
+/**
+ * 정기외박 자동 적립 설정(웹).
+ * 사용처: 보유 휴가 화면(LeaveGrantsPage).
+ */
+
 import { useState } from "react";
-import type { LeaveGrantsPage } from "../api/queries";
-import { useUpdateRegularOvernight } from "../api/queries";
+import type { LeaveGrantsPage } from "@leave/client";
+import { useUpdateRegularOvernight } from "@leave/client";
 
 /**
  * 정기외박 자동 적립 설정. 잔여량이 이 설정에서 파생하므로 육군에서는 쓰지 않는다.

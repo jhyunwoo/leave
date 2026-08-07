@@ -1,3 +1,8 @@
+/**
+ * 체크박스 — 웹(Expo Web)용 기본 구현.
+ * 네이티브에서는 `native-checkbox.native.tsx`(시스템 체크박스)로 바뀐다.
+ */
+
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/theme";
 

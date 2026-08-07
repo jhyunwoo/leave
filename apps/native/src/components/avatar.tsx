@@ -1,3 +1,8 @@
+/**
+ * 별칭 이니셜 아바타(네이티브).
+ * 사용처: 출타 명단, 구성원 목록, 프로필.
+ */
+
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "@/theme";
 

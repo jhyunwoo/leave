@@ -1,3 +1,10 @@
+/**
+ * 관리자 비밀번호 변경 화면.
+ *
+ * `required`가 true면 임시 비밀번호로 처음 로그인한 상태다. 이때는 다른 화면으로
+ * 나갈 수 없고(App.tsx가 라우트를 막는다) 변경을 마쳐야 운영 API가 열린다.
+ */
+
 import { KeyRound, LoaderCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";

@@ -1,3 +1,7 @@
+/**
+ * 바텀시트 — iOS/Android용 시스템 구현(@expo/ui).
+ */
+
 import { BottomSheet, RNHostView } from "@expo/ui";
 import type { ReactElement } from "react";
 

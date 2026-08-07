@@ -1,3 +1,12 @@
+/**
+ * 접속 기록 미들웨어.
+ *
+ * 사용처: apps/api/src/index.ts 에서 가장 바깥에 건다.
+ *
+ * 기록은 응답을 보낸 뒤 waitUntil로 처리해 사용자 지연을 만들지 않는다.
+ * 기록 자체가 실패해도 요청은 성공한다(로그 때문에 서비스가 멈추면 안 된다).
+ */
+
 import { drizzle } from "drizzle-orm/d1";
 import { createMiddleware } from "hono/factory";
 import { accessLogs, type UserRow } from "../db/schema";

@@ -1,3 +1,11 @@
+/**
+ * 무한 스크롤 달력(네이티브).
+ *
+ * 사용처: apps/native/src/screens/calendar/index.tsx.
+ * 스크롤이 위 끝에 닿으면 이전 달을, 아래 끝에 닿으면 다음 달을 이어 붙인다.
+ * 위쪽에 덧붙일 때는 스크롤 위치를 보정해 화면이 튀지 않게 한다.
+ */
+
 import {
   monthBounds,
   shiftMonth,
@@ -27,9 +35,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { useCalendar } from "@/api/queries";
+import { useCalendar } from "@leave/client";
 import { MonthCalendar } from "@/components/month-calendar";
-import type { MyLeaveDay } from "@/lib/my-leave-days";
+import type { MyLeaveDay } from "@leave/client";
 import { colors, spacing } from "@/theme";
 
 const INITIAL_SPAN = 2;

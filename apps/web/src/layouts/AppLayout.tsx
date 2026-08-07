@@ -1,6 +1,11 @@
+/**
+ * 로그인 상태의 공통 레이아웃 — 상단 내비게이션과 알림 배지.
+ * 사용처: App.tsx의 인증된 라우트 전부.
+ */
+
 import { NavLink, Outlet } from "react-router";
-import type { Me } from "../api/queries";
-import { useNotifications } from "../api/queries";
+import type { Me } from "@leave/client";
+import { useNotifications } from "@leave/client";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 

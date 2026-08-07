@@ -1,3 +1,13 @@
+/**
+ * 인증·프로필 라우트.
+ *
+ * 마운트 위치: `/auth` (apps/api/src/index.ts).
+ * 다루는 것: 회원가입, 로그인, 내 정보, 프로필 수정·이미지, 로그아웃, 회원 탈퇴.
+ *
+ * 회원가입은 계정만 만드는 게 아니라 군 종류별 기본 연가 적립분까지 함께 넣는다.
+ * 탈퇴는 관련 데이터를 모두 지우고, 남은 부대원이 있으면 관리자를 이관한다.
+ */
+
 import { createRoute, z } from "@hono/zod-openapi";
 import { DEFAULT_ANNUAL_DAYS, loginSchema, signupSchema } from "@leave/shared";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
@@ -153,10 +163,7 @@ const deleteAccountRoute = createRoute({
 
 const app = createApp();
 // 비밀번호 무차별 대입과 이메일 열거를 막는다. 계정 생성도 같은 이유로 제한한다.
-app.use(
-  "/login",
-  rateLimit({ name: "login", limit: 10, windowSeconds: 600 }),
-);
+app.use("/login", rateLimit({ name: "login", limit: 10, windowSeconds: 600 }));
 app.use(
   "/signup",
   rateLimit({ name: "signup", limit: 10, windowSeconds: 600 }),

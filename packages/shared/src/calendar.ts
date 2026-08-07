@@ -1,3 +1,12 @@
+/**
+ * 달력 표기와 월 그리드 생성.
+ *
+ * 사용처: 웹/앱의 달력 화면, 휴가 목록·상세의 날짜 표기, 서버의 조회 범위 검증.
+ *
+ * 날짜 문자열(YYYY-MM-DD)과 월 문자열(YYYY-MM)만 다루고 Date 객체를 밖으로
+ * 내보내지 않는다. 타임존 때문에 하루가 밀리는 사고를 원천적으로 막기 위해서다.
+ */
+
 import { addDays, parseISODate, toISODate, type ISODate } from "./dates";
 
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;

@@ -1,3 +1,15 @@
+/**
+ * 휴가·보유 휴가 라우트.
+ *
+ * 마운트 위치: `/leaves` (apps/api/src/index.ts).
+ * 다루는 것: 내 휴가 CRUD, 재원별 잔여 요약, 적립분 관리, 정기외박 설정.
+ *
+ * 휴가를 저장하기 전에 반드시 두 가지를 확인한다.
+ *  1) 구간들이 겹치지 않고 빈틈없이 이어지는가(스키마)
+ *  2) 각 구간의 재원이 실제로 남아 있는가(assertSegmentsAvailable)
+ * 저장 뒤에는 그룹 달력 캐시를 무효화하고 초과 알림을 보낸다.
+ */
+
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   inclusiveDays,

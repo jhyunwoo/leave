@@ -1,10 +1,18 @@
+/**
+ * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
+ */
+
+import type { KeyboardEvent } from "react";
+import { Link, useNavigate } from "react-router";
 import {
   useMarkNotificationsRead,
-  useNotificationPrefs,
+  useMyLeaves,
   useNotifications,
-  useUpdateNotificationPrefs,
-} from "../api/queries";
-import { fmtDateShort } from "../lib/format";
+  type NotificationList,
+} from "@leave/client";
+import { fmtDateShort } from "@leave/shared";
+
+type Notification = NotificationList["notifications"][number];
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -14,8 +22,77 @@ function fmtTime(iso: string): string {
 export function NotificationsPage() {
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
-  const prefs = useNotificationPrefs();
-  const updatePrefs = useUpdateNotificationPrefs();
+  const myLeaves = useMyLeaves();
+  const navigate = useNavigate();
+
+  /**
+   * 초과일 중 내 휴가가 걸린 첫 날짜와 그 휴가를 찾는다.
+   *
+   * 알림의 leaveId는 초과를 유발한 "남의" 휴가라 이동에 쓸 수 없다. 알림을 받은
+   * 사람은 정의상 초과일에 자기 휴가가 있으므로 여기서 되짚을 수 있다 —
+   * 다만 알림을 받은 뒤 그 휴가를 지웠거나 기간을 바꿨으면 못 찾을 수 있다.
+   */
+  const resolveTarget = (dates: string[]) => {
+    for (const date of [...dates].sort()) {
+      const mine = myLeaves.data?.leaves.find(
+        (leave) => leave.startDate <= date && date <= leave.endDate,
+      );
+      if (mine) return { leaveId: mine.id, date };
+    }
+    return null;
+  };
+
+  const openDates = (dates: string[]) => {
+    const target = resolveTarget(dates);
+    if (!target) {
+      alert(
+        "휴가를 찾을 수 없어요. 이미 삭제하거나 기간을 바꾼 계획일 수 있어요.",
+      );
+      return;
+    }
+    void navigate(`/leaves/${target.leaveId}?date=${target.date}`);
+  };
+
+  // 카드·행 전체가 클릭 대상이라 키보드로도 같은 동작이 되게 한다.
+  const onCardKeyDown = (dates: string[]) => (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    openDates(dates);
+  };
+
+  /** 날짜 배지 줄. 배지 하나하나가 그 날짜의 상세로 가는 입구다. */
+  const renderDates = (notification: Notification) =>
+    notification.dates.length > 0 ? (
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--sp-xs)",
+          flexWrap: "wrap",
+          marginTop: "var(--sp-sm)",
+        }}
+      >
+        {notification.dates.map((d) => (
+          <button
+            key={d}
+            type="button"
+            className="badge badge-negative caption"
+            aria-label={`${fmtDateShort(d)} 휴가 상세 보기`}
+            onClick={(e) => {
+              // 행 전체 클릭과 겹치지 않게 배지 클릭을 따로 처리한다.
+              e.stopPropagation();
+              openDates([d]);
+            }}
+            style={{ cursor: "pointer", border: "1px solid var(--negative)" }}
+          >
+            {fmtDateShort(d)}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  const notifications = list.data?.notifications ?? [];
+  const [latest, ...earlier] = notifications;
 
   return (
     <div
@@ -46,51 +123,25 @@ export function NotificationsPage() {
             최대 출타 인원 초과 소식을 여기서 확인해요.
           </p>
         </div>
-        {list.data && list.data.unreadCount > 0 && (
-          <button
-            type="button"
+        <div style={{ display: "flex", gap: "var(--sp-sm)", flexShrink: 0 }}>
+          {list.data && list.data.unreadCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={markRead.isPending}
+              onClick={() => void markRead.mutateAsync()}
+            >
+              모두 읽음
+            </button>
+          )}
+          <Link
+            to="/notifications/settings"
             className="btn btn-secondary btn-sm"
-            disabled={markRead.isPending}
-            onClick={() => void markRead.mutateAsync()}
           >
-            모두 읽음
-          </button>
-        )}
+            알림 설정
+          </Link>
+        </div>
       </header>
-
-      {/* 종류별 on/off — 전부 꺼도 앱은 그대로 쓸 수 있다. */}
-      <section
-        className="card"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--sp-md)",
-        }}
-      >
-        <h2 className="display-xs">받을 알림 고르기</h2>
-        <p className="body-sm text-body">
-          종류별로 따로 끌 수 있어요. 모두 꺼도 캘린더와 계획 기능은 그대로
-          사용할 수 있습니다.
-        </p>
-        <PrefToggle
-          checked={prefs.data?.preferences.overage ?? true}
-          onChange={(overage) => void updatePrefs.mutateAsync({ overage })}
-          testId="notification-pref-overage"
-          label="내 계획 날짜가 참고 기준을 넘겼을 때"
-        />
-        <PrefToggle
-          checked={prefs.data?.preferences.blackout ?? true}
-          onChange={(blackout) => void updatePrefs.mutateAsync({ blackout })}
-          testId="notification-pref-blackout"
-          label="내 계획 기간에 제한 기간(검열·훈련)이 등록됐을 때"
-        />
-        <PrefToggle
-          checked={prefs.data?.preferences.unitNotice ?? true}
-          onChange={(unitNotice) => void updatePrefs.mutateAsync({ unitNotice })}
-          testId="notification-pref-unit-notice"
-          label="그룹 설정·관리자 변경 안내"
-        />
-      </section>
 
       {list.isPending ? (
         <div
@@ -102,7 +153,7 @@ export function NotificationsPage() {
         >
           <div className="spinner" aria-label="불러오는 중" />
         </div>
-      ) : !list.data || list.data.notifications.length === 0 ? (
+      ) : !latest ? (
         <div
           className="card-sage"
           style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
@@ -116,95 +167,117 @@ export function NotificationsPage() {
           </p>
         </div>
       ) : (
-        <ul
-          className="content-panel"
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-          }}
-        >
-          {list.data.notifications.map((n) => (
-            <li
-              key={n.id}
-              className="content-row"
+        <>
+          {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다. */}
+          <section
+            className="card"
+            data-testid="latest-notification"
+            role="button"
+            tabIndex={0}
+            aria-label={`최근 알림: ${latest.title}. 휴가 상세 보기`}
+            onClick={() => openDates(latest.dates)}
+            onKeyDown={onCardKeyDown(latest.dates)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-sm)",
+              cursor: "pointer",
+              borderLeft: latest.read
+                ? "4px solid var(--canvas-soft)"
+                : "4px solid var(--negative)",
+            }}
+          >
+            <p className="eyebrow">최근 알림</p>
+            <p className="display-xs">{latest.title}</p>
+            <p className="body-sm text-body">{latest.body}</p>
+            {renderDates(latest)}
+            <div
               style={{
                 display: "flex",
-                gap: "var(--sp-md)",
-                opacity: n.read ? 0.65 : 1,
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "var(--sp-sm)",
+                marginTop: "var(--sp-sm)",
               }}
             >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  marginTop: 6,
-                  flexShrink: 0,
-                  background: n.read ? "var(--canvas-soft)" : "var(--negative)",
+              <span className="caption text-mute">
+                {fmtTime(latest.createdAt)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDates(latest.dates);
                 }}
-              />
-              <div style={{ minWidth: 0 }}>
-                <p className="body-sm strong">{n.title}</p>
-                <p className="body-sm text-body" style={{ marginTop: 2 }}>
-                  {n.body}
-                </p>
-                {n.dates.length > 0 && (
-                  <div
+              >
+                자세히
+              </button>
+            </div>
+          </section>
+
+          {earlier.length > 0 && (
+            <section
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--sp-sm)",
+              }}
+            >
+              <h2 className="caption text-mute">이전 알림</h2>
+              <ul
+                className="content-panel"
+                style={{ listStyle: "none", margin: 0, padding: 0 }}
+              >
+                {earlier.map((n) => (
+                  <li
+                    key={n.id}
+                    className="content-row"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${n.title}. 휴가 상세 보기`}
+                    onClick={() => openDates(n.dates)}
+                    onKeyDown={onCardKeyDown(n.dates)}
                     style={{
                       display: "flex",
-                      gap: "var(--sp-xs)",
-                      flexWrap: "wrap",
-                      marginTop: "var(--sp-sm)",
+                      gap: "var(--sp-md)",
+                      opacity: n.read ? 0.65 : 1,
+                      cursor: "pointer",
                     }}
                   >
-                    {n.dates.map((d) => (
-                      <span key={d} className="badge badge-negative caption">
-                        {fmtDateShort(d)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p
-                  className="caption text-mute"
-                  style={{ marginTop: "var(--sp-sm)" }}
-                >
-                  {fmtTime(n.createdAt)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        marginTop: 6,
+                        flexShrink: 0,
+                        background: n.read
+                          ? "var(--canvas-soft)"
+                          : "var(--negative)",
+                      }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <p className="body-sm strong">{n.title}</p>
+                      <p className="body-sm text-body" style={{ marginTop: 2 }}>
+                        {n.body}
+                      </p>
+                      {renderDates(n)}
+                      <p
+                        className="caption text-mute"
+                        style={{ marginTop: "var(--sp-sm)" }}
+                      >
+                        {fmtTime(n.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </div>
-  );
-}
-
-function PrefToggle(props: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  testId: string;
-}) {
-  return (
-    <label
-      style={{
-        display: "flex",
-        gap: "var(--sp-sm)",
-        alignItems: "center",
-        cursor: "pointer",
-        minHeight: 44,
-      }}
-    >
-      <input
-        type="checkbox"
-        checked={props.checked}
-        onChange={(e) => props.onChange(e.target.checked)}
-        style={{ width: 20, height: 20, flexShrink: 0 }}
-        data-testid={props.testId}
-      />
-      <span className="body-sm text-body">{props.label}</span>
-    </label>
   );
 }

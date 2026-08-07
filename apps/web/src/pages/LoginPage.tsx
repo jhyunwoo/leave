@@ -1,6 +1,8 @@
+/** 로그인 화면. 성공하면 토큰이 저장되고 App.tsx가 달력으로 넘긴다. */
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useLogin } from "../api/queries";
+import { useLogin } from "@leave/client";
 import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";

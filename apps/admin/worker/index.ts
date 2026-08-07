@@ -1,3 +1,16 @@
+/**
+ * 관리자 워커의 진입점 — 보안 헤더, 인증 단계, 라우트 마운트.
+ *
+ * 배포: Cloudflare Workers. 정적 자산(관리자 SPA)은 ASSETS 바인딩이 낸다.
+ *
+ * 접근 단계가 세 겹이다.
+ *  1) csrfMiddleware        — 쿠키 세션을 쓰므로 교차 출처 변경 요청을 막는다.
+ *  2) adminAuthMiddleware   — 로그인한 관리자만 통과.
+ *  3) passwordChangedMiddleware — 임시 비밀번호를 아직 안 바꾼 계정은
+ *                                 실제 운영 API에 닿지 못하게 막는다.
+ * /api로 시작하지 않는 요청은 SPA 자산으로 넘겨 클라이언트 라우팅이 이어지게 한다.
+ */
+
 import { Hono } from "hono";
 import {
   adminAuthMiddleware,

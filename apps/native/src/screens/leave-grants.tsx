@@ -1,3 +1,10 @@
+/**
+ * 보유 휴가 화면(네이티브) — 재원별 적립분과 정기외박 주기를 관리한다.
+ *
+ * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
+ * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
+ */
+
 import { fmtDateShort, fmtRangeTiny, type BalanceKey } from "@leave/shared";
 import { useState } from "react";
 import {
@@ -8,8 +15,8 @@ import {
   Text,
   View,
 } from "react-native";
-import type { LeaveGrantFund, LeaveGrantItem } from "@/api/queries";
-import { useDeleteLeaveGrant, useLeaveGrants, useMe } from "@/api/queries";
+import type { LeaveGrantFund, LeaveGrantItem } from "@leave/client";
+import { useDeleteLeaveGrant, useLeaveGrants, useMe } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ActionMenu } from "@/components/action-menu";

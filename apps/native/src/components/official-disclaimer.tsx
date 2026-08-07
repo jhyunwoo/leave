@@ -1,3 +1,9 @@
+/**
+ * 출타 상태가 보이는 모든 화면에 붙는 고지.
+ * 웹의 `OfficialDisclaimer.tsx`와 문구를 똑같이 유지해야 스토어 심사와
+ * 이용약관에서 말하는 서비스 성격이 화면마다 어긋나지 않는다.
+ */
+
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/theme";
 

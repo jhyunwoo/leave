@@ -1,3 +1,9 @@
+/**
+ * 그룹 관리 화면(네이티브, 관리자 전용).
+ * 기본 정보와 하루 최대 출타 인원, 제한 기간(검열·훈련), 구성원과 초대코드,
+ * 관리자 이관까지 그룹 운영에 필요한 조작을 한 화면에 모은다.
+ */
+
 import {
   blackoutCreateSchema,
   fmtRangeTiny,
@@ -16,7 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { IssuedUnitInvite, Me } from "@/api/queries";
+import type { IssuedUnitInvite, Me } from "@leave/client";
 import {
   useBlackouts,
   useBlockUser,
@@ -29,7 +35,7 @@ import {
   useTransferAdmin,
   useUnitMembers,
   useUpdateUnit,
-} from "@/api/queries";
+} from "@leave/client";
 import { ActionMenu } from "@/components/action-menu";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
@@ -315,7 +321,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
       <Text style={styles.sectionTitle}>제한 기간</Text>
       <Text style={styles.body}>
         검열·훈련·평가처럼 출타율과 무관하게 휴가가 제한될 수 있는 기간을
-        등록하면, 참여자 달력에 "제한 가능"으로 표시됩니다.
+        등록하면, 참여자 달력에 &quot;제한 가능&quot;으로 표시됩니다.
       </Text>
       <DateRangePicker
         startDate={startDate}

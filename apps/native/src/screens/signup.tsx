@@ -1,3 +1,9 @@
+/**
+ * 회원가입 화면(네이티브).
+ * 입대일과 군 종류를 넣으면 전역 예정일과 현재 계급이 자동 계산된다
+ * (@leave/shared의 rank 규칙).
+ */
+
 import { signupSchema } from "@leave/shared";
 import { Link } from "expo-router";
 import { useState } from "react";
@@ -9,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSignup } from "@/api/queries";
+import { useSignup } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";

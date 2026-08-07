@@ -1,3 +1,10 @@
+/**
+ * 내 휴가를 "날짜 → 그날의 재원" 맵으로 펼친다.
+ *
+ * 사용처: 웹/네이티브 달력의 월 그리드. 셀 하나를 그릴 때 이 맵만 조회하면
+ * 되므로, 셀마다 전체 휴가 목록을 훑는 O(날짜 × 휴가) 계산이 사라진다.
+ * 맵에 없는 날짜는 내 휴가가 없는 날이고, 그룹 출타율만 보여준다.
+ */
 import {
   eachDate,
   isConfirmedLeaveStatus,
@@ -5,9 +12,11 @@ import {
   type BalanceKey,
   type ISODate,
 } from "@leave/shared";
-import type { MyLeave } from "@/api/queries";
+import type { MyLeave } from "./types";
 
+/** 달력 셀 하나가 알아야 하는 "그날 내 휴가"의 전부. */
 export type MyLeaveDay = {
+  /** 그날 쓰는 재원(연가·정기외박 등). 칩 색을 정한다. */
   key: BalanceKey;
   title: string;
   /** 같은 재원 구간의 첫날/마지막날. 달력에서 칩을 이어 붙여 그릴 때 쓴다. */
@@ -22,10 +31,6 @@ export type MyLeaveDay = {
   isDraft: boolean;
 };
 
-/**
- * 내 휴가를 날짜 → 그날의 재원으로 펼친다.
- * 달력 셀은 이 맵만 보면 되고, 없으면 지금처럼 부대 출타율만 보여준다.
- */
 export function buildMyLeaveDayMap(
   leaves: readonly MyLeave[] | undefined,
 ): Map<ISODate, MyLeaveDay> {

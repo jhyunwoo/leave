@@ -26,7 +26,10 @@ describe("buildMonthGrid", () => {
     const firstDow = new Date(`${first!.date}T00:00:00Z`).getUTCDay();
     expect(firstDow).toBe(0);
     // 2월의 모든 날짜가 inMonth로 존재
-    const inMonth = weeks.flat().filter((c) => c.inMonth).map((c) => c.date);
+    const inMonth = weeks
+      .flat()
+      .filter((c) => c.inMonth)
+      .map((c) => c.date);
     expect(inMonth).toContain("2026-02-01");
     expect(inMonth).toContain("2026-02-28");
     expect(inMonth.length).toBe(28);

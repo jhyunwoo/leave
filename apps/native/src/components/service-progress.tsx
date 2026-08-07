@@ -1,3 +1,9 @@
+/**
+ * 복무 진행률 표시.
+ * 사용처: 프로필 화면. 입대일~전역일 사이 현재 위치를 소수점 한 자리까지 보여준다.
+ * 화면이 앞에 있을 때만 1분마다 갱신해 배터리와 렌더 비용을 아낀다.
+ */
+
 import { parseISODate, type ISODate } from "@leave/shared";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";

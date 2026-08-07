@@ -1,3 +1,8 @@
+/**
+ * 입력 폼을 담는 시트.
+ * 사용처: 휴가 등록/수정, 적립분 편집, 제한 기간 등록.
+ */
+
 import type { ReactElement } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 import { colors } from "@/theme";

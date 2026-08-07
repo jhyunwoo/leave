@@ -1,3 +1,9 @@
+/**
+ * 버튼 — iOS용 SwiftUI 구현(@expo/ui).
+ * 시스템 버튼을 그대로 써서 눌림 반응·접근성·Dynamic Type이 OS와 완전히 같아진다.
+ * 라벨 폭 어림 계산이 필요한 이유는 ./button-width.ts 주석 참고.
+ */
+
 import { Button as NativeButton, Host } from "@expo/ui";
 import {
   buttonBorderShape,

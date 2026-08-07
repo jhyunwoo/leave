@@ -1,3 +1,13 @@
+/**
+ * 관리자 생성·편집 폼 — 리소스마다 다른 입력 필드를 한 컴포넌트에서 그린다.
+ *
+ * 사용처: EntityPage의 상세 서랍(생성/편집 모드).
+ *
+ * 휴가 폼은 앱과 같은 구간 편집 규칙(@leave/shared의 draft 함수들)을 쓴다.
+ * 관리자가 만든 데이터도 앱에서 그대로 계산돼야 하기 때문이다.
+ * 이미지는 multipart라 이 폼이 아니라 ImageManager가 맡는다.
+ */
+
 import {
   addDays,
   BALANCE_KEYS,
@@ -17,11 +27,7 @@ import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 export type EditableResource =
-  | "users"
-  | "units"
-  | "leaves"
-  | "notifications"
-  | "admins";
+  "users" | "units" | "leaves" | "notifications" | "admins";
 
 type Props = {
   resource: EditableResource;

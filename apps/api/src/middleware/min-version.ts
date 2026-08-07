@@ -1,3 +1,10 @@
+/**
+ * 최소 지원 앱 버전 차단 미들웨어.
+ *
+ * 사용처: apps/api/src/index.ts (`/`, `/meta`, `/docs`는 제외).
+ * 안내 문구를 받아야 하는 경로까지 막으면 사용자가 무엇을 해야 할지 알 수 없다.
+ */
+
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../lib/app";
 
@@ -29,21 +36,23 @@ export function compareVersions(a: string, b: string): number | null {
   return 0;
 }
 
-export const minVersionMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  const min = c.env.MIN_APP_VERSION;
-  const client = c.req.header("X-Client-Version");
-  if (!min || !client) return next();
+export const minVersionMiddleware = createMiddleware<AppEnv>(
+  async (c, next) => {
+    const min = c.env.MIN_APP_VERSION;
+    const client = c.req.header("X-Client-Version");
+    if (!min || !client) return next();
 
-  const compared = compareVersions(client, min);
-  if (compared !== null && compared < 0) {
-    return c.json(
-      {
-        error:
-          "앱을 업데이트해야 계속 사용할 수 있어요. 출타 계산 규칙이 바뀌어 이전 버전은 다른 숫자를 보여줍니다.",
-        minSupportedVersion: min,
-      },
-      426,
-    );
-  }
-  return next();
-});
+    const compared = compareVersions(client, min);
+    if (compared !== null && compared < 0) {
+      return c.json(
+        {
+          error:
+            "앱을 업데이트해야 계속 사용할 수 있어요. 출타 계산 규칙이 바뀌어 이전 버전은 다른 숫자를 보여줍니다.",
+          minSupportedVersion: min,
+        },
+        426,
+      );
+    }
+    return next();
+  },
+);

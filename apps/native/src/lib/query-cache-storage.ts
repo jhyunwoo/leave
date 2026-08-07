@@ -1,3 +1,8 @@
+/**
+ * 쿼리 캐시 저장소 — 웹(Expo Web)용 기본 구현.
+ * Metro가 네이티브 빌드에서는 같은 이름의 `.native.ts`(SQLite)로 바꿔 끼운다.
+ */
+
 interface QueryCacheStorage {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;

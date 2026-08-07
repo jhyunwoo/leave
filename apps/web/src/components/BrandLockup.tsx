@@ -1,3 +1,8 @@
+/**
+ * 브랜드 마크 + 워드마크 조합.
+ * 사용처: 상단바, 로그인·회원가입, 랜딩 페이지.
+ */
+
 type BrandLockupProps = {
   className?: string;
   iconSize?: number;

@@ -1,3 +1,9 @@
+/**
+ * 비로그인 첫 화면(홍보 랜딩).
+ * 검색 유입과 스토어 링크가 닿는 곳이라 로그인 없이 서비스 성격과 법적 고지를
+ * 확인할 수 있어야 한다.
+ */
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { BrandLockup } from "../components/BrandLockup";
