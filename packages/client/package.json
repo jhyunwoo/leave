@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@leave/api": "workspace:*",
@@ -22,7 +23,8 @@
     "@tanstack/react-query": "^5.101.2",
     "@types/react": "^19.2.17",
     "hono": "^4.12.30",
-    "react": "^19.2.7",
-    "typescript": "5.9.2"
+    "react": "19.2.3",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
   }
 }
