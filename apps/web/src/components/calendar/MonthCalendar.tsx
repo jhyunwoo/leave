@@ -1,3 +1,14 @@
+/**
+ * 한 달치 달력 그리드.
+ *
+ * 사용처: CalendarScroll(웹 달력 화면).
+ *
+ * 셀 하나가 보여주는 것은 두 가지 중 하나다.
+ *  - 내 휴가가 있는 날 → 재원 색 칩(확정/희망/초안을 테두리로 구분)
+ *  - 그 밖의 날       → 그룹 출타율 신호(여유·보통·임박·초과)
+ * 정기외박 주기가 있으면 날짜 아래에 주기별 색 선을 함께 깐다.
+ */
+
 import {
   availabilitySignal,
   BALANCE_LABELS,
@@ -7,9 +18,9 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import { useMemo } from "react";
-import type { Calendar } from "../../api/queries";
-import { buildMonthGrid, WEEKDAYS } from "../../lib/format";
-import type { MyLeaveDay } from "../../lib/my-leave-days";
+import type { Calendar } from "@leave/client";
+import { buildMonthGrid, WEEKDAYS } from "@leave/shared";
+import type { MyLeaveDay } from "@leave/client";
 import "./calendar.css";
 
 export function MonthCalendar(props: {

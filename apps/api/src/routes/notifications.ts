@@ -1,3 +1,10 @@
+/**
+ * 알림함·알림 설정 라우트.
+ *
+ * 마운트 위치: `/notifications` (apps/api/src/index.ts).
+ * 알림 본문은 서버가 만들고(lib/overage.ts) 여기서는 조회·읽음 처리·수신 설정만 한다.
+ */
+
 import { createRoute, z } from "@hono/zod-openapi";
 import { notificationPrefsSchema } from "@leave/shared";
 import { and, desc, eq } from "drizzle-orm";
@@ -67,7 +74,8 @@ const updatePrefsRoute = createRoute({
   path: "/preferences",
   tags: ["알림"],
   summary: "알림 종류별 수신 설정 변경",
-  description: "보낸 항목만 바꿉니다. 전부 꺼도 앱은 그대로 이용할 수 있습니다.",
+  description:
+    "보낸 항목만 바꿉니다. 전부 꺼도 앱은 그대로 이용할 수 있습니다.",
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -92,7 +100,9 @@ function parseDates(row: NotificationRow): string[] {
   if (!row.datesJson) return [];
   try {
     const parsed: unknown = JSON.parse(row.datesJson);
-    return Array.isArray(parsed) ? parsed.filter((d) => typeof d === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((d) => typeof d === "string")
+      : [];
   } catch {
     return [];
   }

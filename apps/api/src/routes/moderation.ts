@@ -1,3 +1,11 @@
+/**
+ * 신고·차단 라우트.
+ *
+ * 마운트 위치: `/moderation` (apps/api/src/index.ts).
+ * 자유 입력(그룹 이름·설명, 참여자 별칭)이 남아 있는 한 스토어 심사가 요구하는
+ * 최소 안전장치다. 자세한 배경은 아래 라우트 정의 주석 참고.
+ */
+
 import { createRoute, z } from "@hono/zod-openapi";
 import { blockCreateSchema, reportCreateSchema } from "@leave/shared";
 import { and, eq } from "drizzle-orm";

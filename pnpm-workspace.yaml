@@ -10,6 +10,9 @@ allowBuilds:
   agent-browser: true
   esbuild: true
   sharp: false
+  # eslint-import-resolver-typescript의 네이티브 바인딩. 빌드 스크립트 없이도
+  # 플랫폼별 optionalDependencies로 해결돼 lint가 정상 동작한다.
+  unrs-resolver: false
   workerd: true
 
 # 승인되지 않은(=무시된) 빌드 스크립트가 있어도 설치를 실패시키지 않고 경고만 낸다.

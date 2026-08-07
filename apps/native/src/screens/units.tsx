@@ -1,10 +1,17 @@
+/**
+ * 그룹 참여·생성 화면(네이티브).
+ *
+ * 그룹 검색은 일부러 없다. 부대를 검색으로 찾을 수 있으면 그 자체가 부대 목록이
+ * 되기 때문이다. 초대코드로만 들어올 수 있고, 새로 만들면 코드가 한 번 노출된다.
+ */
+
 import {
   unitCreateSchema,
   unitJoinSchema,
   type UnitCreateInput,
 } from "@leave/shared";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -20,7 +27,7 @@ import {
   useJoinUnit,
   useLeaveUnit,
   useMe,
-} from "@/api/queries";
+} from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
@@ -243,9 +250,14 @@ function CreateUnitModal(props: {
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
 
-  useEffect(() => {
+  // 시트를 닫으면 지난 오류를 비워 다음에 열 때 남아 있지 않게 한다.
+  // RN Modal은 닫혀도 자식을 언마운트하지 않아 상태가 그대로 살아 있다.
+  // 이펙트 대신 렌더 중에 맞추는 React 권장 방식이라 렌더가 연쇄되지 않는다.
+  const [wasVisible, setWasVisible] = useState(props.visible);
+  if (wasVisible !== props.visible) {
+    setWasVisible(props.visible);
     if (!props.visible) setError(null);
-  }, [props.visible]);
+  }
 
   const submit = async () => {
     const input = {

@@ -1,3 +1,9 @@
+/**
+ * 네이티브 컨텍스트 메뉴 버튼.
+ * 사용처: 구성원 목록(신고·차단·강제 탈퇴), 휴가 항목의 부가 동작.
+ * 파괴적 동작은 시스템이 붉게 표시하도록 destructive 플래그를 넘긴다.
+ */
+
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius } from "@/theme";

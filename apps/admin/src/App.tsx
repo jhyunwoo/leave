@@ -1,3 +1,14 @@
+/**
+ * 관리자 SPA의 라우트 트리와 인증 게이트.
+ *
+ * 세 가지 상태만 존재한다.
+ *  - 비로그인            → 로그인 화면
+ *  - 임시 비밀번호 상태  → 비밀번호 변경만 가능(다른 화면으로 못 넘어간다)
+ *  - 정상               → AppShell 아래의 운영 화면들
+ *
+ * 목록 화면은 전부 `EntityPage`한 개가 리소스 이름만 바꿔 그린다.
+ */
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { api, ApiError, type AdminAccount } from "./api/client";

@@ -1,3 +1,8 @@
+/**
+ * 적립분 추가·수정 모달(웹).
+ * 사용처: 보유 휴가 화면(LeaveGrantsPage).
+ */
+
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
@@ -5,8 +10,8 @@ import {
   type BalanceKey,
 } from "@leave/shared";
 import { useState } from "react";
-import type { LeaveGrantItem } from "../api/queries";
-import { useCreateLeaveGrant, useUpdateLeaveGrant } from "../api/queries";
+import type { LeaveGrantItem } from "@leave/client";
+import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@leave/client";
 import { Modal } from "./Modal";
 
 /**
@@ -63,7 +68,9 @@ export function LeaveGrantModal(props: {
       }
       props.onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "저장하지 못했습니다");
+      setError(
+        caught instanceof Error ? caught.message : "저장하지 못했습니다",
+      );
     }
   };
 

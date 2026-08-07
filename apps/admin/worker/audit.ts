@@ -1,3 +1,13 @@
+/**
+ * 관리자 감사 로그.
+ *
+ * 사용처: 데이터를 바꾸는 모든 관리자 라우트.
+ *
+ * 누가·언제·무엇을 어떻게 바꿨는지를 변경 전/후 스냅샷과 함께 남긴다.
+ * 스냅샷에 비밀번호 해시·토큰 같은 값이 섞이면 로그 자체가 유출 경로가 되므로,
+ * 키 이름을 기준으로 걸러낸 뒤 저장한다(SENSITIVE_KEY).
+ */
+
 import { adminAuditLogs } from "@leave/api/db";
 import { drizzle } from "drizzle-orm/d1";
 import type { Context } from "hono";

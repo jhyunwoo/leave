@@ -1,3 +1,16 @@
+/**
+ * 관리자 인증 — 로그인, 세션 쿠키, CSRF, 비밀번호 변경 강제.
+ *
+ * 사용처: apps/admin/worker/index.ts.
+ *
+ * 사용자 앱과 달리 관리자 세션은 Bearer 토큰이 아니라 HttpOnly 쿠키를 쓴다.
+ * 브라우저 전용 화면이라 XSS로 토큰이 읽히는 경로를 없애는 편이 낫기 때문이다.
+ * 대신 쿠키는 자동 전송되므로 CSRF 검사가 필수다(csrfMiddleware).
+ *
+ * 로그인 실패는 15분 창 안에서 5회로 제한하고, 임시 비밀번호로 만든 계정은
+ * 비밀번호를 바꾸기 전까지 운영 API에 닿지 못한다.
+ */
+
 import {
   adminAccounts,
   adminSessions,

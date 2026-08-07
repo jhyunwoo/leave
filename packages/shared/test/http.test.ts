@@ -14,7 +14,10 @@ describe("unwrap", () => {
   it("실패 응답은 서버 error 메시지로 ApiError를 던진다", async () => {
     await expect(
       unwrap(fakeRes(false, 409, { error: "이미 가입된 이메일입니다" })),
-    ).rejects.toMatchObject({ status: 409, message: "이미 가입된 이메일입니다" });
+    ).rejects.toMatchObject({
+      status: 409,
+      message: "이미 가입된 이메일입니다",
+    });
   });
 
   it("error 필드가 없으면 기본 메시지", async () => {

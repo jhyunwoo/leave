@@ -1,11 +1,18 @@
+/**
+ * 보유 휴가 화면 — 재원별 적립분과 정기외박 주기를 관리한다.
+ *
+ * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
+ * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
+ */
+
 import { fmtRangeTiny, type BalanceKey } from "@leave/shared";
 import { useState } from "react";
 import { Link } from "react-router";
-import type { LeaveGrantFund, LeaveGrantItem, Me } from "../api/queries";
-import { useDeleteLeaveGrant, useLeaveGrants } from "../api/queries";
+import type { LeaveGrantFund, LeaveGrantItem, Me } from "@leave/client";
+import { useDeleteLeaveGrant, useLeaveGrants } from "@leave/client";
 import { LeaveGrantModal } from "../components/LeaveGrantModal";
 import { RegularOvernightSettings } from "../components/RegularOvernightSettings";
-import { fmtDateShort } from "../lib/format";
+import { fmtDateShort } from "@leave/shared";
 
 /** 만기가 이 안으로 다가오면 임박으로 본다. */
 const EXPIRING_SOON = 30;
@@ -37,7 +44,8 @@ export function LeaveGrantsPage(props: { me: Me }) {
   const { totals, funds, regularOvernight } = page.data;
   const cycleKey = funds.find((fund) => fund.cycleScoped)?.key ?? null;
   const active = funds.filter(
-    (fund) => !fund.cycleScoped && (fund.grants.length > 0 || fund.usedDays > 0),
+    (fund) =>
+      !fund.cycleScoped && (fund.grants.length > 0 || fund.usedDays > 0),
   );
   const empty = funds.filter(
     (fund) =>
@@ -75,8 +83,14 @@ export function LeaveGrantsPage(props: { me: Me }) {
         </h1>
       </header>
 
-      <section className="card" style={{ display: "grid", gap: "var(--sp-sm)" }}>
-        <p className="display-md" style={{ fontVariantNumeric: "tabular-nums" }}>
+      <section
+        className="card"
+        style={{ display: "grid", gap: "var(--sp-sm)" }}
+      >
+        <p
+          className="display-md"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           남은 휴가 {totals.remainingDays}일
         </p>
         <p className="body-sm text-body">
@@ -97,7 +111,9 @@ export function LeaveGrantsPage(props: { me: Me }) {
             <div style={{ flex: totals.usedDays, background: "#d8ddd5" }} />
           )}
           {totals.remainingDays > 0 && (
-            <div style={{ flex: totals.remainingDays, background: "#9fe870" }} />
+            <div
+              style={{ flex: totals.remainingDays, background: "#9fe870" }}
+            />
           )}
           {totals.expiredDays > 0 && (
             <div style={{ flex: totals.expiredDays, background: "#fff0f0" }} />
@@ -139,9 +155,14 @@ export function LeaveGrantsPage(props: { me: Me }) {
       ))}
 
       {empty.length > 0 && (
-        <section className="card" style={{ display: "grid", gap: "var(--sp-md)" }}>
+        <section
+          className="card"
+          style={{ display: "grid", gap: "var(--sp-md)" }}
+        >
           <h2 className="body-lg strong">다른 재원 추가</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-xs)" }}>
+          <div
+            style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-xs)" }}
+          >
             {empty.map((fund) => (
               <button
                 key={fund.key}
@@ -268,7 +289,9 @@ function GrantRow(props: {
             {grant.days}일
           </strong>{" "}
           <span className="caption text-mute">
-            {grant.expiresOn ? `만기 ${fmtDateShort(grant.expiresOn)}` : "만기 없음"}
+            {grant.expiresOn
+              ? `만기 ${fmtDateShort(grant.expiresOn)}`
+              : "만기 없음"}
             {grant.usedDays > 0 ? ` · 사용 ${grant.usedDays}일` : ""}
           </span>
         </p>
@@ -363,7 +386,9 @@ function CycleList(props: {
               padding: "var(--sp-sm)",
               borderRadius: "var(--radius-md, 12px)",
               background:
-                cycle.state === "current" ? "var(--primary-pale, #e2f6d5)" : undefined,
+                cycle.state === "current"
+                  ? "var(--primary-pale, #e2f6d5)"
+                  : undefined,
             }}
           >
             <span
@@ -393,7 +418,9 @@ function CycleList(props: {
                   소멸 {cycle.remainingDays}일
                 </p>
               ) : (
-                <p className="caption text-mute">잔여 {cycle.remainingDays}일</p>
+                <p className="caption text-mute">
+                  잔여 {cycle.remainingDays}일
+                </p>
               )}
             </div>
             {cycle.state === "current" && (

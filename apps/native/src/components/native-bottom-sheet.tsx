@@ -1,3 +1,9 @@
+/**
+ * 바텀시트 — 웹(Expo Web)용 구현.
+ * 입력 폼에는 이걸 쓰지 않는다(이유는 form-sheet.tsx 주석 참고).
+ * 짧은 선택지 표시처럼 높이가 콘텐츠에 좌우되지 않는 경우에만 쓴다.
+ */
+
 import { BottomSheet } from "@expo/ui/community/bottom-sheet";
 import type { ReactElement } from "react";
 import { View } from "react-native";

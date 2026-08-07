@@ -436,7 +436,11 @@ describe("정기외박 사용 가능 여부", () => {
         config,
         existing: [],
         requested: [
-          { category: "annual", startDate: "2026-05-09", endDate: "2026-05-10" },
+          {
+            category: "annual",
+            startDate: "2026-05-09",
+            endDate: "2026-05-10",
+          },
         ],
         dischargeAt: discharge,
       }),

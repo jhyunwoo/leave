@@ -1,18 +1,18 @@
+/**
+ * 달력에서 날짜를 고르면 열리는 하루 요약 패널.
+ * 출타율·공휴일·제한 기간을 알리고, 그날의 출타 명단(DayRoster)을 보여준다.
+ */
+
 import {
   availabilitySignal,
-  BALANCE_LABELS,
   fmtRangeTiny,
   getHoliday,
-  isConfirmedLeaveStatus,
-  LEAVE_STATUS_LABELS,
-  segmentBalanceKey,
-  segmentOnDate,
   type RegularOvernightCycle,
 } from "@leave/shared";
-import type { Calendar } from "../../api/queries";
-import { fmtDateK, fmtRange } from "../../lib/format";
-import { Avatar } from "../Avatar";
+import type { Calendar } from "@leave/client";
+import { fmtDateK } from "@leave/shared";
 import { OfficialDisclaimer } from "../OfficialDisclaimer";
+import { DayRoster } from "./DayRoster";
 
 export function DayPanel(props: {
   calendar: Calendar;
@@ -25,10 +25,6 @@ export function DayPanel(props: {
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
-  // 명단에는 내 일정도 함께 들어 있다. 초안은 서버가 애초에 내려주지 않는다.
-  const dayAttendees = calendar.attendees.filter(
-    (a) => a.startDate <= date && date <= a.endDate,
-  );
   const exceeded = stat?.exceeded ?? false;
   const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
   const holiday = getHoliday(date);
@@ -113,88 +109,11 @@ export function DayPanel(props: {
         </p>
       )}
 
-      {dayAttendees.length === 0 ? (
-        <div
-          className="card-sage"
-          style={{ textAlign: "center", padding: "var(--sp-2xl) var(--sp-lg)" }}
-        >
-          <p className="body-sm text-body">이 날 출타 예정인 사람이 없어요.</p>
-          <p className="caption text-mute" style={{ marginTop: 4 }}>
-            내 계획을 먼저 시뮬레이션해보세요.
-          </p>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--sp-md)",
-          }}
-        >
-          <p className="body-sm strong">이 날 출타 {dayAttendees.length}명</p>
-          <ul
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--sp-xs)",
-            }}
-          >
-            {dayAttendees.map((attendee) => {
-              // 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
-              const segment = segmentOnDate(attendee.segments, date);
-              const key = segment ? segmentBalanceKey(segment) : null;
-              const isMine = attendee.userId === props.myUserId;
-              return (
-                <li
-                  key={attendee.leaveId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--sp-md)",
-                    background: isMine
-                      ? "var(--primary-pale, #e2f6d5)"
-                      : "transparent",
-                    borderRadius: "var(--r-lg)",
-                    padding: "var(--sp-sm)",
-                    minWidth: 0,
-                  }}
-                >
-                  <Avatar name={attendee.name} size={32} />
-                  <div style={{ minWidth: 0 }}>
-                    <p className="body-sm strong">
-                      {isMine
-                        ? "내 계획"
-                        : `${attendee.rankLabel} ${attendee.name}`}
-                      {key && (
-                        <span
-                          className="cal-mine"
-                          data-balance={key}
-                          style={{
-                            display: "inline-block",
-                            width: "auto",
-                            margin: "0 0 0 6px",
-                          }}
-                        >
-                          {BALANCE_LABELS[key]}
-                        </span>
-                      )}
-                    </p>
-                    <p className="caption text-mute">
-                      {fmtRange(attendee.startDate, attendee.endDate)}
-                      {isConfirmedLeaveStatus(attendee.status)
-                        ? ""
-                        : ` · ${LEAVE_STATUS_LABELS[attendee.status]}`}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      <DayRoster
+        attendees={calendar.attendees}
+        date={date}
+        myUserId={props.myUserId}
+      />
 
       <button
         type="button"

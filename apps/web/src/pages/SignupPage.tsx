@@ -1,7 +1,13 @@
+/**
+ * 회원가입 화면.
+ * 입대일과 군 종류를 넣으면 전역 예정일과 현재 계급이 자동으로 계산된다
+ * (@leave/shared의 rank 규칙). 사용자는 그 값을 확인만 하면 된다.
+ */
+
 import { signupSchema } from "@leave/shared";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useSignup } from "../api/queries";
+import { useSignup } from "@leave/client";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";

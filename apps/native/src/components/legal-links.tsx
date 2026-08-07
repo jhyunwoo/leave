@@ -1,3 +1,9 @@
+/**
+ * 공개 문서 링크(개인정보처리방침·이용약관·지원).
+ * 로그인 전에도 열 수 있어야 한다(Apple 5.1.1(i)). 앱에는 정적 페이지가 없으므로
+ * 웹 사이트의 절대 URL을 시스템 브라우저로 연다.
+ */
+
 import * as Linking from "expo-linking";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, spacing } from "@/theme";

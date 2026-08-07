@@ -1,3 +1,10 @@
+/**
+ * 휴가 구간 한 줄 편집기 — 재원 선택 + 종료일 + 삭제.
+ *
+ * 사용처: 휴가 등록/수정 시트(leave-form-modal.tsx).
+ * 마지막 구간의 종료일은 휴가 전체 종료일에 묶여 있어 고칠 수 없다.
+ */
+
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,

@@ -1,3 +1,13 @@
+/**
+ * 달력 화면 — 앱의 첫 화면.
+ *
+ * 사용처: 달력 탭(app/(tabs)/(calendar)/index.tsx).
+ *
+ * 그룹에 속해 있으면 스크롤 달력과 하루 패널을, 아직 그룹이 없으면 참여 안내를
+ * 보여준다. 날짜를 고르면 그날 기준으로 휴가 등록 시트가 열린다.
+ * 웹의 CalendarPage와 같은 정보를 같은 규칙으로 보여준다.
+ */
+
 import {
   cycleFor,
   cycleUsedDays,
@@ -18,7 +28,7 @@ import {
   useMe,
   useMyLeaves,
   type Calendar,
-} from "@/api/queries";
+} from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
@@ -30,7 +40,7 @@ import {
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
-import { buildMyLeaveDayMap } from "@/lib/my-leave-days";
+import { buildMyLeaveDayMap } from "@leave/client";
 import { colors, spacing } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,

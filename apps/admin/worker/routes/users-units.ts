@@ -1,3 +1,13 @@
+/**
+ * 관리자용 사용자·부대 라우트.
+ *
+ * 마운트 위치: `/api` (worker/index.ts).
+ * 다루는 것: 목록·검색·생성·수정·삭제, 초대코드 조회/폐기, 사용자 세션 만료.
+ *
+ * 사용자나 그룹을 바꾸면 그 그룹의 달력 집계가 달라지므로
+ * `bumpUnitVersion`으로 캐시를 무효화해야 한다.
+ */
+
 import {
   bumpUnitVersion,
   hashPassword,

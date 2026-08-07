@@ -1,3 +1,9 @@
+/**
+ * 하루 최대 출타 인원 입력 필드.
+ * 사용처: 그룹 생성(units 화면)과 그룹 관리(unit-manage 화면).
+ * 이 값이 달력 초과 판정의 기준이므로 두 화면이 같은 컴포넌트를 쓴다.
+ */
+
 import { StyleSheet, Text, View } from "react-native";
 import { Field, Input } from "@/components/field";
 import { colors, spacing } from "@/theme";

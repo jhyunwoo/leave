@@ -1,3 +1,13 @@
+/**
+ * 관리자용 휴가·알림·신고 라우트.
+ *
+ * 마운트 위치: `/api` (worker/index.ts).
+ *
+ * 관리자가 대신 등록하는 휴가도 앱과 **완전히 같은 규칙**을 통과해야 한다.
+ * 구간이 겹치거나 비어서는 안 되고, 재원 잔여도 검사한다. 여기만 규칙이 느슨하면
+ * 관리자가 만든 데이터가 앱에서 계산 불가 상태로 나타난다.
+ */
+
 import {
   assertSegmentsAvailable,
   buildNotificationPushMessage,
@@ -469,7 +479,9 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
       before,
       after: { ...before, status: input.data.status, resolvedAt },
     });
-    return c.json({ item: { ...before, status: input.data.status, resolvedAt } });
+    return c.json({
+      item: { ...before, status: input.data.status, resolvedAt },
+    });
   })
   .get("/notifications", async (c) => {
     const db = drizzle(c.env.DB);

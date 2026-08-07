@@ -1,3 +1,8 @@
+/**
+ * 비율을 한 줄로 보여주는 누적 막대.
+ * 사용처: 보유 휴가 화면의 재원별 사용/잔여 비율.
+ */
+
 import { StyleSheet, View, type ColorValue } from "react-native";
 import { colors, radius } from "@/theme";
 

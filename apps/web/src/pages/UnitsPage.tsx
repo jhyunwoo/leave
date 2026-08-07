@@ -1,3 +1,10 @@
+/**
+ * 그룹 참여·생성 화면.
+ *
+ * 그룹 검색은 일부러 없다. 부대를 검색으로 찾을 수 있으면 그 자체가 부대 목록이
+ * 되기 때문이다. 초대코드로만 들어올 수 있고, 새로 만들면 코드가 한 번 노출된다.
+ */
+
 import {
   unitCreateSchema,
   unitJoinSchema,
@@ -5,8 +12,8 @@ import {
 } from "@leave/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { IssuedUnitInvite, Me } from "../api/queries";
-import { useCreateUnit, useJoinUnit, useLeaveUnit } from "../api/queries";
+import type { IssuedUnitInvite, Me } from "@leave/client";
+import { useCreateUnit, useJoinUnit, useLeaveUnit } from "@leave/client";
 import { Field } from "../components/Field";
 import { LeaveLimitFields } from "../components/LeaveLimitFields";
 import { Modal } from "../components/Modal";

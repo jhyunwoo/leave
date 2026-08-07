@@ -1,3 +1,16 @@
+/**
+ * D1(SQLite) 테이블 정의 — 이 서비스의 데이터 모양 전부.
+ *
+ * 사용처: API 라우트와 관리자 워커(`@leave/api/db`로 가져간다).
+ * 마이그레이션: 이 파일을 고친 뒤 `pnpm --filter @leave/api db:generate`.
+ *
+ * 열거형(군 종류·계급·휴가 종류·상태)은 @leave/shared의 상수를 그대로 쓴다.
+ * DB와 앱이 다른 목록을 들고 있으면 저장은 되는데 화면에서 라벨이 비는 사고가 난다.
+ *
+ * 개인정보 최소 수집 원칙: 접속 로그에 IP·국가·User-Agent를 두지 않고,
+ * 푸시 로그에 메시지 원문을 두지 않는다. 초대코드는 해시만 저장한다.
+ */
+
 import {
   BALANCE_KEYS,
   BRANCHES,
@@ -112,7 +125,9 @@ export const leaves = sqliteTable(
     endDate: text("end_date").notNull(),
     reason: text("reason"),
     // draft는 나만 보이고 집계에서 빠진다. 자세한 규칙은 shared의 LEAVE_STATUSES 참고.
-    status: text("status", { enum: LEAVE_STATUSES }).notNull().default("shared"),
+    status: text("status", { enum: LEAVE_STATUSES })
+      .notNull()
+      .default("shared"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [

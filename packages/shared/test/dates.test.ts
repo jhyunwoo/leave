@@ -66,7 +66,11 @@ describe("monthBounds / rangesOverlap", () => {
     });
   });
   it("범위 겹침 판정", () => {
-    expect(rangesOverlap("2026-01-01", "2026-01-10", "2026-01-10", "2026-01-20")).toBe(true);
-    expect(rangesOverlap("2026-01-01", "2026-01-09", "2026-01-10", "2026-01-20")).toBe(false);
+    expect(
+      rangesOverlap("2026-01-01", "2026-01-10", "2026-01-10", "2026-01-20"),
+    ).toBe(true);
+    expect(
+      rangesOverlap("2026-01-01", "2026-01-09", "2026-01-10", "2026-01-20"),
+    ).toBe(false);
   });
 });

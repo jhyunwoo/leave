@@ -1,3 +1,9 @@
+/**
+ * 그룹 관리 화면(관리자 전용).
+ * 기본 정보와 하루 최대 출타 인원, 제한 기간(검열·훈련), 구성원과 초대코드,
+ * 관리자 이관까지 그룹 운영에 필요한 조작을 한 화면에 모은다.
+ */
+
 import {
   blackoutCreateSchema,
   fmtRangeTiny,
@@ -9,7 +15,7 @@ import {
 } from "@leave/shared";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router";
-import type { IssuedUnitInvite, Me } from "../api/queries";
+import type { IssuedUnitInvite, Me } from "@leave/client";
 import {
   useBlackouts,
   useBlockUser,
@@ -21,7 +27,7 @@ import {
   useTransferAdmin,
   useUnitMembers,
   useUpdateUnit,
-} from "../api/queries";
+} from "@leave/client";
 import { Field } from "../components/Field";
 import { LeaveLimitFields } from "../components/LeaveLimitFields";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";

@@ -178,7 +178,10 @@ describe("적립분 배분", () => {
         grant({ id: "award", balanceKey: "award", days: 3 }),
         grant({ id: "annual", balanceKey: "annual", days: 3 }),
       ],
-      [used("2026-07-01"), { category: "annual", startDate: "2026-07-05", endDate: "2026-07-06" }],
+      [
+        used("2026-07-01"),
+        { category: "annual", startDate: "2026-07-05", endDate: "2026-07-06" },
+      ],
       TODAY,
     );
     expect(all.award.usedDays).toBe(1);
@@ -190,8 +193,18 @@ describe("적립분 배분", () => {
     const all = allocateAllGrants(
       [grant({ id: "g", balanceKey: "other_overnight", days: 3 })],
       [
-        { category: "overnight", overnightKind: "other", startDate: "2026-07-01", endDate: "2026-07-01" },
-        { category: "overnight", overnightKind: "regular", startDate: "2026-07-05", endDate: "2026-07-05" },
+        {
+          category: "overnight",
+          overnightKind: "other",
+          startDate: "2026-07-01",
+          endDate: "2026-07-01",
+        },
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-07-05",
+          endDate: "2026-07-05",
+        },
       ],
       TODAY,
     );
@@ -205,8 +218,18 @@ describe("적립분 배분", () => {
       grant({ id: "b", days: 1, expiresOn: "2026-09-30" }),
       grant({ id: "a", days: 1, expiresOn: "2026-09-30" }),
     ];
-    const first = allocateBalanceGrants("award", grants, [used("2026-08-01")], TODAY);
-    const second = allocateBalanceGrants("award", [...grants].reverse(), [used("2026-08-01")], TODAY);
+    const first = allocateBalanceGrants(
+      "award",
+      grants,
+      [used("2026-08-01")],
+      TODAY,
+    );
+    const second = allocateBalanceGrants(
+      "award",
+      [...grants].reverse(),
+      [used("2026-08-01")],
+      TODAY,
+    );
     expect(first.grants.map((e) => [e.grant.id, e.usedDays])).toEqual(
       second.grants.map((e) => [e.grant.id, e.usedDays]),
     );
@@ -281,16 +304,28 @@ describe("만기·부여일 경계", () => {
 
 describe("적립분 상태", () => {
   it("부여일 전이면 예정, 만기 후면 만료, 그 사이는 사용 가능", () => {
-    expect(grantStatus(grant({ id: "a", grantedOn: "2026-09-01" }), TODAY)).toBe("future");
-    expect(grantStatus(grant({ id: "a", expiresOn: "2026-08-01" }), TODAY)).toBe("expired");
-    expect(grantStatus(grant({ id: "a", expiresOn: "2026-08-02" }), TODAY)).toBe("active");
+    expect(
+      grantStatus(grant({ id: "a", grantedOn: "2026-09-01" }), TODAY),
+    ).toBe("future");
+    expect(
+      grantStatus(grant({ id: "a", expiresOn: "2026-08-01" }), TODAY),
+    ).toBe("expired");
+    expect(
+      grantStatus(grant({ id: "a", expiresOn: "2026-08-02" }), TODAY),
+    ).toBe("active");
     expect(grantStatus(grant({ id: "a" }), TODAY)).toBe("active");
   });
 
   it("만기 임박은 아직 살아 있는 적립분만 해당한다", () => {
-    expect(isExpiringSoon(grant({ id: "a", expiresOn: "2026-08-20" }), TODAY)).toBe(true);
-    expect(isExpiringSoon(grant({ id: "a", expiresOn: "2026-10-20" }), TODAY)).toBe(false);
-    expect(isExpiringSoon(grant({ id: "a", expiresOn: "2026-07-20" }), TODAY)).toBe(false);
+    expect(
+      isExpiringSoon(grant({ id: "a", expiresOn: "2026-08-20" }), TODAY),
+    ).toBe(true);
+    expect(
+      isExpiringSoon(grant({ id: "a", expiresOn: "2026-10-20" }), TODAY),
+    ).toBe(false);
+    expect(
+      isExpiringSoon(grant({ id: "a", expiresOn: "2026-07-20" }), TODAY),
+    ).toBe(false);
     expect(isExpiringSoon(grant({ id: "a" }), TODAY)).toBe(false);
   });
 
@@ -372,21 +407,28 @@ describe("구버전 총량 API 매핑", () => {
 
   it("이미 쓴 일수보다 작게 설정하면 거절한다", () => {
     const plan = planTotalChange(
-      allocate([grant({ id: "base", days: 5 })], [used("2026-08-01", "2026-08-03")]),
+      allocate(
+        [grant({ id: "base", days: 5 })],
+        [used("2026-08-01", "2026-08-03")],
+      ),
       2,
     );
     expect(plan).toEqual({ ok: false, minimumTotal: 3 });
   });
 
   it("총량이 그대로면 아무것도 바꾸지 않는다", () => {
-    expect(planTotalChange(allocate([grant({ id: "base", days: 5 })]), 5)).toEqual({
+    expect(
+      planTotalChange(allocate([grant({ id: "base", days: 5 })]), 5),
+    ).toEqual({
       ok: true,
       mutations: [],
     });
   });
 
   it("0으로 만들면 적립분이 남지 않는다", () => {
-    expect(planTotalChange(allocate([grant({ id: "base", days: 3 })]), 0)).toEqual({
+    expect(
+      planTotalChange(allocate([grant({ id: "base", days: 3 })]), 0),
+    ).toEqual({
       ok: true,
       mutations: [{ kind: "delete", id: "base" }],
     });

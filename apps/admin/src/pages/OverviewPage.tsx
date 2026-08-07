@@ -1,3 +1,10 @@
+/**
+ * 관리자 운영 현황(대시보드).
+ *
+ * 오늘의 요청 수·오류율·활성 세션과 최근 접속 로그, 각 인프라(D1·R2·KV·푸시)
+ * 상태를 한 화면에 모은다. 1분마다 자동으로 다시 받는다.
+ */
+
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -12,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { formatDateTime } from "../lib/format";
 import { api } from "../api/client";
 import {
   DataTable,
@@ -52,16 +60,6 @@ type Overview = {
   };
 };
 
-const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
 export function OverviewPage() {
   const navigate = useNavigate();
   const overview = useQuery({
@@ -85,7 +83,7 @@ export function OverviewPage() {
     {
       key: "time",
       label: "시각",
-      render: (row) => timeFormatter.format(new Date(row.createdAt)),
+      render: (row) => formatDateTime(row.createdAt),
     },
     {
       key: "user",
@@ -238,7 +236,7 @@ export function OverviewPage() {
             <div className="system-checked">
               <span>마지막 점검</span>
               <time dateTime={system.checkedAt}>
-                {timeFormatter.format(new Date(system.checkedAt))}
+                {formatDateTime(system.checkedAt)}
               </time>
             </div>
           </section>

@@ -1,3 +1,8 @@
+/**
+ * 버튼 — Android용 Compose 구현(@expo/ui).
+ * iOS 구현과 props가 같고, Material 스타일만 다르다.
+ */
+
 import { Button as NativeButton, Host } from "@expo/ui";
 import type { ReactNode } from "react";
 import {

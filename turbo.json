@@ -1,38 +1,60 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  // 이 파일들이 바뀌면 모든 태스크의 캐시를 버린다(의존성 해석·컴파일러 설정이 달라지므로).
   "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.json"],
   "tasks": {
+    // ── 빌드·검증 ────────────────────────────────────────────────
+    // 의존 패키지를 먼저 빌드해야 한다(^build). @leave/shared·@leave/client는
+    // 소스를 그대로 내보내므로 실제 빌드 산출물은 앱에서만 나온다.
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    // 타입 검사도 의존 패키지부터. 문서 수정으로 캐시가 깨지지 않게 .md는 제외한다.
     "check-types": {
       "dependsOn": ["^check-types"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md"]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["^lint"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"]
     },
+    // API 테스트는 migrations/를 적용해 실제 D1에 붙으므로 입력에 포함한다.
     "test": {
       "inputs": ["$TURBO_DEFAULT$", "test/**", "migrations/**", "!**/*.md"],
       "outputs": []
     },
-    "test:e2e": {
-      "cache": false
-    },
+    // 브라우저·시뮬레이터를 띄우는 테스트는 결과가 환경에 좌우돼 캐시하지 않는다.
+    "test:e2e": { "cache": false },
+
+    // ── 개발 서버 (계속 떠 있는 태스크) ──────────────────────────
     "dev": { "cache": false, "persistent": true },
     "start": { "cache": false, "persistent": true },
     "android": { "cache": false, "persistent": true },
     "ios": { "cache": false, "persistent": true },
+    "web": { "cache": false, "persistent": true },
     "preview": { "cache": false, "persistent": true },
+
+    // ── 배포 ─────────────────────────────────────────────────────
+    // 타입이 깨진 코드를 올리지 않도록 배포 전에 빌드와 타입 검사를 강제한다.
     "deploy": {
       "dependsOn": ["build", "check-types"],
       "cache": false
     },
+
+    // ── 데이터베이스 (apps/api, apps/admin) ──────────────────────
     "db:generate": { "cache": false },
     "db:migrate:local": { "cache": false },
-    "db:migrate:remote": { "cache": false }
+    "db:migrate:remote": { "cache": false },
+
+    // ── 앱 배포·운영 스크립트 ────────────────────────────────────
+    // 외부 서비스(EAS·D1)를 건드리므로 전부 캐시하지 않는다.
+    "eas:build": { "cache": false },
+    "eas:submit": { "cache": false },
+    "eas:update:preview": { "cache": false },
+    "eas:update:production": { "cache": false },
+    "admin:bootstrap": { "cache": false }
   }
 }

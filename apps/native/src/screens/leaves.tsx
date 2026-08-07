@@ -1,9 +1,9 @@
-import {
-  BALANCE_LABELS,
-  fmtRange,
-  fmtRangeTiny,
-  segmentBalanceKey,
-} from "@leave/shared";
+/**
+ * 내 휴가 목록 화면(네이티브).
+ * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약과 보유 휴가로 가는 길을 준다.
+ */
+
+import { fmtRange } from "@leave/shared";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,12 +15,13 @@ import {
   Text,
   View,
 } from "react-native";
-import type { MyLeave } from "@/api/queries";
-import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@/api/queries";
+import type { MyLeave } from "@leave/client";
+import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@leave/client";
 import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import { BALANCE_COLORS, colors, layout, radius, spacing } from "@/theme";
+import { SegmentBadges } from "@/components/segment-badges";
+import { colors, layout, radius, spacing } from "@/theme";
 
 export function LeavesScreen() {
   const leaves = useMyLeaves();
@@ -160,7 +161,17 @@ export function LeavesScreen() {
                 key={l.id}
                 style={[styles.leaveRow, index > 0 && styles.rowDivider]}
               >
-                <View style={{ flex: 1, minWidth: 0 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${l.title} 자세히 보기`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/leave/[leaveId]",
+                      params: { leaveId: l.id },
+                    })
+                  }
+                  style={{ flex: 1, minWidth: 0 }}
+                >
                   <Text style={styles.leaveTitle}>{l.title}</Text>
                   <Text style={styles.leaveDates}>
                     {fmtRange(l.startDate, l.endDate)}
@@ -168,27 +179,8 @@ export function LeavesScreen() {
                   {l.reason ? (
                     <Text style={styles.leaveReason}>{l.reason}</Text>
                   ) : null}
-                  <View style={styles.segmentBadges}>
-                    {l.segments.map((segment) => {
-                      const key = segmentBalanceKey(segment);
-                      const tone = BALANCE_COLORS[key];
-                      return (
-                        <View
-                          key={`${key}-${segment.startDate}`}
-                          style={[styles.badge, { backgroundColor: tone.bg }]}
-                        >
-                          <Text
-                            style={[styles.badgeText, { color: tone.fg }]}
-                            selectable
-                          >
-                            {BALANCE_LABELS[key]}{" "}
-                            {fmtRangeTiny(segment.startDate, segment.endDate)}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
+                  <SegmentBadges segments={l.segments} />
+                </Pressable>
                 <ActionMenu
                   label={`${l.title} 작업`}
                   buttonLabel="휴가 관리"
@@ -333,16 +325,4 @@ const styles = StyleSheet.create({
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
   leaveReason: { fontSize: 12, color: colors.mute, marginTop: 4 },
-  segmentBadges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-  },
-  badge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  badgeText: { fontSize: 11, fontWeight: "600" },
 });

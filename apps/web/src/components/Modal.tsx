@@ -1,3 +1,10 @@
+/**
+ * 공용 모달 껍데기.
+ *
+ * 사용처: 휴가 등록/수정, 적립분 편집 등 웹의 모든 대화형 폼.
+ * 열려 있는 동안 배경 스크롤을 잠그고 Esc로 닫는다.
+ */
+
 import { useEffect, type ReactNode } from "react";
 
 export function Modal(props: {

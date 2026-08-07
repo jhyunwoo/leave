@@ -1,3 +1,7 @@
+/**
+ * 프로필 화면(네이티브) — 내 정보와 복무 진행률, 로그아웃·회원 탈퇴.
+ */
+
 import { Stack, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -7,7 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useDeleteAccount, useLogout, useMe } from "@/api/queries";
+import { useDeleteAccount, useLogout, useMe } from "@leave/client";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";

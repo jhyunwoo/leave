@@ -1,3 +1,13 @@
+/**
+ * 관리자 API 클라이언트.
+ *
+ * 사용처: 관리자 SPA의 모든 화면.
+ *
+ * 사용자 앱과 달리 인증은 HttpOnly 쿠키로 하므로 토큰을 직접 다루지 않는다
+ * (`credentials: "include"`). 대신 쿠키가 자동 전송되는 만큼 CSRF 헤더를 붙인다.
+ * 서버 오류는 `ApiError`로 감싸 화면이 status로 분기할 수 있게 한다.
+ */
+
 export class ApiError extends Error {
   status: number;
   code?: string;

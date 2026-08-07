@@ -1,3 +1,8 @@
+/**
+ * 떠 있는 내비게이션·핵심 조작용 Liquid Glass 표면(iOS 26+).
+ * 지원하지 않는 환경에서는 BlurView나 단색으로 자동 대체된다.
+ */
+
 import { BlurView } from "expo-blur";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import type { ReactNode } from "react";

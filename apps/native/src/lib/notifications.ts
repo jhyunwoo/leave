@@ -1,3 +1,11 @@
+/**
+ * Expo 푸시 권한·토큰 발급과 수신/열람 이벤트 보고.
+ *
+ * 사용처: 알림 설정 화면(토큰 등록), 루트 레이아웃(이벤트 보고 훅).
+ * 시뮬레이터·권한 거부처럼 토큰을 못 받는 상황에서는 null을 돌려주고 앱 흐름을
+ * 막지 않는다. 푸시는 편의 기능이지 진입 조건이 아니다.
+ */
+
 import type { PushEventInput } from "@leave/shared";
 import Constants from "expo-constants";
 import * as Device from "expo-device";

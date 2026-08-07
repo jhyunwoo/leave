@@ -1,3 +1,13 @@
+/**
+ * 출타 초과 감지와 알림 발송.
+ *
+ * 사용처: 휴가 등록·수정 라우트(apps/api/src/routes/leaves.ts)와 관리자 워커.
+ *
+ * 이 서비스의 핵심 약속 — "내 계획 때문에 그날이 초과되면, 그날 나가려던 사람들이
+ * 바로 안다" — 을 실행하는 곳이다. 인앱 알림과 Expo 푸시를 함께 만들되,
+ * 초과 알림을 끈 사용자는 양쪽 모두에서 제외한다.
+ */
+
 import {
   findExceededDates,
   isCountedLeaveStatus,

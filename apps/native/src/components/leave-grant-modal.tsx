@@ -1,3 +1,9 @@
+/**
+ * 적립분 추가·수정 시트(네이티브).
+ * 사용처: 보유 휴가 화면(screens/leave-grants.tsx).
+ * 재원은 수정할 때 바꿀 수 없다 — 옮기면 두 재원의 사용분 귀속이 조용히 뒤집힌다.
+ */
+
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
@@ -16,8 +22,8 @@ import {
   Text,
   View,
 } from "react-native";
-import type { LeaveGrantItem } from "@/api/queries";
-import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@/api/queries";
+import type { LeaveGrantItem } from "@leave/client";
+import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@leave/client";
 import { Button } from "@/components/button";
 import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";

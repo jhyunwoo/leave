@@ -1,3 +1,8 @@
+/**
+ * 라벨 + 입력 + 힌트/오류를 묶는 폼 필드.
+ * 사용처: 로그인·회원가입·그룹 관리 등 네이티브의 모든 폼.
+ */
+
 import type { ReactNode } from "react";
 import {
   StyleSheet,

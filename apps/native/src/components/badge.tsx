@@ -1,3 +1,8 @@
+/**
+ * 상태를 한 단어로 보여주는 작은 배지(긍정/부정/중립).
+ * 사용처: 휴가 목록·상세의 계획 상태, 구성원 목록의 역할 표시.
+ */
+
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/theme";
 

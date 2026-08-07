@@ -1,3 +1,10 @@
+/**
+ * 관리자 설정 — 관리자 계정·관리자 세션·감사 로그를 탭으로 묶는다.
+ *
+ * 세 탭 모두 내용은 `EntityPage`가 그리고, 이 화면은 owner 권한 확인(AdminOnly)과
+ * 탭 전환만 맡는다.
+ */
+
 import { FileClock, Monitor, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import type { AdminAccount } from "../api/client";

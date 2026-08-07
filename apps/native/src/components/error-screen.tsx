@@ -1,3 +1,8 @@
+/**
+ * 오류 화면(표시 전용).
+ * 사용처: 루트 에러 경계(root-error-boundary.tsx)와 라우트 에러 경계(_layout.tsx).
+ */
+
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/button";
 import type { FatalErrorRecord } from "@/lib/fatal-error";

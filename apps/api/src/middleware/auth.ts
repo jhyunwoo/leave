@@ -1,3 +1,12 @@
+/**
+ * 세션 인증 미들웨어.
+ *
+ * 사용처: 인증이 필요한 모든 라우터가 `app.use("*", authMiddleware)`로 건다.
+ *
+ * 토큰 원문은 저장하지 않고 SHA-256 해시로만 조회한다. DB가 새더라도 그 값으로
+ * 남의 세션을 흉내 낼 수 없다. 통과하면 `c.var.user`에 사용자 행이 들어간다.
+ */
+
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { createMiddleware } from "hono/factory";

@@ -1,5 +1,10 @@
+/**
+ * 하단 탭 구성 — 달력·내 휴가·알림·프로필.
+ * 알림 탭에는 안 읽은 개수를 배지로 붙인다.
+ */
+
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { useNotifications } from "@/api/queries";
+import { useNotifications } from "@leave/client";
 import { colors } from "@/theme";
 
 /**

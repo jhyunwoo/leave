@@ -1,3 +1,11 @@
+/**
+ * 라우트 트리 **바깥**까지 덮는 최상위 에러 경계.
+ *
+ * 사용처: apps/native/index.js — expo-router보다 위에 둔다.
+ * 라우터 안쪽은 `app/_layout.tsx`의 ErrorBoundary가 맡고, 라우터 자체가
+ * 초기화되기 전에 터진 오류는 여기가 아니면 아무도 잡지 못한다.
+ */
+
 import * as SplashScreen from "expo-splash-screen";
 import { Component, Fragment, type ReactNode } from "react";
 import { Modal } from "react-native";
@@ -98,7 +106,11 @@ export class RootErrorBoundary extends Component<Props, State> {
         {this.props.children}
         {/* 렌더 밖에서 난 오류는 트리가 멀쩡하다. 화면만 덮어 내용을 알리고,
             닫으면 하던 일을 그대로 이어가게 한다(앱을 다시 마운트하지 않는다). */}
-        <Modal visible={record != null} transparent={false} animationType="fade">
+        <Modal
+          visible={record != null}
+          transparent={false}
+          animationType="fade"
+        >
           {record ? (
             <ErrorScreen
               title="문제가 발생했어요"

@@ -1,3 +1,10 @@
+/**
+ * 달력 화면 — 이 서비스의 첫 화면.
+ *
+ * 그룹에 속해 있으면 스크롤 달력과 하루 패널을, 아직 그룹이 없으면 참여 안내를
+ * 보여준다. 날짜를 고르면 그날 기준으로 휴가 등록 모달이 열린다.
+ */
+
 import {
   cycleFor,
   cycleUsedDays,
@@ -9,15 +16,15 @@ import {
 } from "@leave/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router";
-import type { Me } from "../api/queries";
-import { useCalendar, useLeaveBalances, useMyLeaves } from "../api/queries";
+import type { Me } from "@leave/client";
+import { useCalendar, useLeaveBalances, useMyLeaves } from "@leave/client";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
 import { LeaveFormModal } from "../components/LeaveFormModal";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
-import { fmtDateShort } from "../lib/format";
-import { buildMyLeaveDayMap } from "../lib/my-leave-days";
+import { fmtDateShort } from "@leave/shared";
+import { buildMyLeaveDayMap } from "@leave/client";
 
 export function CalendarPage(props: { me: Me }) {
   const unit = props.me.unit;

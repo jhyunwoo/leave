@@ -1,3 +1,10 @@
+/**
+ * 관리자 화면의 공통 뼈대 — 좌측 내비게이션, 상단바, 전역 검색.
+ *
+ * 사용처: apps/admin/src/App.tsx 의 인증된 라우트 전부.
+ * `AdminOnly`는 owner 전용 화면(관리자 계정·감사 로그)을 감싸는 권한 가드다.
+ */
+
 import {
   Bell,
   Building2,

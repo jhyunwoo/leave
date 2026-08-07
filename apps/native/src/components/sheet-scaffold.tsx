@@ -1,3 +1,8 @@
+/**
+ * 시트 안쪽의 표준 구조 — 고정 헤더 + 스크롤 본문 + 고정 푸터.
+ * 사용처: FormSheet를 쓰는 모든 시트.
+ */
+
 import type { ReactNode } from "react";
 import {
   ScrollView,

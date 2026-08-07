@@ -1,3 +1,8 @@
+/**
+ * 관리자 로그인 화면.
+ * 성공하면 서버가 HttpOnly 세션 쿠키를 심고, 응답의 관리자 정보로 앱 상태를 채운다.
+ */
+
 import { LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, type AdminAccount, ApiError } from "../api/client";

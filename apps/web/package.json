@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@leave/api": "workspace:*",
+    "@leave/client": "workspace:*",
     "@leave/shared": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
     "hono": "^4.12.30",

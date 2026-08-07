@@ -1,3 +1,18 @@
+/**
+ * API 워커의 진입점 — 미들웨어 순서와 라우트 마운트를 정한다.
+ *
+ * 배포: Cloudflare Workers (wrangler.jsonc). 로컬은 `pnpm dev:web`이 8787로 띄운다.
+ *
+ * 미들웨어는 바깥에서 안쪽 순서로 쌓인다.
+ *  1) 접속 기록  — 모든 요청을 남긴다. next() 뒤에 실행돼 인증된 사용자까지 안다.
+ *  2) CORS       — 허용 오리진은 환경변수로 받는다.
+ *  3) 최소 버전  — 출타 계산 규칙이 바뀐 뒤의 구버전 앱을 끊는다.
+ *
+ * 마지막에 체이닝된 `routes`의 타입이 그대로 `AppType`이 되고, 웹/앱이
+ * `hc<AppType>()`으로 가져가 컴파일 타임에 경로·입력·응답을 맞춘다.
+ * 즉 라우트를 고치면 클라이언트에서 타입 오류로 즉시 드러난다.
+ */
+
 import { Scalar } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { createApp } from "./lib/app";
@@ -33,7 +48,12 @@ app.use("*", async (c, next) => {
 // /meta와 문서는 업데이트 안내를 받아야 하므로 예외로 둔다.
 app.use("*", async (c, next) => {
   const path = new URL(c.req.url).pathname;
-  if (path === "/" || path === "/meta" || path.startsWith("/docs") || path === "/openapi.json") {
+  if (
+    path === "/" ||
+    path === "/meta" ||
+    path.startsWith("/docs") ||
+    path === "/openapi.json"
+  ) {
     return next();
   }
   return minVersionMiddleware(c, next);

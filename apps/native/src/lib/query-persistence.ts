@@ -1,3 +1,13 @@
+/**
+ * 오프라인 대비 쿼리 캐시 디스크 저장 설정.
+ *
+ * 사용처: apps/native/src/app/_layout.tsx.
+ *
+ * 무엇을 남길지가 이 파일의 핵심이다. 계정·알림 같은 민감하거나 금방 낡는
+ * 데이터는 기기에 남기지 않고, 오프라인에서 실제로 다시 보여줄 읽기 데이터
+ * (달력·내 휴가·잔여·적립분)만 명시적으로 허용한다.
+ */
+
 import NetInfo from "@react-native-community/netinfo";
 import { onlineManager } from "@tanstack/react-query";
 import type {

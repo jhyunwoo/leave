@@ -1,3 +1,8 @@
+/**
+ * 푸시 수신·열람 이벤트 보고 훅.
+ * 사용처: apps/native/src/app/_layout.tsx (로그인 상태일 때만 켠다).
+ */
+
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 import { reportPushEvent } from "./notifications";

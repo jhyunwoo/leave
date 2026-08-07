@@ -1,3 +1,12 @@
+/**
+ * 무한 스크롤 달력 — 여러 달을 이어 붙이고 스크롤에 따라 앞뒤로 더 불러온다.
+ *
+ * 사용처: apps/web/src/pages/CalendarPage.tsx.
+ *
+ * 위쪽으로 달을 덧붙일 때는 스크롤 위치를 보정해야 한다. 안 하면 새 달이 삽입된
+ * 만큼 화면이 아래로 튀어, 보고 있던 날짜가 사라진 것처럼 보인다.
+ */
+
 import {
   cyclesInRange,
   monthBounds,
@@ -17,8 +26,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { useCalendar } from "../../api/queries";
-import type { MyLeaveDay } from "../../lib/my-leave-days";
+import { useCalendar } from "@leave/client";
+import type { MyLeaveDay } from "@leave/client";
 import { MonthCalendar } from "./MonthCalendar";
 import "./calendar.css";
 
@@ -149,10 +158,7 @@ export const CalendarScroll = forwardRef<
 
   return (
     <div className="cal-scroll-shell">
-      <div
-        className="cal-weekdays cal-weekdays-sticky"
-        role="row"
-      >
+      <div className="cal-weekdays cal-weekdays-sticky" role="row">
         {WEEKDAYS.map((w, i) => (
           <div
             key={w}

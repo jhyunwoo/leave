@@ -1,3 +1,5 @@
+/** 관리자 e2e 테스트 설정. 실행: `pnpm --filter @leave/admin test:e2e`. */
+
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({

@@ -1,3 +1,8 @@
+/**
+ * 네이티브 버튼의 최소 폭 어림 계산.
+ * 사용처: button.ios.tsx / button.native.tsx.
+ */
+
 import { spacing } from "@/theme";
 
 /**
