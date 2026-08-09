@@ -135,7 +135,17 @@
           "backgroundColor": "#ffffff",
           "image": "./assets/images/leave-splash-rounded.png",
           "imageWidth": 128,
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/leave-splash-rounded.png"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진을 고를 때만 사진 보관함을 엽니다. 고른 사진 한 장만 업로드되고, 앱이 보관함을 훑어보지 않습니다."
         }
       ],
       [

@@ -6,10 +6,16 @@
  * 세션이 바뀌면 이전 사용자의 데이터가 화면에 남으면 안 되므로 항상
  * `queryClient.clear()`로 캐시를 통째로 비운 뒤 토큰을 갈아끼운다.
  */
-import type { LoginInput, SignupInput } from "@leave/shared";
+import type {
+  LoginInput,
+  PasswordChangeInput,
+  ProfileUpdateInput,
+  SignupInput,
+} from "@leave/shared";
 import { ApiError } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLeaveApi } from "../context";
+import { useInvalidateKeys } from "./invalidate";
 import { queryKeys } from "../query-keys";
 import type { AuthResponse, Me } from "../types";
 
@@ -26,6 +32,83 @@ export function useMe() {
     queryKey: queryKeys.me,
     retry: retryUnlessUnauthorized,
     queryFn: async () => unwrap<Me>(await client.auth.me.$get()),
+  });
+}
+
+/**
+ * 내 정보 수정(별칭·군 종류·입대일·전역예정일·계급).
+ *
+ * 달력 응답에는 별칭과 계급 라벨이 함께 실려 나가므로 달력 캐시도 같이 버린다.
+ */
+export function useUpdateProfile() {
+  const { client, unwrap } = useLeaveApi();
+  const invalidate = useInvalidateKeys([
+    queryKeys.me,
+    queryKeys.calendars,
+    queryKeys.allUnitMembers,
+  ]);
+  return useMutation({
+    mutationFn: async (input: ProfileUpdateInput) =>
+      unwrap<{ user: Me["user"] }>(
+        await client.auth.me.$patch({ json: input }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * 프로필 이미지 업로드. 파일을 multipart로 보낸다.
+ *
+ * 네이티브는 파일 시스템 경로를 그대로 쓸 수 없어서, 화면 쪽에서 uri를 읽어
+ * Blob/File로 만들어 넘긴다(profile.tsx의 pickImage 참고).
+ */
+export function useUploadProfileImage() {
+  const { client, unwrap } = useLeaveApi();
+  const invalidate = useInvalidateKeys([
+    queryKeys.me,
+    queryKeys.calendars,
+    queryKeys.allUnitMembers,
+  ]);
+  return useMutation({
+    mutationFn: async (image: Blob) => {
+      const form = new FormData();
+      form.append("image", image);
+      return unwrap<{ profileImageKey: string }>(
+        await client.auth.me.image.$put({ form: form as never }),
+      );
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** 프로필 이미지 삭제. 이니셜 아바타로 되돌아간다. */
+export function useDeleteProfileImage() {
+  const { client, unwrap } = useLeaveApi();
+  const invalidate = useInvalidateKeys([
+    queryKeys.me,
+    queryKeys.calendars,
+    queryKeys.allUnitMembers,
+  ]);
+  return useMutation({
+    mutationFn: async () => unwrap(await client.auth.me.image.$delete()),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * 비밀번호 변경. 서버가 기존 세션을 전부 끊으므로, 돌려받은 새 토큰으로
+ * 즉시 갈아끼워야 이 기기가 그대로 로그아웃되지 않는다.
+ */
+export function useChangePassword() {
+  const { client, unwrap, setSessionToken } = useLeaveApi();
+  return useMutation({
+    mutationFn: async (input: PasswordChangeInput) =>
+      unwrap<{ token: string }>(
+        await client.auth.me.password.$post({ json: input }),
+      ),
+    onSuccess: async (data) => {
+      await setSessionToken(data.token);
+    },
   });
 }
 

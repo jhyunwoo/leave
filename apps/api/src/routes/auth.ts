@@ -9,7 +9,13 @@
  */
 
 import { createRoute, z } from "@hono/zod-openapi";
-import { DEFAULT_ANNUAL_DAYS, loginSchema, signupSchema } from "@leave/shared";
+import {
+  DEFAULT_ANNUAL_DAYS,
+  loginSchema,
+  passwordChangeSchema,
+  profileUpdateSchema,
+  signupSchema,
+} from "@leave/shared";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import {
@@ -50,6 +56,28 @@ import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 프로필 이미지 상한. 관리자 워커(admins-images.ts)와 같은 기준을 쓴다. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+/** multipart 본문에서 image 파트를 꺼내 형식·크기를 확인한다. */
+async function readImageFile(c: {
+  req: { parseBody: () => Promise<Record<string, string | File>> };
+}): Promise<File | null> {
+  const body = await c.req.parseBody();
+  const image = body.image;
+  if (!(image instanceof File)) return null;
+  if (!IMAGE_EXTENSIONS[image.type]) return null;
+  if (image.size > MAX_IMAGE_BYTES) return null;
+  return image;
+}
 
 async function createSession(
   db: DrizzleD1Database,
@@ -147,6 +175,51 @@ const activityRoute = createRoute({
   },
 });
 
+const updateProfileRoute = createRoute({
+  method: "patch",
+  path: "/me",
+  tags: ["인증"],
+  summary: "내 정보 수정 (별칭·군 종류·입대일·전역예정일·계급)",
+  description:
+    "보낸 항목만 바꿉니다. 표시 계급은 입대일에서 다시 계산되므로, 입대일을 바꾸면 계급 표시도 함께 바뀝니다.",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: profileUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(z.object({ user: userSchema }), "수정된 내 정보"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const changePasswordRoute = createRoute({
+  method: "post",
+  path: "/me/password",
+  tags: ["인증"],
+  summary: "비밀번호 변경",
+  description:
+    "현재 비밀번호를 확인한 뒤 바꿉니다. 성공하면 기존 세션이 모두 끊기고 새 토큰을 돌려줍니다.",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: passwordChangeSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(
+      z.object({ token: z.string() }),
+      "변경 완료. 이 기기에서 계속 쓸 새 토큰",
+    ),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패 또는 현재 비밀번호 불일치"),
+  },
+});
+
 const deleteAccountRoute = createRoute({
   method: "delete",
   path: "/account",
@@ -170,6 +243,8 @@ app.use(
 );
 app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
+app.use("/me/password", authMiddleware);
+app.use("/me/image", authMiddleware);
 app.use("/activity", authMiddleware);
 app.use("/account", authMiddleware);
 
@@ -274,6 +349,77 @@ export const authRoutes = app
     // 초대코드 가입은 즉시 완료되므로 대기 상태는 더 이상 만들지 않는다.
     const joinRequest = null;
     return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
+  })
+  .openapi(updateProfileRoute, async (c) => {
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    // 부분 수정이라 날짜 선후 검사는 기존 값과 합친 뒤에야 할 수 있다.
+    const next: UserRow = {
+      ...user,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.branch !== undefined ? { branch: input.branch } : {}),
+      ...(input.enlistedAt !== undefined
+        ? { enlistedAt: input.enlistedAt }
+        : {}),
+      ...(input.dischargeAt !== undefined
+        ? { dischargeAt: input.dischargeAt }
+        : {}),
+      ...(input.rank !== undefined ? { signupRank: input.rank } : {}),
+    };
+    if (next.enlistedAt >= next.dischargeAt) {
+      return c.json({ error: "전역 예정일은 입대일보다 뒤여야 합니다" }, 400);
+    }
+
+    await db
+      .update(users)
+      .set({
+        name: next.name,
+        branch: next.branch,
+        enlistedAt: next.enlistedAt,
+        dischargeAt: next.dischargeAt,
+        signupRank: next.signupRank,
+      })
+      .where(eq(users.id, user.id));
+
+    // 부대 달력 캐시에는 별칭과 계급 라벨이 박혀 있다. 표시 계급은 입대일에서
+    // 파생하므로 이름·계급·입대일 중 하나만 바뀌어도 캐시를 새로 발급해야 한다.
+    const affectsCalendar =
+      next.name !== user.name ||
+      next.signupRank !== user.signupRank ||
+      next.enlistedAt !== user.enlistedAt;
+    if (user.unitId && affectsCalendar) {
+      await bumpUnitVersion(c.env.CACHE, user.unitId);
+    }
+
+    return c.json({ user: serializeUser(next) }, 200);
+  })
+  .openapi(changePasswordRoute, async (c) => {
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    const valid = await verifyPassword(
+      input.currentPassword,
+      user.passwordSalt,
+      user.passwordHash,
+    );
+    if (!valid) {
+      return c.json({ error: "현재 비밀번호가 올바르지 않습니다" }, 401);
+    }
+
+    const { hash, salt } = await hashPassword(input.newPassword);
+    await db
+      .update(users)
+      .set({ passwordHash: hash, passwordSalt: salt })
+      .where(eq(users.id, user.id));
+
+    // 비밀번호가 새면 이미 붙어 있던 세션도 같이 끊어야 의미가 있다. 전부 지우고
+    // 이 기기용으로 새 토큰을 발급해, 다른 기기만 로그아웃되게 한다.
+    await db.delete(sessions).where(eq(sessions.userId, user.id));
+    const token = await createSession(db, user.id);
+    return c.json({ token }, 200);
   })
   .openapi(activityRoute, async (c) => {
     const user = c.get("user");
@@ -381,5 +527,71 @@ export const authRoutes = app
     // 부대원 수 변동 → 해당 부대 달력 통계 캐시 무효화
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
+    return c.json({ ok: true as const }, 200);
+  })
+  /**
+   * 프로필 이미지 — 업로드·열람·삭제.
+   *
+   * multipart와 바이너리 스트림이라 zod-openapi(createRoute)의 JSON 스키마
+   * 모델에 얹기 어렵다. OpenAPIHono는 Hono를 상속하므로 평범한 메서드로 붙여도
+   * RPC 타입(AppType)에는 그대로 실린다. 그래서 여기만 createRoute를 쓰지 않는다.
+   *
+   * 내 이미지만 다룬다 — 키를 쿼리로 받지 않으므로 남의 오브젝트를 넘볼 수 없다.
+   */
+  .put("/me/image", async (c) => {
+    const image = await readImageFile(c);
+    if (!image) {
+      return c.json(
+        {
+          error: "5MB 이하의 JPEG, PNG, WebP, GIF, AVIF 이미지를 선택해주세요",
+        },
+        400,
+      );
+    }
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    const key = `profiles/${user.id}/${crypto.randomUUID()}.${IMAGE_EXTENSIONS[image.type]}`;
+    await c.env.BUCKET.put(key, image.stream(), {
+      httpMetadata: { contentType: image.type },
+      customMetadata: { uploadedBy: user.id, source: "app" },
+    });
+    await db
+      .update(users)
+      .set({ profileImageKey: key })
+      .where(eq(users.id, user.id));
+    // 이전 오브젝트는 참조가 끊긴 뒤에 지운다. 실패해도 요청은 성공으로 둔다.
+    if (user.profileImageKey) {
+      await c.env.BUCKET.delete(user.profileImageKey).catch(() => undefined);
+    }
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
+    return c.json({ profileImageKey: key }, 200);
+  })
+  .get("/me/image", async (c) => {
+    const user = c.get("user");
+    if (!user.profileImageKey) {
+      return c.json({ error: "등록된 프로필 이미지가 없습니다" }, 404);
+    }
+    const object = await c.env.BUCKET.get(user.profileImageKey);
+    if (!object) {
+      return c.json({ error: "이미지를 찾을 수 없습니다" }, 404);
+    }
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    // 개인 이미지라 공용 캐시에 남기지 않는다.
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(object.body, { headers });
+  })
+  .delete("/me/image", async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    await db
+      .update(users)
+      .set({ profileImageKey: null })
+      .where(eq(users.id, user.id));
+    if (user.profileImageKey) {
+      await c.env.BUCKET.delete(user.profileImageKey).catch(() => undefined);
+    }
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   });
