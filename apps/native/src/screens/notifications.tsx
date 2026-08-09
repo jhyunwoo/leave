@@ -21,7 +21,7 @@ import {
   type NotificationList,
 } from "@leave/client";
 import { ContentPanel } from "@/components/content-panel";
-import { colors, layout, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Notification = NotificationList["notifications"][number];
 
@@ -34,6 +34,8 @@ function fmtTime(iso: string): string {
 }
 
 export function NotificationsScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
   const myLeaves = useMyLeaves();
@@ -213,7 +215,7 @@ export function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
@@ -295,4 +297,4 @@ const styles = StyleSheet.create({
   },
   dateChipText: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   time: { fontSize: 12, color: colors.mute, marginTop: 2 },
-});
+}));

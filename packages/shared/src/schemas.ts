@@ -266,11 +266,31 @@ export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   }),
 ]);
 
+/**
+ * 내 정보 수정. 보낸 항목만 바꾸는 부분 수정이라 전부 optional이다.
+ *
+ * 입대일·전역예정일의 선후 관계는 여기서 검사하지 않는다. 한쪽만 보낼 수 있어서
+ * 두 값이 다 있어야 성립하는 규칙을 스키마 단계에서 강제할 수 없다. 서버가
+ * 기존 행과 합친 뒤에 검사한다(apps/api/src/routes/auth.ts).
+ */
 export const profileUpdateSchema = z.object({
-  name: z.string().trim().min(1).max(50).optional(),
+  name: z.string().trim().min(1, "별칭을 입력해주세요").max(50).optional(),
+  branch: z.enum(BRANCHES).optional(),
   enlistedAt: isoDateSchema.optional(),
   dischargeAt: isoDateSchema.optional(),
   rank: z.enum(RANKS).optional(),
+});
+
+/**
+ * 비밀번호 변경. 현재 비밀번호를 함께 받아 세션 탈취만으로는 바꾸지 못하게 한다.
+ * 성공하면 서버가 기존 세션을 모두 끊고 새 토큰을 발급한다.
+ */
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "현재 비밀번호를 입력해주세요"),
+  newPassword: z
+    .string()
+    .min(8, "비밀번호는 8자 이상이어야 합니다")
+    .max(100, "비밀번호는 100자 이하여야 합니다"),
 });
 
 /** 검열·훈련 등 출타율과 무관하게 휴가가 제한될 수 있는 기간(관리자 등록). */
@@ -357,3 +377,4 @@ export type RegularOvernightConfigInput = z.infer<
   typeof regularOvernightConfigSchema
 >;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;

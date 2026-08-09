@@ -11,13 +11,13 @@ import {
   type ISODate,
   type RegularOvernightCycle,
 } from "@leave/shared";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing } from "@/theme";
 import { DayRoster } from "./day-roster";
 
 export function DayPanel(props: {
@@ -29,6 +29,7 @@ export function DayPanel(props: {
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
 }) {
+  const styles = useStyles();
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
   const exceeded = stat?.exceeded ?? false;
@@ -90,7 +91,7 @@ export function DayPanel(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     padding: spacing.xl,
     gap: spacing.lg,
@@ -120,7 +121,8 @@ const styles = StyleSheet.create({
   blackoutTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: colors.warningContent,
+    // danger 톤 패널 위에 얹히므로 경고(노랑) 계열이 아니라 같은 계열을 쓴다.
+    color: colors.negativeDeep,
   },
   cycleLine: { fontSize: 12, color: colors.body, marginTop: -spacing.sm },
-});
+}));

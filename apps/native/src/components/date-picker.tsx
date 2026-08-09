@@ -21,7 +21,7 @@ import {
 import * as Haptics from "expo-haptics";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 function initialMonth(value?: ISODate, min?: ISODate, max?: ISODate) {
   let month = (value || todayInSeoul()).slice(0, 7);
@@ -46,6 +46,8 @@ function CalendarPanel(props: {
   onSelect: (date: ISODate) => void;
   testID?: string;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const weeks = useMemo(() => buildMonthGrid(props.month), [props.month]);
   const previousMonth = shiftMonth(props.month, -1);
   const nextMonth = shiftMonth(props.month, 1);
@@ -185,6 +187,7 @@ export function DatePickerRow(props: {
   onChange: (date: ISODate) => void;
   testID?: string;
 }) {
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() =>
     initialMonth(props.value || undefined, props.min, props.max),
@@ -251,6 +254,7 @@ export function DateRangePicker(props: {
   onChange: (startDate: ISODate, endDate: ISODate) => void;
   testID?: string;
 }) {
+  const styles = useStyles();
   const [active, setActive] = useState<"start" | "end" | null>(null);
   const [month, setMonth] = useState(() =>
     initialMonth(props.startDate || props.endDate || undefined),
@@ -386,7 +390,7 @@ export function DateRangePicker(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   field: { gap: spacing.sm, width: "100%" },
   dateRow: {
     minHeight: 58,
@@ -490,7 +494,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
-    backgroundColor: colors.canvasSoft,
+    // canvasSoft는 다크에서 순검정이라 canvas 패널 위에 구멍처럼 보인다.
+    // 한 단 위의 표면을 써서 두 스킴 모두에서 버튼으로 읽히게 한다.
+    backgroundColor: colors.surfaceCard,
   },
   navigationDisabled: { opacity: 0.28 },
   monthButtonText: { fontSize: 26, lineHeight: 30, color: colors.ink },
@@ -536,4 +542,4 @@ const styles = StyleSheet.create({
   dayTextSelected: { color: colors.onPrimary, fontWeight: "800" },
   dayDisabled: { color: colors.mutedSoft },
   dayOutside: { color: "transparent" },
-});
+}));

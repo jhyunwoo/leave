@@ -7,13 +7,7 @@
 import { signupSchema } from "@leave/shared";
 import { Link } from "expo-router";
 import { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup } from "@leave/client";
 import { Button } from "@/components/button";
@@ -22,7 +16,7 @@ import { Field, Input } from "@/components/field";
 import { LegalLinks } from "@/components/legal-links";
 import { NativeCheckbox } from "@/components/native-checkbox";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing } from "@/theme";
 
 /**
  * 출시 전 최소수집 가입 화면.
@@ -32,6 +26,7 @@ import { colors, spacing } from "@/theme";
  * 함께 제거한다. 따라서 앱은 군 복무 정보나 사진 권한을 사용자에게 요청하지 않는다.
  */
 export function SignupScreen() {
+  const styles = useStyles();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -217,7 +212,7 @@ export function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     padding: spacing.xl,
@@ -247,4 +242,4 @@ const styles = StyleSheet.create({
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },
   link: { fontWeight: "600", color: colors.ink },
-});
+}));

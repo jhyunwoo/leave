@@ -12,8 +12,14 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View, type ColorValue } from "react-native";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { Text, View, type ColorValue } from "react-native";
+import {
+  makeStyles,
+  radius,
+  spacing,
+  useBalanceColors,
+  useColors,
+} from "@/theme";
 
 /** 네이티브 헤더 아래 글래스 스트립이 높이를 계산할 때 쓰는 배너 높이. */
 export const CYCLE_BANNER_HEIGHT = 30;
@@ -26,17 +32,21 @@ export function CycleBanner(props: {
   cycle: RegularOvernightCycle;
   usedDays: number;
 }) {
+  const colors = useColors();
+  const balance = useBalanceColors();
   const today = todayInSeoul();
   const remaining = Math.max(props.cycle.grantDays - props.usedDays, 0);
   const daysLeft = Math.max(diffDays(today, props.cycle.end), 0);
-  const tone = BALANCE_COLORS.regular_overnight;
+  const tone = balance.regular_overnight;
   // 남은 정기외박이 없으면 조용히, 마감이 일주일 안이면 눈에 띄게.
   const urgent = remaining > 0 && daysLeft <= 7;
 
   return (
     <BannerLine
+      // 점은 칩이 아니라 페이지 배경 위에 찍히므로 tone.bg가 아니라 tone.fg를
+      // 쓴다. 다크에서 tone.bg는 배경과 거의 같은 명도라 점이 사라진다.
       accent={
-        urgent ? colors.warning : remaining > 0 ? tone.bg : colors.surfaceCard
+        urgent ? colors.warning : remaining > 0 ? tone.fg : colors.surfaceStrong
       }
       color={
         urgent ? colors.warningContent : remaining > 0 ? tone.fg : colors.mute
@@ -55,6 +65,7 @@ export function CycleBanner(props: {
  * 소진 현황 대신 첫 적립일과 남은 날을 보여준다.
  */
 export function FirstGrantBanner(props: { firstGrantDate: ISODate }) {
+  const colors = useColors();
   const daysLeft = Math.max(diffDays(todayInSeoul(), props.firstGrantDate), 0);
   return (
     <BannerLine accent={colors.surfaceStrong} color={colors.mute}>
@@ -69,6 +80,7 @@ function BannerLine(props: {
   color: ColorValue;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.root}>
       <View style={[styles.dot, { backgroundColor: props.accent }]} />
@@ -79,7 +91,7 @@ function BannerLine(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   root: {
     height: CYCLE_BANNER_HEIGHT - spacing.xs,
     marginHorizontal: spacing.lg,
@@ -91,4 +103,4 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: radius.pill },
   text: { flex: 1, fontSize: 11, fontWeight: "600" },
-});
+}));

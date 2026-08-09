@@ -5,12 +5,13 @@
 
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useNotifications } from "@leave/client";
-import { colors } from "@/theme";
+import { useColors } from "@/theme";
 
 /**
  * 네이티브 시스템 탭바 — 플랫폼 관례를 유지하고 선택 상태만 딥 그린으로 통일한다.
  */
 export default function TabLayout() {
+  const colors = useColors();
   const notifications = useNotifications();
   const unread = notifications.data?.unreadCount ?? 0;
 

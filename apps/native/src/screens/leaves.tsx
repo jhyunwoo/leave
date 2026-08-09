@@ -21,9 +21,11 @@ import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { SegmentBadges } from "@/components/segment-badges";
-import { colors, layout, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function LeavesScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
   const del = useDeleteLeave();
@@ -233,7 +235,7 @@ export function LeavesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
@@ -325,4 +327,4 @@ const styles = StyleSheet.create({
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
   leaveReason: { fontSize: 12, color: colors.mute, marginTop: 4 },
-});
+}));

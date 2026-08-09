@@ -41,7 +41,7 @@ import { LeaveFormModal } from "@/components/leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { buildMyLeaveDayMap } from "@leave/client";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing, useColors } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
   CycleBanner,
@@ -64,6 +64,8 @@ const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 });
 
 export function CalendarScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const me = useMe();
   const netInfo = useNetInfo();
   const queryClient = useQueryClient();
@@ -364,7 +366,7 @@ export function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvas },
   calendarLayer: {
     position: "absolute",
@@ -440,4 +442,4 @@ const styles = StyleSheet.create({
     color: colors.mute,
   },
   daySheetContent: { padding: 0, gap: 0 },
-});
+}));

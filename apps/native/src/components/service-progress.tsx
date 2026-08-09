@@ -7,8 +7,8 @@
 import { parseISODate, type ISODate } from "@leave/shared";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { AppState, Text, View } from "react-native";
+import { makeStyles, radius, spacing } from "@/theme";
 
 /** 한눈에 읽을 수 있는 정밀도만 유지한다. */
 const DECIMALS = 1;
@@ -73,6 +73,7 @@ export function ServiceProgress(props: {
   /** 오른쪽 아래에 덧붙일 설명(예: "다음 진급 12월 1일"). */
   caption: string;
 }) {
+  const styles = useStyles();
   const now = useTicker();
   const progress = serviceProgressAt(props.enlistedAt, props.dischargeAt, now);
   const percent = progress * 100;
@@ -97,7 +98,7 @@ export function ServiceProgress(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { gap: spacing.sm },
   percent: {
     fontSize: 15,
@@ -118,4 +119,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   caption: { fontSize: 12, color: colors.mute },
-});
+}));

@@ -4,9 +4,9 @@
  * 이 값이 달력 초과 판정의 기준이므로 두 화면이 같은 컴포넌트를 쓴다.
  */
 
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Field, Input } from "@/components/field";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing } from "@/theme";
 
 /** 하루 최대 출타 인원 — 부대 관리자가 직접 지정한다. */
 export function LeaveLimitFields(props: {
@@ -14,6 +14,7 @@ export function LeaveLimitFields(props: {
   onCountChange: (value: string) => void;
   testID?: string;
 }) {
+  const styles = useStyles();
   const count = Number(props.count);
   const hint = Number.isFinite(count)
     ? `하루에 최대 ${Math.max(0, Math.floor(count))}명까지 출타할 수 있어요.`
@@ -36,8 +37,8 @@ export function LeaveLimitFields(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   countRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   countInput: { width: 120, textAlign: "center" },
   unit: { fontSize: 16, fontWeight: "600", color: colors.ink },
-});
+}));

@@ -1,9 +1,10 @@
 /** 알림 탭의 스택 레이아웃 — 목록과 알림 설정 화면을 담는다. */
 
 import { Stack } from "expo-router/stack";
-import { colors } from "@/theme";
+import { useColors } from "@/theme";
 
 export default function NotificationsStackLayout() {
+  const colors = useColors();
   return (
     <Stack
       screenOptions={{

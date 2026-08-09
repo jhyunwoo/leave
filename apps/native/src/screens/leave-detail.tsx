@@ -40,7 +40,7 @@ import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SegmentBadges } from "@/components/segment-badges";
-import { colors, layout, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 import { DayRoster } from "./calendar/day-roster";
 
 /**
@@ -51,6 +51,8 @@ import { DayRoster } from "./calendar/day-roster";
  * 알림 화면이 초과일을 덮는 내 휴가를 먼저 찾아 이 화면으로 넘긴다.
  */
 export function LeaveDetailScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const { leaveId, date } = useLocalSearchParams<{
     leaveId: string;
     date?: string;
@@ -296,7 +298,7 @@ export function LeaveDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
@@ -345,7 +347,9 @@ const styles = StyleSheet.create({
   },
   dateChipSelected: { backgroundColor: colors.negativeDeep },
   dateChipText: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
-  dateChipTextSelected: { color: colors.canvas },
+  // negativeDeep 채움 위에 얹히는 글자. canvas를 쓰면 스킴에 따라 대비가
+  // 뒤집혀(다크에서 밝은 분홍 위 어두운 회색) 읽히지 않는다.
+  dateChipTextSelected: { color: colors.onNegativeBg },
   eyebrow: { fontSize: 12, fontWeight: "500", color: colors.mute },
   date: { fontSize: 20, fontWeight: "600", color: colors.ink, marginTop: -8 },
   statusRow: {
@@ -359,7 +363,8 @@ const styles = StyleSheet.create({
   blackoutTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: colors.warningContent,
+    // danger 톤 패널 위에 얹히므로 경고(노랑) 계열이 아니라 같은 계열을 쓴다.
+    color: colors.negativeDeep,
   },
   cycleLine: { fontSize: 12, color: colors.body },
-});
+}));

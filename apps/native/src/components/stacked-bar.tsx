@@ -3,8 +3,8 @@
  * 사용처: 보유 휴가 화면의 재원별 사용/잔여 비율.
  */
 
-import { StyleSheet, View, type ColorValue } from "react-native";
-import { colors, radius } from "@/theme";
+import { View, type ColorValue } from "react-native";
+import { makeStyles, radius } from "@/theme";
 
 export type BarSegment = { value: number; color: ColorValue };
 
@@ -13,6 +13,7 @@ export type BarSegment = { value: number; color: ColorValue };
  * 복무율을 보여주는 service-progress와 의미가 달라 따로 둔다.
  */
 export function StackedBar(props: { segments: BarSegment[] }) {
+  const styles = useStyles();
   const total = props.segments.reduce(
     (sum, s) => sum + Math.max(0, s.value),
     0,
@@ -35,7 +36,7 @@ export function StackedBar(props: { segments: BarSegment[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   track: {
     height: 8,
     flexDirection: "row",
@@ -43,4 +44,4 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.surfaceCard,
   },
-});
+}));

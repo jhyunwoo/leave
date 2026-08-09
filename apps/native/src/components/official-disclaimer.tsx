@@ -5,12 +5,13 @@
  */
 
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing } from "@/theme";
 
 const FULL_NOTICE =
   "출타 상태는 이용자가 입력한 계획과 관리자가 정한 참고 기준으로 계산한 추정치입니다. 공식 기록·승인과 무관하며 실제 휴가는 지휘관 승인과 소속 부대 지침을 따라야 합니다.";
 
 export function OfficialDisclaimer(props: { compact?: boolean }) {
+  const styles = useStyles();
   if (props.compact) {
     return (
       <Text
@@ -36,7 +37,7 @@ export function OfficialDisclaimer(props: { compact?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     borderRadius: radius.lg,
     borderCurve: "continuous",
@@ -54,4 +55,4 @@ const styles = StyleSheet.create({
     color: colors.body,
     textAlign: "center",
   },
-});
+}));

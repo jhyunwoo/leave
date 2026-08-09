@@ -11,7 +11,7 @@ import {
   View,
   type TextInputProps,
 } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function Field(props: {
   label: string;
@@ -19,6 +19,7 @@ export function Field(props: {
   error?: string | null;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{props.label}</Text>
@@ -33,6 +34,8 @@ export function Field(props: {
 }
 
 export function Input(props: TextInputProps) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <TextInput
       placeholderTextColor={colors.mute}
@@ -44,7 +47,7 @@ export function Input(props: TextInputProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: "600", color: colors.ink },
   hint: { fontSize: 12, color: colors.mute },
@@ -61,4 +64,4 @@ const styles = StyleSheet.create({
     color: colors.ink,
     minHeight: 48,
   },
-});
+}));

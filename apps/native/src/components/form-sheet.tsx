@@ -4,8 +4,8 @@
  */
 
 import type { ReactElement } from "react";
-import { Modal, StyleSheet, View } from "react-native";
-import { colors } from "@/theme";
+import { Modal, View } from "react-native";
+import { makeStyles } from "@/theme";
 
 /**
  * 입력 폼을 담는 시트.
@@ -26,6 +26,7 @@ export function FormSheet(props: {
   testID?: string;
   children: ReactElement;
 }) {
+  const styles = useStyles();
   return (
     <Modal
       visible={props.isPresented}
@@ -41,6 +42,6 @@ export function FormSheet(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
-});
+}));

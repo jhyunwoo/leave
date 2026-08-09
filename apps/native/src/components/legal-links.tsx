@@ -5,8 +5,8 @@
  */
 
 import * as Linking from "expo-linking";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, spacing } from "@/theme";
+import { Pressable, Text, View } from "react-native";
+import { makeStyles, spacing } from "@/theme";
 
 const PUBLIC_SITE = "https://leave.moveto.kr";
 
@@ -17,6 +17,7 @@ const LINKS = [
 ] as const;
 
 export function LegalLinks() {
+  const styles = useStyles();
   return (
     <View style={styles.row} accessibilityLabel="법적 고지와 지원 링크">
       {LINKS.map((item) => (
@@ -35,7 +36,7 @@ export function LegalLinks() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   row: {
     minHeight: 44,
     flexDirection: "row",
@@ -46,4 +47,4 @@ const styles = StyleSheet.create({
   },
   link: { minHeight: 44, justifyContent: "center" },
   text: { fontSize: 12, color: colors.body, textDecorationLine: "underline" },
-});
+}));
