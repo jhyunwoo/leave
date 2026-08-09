@@ -3,8 +3,8 @@
  * 네이티브에서는 `native-checkbox.native.tsx`(시스템 체크박스)로 바뀐다.
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { Pressable, Text, View } from "react-native";
+import { makeStyles, radius, spacing } from "@/theme";
 
 export function NativeCheckbox(props: {
   value: boolean;
@@ -12,6 +12,7 @@ export function NativeCheckbox(props: {
   label: string;
   testID?: string;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -29,7 +30,7 @@ export function NativeCheckbox(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   row: {
     alignSelf: "stretch",
     minHeight: 44,
@@ -49,4 +50,4 @@ const styles = StyleSheet.create({
   boxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   check: { color: colors.onPrimary, fontSize: 15, fontWeight: "800" },
   label: { flex: 1, fontSize: 13, lineHeight: 19, color: colors.body },
-});
+}));

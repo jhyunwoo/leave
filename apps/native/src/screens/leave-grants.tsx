@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -27,7 +26,15 @@ import {
 } from "@/components/leave-grant-modal";
 import { RegularOvernightSettings } from "@/components/regular-overnight-settings";
 import { StackedBar } from "@/components/stacked-bar";
-import { BALANCE_COLORS, colors, layout, radius, spacing, type } from "@/theme";
+import {
+  layout,
+  makeStyles,
+  radius,
+  spacing,
+  type,
+  useBalanceColors,
+  useColors,
+} from "@/theme";
 
 /** 만기가 이 안으로 다가오면 임박으로 본다. */
 const EXPIRING_SOON = 30;
@@ -37,6 +44,9 @@ const RECENT_PAST_CYCLES = 2;
 type Editing = { grant: LeaveGrantItem } | { newKey: BalanceKey } | null;
 
 export function LeaveGrantsScreen() {
+  const styles = useStyles();
+  const colors = useColors();
+  const balance = useBalanceColors();
   const page = useLeaveGrants();
   const me = useMe();
   const del = useDeleteLeaveGrant();
@@ -89,7 +99,9 @@ export function LeaveGrantsScreen() {
             segments={[
               { value: totals.usedDays, color: colors.surfaceStrong },
               { value: totals.remainingDays, color: colors.primary },
-              { value: totals.expiredDays, color: colors.negativeTint },
+              // negativeTint는 다크에서 막대 트랙(surfaceCard)과 명도가 거의
+              // 같아 소멸분이 사라진다. 채도 있는 negative로 올린다.
+              { value: totals.expiredDays, color: colors.negative },
             ]}
           />
 
@@ -161,7 +173,7 @@ export function LeaveGrantsScreen() {
             </Text>
             <View style={styles.chips}>
               {empty.map((fund) => {
-                const tone = BALANCE_COLORS[fund.key];
+                const tone = balance[fund.key];
                 return (
                   <Pressable
                     key={fund.key}
@@ -211,8 +223,10 @@ function FundCard(props: {
   onEdit: (grant: LeaveGrantItem) => void;
   onDelete: (grant: LeaveGrantItem) => void;
 }) {
+  const styles = useStyles();
+  const balance = useBalanceColors();
   const { fund } = props;
-  const tone = BALANCE_COLORS[fund.key];
+  const tone = balance[fund.key];
 
   return (
     <ContentPanel style={styles.fundCard}>
@@ -263,6 +277,7 @@ function GrantRow(props: {
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const styles = useStyles();
   const { grant } = props;
   const expired = grant.status === "expired";
   const soon =
@@ -346,6 +361,8 @@ function CycleList(props: {
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   if (props.cycles.length === 0) return null;
 
   const past = props.cycles.filter((cycle) => cycle.state === "past");
@@ -418,7 +435,7 @@ function CycleList(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
@@ -539,4 +556,4 @@ const styles = StyleSheet.create({
   },
   cycleRemaining: { fontSize: 11, color: colors.mute },
   cycleLost: { fontSize: 11, fontWeight: "600", color: colors.negativeDeep },
-});
+}));

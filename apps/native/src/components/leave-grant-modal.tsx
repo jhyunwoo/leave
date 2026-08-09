@@ -17,7 +17,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Pressable,
-  StyleSheet,
   Switch,
   Text,
   View,
@@ -29,7 +28,7 @@ import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
 import { FormSheet } from "@/components/form-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing, useColors } from "@/theme";
 
 /**
  * 적립분 추가·수정 시트.
@@ -46,6 +45,8 @@ export function LeaveGrantModal(props: {
   lockedKey?: BalanceKey | null;
   onClose: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const editing = props.editing;
   const create = useCreateLeaveGrant();
   const update = useUpdateLeaveGrant();
@@ -232,7 +233,7 @@ export function confirmGrantDelete(
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   sheet: { flex: 1 },
   pickerHost: { minHeight: 44 },
   switchRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -240,4 +241,4 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: colors.mute },
   disclosure: { fontSize: 13, fontWeight: "600", color: colors.brand },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
-});
+}));

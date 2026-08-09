@@ -5,8 +5,8 @@
  */
 
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
-import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius } from "@/theme";
+import { Pressable, Text } from "react-native";
+import { makeStyles, radius } from "@/theme";
 
 export function ActionMenu(props: {
   label?: string;
@@ -21,6 +21,7 @@ export function ActionMenu(props: {
   }>;
   testID?: string;
 }) {
+  const styles = useStyles();
   const actions: MenuAction[] = props.actions.map((action) => ({
     id: action.id,
     title: action.title,
@@ -52,7 +53,7 @@ export function ActionMenu(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   trigger: {
     minWidth: 44,
     minHeight: 44,
@@ -67,4 +68,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-});
+}));

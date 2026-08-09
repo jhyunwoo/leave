@@ -19,7 +19,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { estimateLabelWidth } from "./button-width";
 
 type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
@@ -35,6 +35,9 @@ export function Button(props: {
   systemImage?: string;
   testID?: string;
 }) {
+  // SwiftUI 호스트에는 DynamicColorIOS 객체가 아니라 확정된 hex를 넘긴다.
+  // 스킴이 바뀌면 이 컴포넌트가 다시 렌더되며 새 값이 내려간다.
+  const { colors, scheme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const variant = props.variant ?? "primary";
   const size = props.size ?? "md";
@@ -71,6 +74,7 @@ export function Button(props: {
   return (
     <Host
       matchContents={{ vertical: true }}
+      colorScheme={scheme}
       seedColor={variant === "danger" ? colors.negative : colors.primary}
       style={[
         styles.host,

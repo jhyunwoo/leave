@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Image,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -17,9 +16,10 @@ import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LegalLinks } from "@/components/legal-links";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing } from "@/theme";
 
 export function LoginScreen() {
+  const styles = useStyles();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +131,7 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: { padding: spacing.xl, gap: spacing.xxl },
   brand: { alignItems: "center", gap: spacing.sm },
@@ -179,4 +179,4 @@ const styles = StyleSheet.create({
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   footer: { textAlign: "center", fontSize: 14, color: colors.body },
   link: { fontWeight: "600", color: colors.ink },
-});
+}));

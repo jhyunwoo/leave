@@ -23,14 +23,8 @@ import {
   todayInSeoul,
   type LeaveStatus,
 } from "@leave/shared";
-import {
-  Alert,
-  KeyboardAvoidingView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { Alert, KeyboardAvoidingView, Text, View } from "react-native";
+import { makeStyles, radius, spacing } from "@/theme";
 import { Button } from "./button";
 import { DateRangePicker } from "./date-picker";
 import { FormSheet } from "./form-sheet";
@@ -64,6 +58,7 @@ export function LeaveFormModal(props: {
   editing?: MyLeave | null;
   onClose: () => void;
 }) {
+  const styles = useStyles();
   const form = useLeaveForm({
     // 네이티브는 날짜 선택기가 항상 유효한 날을 요구하므로 빈 값을 두지 않는다.
     initialDate: props.initialDate ?? todayInSeoul(),
@@ -309,7 +304,7 @@ export function LeaveFormModal(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   sheet: { flex: 1 },
   footerActions: { width: "100%", gap: spacing.sm },
   footerHint: {
@@ -369,4 +364,4 @@ const styles = StyleSheet.create({
   splitActions: { gap: spacing.xs, paddingTop: spacing.xs },
   splitHint: { fontSize: 11, color: colors.mute, textAlign: "center" },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
-});
+}));

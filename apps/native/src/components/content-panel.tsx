@@ -4,8 +4,8 @@
  */
 
 import type { ReactNode } from "react";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { colors, radius } from "@/theme";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import { makeStyles, radius } from "@/theme";
 
 type ContentPanelTone = "plain" | "grouped" | "accent" | "danger";
 
@@ -22,6 +22,7 @@ export function ContentPanel(props: {
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
+  const styles = useStyles();
   const tone = props.tone ?? "plain";
   return (
     <View
@@ -33,7 +34,7 @@ export function ContentPanel(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   base: {
     borderRadius: radius.xl,
     borderCurve: "continuous",
@@ -42,4 +43,4 @@ const styles = StyleSheet.create({
   grouped: { backgroundColor: colors.surfaceCard },
   accent: { backgroundColor: colors.primaryPale },
   danger: { backgroundColor: colors.negativeTint },
-});
+}));

@@ -16,6 +16,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { type ErrorBoundaryProps, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
 import { loadStoredToken } from "@/api/client";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { tokenAtom } from "@/state/auth";
-import { colors } from "@/theme";
+import { useColors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 configureQueryOnlineManager();
@@ -69,6 +70,7 @@ const queryClient = new QueryClient({
 });
 
 function RootNavigator() {
+  const colors = useColors();
   const token = useAtomValue(tokenAtom);
   const setToken = useSetAtom(tokenAtom);
   const [ready, setReady] = useState(false);
@@ -144,7 +146,12 @@ function RootNavigator() {
             title: "보유 휴가",
             // 탭은 헤더를 숨겨 제목이 없으므로, 돌아갈 곳을 뒤로가기에 직접 적는다.
             headerBackTitle: "내 휴가",
-            headerStyle: { backgroundColor: colors.canvas },
+            // 탭 스택들과 같은 규칙 — headerStyle로 배경을 칠하지 않고 시스템의
+            // 반투명 바를 그대로 쓴다. 불투명하게 칠하면 다크모드에서 본문과
+            // 색이 어긋나 흰 띠처럼 보인다. 웹에는 blur 바가 없어 흐름에 남긴다.
+            headerTransparent: process.env.EXPO_OS !== "web",
+            headerShadowVisible: false,
+            headerTintColor: colors.brand,
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
@@ -155,7 +162,9 @@ function RootNavigator() {
             headerShown: true,
             title: "휴가 상세",
             headerBackTitle: "뒤로",
-            headerStyle: { backgroundColor: colors.canvas },
+            headerTransparent: process.env.EXPO_OS !== "web",
+            headerShadowVisible: false,
+            headerTintColor: colors.brand,
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
@@ -169,6 +178,14 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const colors = useColors();
+
+  // 루트 뷰 배경. 회전·모달 전환 중 잠깐 드러나는 면이라, 다크모드에서 흰 판이
+  // 번쩍이지 않도록 스킴에 맞춰 맞춰둔다.
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(colors.canvasSoft);
+  }, [colors.canvasSoft]);
+
   return (
     <PersistQueryClientProvider
       client={queryClient}

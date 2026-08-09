@@ -18,10 +18,10 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import type { MyLeaveDay } from "@leave/client";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing, useTheme } from "@/theme";
 
 /** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */
 export function MonthCalendar(props: {
@@ -48,6 +48,8 @@ export function MonthCalendar(props: {
     cycles,
     currentCycle,
   } = props;
+  const styles = useStyles();
+  const { colors, balance } = useTheme();
   const today = todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
   const statByDate = useMemo(
@@ -95,7 +97,7 @@ export function MonthCalendar(props: {
               currentCycle != null &&
               currentCycle.start <= cell.date &&
               cell.date <= currentCycle.end;
-            const tone = mine ? BALANCE_COLORS[mine.key] : null;
+            const tone = mine ? balance[mine.key] : null;
             // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
             const cycle = cell.inMonth
               ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
@@ -215,10 +217,12 @@ export function MonthCalendar(props: {
                           style={[
                             styles.countText,
                             signal.percent === 0 && { color: colors.mute },
+                            // 노란 채움 위에 얹히므로 warningContent가 아니라
+                            // 전용 대비색을 쓴다(다크에서 노랑 위 노랑이 된다).
                             signal.key === "near" && {
-                              color: colors.warningContent,
+                              color: colors.onWarning,
                             },
-                            exceeded && { color: "#fff" },
+                            exceeded && { color: colors.onNegativeBg },
                             isSelected && {
                               color: exceeded
                                 ? colors.negativeDeep
@@ -254,7 +258,7 @@ export function MonthCalendar(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   weekRow: { flexDirection: "row", gap: 2, marginBottom: 2 },
   weekday: {
     flex: 1,
@@ -314,7 +318,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 12,
     fontWeight: "700",
-    color: colors.warningContent,
+    // blockedPill이 warning 채움이라 그 위 글자는 onWarning을 쓴다.
+    color: colors.onWarning,
   },
   countPillNear: { backgroundColor: colors.warning },
   countText: {
@@ -365,4 +370,4 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.pill,
     borderBottomRightRadius: radius.pill,
   },
-});
+}));

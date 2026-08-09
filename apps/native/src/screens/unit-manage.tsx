@@ -17,7 +17,6 @@ import {
   Alert,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -44,7 +43,7 @@ import { DateRangePicker } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
-import { colors, layout, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Unit = NonNullable<Me["unit"]>;
 
@@ -61,6 +60,8 @@ async function shareInvite(invite: IssuedUnitInvite) {
 }
 
 export function UnitManageScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const me = useMe();
   const insets = useSafeAreaInsets();
   const unit = me.data?.unit ?? null;
@@ -111,6 +112,7 @@ export function UnitManageScreen() {
 }
 
 function ParticipationSection({ unit }: { unit: Unit }) {
+  const styles = useStyles();
   const reference = unit.referenceMemberTotal;
   const participation =
     reference && reference > 0
@@ -147,6 +149,7 @@ function ParticipationSection({ unit }: { unit: Unit }) {
 }
 
 function EditUnitSection({ unit }: { unit: Unit }) {
+  const styles = useStyles();
   const update = useUpdateUnit(unit.id);
   const [name, setName] = useState(unit.name);
   const [referenceTotal, setReferenceTotal] = useState(
@@ -216,6 +219,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
 }
 
 function InviteSection({ unit }: { unit: Unit }) {
+  const styles = useStyles();
   const rotate = useRotateUnitInvite(unit.id);
   const [invite, setInvite] = useState<IssuedUnitInvite | null>(null);
 
@@ -285,6 +289,7 @@ function InviteSection({ unit }: { unit: Unit }) {
  * 이게 없으면 앱은 "가능"이라 했는데 현실은 불가인 상황이 반복된다.
  */
 function BlackoutSection({ unit }: { unit: Unit }) {
+  const styles = useStyles();
   const list = useBlackouts(unit.id);
   const create = useCreateBlackout(unit.id);
   const remove = useDeleteBlackout(unit.id);
@@ -368,6 +373,8 @@ function BlackoutSection({ unit }: { unit: Unit }) {
 }
 
 function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
+  const styles = useStyles();
+  const colors = useColors();
   const members = useUnitMembers(unit.id);
   const transfer = useTransferAdmin(unit.id);
   const remove = useRemoveMember(unit.id);
@@ -522,7 +529,7 @@ function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   center: {
     flex: 1,
@@ -571,4 +578,4 @@ const styles = StyleSheet.create({
   },
   aliasMarkText: { color: colors.ink, fontSize: 15, fontWeight: "700" },
   personName: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
-});
+}));

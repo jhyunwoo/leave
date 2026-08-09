@@ -16,7 +16,7 @@ import {
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";
 import { DatePickerRow } from "./date-picker";
 
 /**
@@ -35,8 +35,10 @@ export function SegmentRow(props: {
   onChangeEnd: (date: ISODate) => void;
   onRemove: () => void;
 }) {
+  const styles = useStyles();
+  const balance = useBalanceColors();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const selectedTone = BALANCE_COLORS[props.draft.key];
+  const selectedTone = balance[props.draft.key];
   const selectedRemaining = props.remainingByKey.get(props.draft.key) ?? 0;
 
   return (
@@ -105,7 +107,7 @@ export function SegmentRow(props: {
             const selected = key === props.draft.key;
             const remaining = props.remainingByKey.get(key) ?? 0;
             const insufficient = !selected && remaining < props.draft.days;
-            const tone = BALANCE_COLORS[key];
+            const tone = balance[key];
 
             return (
               <Pressable
@@ -181,13 +183,13 @@ export function SegmentRow(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: {
     width: "100%",
     gap: spacing.sm,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(14, 15, 12, 0.12)",
+    borderTopColor: colors.hairline,
   },
   summaryRow: {
     minHeight: 44,
@@ -276,4 +278,4 @@ const styles = StyleSheet.create({
   optionMeta: { fontSize: 10, color: colors.body },
   optionMetaInsufficient: { color: colors.negativeDeep },
   pressed: { opacity: 0.72 },
-});
+}));

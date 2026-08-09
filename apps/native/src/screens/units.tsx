@@ -17,7 +17,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -35,7 +34,7 @@ import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { FormSheet } from "@/components/form-sheet";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SheetScaffold } from "@/components/sheet-scaffold";
-import { colors, layout, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing } from "@/theme";
 
 async function shareInvite(invite: IssuedUnitInvite) {
   await Share.share({
@@ -50,6 +49,7 @@ async function shareInvite(invite: IssuedUnitInvite) {
 }
 
 export function UnitsScreen() {
+  const styles = useStyles();
   const me = useMe();
   const join = useJoinUnit();
   const leaveUnit = useLeaveUnit();
@@ -221,6 +221,7 @@ export function UnitsScreen() {
 }
 
 function InvitePanel(props: { invite: IssuedUnitInvite; onShare: () => void }) {
+  const styles = useStyles();
   return (
     <ContentPanel style={styles.inviteCard}>
       <Text style={styles.sectionTitle}>지금 초대코드를 보관하세요</Text>
@@ -244,6 +245,7 @@ function CreateUnitModal(props: {
   onClose: () => void;
   onCreated: (invite: IssuedUnitInvite) => void;
 }) {
+  const styles = useStyles();
   const [name, setName] = useState("");
   const [referenceTotal, setReferenceTotal] = useState("");
   const [maxCount, setMaxCount] = useState("1");
@@ -346,7 +348,7 @@ function CreateUnitModal(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   createSheet: { flex: 1 },
   content: {
@@ -413,4 +415,4 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: "600",
   },
-});
+}));

@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text } from "react-native";
+import { ScrollView, Text } from "react-native";
 import {
   useNotificationPrefs,
   useRegisterPushToken,
@@ -14,9 +14,10 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { NativeCheckbox } from "@/components/native-checkbox";
 import { getPushToken } from "@/lib/notifications";
-import { colors, layout, spacing } from "@/theme";
+import { layout, makeStyles, spacing } from "@/theme";
 
 export function NotificationSettingsScreen() {
+  const styles = useStyles();
   const registerPush = useRegisterPushToken();
   const prefs = useNotificationPrefs();
   const updatePrefs = useUpdateNotificationPrefs();
@@ -106,7 +107,7 @@ export function NotificationSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
@@ -122,4 +123,4 @@ const styles = StyleSheet.create({
   preferenceTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
   preferenceBody: { fontSize: 13, lineHeight: 20, color: colors.body },
   permissionResult: { fontSize: 12, color: colors.body },
-});
+}));

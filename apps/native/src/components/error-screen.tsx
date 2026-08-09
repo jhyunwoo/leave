@@ -3,10 +3,10 @@
  * 사용처: 루트 에러 경계(root-error-boundary.tsx)와 라우트 에러 경계(_layout.tsx).
  */
 
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { Button } from "@/components/button";
 import type { FatalErrorRecord } from "@/lib/fatal-error";
-import { colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing } from "@/theme";
 
 /**
  * 오류를 사용자에게 보여주는 마지막 화면. 루트 경계와 라우트 경계가 같이 쓴다.
@@ -22,6 +22,7 @@ export function ErrorScreen(props: {
   actionLabel: string;
   onAction: () => void;
 }) {
+  const styles = useStyles();
   const { record } = props;
   return (
     <View style={styles.root}>
@@ -56,7 +57,7 @@ export function ErrorScreen(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvas },
   content: {
     flexGrow: 1,
@@ -78,4 +79,4 @@ const styles = StyleSheet.create({
   button: {
     alignSelf: "flex-start",
   },
-});
+}));

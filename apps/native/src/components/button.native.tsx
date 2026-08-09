@@ -11,7 +11,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { estimateLabelWidth } from "./button-width";
 
 type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
@@ -27,6 +27,8 @@ export function Button(props: {
   systemImage?: string;
   testID?: string;
 }) {
+  // Compose의 Material 팔레트 생성기에는 확정된 ARGB가 필요하다.
+  const { colors, scheme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const variant = props.variant ?? "primary";
   const size = props.size ?? "md";
@@ -50,6 +52,7 @@ export function Button(props: {
   return (
     <Host
       matchContents
+      colorScheme={scheme}
       seedColor={variant === "danger" ? colors.negative : colors.primary}
       style={[
         styles.host,

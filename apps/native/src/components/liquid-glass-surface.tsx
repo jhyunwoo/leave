@@ -6,8 +6,8 @@
 import { BlurView } from "expo-blur";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import type { ReactNode } from "react";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { colors, radius } from "@/theme";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import { makeStyles, radius } from "@/theme";
 
 /**
  * 콘텐츠 위에 떠 있는 내비게이션·핵심 조작 전용 Liquid Glass 표면.
@@ -19,6 +19,7 @@ export function LiquidGlassSurface(props: {
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
+  const styles = useStyles();
   const style = [styles.base, props.style];
 
   if (process.env.EXPO_OS === "ios" && isLiquidGlassAvailable()) {
@@ -53,11 +54,11 @@ export function LiquidGlassSurface(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   base: {
     overflow: "hidden",
     borderCurve: "continuous",
     borderRadius: radius.xl,
   },
   fallback: { backgroundColor: colors.surfaceCard },
-});
+}));

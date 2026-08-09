@@ -15,7 +15,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors } from "@/theme";
+import { makeStyles, useColors } from "@/theme";
 
 type Variant = "primary" | "secondary" | "tertiary" | "danger" | "ghost";
 
@@ -30,6 +30,8 @@ export function Button(props: {
   systemImage?: string;
   testID?: string;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const variant = props.variant ?? "primary";
   const size = props.size ?? "md";
   const disabled = Boolean(props.disabled || props.loading);
@@ -73,7 +75,7 @@ export function Button(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   button: {
     minHeight: 48,
     minWidth: 44,
@@ -99,4 +101,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.45 },
   label: { fontSize: 15, fontWeight: "700" },
-});
+}));

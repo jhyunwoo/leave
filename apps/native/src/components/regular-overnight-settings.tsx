@@ -4,14 +4,14 @@
  */
 
 import { useState } from "react";
-import { Alert, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Switch, Text, View } from "react-native";
 import type { LeaveGrantsPage } from "@leave/client";
 import { useUpdateRegularOvernight } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Input } from "@/components/field";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing, useColors } from "@/theme";
 
 /**
  * 정기외박 자동 적립 설정. 잔여량이 이 설정에서 파생하므로 육군에서는 쓰지 않는다.
@@ -20,6 +20,8 @@ import { colors, spacing } from "@/theme";
 export function RegularOvernightSettings(props: {
   config: LeaveGrantsPage["regularOvernight"];
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const update = useUpdateRegularOvernight();
   const [enabled, setEnabled] = useState(props.config.enabled);
   const [startDate, setStartDate] = useState(props.config.startDate ?? "");
@@ -116,7 +118,7 @@ export function RegularOvernightSettings(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     padding: spacing.lg,
     gap: spacing.md,
@@ -126,4 +128,4 @@ const styles = StyleSheet.create({
   label: { color: colors.ink, fontSize: 13, fontWeight: "600" },
   hint: { color: colors.mute, fontSize: 11 },
   numbers: { flexDirection: "row", gap: spacing.md },
-});
+}));

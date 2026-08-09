@@ -1,9 +1,10 @@
 /** 내 휴가 탭의 스택 레이아웃(헤더 스타일만 정한다). */
 
 import { Stack } from "expo-router/stack";
-import { colors } from "@/theme";
+import { useColors } from "@/theme";
 
 export default function LeavesStackLayout() {
+  const colors = useColors();
   return (
     <Stack
       screenOptions={{

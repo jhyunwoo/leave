@@ -17,7 +17,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Avatar } from "@/components/avatar";
 import { ContentPanel } from "@/components/content-panel";
-import { BALANCE_COLORS, colors, radius, spacing } from "@/theme";
+import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";
 
 /**
  * 하루의 출타 명단. 날짜 상세 시트와 휴가 상세 화면이 함께 쓴다.
@@ -30,6 +30,8 @@ export function DayRoster(props: {
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
 }) {
+  const styles = useStyles();
+  const balance = useBalanceColors();
   const { date } = props;
   const dayAttendees = props.attendees.filter(
     (attendee) => attendee.startDate <= date && date <= attendee.endDate,
@@ -55,7 +57,7 @@ export function DayRoster(props: {
         // 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
         const segment = segmentOnDate(attendee.segments, date);
         const key = segment ? segmentBalanceKey(segment) : null;
-        const tone = key ? BALANCE_COLORS[key] : null;
+        const tone = key ? balance[key] : null;
         const isMine = attendee.userId === props.myUserId;
         return (
           <View
@@ -96,7 +98,7 @@ export function DayRoster(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   empty: {
     padding: spacing.xl,
     alignItems: "center",
@@ -138,4 +140,4 @@ const styles = StyleSheet.create({
   },
   statusChipText: { fontSize: 10, fontWeight: "600", color: colors.mute },
   leaveMeta: { fontSize: 12, color: colors.mute, marginTop: 1 },
-});
+}));

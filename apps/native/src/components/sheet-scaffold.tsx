@@ -13,7 +13,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing } from "@/theme";
 import { Button } from "./button";
 
 /**
@@ -29,6 +29,7 @@ export function SheetScaffold(props: {
   footer?: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
 }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
 
   return (
@@ -73,7 +74,7 @@ export function SheetScaffold(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   header: {
     minHeight: 58,
@@ -101,4 +102,4 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
-});
+}));

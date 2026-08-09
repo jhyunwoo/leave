@@ -31,14 +31,13 @@ import {
   FlatList,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useCalendar } from "@leave/client";
 import { MonthCalendar } from "@/components/month-calendar";
 import type { MyLeaveDay } from "@leave/client";
-import { colors, spacing } from "@/theme";
+import { makeStyles, spacing, useColors } from "@/theme";
 
 const INITIAL_SPAN = 2;
 const PAGE_SIZE = 6;
@@ -95,6 +94,7 @@ export const CalendarScroll = forwardRef<
   },
   ref,
 ) {
+  const styles = useStyles();
   const currentMonth = todayInSeoul().slice(0, 7);
   const [months, setMonths] = useState(() =>
     monthRange(currentMonth, INITIAL_SPAN),
@@ -222,6 +222,8 @@ function MonthBlock(props: {
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const calendar = useCalendar(props.unitId, props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
@@ -259,7 +261,7 @@ function MonthBlock(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1 },
   list: { flex: 1 },
   monthBlock: {},
@@ -279,4 +281,4 @@ const styles = StyleSheet.create({
   limitSummary: { fontSize: 11, color: colors.mute },
   monthLoading: { paddingVertical: spacing.xxxl, alignItems: "center" },
   monthError: { fontSize: 14, color: colors.body, paddingVertical: spacing.lg },
-});
+}));

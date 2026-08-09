@@ -3,12 +3,14 @@
  * 사용처: 휴가 목록·상세의 계획 상태, 구성원 목록의 역할 표시.
  */
 
-import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/theme";
+import { Text, View } from "react-native";
+import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Kind = "positive" | "negative" | "neutral";
 
 export function Badge(props: { text: string; kind?: Kind }) {
+  const styles = useStyles();
+  const colors = useColors();
   const kind = props.kind ?? "neutral";
   return (
     <View style={[styles.base, styles[kind]]}>
@@ -24,7 +26,7 @@ export function Badge(props: { text: string; kind?: Kind }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   base: {
     alignSelf: "flex-start",
     paddingVertical: spacing.xs,
@@ -35,4 +37,4 @@ const styles = StyleSheet.create({
   negative: { backgroundColor: colors.negativeTint },
   neutral: { backgroundColor: colors.surfaceCard },
   label: { fontSize: 13, fontWeight: "600", color: colors.inkDeep },
-});
+}));
