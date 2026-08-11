@@ -30,6 +30,7 @@ import {
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { tokenAtom } from "@/state/auth";
+import { useOnboardingStatus } from "@leave/client";
 import { useColors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -86,10 +87,13 @@ function RootNavigator() {
   }, [setToken]);
 
   const isAuthed = token !== null && token !== undefined;
+  const onboarding = useOnboardingStatus(isAuthed);
   // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)
   useNotificationLogging(isAuthed);
 
-  if (!ready || token === undefined) return null; // 스플래시 유지
+  if (!ready || token === undefined || (isAuthed && onboarding.isPending))
+    return null; // 스플래시 유지
+  const onboardingComplete = onboarding.data?.completed === true;
 
   return (
     <Stack
@@ -98,7 +102,7 @@ function RootNavigator() {
         contentStyle: { backgroundColor: colors.canvasSoft },
       }}
     >
-      <Stack.Protected guard={isAuthed}>
+      <Stack.Protected guard={isAuthed && onboardingComplete}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="units"
@@ -168,6 +172,9 @@ function RootNavigator() {
             headerTitleStyle: { fontWeight: "600", color: colors.ink },
           }}
         />
+      </Stack.Protected>
+      <Stack.Protected guard={isAuthed && !onboardingComplete}>
+        <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthed}>
         <Stack.Screen name="login" />

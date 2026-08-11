@@ -28,4 +28,5 @@ export * from "./leave";
 export * from "./leave-draft";
 export * from "./leave-grants";
 export * from "./regular-overnight";
+export * from "./regular-overnight-guidance";
 export * from "./availability";

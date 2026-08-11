@@ -254,6 +254,7 @@ export function CalendarScreen() {
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
+            enlistedMonth={me.data?.user.enlistedAt.slice(0, 7) ?? null}
             onSelectDate={(d) => {
               // 새 날짜를 고르면 대기 중이던 폼 요청은 무효로 본다.
               pendingFormDate.current = null;

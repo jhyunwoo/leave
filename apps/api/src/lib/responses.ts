@@ -340,7 +340,8 @@ export const leaveBalanceSummarySchema = z
 export const authResponseSchema = z
   .object({
     token: z.string(),
-    user: userSchema,
+    user: userSchema.nullable(),
+    onboardingCompleted: z.boolean(),
   })
   .openapi("AuthResponse");
 

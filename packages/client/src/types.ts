@@ -63,6 +63,11 @@ export type AuthResponse = InferResponseType<
   200
 >;
 
+export type OnboardingStatus = InferResponseType<
+  Client["auth"]["onboarding"]["$get"],
+  200
+>;
+
 /** 보유 휴가 요약: 재원별 총량/사용/잔여 + 정기외박 설정. */
 export type LeaveBalanceSummary = InferResponseType<
   Client["leaves"]["balances"]["$get"],

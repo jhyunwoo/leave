@@ -24,6 +24,7 @@ import {
 import { serializeUnit } from "../lib/serialize";
 import { checkUnitAdmin, serializeUnitById } from "../lib/unit-access";
 import { authMiddleware } from "../middleware/auth";
+import { onboardingMiddleware } from "../middleware/onboarding";
 import { rateLimit } from "../middleware/rate-limit";
 import { shiftMonth, todayInSeoul } from "@leave/shared";
 import {
@@ -57,6 +58,12 @@ const CALENDAR_FUTURE_MONTHS = 24;
 
 const app = createApp();
 app.use("*", authMiddleware);
+app.use("*", async (c, next) => {
+  const path = new URL(c.req.url).pathname;
+  if (c.req.method === "POST" && (path === "/units" || path === "/units/join"))
+    return next();
+  return onboardingMiddleware(c, next);
+});
 // 초대코드를 무차별 대입으로 찾아내지 못하게 막는 마지막 방어선.
 // (코드 자체가 192비트라 현실적으로 불가능하지만, 시도 비용을 0으로 두지 않는다.)
 app.use(

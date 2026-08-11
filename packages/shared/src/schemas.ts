@@ -36,18 +36,33 @@ export const signupSchema = z
       .string()
       .min(8, "비밀번호는 8자 이상이어야 합니다")
       .max(100, "비밀번호는 100자 이하여야 합니다"),
-    name: z.string().trim().min(1, "이름을 입력해주세요").max(50),
-    branch: z.enum(BRANCHES),
-    enlistedAt: isoDateSchema,
-    dischargeAt: isoDateSchema,
-    rank: z.enum(RANKS),
+    // 신규 클라이언트는 계정부터 만든 뒤 온보딩에서 복무정보를 저장한다.
+    // optional은 구버전 클라이언트의 한 번에 가입 계약을 유지하기 위한 것이다.
+    name: z.string().trim().min(1, "이름을 입력해주세요").max(50).optional(),
+    branch: z.enum(BRANCHES).optional(),
+    enlistedAt: isoDateSchema.optional(),
+    dischargeAt: isoDateSchema.optional(),
+    rank: z.enum(RANKS).optional(),
     // 접속 기록·푸시 로그 등 개인정보 수집·이용 동의 (가입 필수)
     dataConsent: z.boolean(),
   })
-  .refine((v) => v.enlistedAt < v.dischargeAt, {
-    message: "전역 예정일은 입대일보다 뒤여야 합니다",
-    path: ["dischargeAt"],
-  })
+  .refine(
+    (v) => !v.enlistedAt || !v.dischargeAt || v.enlistedAt < v.dischargeAt,
+    {
+      message: "전역 예정일은 입대일보다 뒤여야 합니다",
+      path: ["dischargeAt"],
+    },
+  )
+  .refine(
+    (v) => {
+      const supplied = [v.name, v.branch, v.enlistedAt, v.dischargeAt, v.rank];
+      return (
+        supplied.every((value) => value === undefined) ||
+        supplied.every((value) => value !== undefined)
+      );
+    },
+    { message: "복무정보는 모두 입력하거나 온보딩에서 설정해주세요" },
+  )
   .refine((v) => v.dataConsent === true, {
     message: "개인정보 수집 및 이용에 동의해야 가입할 수 있습니다",
     path: ["dataConsent"],
@@ -281,6 +296,20 @@ export const profileUpdateSchema = z.object({
   rank: z.enum(RANKS).optional(),
 });
 
+/** 온보딩 1단계는 부분 수정이 아니라 완성된 복무 프로필 한 벌을 저장한다. */
+export const onboardingProfileSchema = z
+  .object({
+    name: z.string().trim().min(1, "별칭을 입력해주세요").max(50),
+    branch: z.enum(BRANCHES),
+    enlistedAt: isoDateSchema,
+    dischargeAt: isoDateSchema,
+    rank: z.enum(RANKS),
+  })
+  .refine((value) => value.enlistedAt < value.dischargeAt, {
+    path: ["dischargeAt"],
+    message: "전역 예정일은 입대일보다 뒤여야 합니다",
+  });
+
 /**
  * 비밀번호 변경. 현재 비밀번호를 함께 받아 세션 탈취만으로는 바꾸지 못하게 한다.
  * 성공하면 서버가 기존 세션을 모두 끊고 새 토큰을 발급한다.
@@ -358,6 +387,7 @@ export const pushEventSchema = z.object({
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
+export type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>;
 export type PushEventInput = z.infer<typeof pushEventSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UnitCreateInput = z.infer<typeof unitCreateSchema>;

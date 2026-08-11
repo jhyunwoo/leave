@@ -20,6 +20,7 @@ import {
   reportSchema,
 } from "../lib/responses";
 import { authMiddleware } from "../middleware/auth";
+import { onboardingMiddleware } from "../middleware/onboarding";
 
 /**
  * 자유 입력이 남아 있는 한(그룹 별칭·설명, 참여자 별칭) 신고·차단 경로가 필요하다.
@@ -99,6 +100,7 @@ const deleteBlockRoute = createRoute({
 
 const app = createApp();
 app.use("*", authMiddleware);
+app.use("*", onboardingMiddleware);
 
 export const moderationRoutes = app
   .openapi(createReportRoute, async (c) => {
