@@ -22,6 +22,25 @@ const baseSignup = {
 };
 
 describe("signupSchema", () => {
+  it("복무정보 없이 계정만 먼저 만들 수 있다", () => {
+    expect(
+      signupSchema.safeParse({
+        email: "account@test.com",
+        password: "password123",
+        dataConsent: true,
+      }).success,
+    ).toBe(true);
+  });
+  it("복무정보 일부만 보내면 실패한다", () => {
+    expect(
+      signupSchema.safeParse({
+        email: "partial@test.com",
+        password: "password123",
+        name: "라임고래",
+        dataConsent: true,
+      }).success,
+    ).toBe(false);
+  });
   it("동의(dataConsent=true) 시 통과", () => {
     expect(signupSchema.safeParse(baseSignup).success).toBe(true);
   });

@@ -29,6 +29,58 @@ test("동의하면 회원가입 성공 — 토큰과 사용자 정보 반환", a
   assert.ok(data.user.rankLabel, "계산된 계급 라벨이 있어야 함");
 });
 
+test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async () => {
+  const email = `${uniq("onboarding-")}@test.com`;
+  const created = await req("POST", "/auth/signup", {
+    body: { email, password: "password123", dataConsent: true },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.data.onboardingCompleted, false);
+  assert.equal(created.data.user, null);
+  const token = created.data.token;
+
+  const blocked = await req("GET", "/auth/me", { token });
+  assert.equal(blocked.status, 428);
+  const initial = await req("GET", "/auth/onboarding", { token });
+  assert.equal(initial.status, 200);
+  assert.equal(initial.data.completed, false);
+  assert.equal(initial.data.profile, null);
+
+  const profile = await req("PUT", "/auth/onboarding/profile", {
+    token,
+    body: {
+      name: "라임고래",
+      branch: "air_force",
+      enlistedAt: "2026-03-23",
+      dischargeAt: "2027-12-22",
+      rank: "private",
+    },
+  });
+  assert.equal(profile.status, 200);
+  const regular = await req("PUT", "/auth/onboarding/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: "2026-05-11",
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+  assert.equal(regular.status, 200);
+
+  const completed = await req("POST", "/auth/onboarding/complete", { token });
+  assert.equal(completed.status, 200);
+  const me = await req("GET", "/auth/me", { token });
+  assert.equal(me.status, 200);
+  assert.equal(me.data.user.branch, "air_force");
+
+  // 완료 API는 재호출해도 연가를 중복 생성하지 않는다.
+  assert.equal((await req("POST", "/auth/onboarding/complete", { token })).status, 200);
+  const grants = await req("GET", "/leaves/grants", { token });
+  const annual = grants.data.funds.find((fund) => fund.key === "annual");
+  assert.equal(annual.grants.length, 1);
+});
+
 test("중복 이메일 가입은 409", async () => {
   const first = await signup();
   const { status } = await signup({ email: first.email });

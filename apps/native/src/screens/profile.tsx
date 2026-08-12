@@ -241,6 +241,7 @@ export function ProfileScreen() {
           <ServiceProgress
             enlistedAt={user.enlistedAt as ISODate}
             dischargeAt={user.dischargeAt as ISODate}
+            daysLeft={user.daysUntilDischarge}
             caption={
               user.nextPromotionDate
                 ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`

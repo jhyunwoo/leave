@@ -11,7 +11,7 @@
 
 import { useAtomValue } from "jotai";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
-import { useMe } from "@leave/client";
+import { useMe, useOnboardingStatus } from "@leave/client";
 import { AppLayout } from "./layouts/AppLayout";
 import { CalendarPage } from "./pages/CalendarPage";
 import { LandingPage } from "./pages/LandingPage";
@@ -23,11 +23,12 @@ import { NotificationSettingsPage } from "./pages/NotificationSettingsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SignupPage } from "./pages/SignupPage";
+import { InviteLandingPage, OnboardingPage } from "./pages/OnboardingPage";
 import { UnitManagePage } from "./pages/UnitManagePage";
 import { UnitsPage } from "./pages/UnitsPage";
 import { isAuthedAtom } from "./state/auth";
 
-function AuthedApp() {
+function CompletedApp() {
   const me = useMe();
 
   if (me.isPending) {
@@ -76,6 +77,22 @@ function AuthedApp() {
   );
 }
 
+function AuthedApp() {
+  const onboarding = useOnboardingStatus();
+  if (onboarding.isPending)
+    return (
+      <div
+        style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}
+      >
+        <div className="spinner" />
+      </div>
+    );
+  if (!onboarding.data) return <Navigate to="/login" replace />;
+  if (!onboarding.data.completed)
+    return <OnboardingPage status={onboarding.data} />;
+  return <CompletedApp />;
+}
+
 /** 로그아웃 상태: 첫 화면은 홍보 랜딩, 그 외 경로는 로그인으로. */
 function PublicApp() {
   return (
@@ -92,6 +109,7 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/invite" element={<InviteLandingPage />} />
         <Route
           path="/login"
           element={isAuthed ? <Navigate to="/" replace /> : <LoginPage />}

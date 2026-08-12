@@ -23,6 +23,7 @@ import {
   okSchema,
 } from "../lib/responses";
 import { authMiddleware } from "../middleware/auth";
+import { onboardingMiddleware } from "../middleware/onboarding";
 
 const listRoute = createRoute({
   method: "get",
@@ -110,6 +111,7 @@ function parseDates(row: NotificationRow): string[] {
 
 const app = createApp();
 app.use("*", authMiddleware);
+app.use("*", onboardingMiddleware);
 
 export const notificationRoutes = app
   .openapi(listRoute, async (c) => {

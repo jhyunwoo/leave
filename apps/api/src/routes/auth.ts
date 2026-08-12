@@ -12,8 +12,10 @@ import { createRoute, z } from "@hono/zod-openapi";
 import {
   DEFAULT_ANNUAL_DAYS,
   loginSchema,
+  onboardingProfileSchema,
   passwordChangeSchema,
   profileUpdateSchema,
+  regularOvernightConfigSchema,
   signupSchema,
 } from "@leave/shared";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
@@ -25,6 +27,7 @@ import {
   contentReports,
   notifications,
   pushLogs,
+  regularOvernightConfigs,
   sessions,
   unitInvites,
   units,
@@ -35,6 +38,7 @@ import {
 } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
+import { saveRegularOvernightConfig } from "../lib/leave-balances";
 import {
   generateSessionToken,
   hashPassword,
@@ -130,6 +134,87 @@ const loginRoute = createRoute({
   },
 });
 
+const onboardingStatusSchema = z.object({
+  completed: z.boolean(),
+  profile: z
+    .object({
+      name: z.string(),
+      branch: z.enum(["army", "navy", "air_force"]),
+      enlistedAt: z.string(),
+      dischargeAt: z.string(),
+      rank: z.enum(["private", "private_first", "corporal", "sergeant"]),
+    })
+    .nullable(),
+  regularOvernight: z
+    .object({
+      enabled: z.boolean(),
+      startDate: z.string().nullable(),
+      intervalDays: z.number().nullable(),
+      daysPerGrant: z.number().nullable(),
+    })
+    .nullable(),
+  unitId: z.string().nullable(),
+});
+
+const onboardingStatusRoute = createRoute({
+  method: "get",
+  path: "/onboarding",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(onboardingStatusSchema, "온보딩 상태"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const onboardingProfileRoute = createRoute({
+  method: "put",
+  path: "/onboarding/profile",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: onboardingProfileSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(okSchema, "복무정보 저장"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const onboardingRegularRoute = createRoute({
+  method: "put",
+  path: "/onboarding/regular-overnight",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: regularOvernightConfigSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(okSchema, "정기외박 설정 저장"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+const onboardingCompleteRoute = createRoute({
+  method: "post",
+  path: "/onboarding/complete",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(okSchema, "온보딩 완료"),
+    400: errorResponse("복무정보 미완료"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
 const logoutRoute = createRoute({
   method: "post",
   path: "/logout",
@@ -158,6 +243,7 @@ const meRoute = createRoute({
       "내 정보",
     ),
     401: errorResponse("인증 실패"),
+    428: errorResponse("온보딩 미완료"),
   },
 });
 
@@ -245,6 +331,8 @@ app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/me/password", authMiddleware);
 app.use("/me/image", authMiddleware);
+app.use("/onboarding", authMiddleware);
+app.use("/onboarding/*", authMiddleware);
 app.use("/activity", authMiddleware);
 app.use("/account", authMiddleware);
 
@@ -263,39 +351,49 @@ export const authRoutes = app
     }
 
     const { hash, salt } = await hashPassword(input.password);
+    const hasProfile = input.name !== undefined;
     const user: UserRow = {
       id: crypto.randomUUID(),
       email: input.email,
       passwordHash: hash,
       passwordSalt: salt,
-      name: input.name,
-      branch: input.branch,
-      enlistedAt: input.enlistedAt,
-      dischargeAt: input.dischargeAt,
-      signupRank: input.rank,
+      name: input.name ?? "",
+      branch: input.branch ?? "army",
+      enlistedAt: input.enlistedAt ?? "2000-01-01",
+      dischargeAt: input.dischargeAt ?? "2000-01-02",
+      signupRank: input.rank ?? "private",
       profileImageKey: null,
       unitId: null,
       expoPushToken: null,
       // 가입 시 개인정보 수집·이용에 동의했음을 기록 (동의는 스키마에서 필수)
       consentedAt: input.dataConsent ? new Date().toISOString() : null,
+      onboardingCompletedAt: hasProfile ? new Date().toISOString() : null,
       createdAt: new Date().toISOString(),
     };
     await db.insert(users).values(user);
     // 군별 기본 연가를 만기 없는 적립분 한 건으로 심는다. 사용자가 보유 휴가 화면에서
     // 자유롭게 고칠 수 있는 제안값이다.
-    await db.insert(leaveGrants).values({
-      id: crypto.randomUUID(),
-      userId: user.id,
-      balanceKey: "annual",
-      days: DEFAULT_ANNUAL_DAYS[user.branch],
-      grantedOn: null,
-      expiresOn: null,
-      note: null,
-      createdAt: user.createdAt,
-      updatedAt: user.createdAt,
-    });
+    if (hasProfile)
+      await db.insert(leaveGrants).values({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        balanceKey: "annual",
+        days: DEFAULT_ANNUAL_DAYS[user.branch],
+        grantedOn: null,
+        expiresOn: null,
+        note: null,
+        createdAt: user.createdAt,
+        updatedAt: user.createdAt,
+      });
     const token = await createSession(db, user.id);
-    return c.json({ token, user: serializeUser(user) }, 201);
+    return c.json(
+      {
+        token,
+        user: hasProfile ? serializeUser(user) : null,
+        onboardingCompleted: hasProfile,
+      },
+      201,
+    );
   })
   .openapi(loginRoute, async (c) => {
     const input = c.req.valid("json");
@@ -318,7 +416,14 @@ export const authRoutes = app
     }
 
     const token = await createSession(db, user.id);
-    return c.json({ token, user: serializeUser(user) }, 200);
+    return c.json(
+      {
+        token,
+        user: user.onboardingCompletedAt ? serializeUser(user) : null,
+        onboardingCompleted: Boolean(user.onboardingCompletedAt),
+      },
+      200,
+    );
   })
   .openapi(logoutRoute, async (c) => {
     const header = c.req.header("Authorization");
@@ -331,6 +436,8 @@ export const authRoutes = app
   })
   .openapi(meRoute, async (c) => {
     const user = c.get("user");
+    if (!user.onboardingCompletedAt)
+      return c.json({ error: "온보딩을 먼저 완료해주세요" }, 428);
     const db = drizzle(c.env.DB);
 
     let unit = null;
@@ -349,6 +456,144 @@ export const authRoutes = app
     // 초대코드 가입은 즉시 완료되므로 대기 상태는 더 이상 만들지 않는다.
     const joinRequest = null;
     return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
+  })
+  .openapi(onboardingStatusRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    const config = await db
+      .select()
+      .from(regularOvernightConfigs)
+      .where(eq(regularOvernightConfigs.userId, user.id))
+      .get();
+    const placeholder = !user.name || user.enlistedAt === "2000-01-01";
+    return c.json(
+      {
+        completed: Boolean(user.onboardingCompletedAt),
+        profile: placeholder
+          ? null
+          : {
+              name: user.name,
+              branch: user.branch,
+              enlistedAt: user.enlistedAt,
+              dischargeAt: user.dischargeAt,
+              rank: user.signupRank,
+            },
+        regularOvernight: config
+          ? {
+              enabled: config.enabled,
+              startDate: config.startDate,
+              intervalDays: config.intervalDays,
+              daysPerGrant: config.daysPerGrant,
+            }
+          : null,
+        unitId: user.unitId,
+      },
+      200,
+    );
+  })
+  .openapi(onboardingProfileRoute, async (c) => {
+    const input = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    await db
+      .update(users)
+      .set({
+        name: input.name,
+        branch: input.branch,
+        enlistedAt: input.enlistedAt,
+        dischargeAt: input.dischargeAt,
+        signupRank: input.rank,
+      })
+      .where(eq(users.id, user.id));
+    if (input.branch === "army") {
+      await db
+        .insert(regularOvernightConfigs)
+        .values({
+          userId: user.id,
+          enabled: false,
+          startDate: null,
+          intervalDays: null,
+          daysPerGrant: null,
+          updatedAt: new Date().toISOString(),
+        })
+        .onConflictDoUpdate({
+          target: regularOvernightConfigs.userId,
+          set: {
+            enabled: false,
+            startDate: null,
+            intervalDays: null,
+            daysPerGrant: null,
+            updatedAt: new Date().toISOString(),
+          },
+        });
+    }
+    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(onboardingRegularRoute, async (c) => {
+    const input = c.req.valid("json");
+    const user = await drizzle(c.env.DB)
+      .select()
+      .from(users)
+      .where(eq(users.id, c.get("user").id))
+      .get();
+    if (!user || !user.name)
+      return c.json({ error: "복무정보를 먼저 저장해주세요" }, 400);
+    try {
+      await saveRegularOvernightConfig(drizzle(c.env.DB), user, input);
+      return c.json({ ok: true as const }, 200);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "설정하지 못했습니다",
+        },
+        400,
+      );
+    }
+  })
+  .openapi(onboardingCompleteRoute, async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, c.get("user").id))
+      .get();
+    if (
+      !user ||
+      !user.name ||
+      user.enlistedAt === "2000-01-01" ||
+      user.enlistedAt >= user.dischargeAt
+    ) {
+      return c.json({ error: "복무정보를 먼저 완료해주세요" }, 400);
+    }
+    const existingAnnual = await db
+      .select({ id: leaveGrants.id })
+      .from(leaveGrants)
+      .where(
+        and(
+          eq(leaveGrants.userId, user.id),
+          eq(leaveGrants.balanceKey, "annual"),
+        ),
+      )
+      .get();
+    const now = new Date().toISOString();
+    if (!existingAnnual)
+      await db.insert(leaveGrants).values({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        balanceKey: "annual",
+        days: DEFAULT_ANNUAL_DAYS[user.branch],
+        grantedOn: null,
+        expiresOn: null,
+        note: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    await db
+      .update(users)
+      .set({ onboardingCompletedAt: now })
+      .where(eq(users.id, user.id));
+    return c.json({ ok: true as const }, 200);
   })
   .openapi(updateProfileRoute, async (c) => {
     const input = c.req.valid("json");

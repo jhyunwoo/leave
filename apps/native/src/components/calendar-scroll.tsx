@@ -4,6 +4,9 @@
  * 사용처: apps/native/src/screens/calendar/index.tsx.
  * 스크롤이 위 끝에 닿으면 이전 달을, 아래 끝에 닿으면 다음 달을 이어 붙인다.
  * 위쪽에 덧붙일 때는 스크롤 위치를 보정해 화면이 튀지 않게 한다.
+ *
+ * iOS 상태바를 눌러 맨 위로 가는 동작은 목록의 첫 달이 아니라 입대한 달로
+ * 데려간다(onScrollToTop). 입대 이전 달도 그대로 위로 스크롤해 볼 수 있다.
  */
 
 import {
@@ -41,6 +44,8 @@ import { makeStyles, spacing, useColors } from "@/theme";
 
 const INITIAL_SPAN = 2;
 const PAGE_SIZE = 6;
+/** 이전 달을 이어 붙이는 최소 간격(ms). 아래 onScroll 주석 참고. */
+const PREPEND_INTERVAL_MS = 250;
 const CELL_H = 92; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
@@ -80,6 +85,8 @@ export const CalendarScroll = forwardRef<
     myLeaveDays: Map<ISODate, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
     currentCycle: RegularOvernightCycle | null;
+    /** 입대한 달(YYYY-MM). 상태바 탭이 데려갈 목적지. 모르면 null. */
+    enlistedMonth: string | null;
   }
 >(function CalendarScroll(
   {
@@ -91,6 +98,7 @@ export const CalendarScroll = forwardRef<
     myLeaveDays,
     regularOvernight,
     currentCycle,
+    enlistedMonth,
   },
   ref,
 ) {
@@ -101,17 +109,63 @@ export const CalendarScroll = forwardRef<
   );
   const listRef = useRef<FlatList<string>>(null);
   const prependLock = useRef(false);
+  const lastPrependAt = useRef(0);
+  const dragging = useRef(false);
+  const momentumScrolling = useRef(false);
+  // 목록을 다시 짠 뒤에 옮겨갈 달. 아래 scrollToMonth 참고.
+  const pendingMonth = useRef<string | null>(null);
   const settledMonth = useRef(currentMonth);
 
-  // prepend 후 락 해제 (렌더 커밋 이후).
+  // prepend 후 락 해제 (렌더 커밋 이후). 다시 짠 목록이면 목적지로 옮긴다.
   useEffect(() => {
     prependLock.current = false;
+    const target = pendingMonth.current;
+    if (target == null) return;
+    const idx = months.indexOf(target);
+    if (idx < 0) return;
+    pendingMonth.current = null;
+    // 셀 마운트가 끝난 다음 프레임에 옮겨야 새 콘텐츠 높이가 반영된 뒤 자리 잡는다.
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: ITEM_H * idx, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [months]);
+
+  /**
+   * 원하는 달로 이동한다. 목록에 없는 달이면 그 달을 가운데 둔 목록으로 다시 짜고
+   * 커밋 후에 옮긴다(위 useEffect).
+   */
+  const scrollToMonth = useCallback(
+    (month: string) => {
+      const idx = months.indexOf(month);
+      if (idx >= 0) {
+        listRef.current?.scrollToOffset({
+          offset: ITEM_H * idx,
+          animated: true,
+        });
+        return;
+      }
+      pendingMonth.current = month;
+      setMonths(monthRange(month, INITIAL_SPAN));
+    },
+    [months],
+  );
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
-    if (y < ITEM_H && !prependLock.current) {
+    // 손으로 끌어 올릴 때만 이어 붙인다. 상태바 탭처럼 프로그램이 맨 위까지
+    // 끌고 가는 스크롤에서도 붙이면, 애니메이션 한 번에 수십 년치가 쌓여
+    // 1984년 같은 엉뚱한 달에 도착하고 달마다 달력 요청이 나간다.
+    // 시간 간격은 관성 스크롤 중 끌기 표시가 남아 있을 때를 대비한 안전장치.
+    const now = Date.now();
+    if (
+      y < ITEM_H &&
+      (dragging.current || momentumScrolling.current) &&
+      !prependLock.current &&
+      now - lastPrependAt.current > PREPEND_INTERVAL_MS
+    ) {
       prependLock.current = true;
+      lastPrependAt.current = now;
       setMonths((ms) => {
         const first = ms[0]!;
         const older: string[] = [];
@@ -120,6 +174,23 @@ export const CalendarScroll = forwardRef<
       });
     }
   }, []);
+
+  const onScrollBeginDrag = useCallback(() => {
+    dragging.current = true;
+  }, []);
+
+  const onScrollEndDrag = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  const onMomentumScrollBegin = useCallback(() => {
+    momentumScrolling.current = true;
+  }, []);
+
+  /** iOS 상태바 탭으로 맨 위에 닿았을 때. 입대한 달로 데려간다. */
+  const onScrollToTop = useCallback(() => {
+    scrollToMonth(enlistedMonth ?? currentMonth);
+  }, [scrollToMonth, enlistedMonth, currentMonth]);
 
   const onEndReached = useCallback(() => {
     setMonths((ms) => {
@@ -130,20 +201,16 @@ export const CalendarScroll = forwardRef<
     });
   }, []);
 
-  useImperativeHandle(ref, () => ({
-    scrollToToday: () => {
-      const idx = months.indexOf(currentMonth);
-      if (idx >= 0) {
-        listRef.current?.scrollToOffset({
-          offset: ITEM_H * idx,
-          animated: true,
-        });
-      }
-    },
-  }));
+  useImperativeHandle(
+    ref,
+    () => ({ scrollToToday: () => scrollToMonth(currentMonth) }),
+    [scrollToMonth, currentMonth],
+  );
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      dragging.current = false;
+      momentumScrolling.current = false;
       const index = Math.max(
         0,
         Math.min(
@@ -197,6 +264,10 @@ export const CalendarScroll = forwardRef<
         maxToRenderPerBatch={4}
         maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
         onScroll={onScroll}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollBegin={onMomentumScrollBegin}
+        onScrollToTop={onScrollToTop}
         scrollEventThrottle={16}
         onEndReached={onEndReached}
         onEndReachedThreshold={1.5}

@@ -14,6 +14,7 @@ import { pushLogs, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import { errorResponse, jsonContent, okSchema } from "../lib/responses";
 import { authMiddleware } from "../middleware/auth";
+import { onboardingMiddleware } from "../middleware/onboarding";
 
 const registerTokenRoute = createRoute({
   method: "put",
@@ -57,6 +58,7 @@ const pushEventRoute = createRoute({
 
 const app = createApp();
 app.use("*", authMiddleware);
+app.use("*", onboardingMiddleware);
 
 export const pushRoutes = app
   .openapi(registerTokenRoute, async (c) => {

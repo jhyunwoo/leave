@@ -8,8 +8,10 @@
  */
 import type {
   LoginInput,
+  OnboardingProfileInput,
   PasswordChangeInput,
   ProfileUpdateInput,
+  RegularOvernightConfigInput,
   SignupInput,
 } from "@leave/shared";
 import { ApiError } from "@leave/shared";
@@ -17,7 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLeaveApi } from "../context";
 import { useInvalidateKeys } from "./invalidate";
 import { queryKeys } from "../query-keys";
-import type { AuthResponse, Me } from "../types";
+import type { AuthResponse, Me, OnboardingStatus } from "../types";
 
 /** 401 응답은 다시 물어봐도 답이 달라지지 않으므로 재시도하지 않는다. */
 function retryUnlessUnauthorized(failureCount: number, error: Error): boolean {
@@ -32,6 +34,54 @@ export function useMe() {
     queryKey: queryKeys.me,
     retry: retryUnlessUnauthorized,
     queryFn: async () => unwrap<Me>(await client.auth.me.$get()),
+  });
+}
+
+export function useOnboardingStatus(enabled = true) {
+  const { client, unwrap } = useLeaveApi();
+  return useQuery({
+    queryKey: queryKeys.onboarding,
+    enabled,
+    retry: retryUnlessUnauthorized,
+    queryFn: async () =>
+      unwrap<OnboardingStatus>(await client.auth.onboarding.$get()),
+  });
+}
+
+export function useSaveOnboardingProfile() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: OnboardingProfileInput) =>
+      unwrap(await client.auth.onboarding.profile.$put({ json: input })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.onboarding }),
+  });
+}
+
+export function useSaveOnboardingRegularOvernight() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: RegularOvernightConfigInput) =>
+      unwrap(
+        await client.auth.onboarding["regular-overnight"].$put({ json: input }),
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.onboarding }),
+  });
+}
+
+export function useCompleteOnboarding() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await client.auth.onboarding.complete.$post()),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.onboarding });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    },
   });
 }
 

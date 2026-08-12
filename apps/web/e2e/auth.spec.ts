@@ -24,9 +24,7 @@ test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async
   await expect(page.getByRole("link", { name: "가입하기" })).toBeVisible();
 });
 
-test("회원가입: 개인정보 동의 전에는 완료 불가, 동의 후 가입되어 부대 화면으로 이동", async ({
-  page,
-}) => {
+test("회원가입 후 복무정보·정기외박·공유 온보딩", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -35,34 +33,37 @@ test("회원가입: 개인정보 동의 전에는 완료 불가, 동의 후 가�
   await page.goto("/signup");
   await expect(page).toHaveTitle(/리브/);
 
-  // 1단계: 계정
+  // 계정 생성
   await page.getByPlaceholder("you@example.com").fill(email);
   const passwords = page.locator('input[type="password"]');
   await passwords.nth(0).fill("password123");
   await passwords.nth(1).fill("password123");
-  await page.getByPlaceholder("홍길동").fill("이순신");
-  await page.getByRole("button", { name: "다음" }).click();
+  const checks = page.getByRole("checkbox");
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await checks.nth(2).check();
+  await page.getByRole("button", { name: "가입하고 시작" }).click();
 
-  // 2단계: 군 정보 (입대일 입력 시 전역일 자동 제안)
+  await expect(
+    page.getByRole("heading", { name: "내 복무 정보" }),
+  ).toBeVisible();
+  await page.getByPlaceholder("예: 라임고래").fill("푸른고래");
   await page.getByRole("button", { name: "공군", exact: true }).click();
   const militaryDates = page.locator('input[type="date"]');
   await militaryDates.first().fill("2026-03-23");
   await expect(militaryDates.nth(1)).toHaveValue("2027-12-22");
-  await expect(page.getByText("표준 진급일은 매월 1일이에요")).toBeVisible();
-  expect(consoleErrors).toEqual([]);
   await page.getByRole("button", { name: "다음" }).click();
 
-  // 3단계: 동의 전에는 "가입 완료" 비활성
-  const finish = page.getByRole("button", { name: "가입 완료" });
-  await expect(finish).toBeDisabled();
-
-  // 동의 체크 → 활성화 → 가입
-  await page.getByRole("checkbox").check();
-  await expect(finish).toBeEnabled();
-  await finish.click();
-
-  // 가입 후 부대 찾기 화면으로 이동
-  await expect(page).toHaveURL(/\/units/, { timeout: 15_000 });
+  await expect(
+    page.getByRole("heading", { name: "정기외박 설정" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /나중에 설정/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "함께 관리하면 더 정확해요" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "나중에 하기" }).click();
+  await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+  expect(consoleErrors).toEqual([]);
 });
 
 test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({

@@ -45,6 +45,8 @@ export const users = sqliteTable(
     expoPushToken: text("expo_push_token"),
     // 개인정보(접속 기록·푸시 로그) 수집에 동의한 시각. 미동의(구 사용자)면 null.
     consentedAt: text("consented_at"),
+    /** null이면 계정은 있으나 필수 온보딩을 마치지 않은 상태다. */
+    onboardingCompletedAt: text("onboarding_completed_at"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [index("users_unit_idx").on(t.unitId)],

@@ -23,7 +23,6 @@ export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [alias, setAlias] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
@@ -46,12 +45,6 @@ export function SignupPage() {
     const input = {
       email: email.trim(),
       password,
-      name: alias.trim(),
-      // 구 API 호환 전용 고정값: 실제 군 복무 정보를 수집하지 않는다.
-      branch: "army" as const,
-      enlistedAt: "2000-01-01",
-      dischargeAt: "2000-01-02",
-      rank: "private" as const,
       dataConsent: privacyAccepted,
     };
     const parsed = signupSchema.safeParse(input);
@@ -66,7 +59,7 @@ export function SignupPage() {
       // 알림 선택은 가입을 막지 않는다. 로그인 후 알림의 가치를 확인한
       // 설정 화면에서 다시 선택한다.
       void notificationOptIn;
-      navigate("/units", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "가입하지 못했습니다");
     }
@@ -76,7 +69,6 @@ export function SignupPage() {
     email.includes("@") &&
     password.length >= 8 &&
     password === passwordConfirm &&
-    alias.trim().length > 0 &&
     termsAccepted &&
     privacyAccepted &&
     ageConfirmed;
@@ -96,7 +88,7 @@ export function SignupPage() {
       <div className="anim-rise" style={{ textAlign: "center" }}>
         <h1 className="display-md">60초 안에 시작하기</h1>
         <p className="body-sm text-body" style={{ marginTop: "var(--sp-sm)" }}>
-          실제 이름·군번·계급·부대명·사진은 받지 않아요.
+          계정을 만든 뒤 필요한 복무정보만 안전하게 설정해요.
         </p>
       </div>
 
@@ -148,20 +140,6 @@ export function SignupPage() {
             data-testid="signup-password-confirm"
           />
         </Field>
-        <Field
-          label="그룹에서 쓸 별칭"
-          hint="실명·군번·계급·기수는 입력하지 마세요"
-        >
-          <input
-            className="input"
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-            placeholder="예: 라임고래"
-            maxLength={24}
-            data-testid="signup-name"
-          />
-        </Field>
-
         {/* 목적별 분리 동의 — 선택 항목을 거부해도 서비스는 이용할 수 있다. */}
         <div
           style={{
@@ -180,7 +158,7 @@ export function SignupPage() {
             checked={privacyAccepted}
             onChange={setPrivacyAccepted}
             testId="signup-data-consent"
-            label="[필수] 이메일·별칭·그룹 소속·휴가 날짜 처리에 동의합니다. 거부하면 핵심 기능을 제공할 수 없습니다."
+            label="[필수] 이메일·별칭·군종·입대일·전역예정일·현재 계급·그룹 소속·휴가 날짜 처리에 동의합니다. 거부하면 핵심 기능을 제공할 수 없습니다."
           />
           <ConsentCheckbox
             checked={ageConfirmed}

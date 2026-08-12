@@ -54,6 +54,7 @@ import {
   okSchema,
 } from "../lib/responses";
 import { authMiddleware } from "../middleware/auth";
+import { onboardingMiddleware } from "../middleware/onboarding";
 
 const idParam = z.object({ id: z.string() });
 
@@ -279,6 +280,7 @@ function serializeLeave(
 
 const app = createApp();
 app.use("*", authMiddleware);
+app.use("*", onboardingMiddleware);
 
 export const leaveRoutes = app
   .openapi(balancesRoute, async (c) => {
