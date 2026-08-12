@@ -40,6 +40,34 @@ cd apps/native && pnpm start
 # 자동 사용하며, EXPO_PUBLIC_API_URL로 재정의 가능.
 ```
 
+### 브라우저로 UI 확인
+
+프로젝트 로컬 `agent-browser`로 렌더링 결과, 접근성 트리, 콘솔 메시지와 페이지 오류를
+확인할 수 있습니다. 최초 한 번 브라우저를 준비하고 사용자 웹을 실행합니다.
+
+```bash
+pnpm browser:install
+pnpm dev:web
+```
+
+다른 터미널에서 작업 트리별 세션을 만들고 확인할 페이지를 엽니다.
+
+```bash
+LEAVE_BROWSER_SESSION="$(pnpm exec agent-browser session id --scope worktree --prefix leave)"
+pnpm exec agent-browser --session "$LEAVE_BROWSER_SESSION" open http://localhost:5173
+pnpm exec agent-browser --session "$LEAVE_BROWSER_SESSION" wait --load networkidle
+pnpm exec agent-browser --session "$LEAVE_BROWSER_SESSION" snapshot -i
+pnpm exec agent-browser --session "$LEAVE_BROWSER_SESSION" console
+pnpm exec agent-browser --session "$LEAVE_BROWSER_SESSION" errors
+pnpm browser:close
+```
+
+- 관리자 앱은 `pnpm dev:admin`과 `http://localhost:5174`를 사용합니다.
+- API와 문서는 `http://localhost:8787`, `http://localhost:8787/docs`에서 확인합니다.
+- Linux ARM64에는 Chrome for Testing 빌드가 없으므로 시스템 Chromium이 필요합니다.
+  Debian/Ubuntu에서는 `sudo apt-get install -y chromium`으로 설치할 수 있습니다.
+- 비밀번호 같은 자격 증명은 명령 인자나 스크린샷에 남기지 않습니다.
+
 > 참고: 이 저장소는 `pnpm-workspace.yaml`에 `verifyDepsBeforeRun: false`를 두어
 > `pnpm run`/`turbo` 실행마다 자동 `pnpm install`이 도는 것을 끕니다(스토어 버전 불일치 환경 대응).
 
