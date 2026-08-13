@@ -13,7 +13,6 @@ import {
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   ScrollView,
   Share,
@@ -34,6 +33,7 @@ import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { FormSheet } from "@/components/form-sheet";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SheetScaffold } from "@/components/sheet-scaffold";
+import { confirmAction, notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing } from "@/theme";
 
 async function shareInvite(invite: IssuedUnitInvite) {
@@ -83,7 +83,7 @@ export function UnitsScreen() {
     try {
       await join.mutateAsync(parsed.data);
       setInviteCode("");
-      Alert.alert("참여했어요", "공유 그룹의 휴가 계획 달력이 열렸습니다.");
+      notify("참여했어요", "공유 그룹의 휴가 계획 달력이 열렸습니다.");
     } catch (error) {
       setJoinError(
         error instanceof Error ? error.message : "그룹에 참여하지 못했습니다",
@@ -91,26 +91,25 @@ export function UnitsScreen() {
     }
   };
 
-  const doLeave = () => {
+  const doLeave = async () => {
     if (!myUnit) return;
-    Alert.alert("공유 그룹 나가기", "이 그룹에서 나갈까요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "나가기",
-        style: "destructive",
-        onPress: () =>
-          void leaveUnit
-            .mutateAsync()
-            .catch((error) =>
-              Alert.alert(
-                "나가기 실패",
-                error instanceof Error
-                  ? error.message
-                  : "관리자라면 먼저 다른 참여자에게 권한을 넘겨주세요.",
-              ),
-            ),
-      },
-    ]);
+    const confirmed = await confirmAction({
+      title: "공유 그룹 나가기",
+      message: "이 그룹에서 나갈까요?",
+      confirmLabel: "나가기",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await leaveUnit.mutateAsync();
+    } catch (error) {
+      notify(
+        "나가기 실패",
+        error instanceof Error
+          ? error.message
+          : "관리자라면 먼저 다른 참여자에게 권한을 넘겨주세요.",
+      );
+    }
   };
 
   return (
@@ -152,7 +151,7 @@ export function UnitsScreen() {
               variant="danger"
               size="sm"
               loading={leaveUnit.isPending}
-              onPress={doLeave}
+              onPress={() => void doLeave()}
             />
           </View>
         </ContentPanel>

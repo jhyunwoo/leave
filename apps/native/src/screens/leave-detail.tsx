@@ -19,7 +19,6 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,6 +39,8 @@ import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { SegmentBadges } from "@/components/segment-badges";
+import { WebScreenActions } from "@/components/web-screen-actions";
+import { confirmAction, notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 import { DayRoster } from "./calendar/day-roster";
 
@@ -126,25 +127,21 @@ export function LeaveDetailScreen() {
   );
   const cycle = cycleFor(balances.data?.regularOvernight ?? null, selectedDate);
 
-  const confirmDelete = () => {
-    Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        // 삭제하면 이 화면이 가리킬 대상이 사라지므로 목록으로 되돌아간다.
-        onPress: () => {
-          void (async () => {
-            try {
-              await del.mutateAsync(leave.id);
-              router.back();
-            } catch {
-              Alert.alert("삭제하지 못했어요", "잠시 후 다시 시도해주세요.");
-            }
-          })();
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    const confirmed = await confirmAction({
+      title: "휴가 삭제",
+      message: `"${leave.title}" 휴가를 삭제할까요?`,
+      confirmLabel: "삭제",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await del.mutateAsync(leave.id);
+      // 삭제하면 이 화면이 가리킬 대상이 사라지므로 목록으로 되돌아간다.
+      router.back();
+    } catch {
+      notify("삭제하지 못했어요", "잠시 후 다시 시도해주세요.");
+    }
   };
 
   return (
@@ -154,6 +151,27 @@ export function LeaveDetailScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
+        {/* 웹에는 툴바가 없으므로 수정·삭제를 본문 맨 위에서 연다. */}
+        <WebScreenActions
+          actions={[
+            {
+              id: "edit",
+              title: "수정",
+              variant: "primary",
+              onPress: () => setEditing(true),
+              testID: "leave-detail-edit",
+            },
+            {
+              id: "delete",
+              title: "삭제",
+              variant: "danger",
+              disabled: del.isPending,
+              onPress: () => void confirmDelete(),
+              testID: "leave-detail-delete",
+            },
+          ]}
+        />
+
         <ContentPanel style={styles.panel}>
           <Text style={styles.leaveTitle} selectable>
             {leave.title}
@@ -281,7 +299,7 @@ export function LeaveDetailScreen() {
         <Stack.Toolbar.Button
           icon="trash"
           disabled={del.isPending}
-          onPress={confirmDelete}
+          onPress={() => void confirmDelete()}
         >
           삭제
         </Stack.Toolbar.Button>

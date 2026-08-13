@@ -14,7 +14,6 @@ import {
 import { Picker } from "@expo/ui/community/picker";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Pressable,
   Switch,
@@ -28,6 +27,7 @@ import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
 import { FormSheet } from "@/components/form-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
+import { confirmAction } from "@/lib/dialog";
 import { makeStyles, spacing, useColors } from "@/theme";
 
 /**
@@ -216,21 +216,21 @@ export function LeaveGrantModal(props: {
 }
 
 /** 삭제 확인 — 목록 쪽에서 쓰라고 여기 둔다. */
-export function confirmGrantDelete(
+export async function confirmGrantDelete(
   grant: LeaveGrantItem,
   onConfirm: () => void,
-) {
-  Alert.alert(
-    "적립분 삭제",
-    `${BALANCE_LABELS[grant.balanceKey]} ${grant.days}일을 지울까요?` +
+): Promise<void> {
+  const confirmed = await confirmAction({
+    title: "적립분 삭제",
+    message:
+      `${BALANCE_LABELS[grant.balanceKey]} ${grant.days}일을 지울까요?` +
       (grant.usedDays > 0
         ? `\n이미 ${grant.usedDays}일을 쓴 적립분이라, 지우면 그만큼 설명되지 않는 사용분이 생겨요.`
         : ""),
-    [
-      { text: "취소", style: "cancel" },
-      { text: "삭제", style: "destructive", onPress: onConfirm },
-    ],
-  );
+    confirmLabel: "삭제",
+    destructive: true,
+  });
+  if (confirmed) onConfirm();
 }
 
 const useStyles = makeStyles(({ colors }) => ({

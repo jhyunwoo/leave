@@ -8,7 +8,6 @@ import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,8 @@ import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { SegmentBadges } from "@/components/segment-badges";
+import { WebScreenActions } from "@/components/web-screen-actions";
+import { confirmAction } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function LeavesScreen() {
@@ -66,15 +67,14 @@ export function LeavesScreen() {
       item.expiredDays > 0,
   );
 
-  const confirmDelete = (leave: MyLeave) => {
-    Alert.alert("휴가 삭제", `"${leave.title}" 휴가를 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () => void del.mutateAsync(leave.id),
-      },
-    ]);
+  const confirmDelete = async (leave: MyLeave) => {
+    const confirmed = await confirmAction({
+      title: "휴가 삭제",
+      message: `"${leave.title}" 휴가를 삭제할까요?`,
+      confirmLabel: "삭제",
+      destructive: true,
+    });
+    if (confirmed) await del.mutateAsync(leave.id);
   };
 
   return (
@@ -85,7 +85,21 @@ export function LeavesScreen() {
         contentContainerStyle={styles.content}
       >
         {process.env.EXPO_OS === "web" && (
-          <Text style={styles.webTitle}>내 휴가</Text>
+          <View style={styles.webHeader}>
+            <Text style={styles.webTitle}>내 휴가</Text>
+            {/* 웹에는 툴바가 없으므로 등록도 여기서 연다. */}
+            <WebScreenActions
+              actions={[
+                {
+                  id: "create",
+                  title: "휴가 등록",
+                  variant: "primary",
+                  onPress: () => setCreating(true),
+                  testID: "leaves-create",
+                },
+              ]}
+            />
+          </View>
         )}
         {balances.data ? (
           <>
@@ -214,7 +228,7 @@ export function LeavesScreen() {
                       systemImage: "trash",
                       destructive: true,
                       disabled: del.isPending,
-                      onPress: () => confirmDelete(l),
+                      onPress: () => void confirmDelete(l),
                     },
                   ]}
                 />
@@ -259,6 +273,12 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
     gap: spacing.lg,
     paddingBottom: 120,
+  },
+  webHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
   webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
   balancePanel: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },

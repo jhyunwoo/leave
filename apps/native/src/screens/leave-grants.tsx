@@ -173,7 +173,10 @@ export function LeaveGrantsScreen() {
             onAdd={() => setEditing({ newKey: fund.key })}
             onEdit={(grant) => setEditing({ grant })}
             onDelete={(grant) =>
-              confirmGrantDelete(grant, () => void del.mutateAsync(grant.id))
+              void confirmGrantDelete(
+                grant,
+                () => void del.mutateAsync(grant.id),
+              )
             }
           />
         ))}

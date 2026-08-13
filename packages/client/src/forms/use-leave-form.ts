@@ -68,8 +68,9 @@ export type LeaveFormOptions = {
   /** 수정 모드면 대상 휴가. 등록 모드면 null. */
   editing?: MyLeave | null;
   /**
-   * 제목 입력란이 없는 화면(네이티브)에서 휴가 종류로 제목을 자동 생성한다.
-   * 지정하면 `title` 상태 대신 이 함수의 결과를 저장한다.
+   * 사용자가 제목을 직접 적지 않는 화면(네이티브 등록, 아직 이름을 안 고친 수정)에서
+   * 휴가 종류로 제목을 자동 생성한다. 지정하면 `title` 상태 대신 이 함수의 결과를
+   * 저장한다.
    */
   deriveTitle?: (drafts: readonly SegmentDraft[]) => string;
 };
@@ -78,6 +79,20 @@ export type LeaveFormOptions = {
 export function titleFromDrafts(drafts: readonly SegmentDraft[]): string {
   const first = drafts[0];
   return first ? `${BALANCE_LABELS[first.key]} 계획` : "휴가 계획";
+}
+
+/**
+ * `titleFromDrafts`가 지어준 제목인지 판별한다.
+ *
+ * 자동 제목과 사용자가 직접 붙인 이름을 갈라야, 종류를 바꿨을 때 자동 제목만
+ * 따라 바뀌고 손으로 지은 이름은 그대로 남는다.
+ */
+export function isDerivedTitle(title: string): boolean {
+  const trimmed = title.trim();
+  return (
+    trimmed === "휴가 계획" ||
+    BALANCE_KEYS.some((key) => trimmed === `${BALANCE_LABELS[key]} 계획`)
+  );
 }
 
 export function useLeaveForm(options: LeaveFormOptions) {

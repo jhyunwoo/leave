@@ -4,13 +4,14 @@
  */
 
 import { useState } from "react";
-import { Alert, Switch, Text, View } from "react-native";
+import { Switch, Text, View } from "react-native";
 import type { LeaveGrantsPage } from "@leave/client";
 import { useUpdateRegularOvernight } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Input } from "@/components/field";
+import { notify } from "@/lib/dialog";
 import { makeStyles, spacing, useColors } from "@/theme";
 
 /**
@@ -39,9 +40,9 @@ export function RegularOvernightSettings(props: {
           ? { enabled: true, startDate, intervalDays, daysPerGrant }
           : { enabled: false },
       );
-      Alert.alert("저장 완료", "정기외박 적립 설정을 저장했어요.");
+      notify("저장 완료", "정기외박 적립 설정을 저장했어요.");
     } catch (caught) {
-      Alert.alert(
+      notify(
         "저장 실패",
         caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
       );

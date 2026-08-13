@@ -12,14 +12,7 @@ import {
   type UnitUpdateInput,
 } from "@leave/shared";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  Share,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { IssuedUnitInvite, Me } from "@leave/client";
 import {
@@ -43,6 +36,7 @@ import { DateRangePicker } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
+import { confirmAction, notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Unit = NonNullable<Me["unit"]>;
@@ -223,29 +217,25 @@ function InviteSection({ unit }: { unit: Unit }) {
   const rotate = useRotateUnitInvite(unit.id);
   const [invite, setInvite] = useState<IssuedUnitInvite | null>(null);
 
-  const issue = () => {
-    Alert.alert(
-      "새 초대코드 발급",
-      "기존 초대코드는 즉시 폐기됩니다. 새 코드는 이 화면에서 한 번만 확인할 수 있어요.",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "발급",
-          onPress: () =>
-            void rotate
-              .mutateAsync({})
-              .then((result) => setInvite(result.invite))
-              .catch((error) =>
-                Alert.alert(
-                  "발급 실패",
-                  error instanceof Error
-                    ? error.message
-                    : "초대코드를 발급하지 못했어요.",
-                ),
-              ),
-        },
-      ],
-    );
+  const issue = async () => {
+    const confirmed = await confirmAction({
+      title: "새 초대코드 발급",
+      message:
+        "기존 초대코드는 즉시 폐기됩니다. 새 코드는 이 화면에서 한 번만 확인할 수 있어요.",
+      confirmLabel: "발급",
+    });
+    if (!confirmed) return;
+    try {
+      const result = await rotate.mutateAsync({});
+      setInvite(result.invite);
+    } catch (error) {
+      notify(
+        "발급 실패",
+        error instanceof Error
+          ? error.message
+          : "초대코드를 발급하지 못했어요.",
+      );
+    }
   };
 
   return (
@@ -278,7 +268,7 @@ function InviteSection({ unit }: { unit: Unit }) {
         title={rotate.isPending ? "발급 중…" : "새 코드 발급·기존 코드 폐기"}
         variant="secondary"
         loading={rotate.isPending}
-        onPress={issue}
+        onPress={() => void issue()}
       />
     </ContentPanel>
   );
@@ -382,73 +372,53 @@ function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
   const report = useCreateReport();
   const list = members.data?.members ?? [];
 
-  const doTransfer = (userId: string, alias: string) => {
-    Alert.alert(
-      "관리자 위임",
-      `${alias}님에게 관리자를 넘길까요? 넘긴 뒤에는 이 화면을 볼 수 없습니다.`,
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "위임",
-          onPress: () => void transfer.mutateAsync({ userId }),
-        },
-      ],
-    );
+  const doTransfer = async (userId: string, alias: string) => {
+    const confirmed = await confirmAction({
+      title: "관리자 위임",
+      message: `${alias}님에게 관리자를 넘길까요? 넘긴 뒤에는 이 화면을 볼 수 없습니다.`,
+      confirmLabel: "위임",
+    });
+    if (confirmed) await transfer.mutateAsync({ userId });
   };
-  const doRemove = (userId: string, alias: string) => {
-    Alert.alert("참여자 내보내기", `${alias}님을 그룹에서 내보낼까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "내보내기",
-        style: "destructive",
-        onPress: () => void remove.mutateAsync(userId),
-      },
-    ]);
+  const doRemove = async (userId: string, alias: string) => {
+    const confirmed = await confirmAction({
+      title: "참여자 내보내기",
+      message: `${alias}님을 그룹에서 내보낼까요?`,
+      confirmLabel: "내보내기",
+      destructive: true,
+    });
+    if (confirmed) await remove.mutateAsync(userId);
   };
   /** 차단은 이 목록에서만 숨긴다. 출타 집계는 그대로라 숫자가 흔들리지 않는다. */
-  const doBlock = (userId: string, alias: string) => {
-    Alert.alert(
-      "참여자 차단",
-      `${alias}님을 차단할까요? 참여자 목록에서 보이지 않게 되며, 출타 집계에는 그대로 반영됩니다.`,
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "차단",
-          style: "destructive",
-          onPress: () => void block.mutateAsync({ userId }),
-        },
-      ],
-    );
+  const doBlock = async (userId: string, alias: string) => {
+    const confirmed = await confirmAction({
+      title: "참여자 차단",
+      message: `${alias}님을 차단할까요? 참여자 목록에서 보이지 않게 되며, 출타 집계에는 그대로 반영됩니다.`,
+      confirmLabel: "차단",
+      destructive: true,
+    });
+    if (confirmed) await block.mutateAsync({ userId });
   };
-  const doReport = (userId: string, alias: string) => {
-    Alert.alert(
-      "별칭 신고",
-      `${alias}님의 별칭에 실명·군번·계급 등이 들어 있나요? 24시간 안에 검토합니다.`,
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "신고",
-          onPress: () =>
-            void report
-              .mutateAsync({
-                targetType: "member",
-                targetId: userId,
-                reason: "personal_info",
-              })
-              .then(() =>
-                Alert.alert("접수했어요", "24시간 안에 검토하겠습니다."),
-              )
-              .catch((error) =>
-                Alert.alert(
-                  "접수 실패",
-                  error instanceof Error
-                    ? error.message
-                    : "잠시 후 다시 시도해주세요",
-                ),
-              ),
-        },
-      ],
-    );
+  const doReport = async (userId: string, alias: string) => {
+    const confirmed = await confirmAction({
+      title: "별칭 신고",
+      message: `${alias}님의 별칭에 실명·군번·계급 등이 들어 있나요? 24시간 안에 검토합니다.`,
+      confirmLabel: "신고",
+    });
+    if (!confirmed) return;
+    try {
+      await report.mutateAsync({
+        targetType: "member",
+        targetId: userId,
+        reason: "personal_info",
+      });
+      notify("접수했어요", "24시간 안에 검토하겠습니다.");
+    } catch (error) {
+      notify(
+        "접수 실패",
+        error instanceof Error ? error.message : "잠시 후 다시 시도해주세요",
+      );
+    }
   };
 
   return (
@@ -492,14 +462,14 @@ function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
                         title: "관리자 위임",
                         systemImage: "person.badge.key",
                         disabled: transfer.isPending,
-                        onPress: () => doTransfer(member.id, member.name),
+                        onPress: () => void doTransfer(member.id, member.name),
                       },
                       {
                         id: "report",
                         title: "별칭 신고",
                         systemImage: "exclamationmark.bubble",
                         disabled: report.isPending,
-                        onPress: () => doReport(member.id, member.name),
+                        onPress: () => void doReport(member.id, member.name),
                       },
                       {
                         id: "block",
@@ -507,7 +477,7 @@ function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
                         systemImage: "hand.raised",
                         destructive: true,
                         disabled: block.isPending,
-                        onPress: () => doBlock(member.id, member.name),
+                        onPress: () => void doBlock(member.id, member.name),
                       },
                       {
                         id: "remove",
@@ -515,7 +485,7 @@ function MembersSection({ me, unit }: { me: Me; unit: Unit }) {
                         systemImage: "person.crop.circle.badge.minus",
                         destructive: true,
                         disabled: remove.isPending,
-                        onPress: () => doRemove(member.id, member.name),
+                        onPress: () => void doRemove(member.id, member.name),
                       },
                     ]}
                   />

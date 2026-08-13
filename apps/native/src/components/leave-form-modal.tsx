@@ -7,10 +7,17 @@
  * `useLeaveForm`에 있고, 이 파일은 그 결과를 네이티브 위젯으로 그리기만 한다.
  * 같은 규칙을 웹도 쓴다(apps/web/src/components/LeaveFormModal.tsx).
  *
- * 웹과 다른 점: 제목·사유를 사용자에게 묻지 않는다. 자유 입력은 다른 구성원에게
- * 불필요한 개인정보와 UGC를 만들기 때문에, 제목은 휴가 종류에서 자동으로 만든다.
+ * 웹과 다른 점: 등록할 때는 제목·사유를 묻지 않는다. 자유 입력은 다른 구성원에게
+ * 불필요한 개인정보와 UGC를 만들기 때문에, 등록 제목은 휴가 종류에서 자동으로 만든다.
+ * 다만 수정할 때는 제목을 고칠 수 있다 — 자동으로 지은 제목은 종류를 바꾸면 따라
+ * 바뀌고, 한 번 직접 고친 이름은 그대로 남는다. 사유는 여전히 묻지 않는다.
  */
-import { titleFromDrafts, useLeaveForm, type MyLeave } from "@leave/client";
+import {
+  isDerivedTitle,
+  titleFromDrafts,
+  useLeaveForm,
+  type MyLeave,
+} from "@leave/client";
 import {
   addDays,
   fmtDateShort,
@@ -23,10 +30,13 @@ import {
   todayInSeoul,
   type LeaveStatus,
 } from "@leave/shared";
-import { Alert, KeyboardAvoidingView, Text, View } from "react-native";
+import { useState } from "react";
+import { KeyboardAvoidingView, Text, View } from "react-native";
+import { notify } from "@/lib/dialog";
 import { makeStyles, radius, spacing } from "@/theme";
 import { Button } from "./button";
 import { DateRangePicker } from "./date-picker";
+import { Field, Input } from "./field";
 import { FormSheet } from "./form-sheet";
 import { OfficialDisclaimer } from "./official-disclaimer";
 import { SegmentRow } from "./segment-row";
@@ -59,13 +69,20 @@ export function LeaveFormModal(props: {
   onClose: () => void;
 }) {
   const styles = useStyles();
+  // 이미 손으로 지은 이름을 가진 휴가(웹에서 만든 것 등)는 처음부터 직접 입력으로 연다.
+  const [renamed, setRenamed] = useState(
+    () => !!props.editing && !isDerivedTitle(props.editing.title),
+  );
   const form = useLeaveForm({
     // 네이티브는 날짜 선택기가 항상 유효한 날을 요구하므로 빈 값을 두지 않는다.
     initialDate: props.initialDate ?? todayInSeoul(),
     editing: props.editing,
-    deriveTitle: titleFromDrafts,
+    // 이름을 직접 고치기 전까지는 휴가 종류에서 제목을 만들어 쓴다.
+    deriveTitle: renamed ? undefined : titleFromDrafts,
   });
   const { editing, startDate, endDate, duration, resolved, validRange } = form;
+  // 자동 제목은 상태로 들고 있지 않고 그때그때 구간에서 만든다(저장 값과 같다).
+  const shownTitle = renamed ? form.title : titleFromDrafts(form.drafts);
 
   const save = async () => {
     const result = await form.submit();
@@ -74,7 +91,7 @@ export function LeaveFormModal(props: {
     // 저장은 됐지만 그날이 초과라면, 공식 승인 여부는 부대에 확인해야 한다.
     if (result.exceededDates.length > 0) {
       const list = result.exceededDates.map(fmtDateShort).join(", ");
-      Alert.alert(
+      notify(
         "참고 기준 초과",
         `저장은 완료됐지만 ${list}의 추정 출타 상태가 초과예요. 공식 가능 여부는 소속 부대에 확인하세요.`,
       );
@@ -132,6 +149,29 @@ export function LeaveFormModal(props: {
                 무관하게 지휘관이 휴가를 제한할 수 있습니다.
               </Text>
             </View>
+          ) : null}
+
+          {/* 등록은 종류에서 제목을 자동으로 만들고, 이름은 수정할 때 고친다. */}
+          {editing ? (
+            <Field
+              label="휴가 제목"
+              hint={
+                renamed
+                  ? undefined
+                  : "지금은 휴가 종류를 따라 자동으로 지어져요. 직접 고치면 그대로 유지돼요."
+              }
+            >
+              <Input
+                value={shownTitle}
+                onChangeText={(text) => {
+                  setRenamed(true);
+                  form.setTitle(text);
+                }}
+                placeholder="예: 제주도 가족여행"
+                maxLength={80}
+                testID="leave-title"
+              />
+            </Field>
           ) : null}
 
           <DateRangePicker

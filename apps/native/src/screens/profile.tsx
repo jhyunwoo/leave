@@ -24,7 +24,6 @@ import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
@@ -53,6 +52,8 @@ import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { NativeSegmentedControl } from "@/components/segmented-control";
 import { ServiceProgress } from "@/components/service-progress";
 import { SheetScaffold } from "@/components/sheet-scaffold";
+import { WebScreenActions } from "@/components/web-screen-actions";
+import { confirmAction, notify } from "@/lib/dialog";
 import { layout, makeStyles, spacing, useColors } from "@/theme";
 
 export function ProfileScreen() {
@@ -84,7 +85,7 @@ export function ProfileScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
+      notify(
         "사진 접근 권한이 필요해요",
         "설정에서 사진 접근을 허용하면 프로필 사진을 바꿀 수 있어요.",
       );
@@ -103,32 +104,29 @@ export function ProfileScreen() {
       const blob = await fetch(asset.uri).then((res) => res.blob());
       await uploadImage.mutateAsync(blob);
     } catch (caught) {
-      Alert.alert(
+      notify(
         "사진 업로드 실패",
         caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
       );
     }
   };
 
-  const confirmDeleteImage = () => {
-    Alert.alert("프로필 사진 삭제", "이니셜 아바타로 돌아갑니다.", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () =>
-          void deleteImage
-            .mutateAsync()
-            .catch((caught) =>
-              Alert.alert(
-                "삭제 실패",
-                caught instanceof Error
-                  ? caught.message
-                  : "잠시 후 다시 시도해주세요",
-              ),
-            ),
-      },
-    ]);
+  const confirmDeleteImage = async () => {
+    const confirmed = await confirmAction({
+      title: "프로필 사진 삭제",
+      message: "이니셜 아바타로 돌아갑니다.",
+      confirmLabel: "삭제",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteImage.mutateAsync();
+    } catch (caught) {
+      notify(
+        "삭제 실패",
+        caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
+      );
+    }
   };
 
   // 이미지 라우트는 Bearer 인증을 요구한다. 키가 바뀌면 uri도 바뀌어야
@@ -142,29 +140,33 @@ export function ProfileScreen() {
         }
       : null;
 
-  const confirmDeleteAccount = () => {
-    Alert.alert(
-      "계정과 데이터 영구 삭제",
-      "계정, 휴가 계획, 알림, 그룹 소속 데이터가 삭제됩니다. 되돌릴 수 없어요.",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "영구 삭제",
-          style: "destructive",
-          onPress: () =>
-            void deleteAccount
-              .mutateAsync()
-              .catch((caught) =>
-                Alert.alert(
-                  "삭제 실패",
-                  caught instanceof Error
-                    ? caught.message
-                    : "잠시 후 다시 시도해주세요",
-                ),
-              ),
-        },
-      ],
-    );
+  const confirmLogout = async () => {
+    const confirmed = await confirmAction({
+      title: "로그아웃",
+      message: "로그아웃할까요?",
+      confirmLabel: "로그아웃",
+      destructive: true,
+    });
+    if (confirmed) await logout.mutateAsync();
+  };
+
+  const confirmDeleteAccount = async () => {
+    const confirmed = await confirmAction({
+      title: "계정과 데이터 영구 삭제",
+      message:
+        "계정, 휴가 계획, 알림, 그룹 소속 데이터가 삭제됩니다. 되돌릴 수 없어요.",
+      confirmLabel: "영구 삭제",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteAccount.mutateAsync();
+    } catch (caught) {
+      notify(
+        "삭제 실패",
+        caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
+      );
+    }
   };
 
   return (
@@ -175,9 +177,24 @@ export function ProfileScreen() {
         contentContainerStyle={styles.content}
       >
         {process.env.EXPO_OS === "web" ? (
-          <Text selectable style={styles.webTitle}>
-            설정
-          </Text>
+          <View style={styles.webHeader}>
+            <Text selectable style={styles.webTitle}>
+              설정
+            </Text>
+            {/* 웹에는 툴바가 없으므로 로그아웃도 여기서 연다. */}
+            <WebScreenActions
+              actions={[
+                {
+                  id: "logout",
+                  title: "로그아웃",
+                  variant: "danger",
+                  disabled: logout.isPending,
+                  onPress: () => void confirmLogout(),
+                  testID: "profile-logout",
+                },
+              ]}
+            />
+          </View>
         ) : null}
 
         <ContentPanel style={styles.card}>
@@ -207,7 +224,7 @@ export function ProfileScreen() {
                 variant="ghost"
                 size="sm"
                 loading={deleteImage.isPending}
-                onPress={confirmDeleteImage}
+                onPress={() => void confirmDeleteImage()}
                 testID="delete-profile-image"
               />
             ) : null}
@@ -280,7 +297,7 @@ export function ProfileScreen() {
             title={deleteAccount.isPending ? "삭제 중…" : "계정과 데이터 삭제"}
             variant="danger"
             loading={deleteAccount.isPending}
-            onPress={confirmDeleteAccount}
+            onPress={() => void confirmDeleteAccount()}
             testID="delete-account"
           />
         </ContentPanel>
@@ -296,16 +313,7 @@ export function ProfileScreen() {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="rectangle.portrait.and.arrow.right"
-          onPress={() =>
-            Alert.alert("로그아웃", "로그아웃할까요?", [
-              { text: "취소", style: "cancel" },
-              {
-                text: "로그아웃",
-                style: "destructive",
-                onPress: () => void logout.mutateAsync(),
-              },
-            ])
-          }
+          onPress={() => void confirmLogout()}
         >
           로그아웃
         </Stack.Toolbar.Button>
@@ -485,7 +493,7 @@ function ChangePasswordSheet(props: { onClose: () => void }) {
     try {
       await change.mutateAsync({ currentPassword, newPassword });
       props.onClose();
-      Alert.alert(
+      notify(
         "비밀번호를 바꿨어요",
         "이 기기는 그대로 쓸 수 있고, 다른 기기는 다시 로그인해야 해요.",
       );
@@ -605,6 +613,12 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
     gap: spacing.lg,
     paddingBottom: 120,
+  },
+  webHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
   webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
   card: { padding: spacing.xl, gap: spacing.lg },

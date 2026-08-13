@@ -7,7 +7,6 @@ import { fmtDateShort } from "@leave/shared";
 import { Stack, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,8 @@ import {
   type NotificationList,
 } from "@leave/client";
 import { ContentPanel } from "@/components/content-panel";
+import { WebScreenActions } from "@/components/web-screen-actions";
+import { notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Notification = NotificationList["notifications"][number];
@@ -61,7 +62,7 @@ export function NotificationsScreen() {
   const openDates = (dates: string[]) => {
     const target = resolveTarget(dates);
     if (!target) {
-      Alert.alert(
+      notify(
         "휴가를 찾을 수 없어요",
         "이미 삭제하거나 기간을 바꾼 계획일 수 있어요.",
       );
@@ -102,7 +103,33 @@ export function NotificationsScreen() {
         contentContainerStyle={styles.content}
       >
         {process.env.EXPO_OS === "web" && (
-          <Text style={styles.webTitle}>알림</Text>
+          <View style={styles.webHeader}>
+            <Text style={styles.webTitle}>알림</Text>
+            {/* 웹에는 툴바가 없으므로 툴바에 있던 동작을 여기서 연다. */}
+            <WebScreenActions
+              actions={[
+                {
+                  id: "settings",
+                  title: "설정",
+                  onPress: () => router.push("/notifications/settings"),
+                  testID: "notifications-settings",
+                },
+                // 읽지 않은 알림이 없으면 툴바에서도 숨는 버튼이다.
+                ...(list.data && list.data.unreadCount > 0
+                  ? [
+                      {
+                        id: "read-all",
+                        title: markRead.isPending ? "처리 중…" : "모두 읽음",
+                        variant: "primary" as const,
+                        disabled: markRead.isPending,
+                        onPress: () => void markRead.mutateAsync(),
+                        testID: "notifications-read-all",
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </View>
         )}
 
         {list.isPending ? (
@@ -225,6 +252,12 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
     gap: spacing.lg,
     paddingBottom: 120,
+  },
+  webHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
   webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
   empty: {
