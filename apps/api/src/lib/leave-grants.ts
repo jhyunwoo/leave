@@ -10,6 +10,7 @@ import {
   allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  clipSegmentsTo,
   cycleColor,
   cycleState,
   cycleUsedDays,
@@ -217,7 +218,10 @@ export async function buildGrantsPage(db: Db, user: User) {
       cycleScoped: scoped,
       totalDays: allocation.totalDays,
       usedDays: allocation.usedDays,
+      usedToDateDays: allocation.usedToDateDays,
+      plannedDays: allocation.plannedDays,
       remainingDays: allocation.remainingDays,
+      remainingAsOfTodayDays: allocation.remainingAsOfTodayDays,
       expiredDays: allocation.expiredDays,
       upcomingDays: allocation.upcomingDays,
       // 주기 재원은 주기별로 따로 따지므로 재원 총합의 미귀속은 의미가 없다.
@@ -227,6 +231,7 @@ export async function buildGrantsPage(db: Db, user: User) {
         balanceKey: entry.grant.balanceKey,
         days: entry.grant.days,
         usedDays: entry.usedDays,
+        usedToDateDays: entry.usedToDateDays,
         availableDays: entry.availableDays,
         unusedDays: entry.unusedDays,
         grantedOn: entry.grant.grantedOn,
@@ -247,12 +252,21 @@ export async function buildGrantsPage(db: Db, user: User) {
   const totals = {
     totalDays: sum((f) => f.totalDays) + cycles.totals.totalDays,
     usedDays: sum((f) => f.usedDays) + cycles.totals.usedDays,
+    usedToDateDays: sum((f) => f.usedToDateDays) + cycles.totals.usedToDateDays,
+    plannedDays:
+      sum((f) => f.plannedDays) +
+      (cycles.totals.usedDays - cycles.totals.usedToDateDays),
     // 아직 오지 않은 주기 몫도 남은 휴가로 센다. 만기가 정해진 적립분과 달리 주기 몫은
     // 복무 중이면 반드시 들어오므로, 지금 못 쓴다는 이유로 빼면 실제보다 적게 보인다.
     remainingDays:
       sum((f) => f.remainingDays) +
       cycles.totals.remainingDays +
       cycles.totals.upcomingDays,
+    // 화면의 "남은 휴가" — 오늘까지 다녀온 몫만 뺀다. 계획은 plannedDays로 따로 알린다.
+    remainingAsOfTodayDays:
+      sum((f) => f.remainingAsOfTodayDays) +
+      cycles.totals.remainingAsOfTodayDays +
+      cycles.totals.upcomingAsOfTodayDays,
     expiredDays: sum((f) => f.expiredDays) + cycles.totals.expiredDays,
     upcomingDays: sum((f) => f.upcomingDays),
     unattributedDays: sum((f) => f.unattributedDays),
@@ -290,22 +304,32 @@ export function regularOvernightSummary(
   const totals = {
     totalDays: 0,
     usedDays: 0,
+    /** 그중 오늘까지 지나간 몫. */
+    usedToDateDays: 0,
     /** 이번 주기의 잔여 — 지금 쓸 수 있는 몫. */
     remainingDays: 0,
+    /** 이번 주기의 잔여 중 오늘까지 쓴 것만 뺀 값. */
+    remainingAsOfTodayDays: 0,
     /** 아직 오지 않은 주기의 잔여 — 앞으로 받을 몫. */
     upcomingDays: 0,
+    /** 앞으로 받을 몫 중 오늘까지 쓴 것만 뺀 값(미래 주기는 늘 그 주기 몫 전체). */
+    upcomingAsOfTodayDays: 0,
     /** 지난 주기에서 못 쓰고 날린 몫. */
     expiredDays: 0,
   };
   for (const cycle of list) {
     totals.totalDays += cycle.grantDays;
     totals.usedDays += cycle.usedDays;
+    totals.usedToDateDays += cycle.usedToDateDays;
     if (cycle.state === "past") {
+      // 지난 주기는 이미 끝나 계획이 남을 수 없다 — 두 셈이 같다.
       totals.expiredDays += cycle.remainingDays;
     } else if (cycle.state === "future") {
       totals.upcomingDays += cycle.remainingDays;
+      totals.upcomingAsOfTodayDays += cycle.remainingAsOfTodayDays;
     } else {
       totals.remainingDays += cycle.remainingDays;
+      totals.remainingAsOfTodayDays += cycle.remainingAsOfTodayDays;
     }
   }
   return { list, totals };
@@ -326,13 +350,20 @@ function buildCycleList(
     .slice(0, MAX_LISTED_CYCLES)
     .map((cycle) => {
       const usedDays = cycleUsedDays(cycle, segments);
+      // 아직 다녀오지 않은 계획은 "쓴 몫"이 아니다 — 주기 안에서도 오늘까지만 센다.
+      const usedToDateDays = cycleUsedDays(
+        cycle,
+        clipSegmentsTo(segments, today),
+      );
       return {
         index: cycle.index,
         start: cycle.start,
         end: cycle.end,
         grantDays: cycle.grantDays,
         usedDays,
+        usedToDateDays,
         remainingDays: cycle.grantDays - usedDays,
+        remainingAsOfTodayDays: cycle.grantDays - usedToDateDays,
         state: cycleState(cycle, today),
         color: cycleColor(cycle.index),
       };

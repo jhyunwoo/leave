@@ -52,6 +52,14 @@ export function LeaveGrantsPage(props: { me: Me }) {
       !fund.cycleScoped && fund.grants.length === 0 && fund.usedDays === 0,
   );
 
+  // 막대는 "총량 = 사용 + (계획 + 자유)" 로 쪼갠다. 계획분은 남은 휴가에서 빠지지 않고
+  // 그 안에 잡혀 있을 뿐이라 초록 안쪽을 옅은 색으로 나눈다.
+  const plannedBar = Math.min(
+    totals.plannedDays,
+    totals.remainingAsOfTodayDays,
+  );
+  const freeBar = totals.remainingAsOfTodayDays - plannedBar;
+
   const removeGrant = (grant: LeaveGrantItem) => {
     const warning =
       grant.usedDays > 0
@@ -91,10 +99,13 @@ export function LeaveGrantsPage(props: { me: Me }) {
           className="display-md"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          남은 휴가 {totals.remainingDays}일
+          남은 휴가 {totals.remainingAsOfTodayDays}일
         </p>
+        {/* 남은 일수는 오늘까지 다녀온 몫만 뺀다. 계획은 아직 통장에서 빠지지 않는다. */}
         <p className="body-sm text-body">
-          사용 {totals.usedDays}일 · 총 {totals.totalDays}일
+          사용 {totals.usedToDateDays}일
+          {totals.plannedDays > 0 ? ` · 계획 ${totals.plannedDays}일` : ""} · 총{" "}
+          {totals.totalDays}일
         </p>
 
         <div
@@ -107,13 +118,17 @@ export function LeaveGrantsPage(props: { me: Me }) {
           }}
           aria-hidden="true"
         >
-          {totals.usedDays > 0 && (
-            <div style={{ flex: totals.usedDays, background: "#d8ddd5" }} />
-          )}
-          {totals.remainingDays > 0 && (
+          {totals.usedToDateDays > 0 && (
             <div
-              style={{ flex: totals.remainingDays, background: "#9fe870" }}
+              style={{ flex: totals.usedToDateDays, background: "#d8ddd5" }}
             />
+          )}
+          {/* 계획분은 아직 남은 휴가 안에 있다 — 초록을 쪼개 "잡아둔 몫"으로 보여준다. */}
+          {plannedBar > 0 && (
+            <div style={{ flex: plannedBar, background: "#d9f2bb" }} />
+          )}
+          {freeBar > 0 && (
+            <div style={{ flex: freeBar, background: "#9fe870" }} />
           )}
           {totals.expiredDays > 0 && (
             <div style={{ flex: totals.expiredDays, background: "#fff0f0" }} />
@@ -222,9 +237,16 @@ function FundCard(props: {
           className="body-sm text-body"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          잔여 {fund.remainingDays}일 / 총 {fund.totalDays}일
+          잔여 {fund.remainingAsOfTodayDays}일 / 총 {fund.totalDays}일
         </span>
       </div>
+
+      {/* 잔여에는 아직 다녀오지 않은 계획이 들어 있다 — 얼마가 잡혀 있는지 밝혀 둔다. */}
+      {fund.plannedDays > 0 && (
+        <p className="caption text-mute">
+          이 중 {fund.plannedDays}일은 앞으로 갈 계획으로 잡혀 있어요.
+        </p>
+      )}
 
       {fund.unattributedDays > 0 && (
         <p className="field-error">
@@ -292,7 +314,13 @@ function GrantRow(props: {
             {grant.expiresOn
               ? `만기 ${fmtDateShort(grant.expiresOn)}`
               : "만기 없음"}
-            {grant.usedDays > 0 ? ` · 사용 ${grant.usedDays}일` : ""}
+            {/* 다녀온 몫과 잡아둔 계획을 나눠 적어야 위의 잔여와 셈이 맞는다. */}
+            {grant.usedToDateDays > 0
+              ? ` · 사용 ${grant.usedToDateDays}일`
+              : ""}
+            {grant.usedDays > grant.usedToDateDays
+              ? ` · 계획 ${grant.usedDays - grant.usedToDateDays}일`
+              : ""}
           </span>
         </p>
         <p style={{ marginTop: 2 }}>

@@ -1,0 +1,715 @@
+/**
+ * 온보딩 전용 스타일. `pages/OnboardingPage.tsx`에서만 불러온다.
+ *
+ * 예전에는 global.css에 있었는데, 가입 직후 한 번만 지나가는 화면의 규칙이
+ * 모든 페이지의 스타일시트에 상주할 이유가 없다. 랜딩(`landing.css`)과 같은
+ * 방식으로 페이지 옆에 둔다.
+ *
+ * 모션은 전역 `prefers-reduced-motion` 블록(global.css)이 한 번에 잠근다.
+ * 여기서 새 애니메이션을 더해도 그 규칙이 duration을 1ms로 눌러버린다.
+ */
+
+.ob {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  /* 한국어는 어절 안에서 줄이 끊기면 크게 읽기 나빠진다. 큰 제목이 많은
+     화면이라 페이지 전체에 어절 단위 줄바꿈을 건다. */
+  word-break: keep-all;
+}
+
+/* ------------------------------------------------------------ 상단 바 */
+
+.ob-bar {
+  height: 72px;
+  flex: none;
+  padding: 0 clamp(20px, 5vw, 56px);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xl);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+/* 단계 표시는 숫자가 아니라 칸이다. "3 / 8"은 아직 다섯 개 남았다는 압박이 되고,
+   채워지는 칸은 지나온 만큼이 먼저 보인다. */
+.ob-steps {
+  flex: 1;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  max-width: 320px;
+}
+
+.ob-steps span {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--hairline-soft);
+  transition:
+    background 260ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+.ob-steps span.is-done {
+  background: var(--positive);
+}
+
+.ob-steps span.is-now {
+  background: var(--primary);
+  transform: scaleY(1.75);
+}
+
+.ob-back {
+  min-height: 40px;
+  padding: 0 var(--sp-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out);
+}
+
+.ob-back:hover:not(:disabled) {
+  background: var(--canvas-soft);
+}
+
+.ob-back:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- 본문 */
+
+.ob-body {
+  flex: 1;
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: clamp(32px, 6vh, 72px) 0 80px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(32px, 6vw, 80px);
+  align-items: center;
+}
+
+.ob-stage {
+  position: sticky;
+  top: 96px;
+}
+
+.ob-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+  max-width: 460px;
+}
+
+/* 단계가 바뀌면 패널이 통째로 새로 마운트된다(key={step}). 요소를 조금씩
+   늦춰 들이면 "새 질문 하나"가 왔다는 게 읽힌다. */
+.ob-panel > * {
+  animation: ob-step-in 420ms var(--ease-out) both;
+}
+
+.ob-panel > *:nth-child(1) {
+  animation-delay: 20ms;
+}
+.ob-panel > *:nth-child(2) {
+  animation-delay: 70ms;
+}
+.ob-panel > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.ob-panel > *:nth-child(4) {
+  animation-delay: 170ms;
+}
+.ob-panel > *:nth-child(n + 5) {
+  animation-delay: 210ms;
+}
+
+@keyframes ob-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ob-title {
+  font-size: clamp(28px, 3.4vw, 38px);
+  font-weight: 900;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+/* 단계가 바뀔 때마다 이 제목으로 포커스를 옮겨 스크린리더가 새 질문을 읽게 한다.
+   제목은 누를 수 있는 요소가 아니므로 초점 테두리는 그리지 않는다 — 그리면
+   마우스로 "다음"을 누른 사람에게도 매번 네모가 번쩍인다. */
+.ob-title:focus,
+.ob-title:focus-visible {
+  outline: none;
+}
+
+.ob-lead {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--body);
+  margin-top: calc(var(--sp-xl) * -1 + var(--sp-sm));
+}
+
+.ob-input-lg {
+  font-size: 18px;
+  min-height: 54px;
+}
+
+.ob-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mute);
+}
+
+.ob-note.is-live {
+  color: var(--body);
+  animation: ob-step-in 320ms var(--ease-out) both;
+}
+
+.ob-note strong {
+  color: var(--ink);
+}
+
+.ob-error {
+  margin-top: calc(var(--sp-xl) * -1 + var(--sp-xs));
+}
+
+/* ------------------------------------------------------------ 선택지 */
+
+.ob-choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-md);
+}
+
+.ob-choices.is-compact {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ob-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-xs);
+  min-height: 118px;
+  padding: var(--sp-lg) var(--sp-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  background: var(--canvas);
+  color: var(--body);
+  cursor: pointer;
+  transition:
+    border-color 180ms var(--ease-out),
+    background 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+.ob-choices.is-compact .ob-choice {
+  min-height: 78px;
+}
+
+.ob-choice:hover {
+  transform: translateY(-2px);
+  border-color: var(--muted-soft);
+}
+
+.ob-choice.is-on {
+  border-color: var(--positive);
+  background: var(--primary-pale);
+  color: var(--ink-deep);
+  box-shadow: inset 0 0 0 1px var(--positive);
+}
+
+.ob-choice svg {
+  width: 40px;
+  height: 40px;
+  color: var(--mute);
+  transition: color 180ms var(--ease-out);
+}
+
+.ob-choice.is-on svg {
+  color: var(--brand);
+}
+
+.ob-choice strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ob-choice span {
+  font-size: 12px;
+  color: var(--mute);
+}
+
+/* 그룹 선택처럼 설명이 붙는 넓은 카드는 왼쪽 정렬이 읽기 쉽다. */
+.ob-choice.is-wide {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 0;
+  padding: var(--sp-lg) var(--sp-xl);
+  gap: 2px;
+}
+
+.ob-tag {
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------- 행동 */
+
+.ob-next {
+  min-height: 54px;
+  font-size: 17px;
+}
+
+.ob-skip {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  margin-top: calc(var(--sp-xl) * -1 + var(--sp-xs));
+}
+
+.ob-skip:hover {
+  color: var(--ink);
+}
+
+/* -------------------------------------------------- 정기외박 · 그룹 부속 */
+
+.ob-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+}
+
+.ob-metrics > div {
+  padding: var(--sp-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.ob-metrics span {
+  font-size: 13px;
+  color: var(--body);
+}
+
+.ob-metrics strong {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.ob-details {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: var(--sp-md) var(--sp-lg);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+.ob-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+}
+
+.ob-details summary::after {
+  content: " ⌄";
+  color: var(--mute);
+}
+
+.ob-details[open] summary::after {
+  content: " ⌃";
+}
+
+.ob-details > p {
+  margin-top: var(--sp-md);
+}
+
+.ob-sources {
+  margin-top: var(--sp-md);
+  padding-top: var(--sp-md);
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.ob-sources a {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.ob-fineprint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mute);
+}
+
+.ob-notice {
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.ob-invite {
+  border: 1px dashed var(--positive);
+  border-radius: var(--r-md);
+  background: var(--primary-pale);
+  padding: 26px 20px;
+  text-align: center;
+  font: 800 24px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+  animation: ob-pop 420ms var(--ease-out) both;
+}
+
+@keyframes ob-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ob-promise {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.ob-promise li {
+  position: relative;
+  padding-left: 28px;
+  font-size: 15px;
+  color: var(--body);
+}
+
+.ob-promise li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 16px;
+  height: 9px;
+  border-left: 2.5px solid var(--brand);
+  border-bottom: 2.5px solid var(--brand);
+  transform: rotate(-45deg);
+}
+
+.ob-summary {
+  margin: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.ob-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-lg);
+  padding: 13px var(--sp-lg);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.ob-summary > div:last-child {
+  border-bottom: 0;
+}
+
+.ob-summary dt {
+  font-size: 13px;
+  color: var(--mute);
+}
+
+.ob-summary dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* ================================================================ 히어로 */
+
+.ob-hero {
+  position: relative;
+}
+
+.ob-hero-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* 레이어 공통. hidden은 그리지 않고, present는 옅게 남고, active만 또렷하다. */
+.ob-hero .is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ob-hero .is-present {
+  opacity: 0.62;
+}
+
+.ob-hero .is-active {
+  opacity: 1;
+}
+
+.ob-sky,
+.ob-emblem,
+.ob-badge,
+.ob-markers,
+.ob-cycle,
+.ob-nodes,
+.ob-caps,
+.ob-readout {
+  transition:
+    opacity 420ms var(--ease-out),
+    transform 420ms var(--ease-out);
+}
+
+.ob-sky {
+  fill: var(--accent-tint);
+  transition:
+    fill 420ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+}
+
+.ob-sky.is-hidden {
+  fill: var(--canvas-soft);
+  opacity: 1;
+}
+
+/* 군종을 바꾸면 엠블럼이 통째로 다시 마운트된다(key={branch}) — 색만 바뀌는
+   것보다 새 상징이 들어왔다는 게 확실히 읽힌다. */
+.ob-emblem-inner {
+  animation: ob-emblem-in 520ms var(--ease-out) both;
+  transform-origin: 24px 24px;
+}
+
+@keyframes ob-emblem-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ob-badge rect {
+  fill: var(--ink);
+  transition: width 260ms var(--ease-out);
+}
+
+.ob-badge text {
+  fill: var(--canvas);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ob-track {
+  stroke: var(--hairline);
+  stroke-width: 4;
+  stroke-linecap: round;
+  /* 첫 진입에서 좌에서 우로 그어진다. dasharray는 트랙 길이(HERO_TRACK_LENGTH)를
+     엘리먼트가 직접 들고 있으므로 여기서는 offset만 0으로 되돌린다. */
+  animation: ob-draw 900ms var(--ease-out) both;
+}
+
+@keyframes ob-draw {
+  from {
+    stroke-dashoffset: 296;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ob-progress {
+  stroke: var(--positive);
+  stroke-width: 6;
+  stroke-linecap: round;
+  /* 값이 바뀌면 선이 차오른다. dashoffset은 정식 CSS 속성이라 어느 브라우저에서든
+     전환이 걸린다(SVG 기하 속성과 달리). */
+  transition:
+    stroke-dashoffset 700ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+}
+
+.ob-end {
+  fill: var(--canvas);
+  stroke: var(--hairline);
+  stroke-width: 3;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.ob-head {
+  transition:
+    transform 700ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+  transform: translateX(var(--x, 0));
+}
+
+.ob-head circle {
+  fill: var(--positive);
+  stroke: var(--canvas);
+  stroke-width: 3;
+}
+
+.ob-markers path {
+  fill: none;
+  stroke: var(--accent-line);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ob-markers text {
+  fill: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.ob-marker {
+  animation: ob-pop-marker 420ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 90ms);
+  transform-origin: center bottom;
+}
+
+@keyframes ob-pop-marker {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ob-cycle circle {
+  fill: var(--accent-line);
+  animation: ob-pop 300ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 55ms);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ob-nodes circle {
+  fill: var(--canvas);
+  stroke: var(--accent-line);
+  stroke-width: 2.5;
+  animation: ob-gather 480ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+.ob-nodes circle.is-me {
+  fill: var(--primary);
+  stroke: var(--positive);
+}
+
+@keyframes ob-gather {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ob-caps text {
+  fill: var(--mute);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ob-readout-value {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  fill: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.ob-readout-caption {
+  font-weight: 600;
+  fill: var(--accent-line);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------- 좁은 화면 */
+
+@media (max-width: 900px) {
+  .ob-bar {
+    height: 60px;
+    font-size: 20px;
+    gap: var(--sp-md);
+  }
+
+  .ob-body {
+    width: auto;
+    padding: var(--sp-xl) 20px 64px;
+    grid-template-columns: 1fr;
+    gap: var(--sp-xl);
+    align-items: start;
+  }
+
+  .ob-stage {
+    position: static;
+  }
+
+  .ob-panel {
+    max-width: none;
+  }
+
+  .ob-readout strong {
+    font-size: 34px;
+  }
+
+  .ob-choices.is-compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

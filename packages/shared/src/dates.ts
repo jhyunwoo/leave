@@ -80,6 +80,16 @@ export function monthBounds(month: string): { start: ISODate; end: ISODate } {
   };
 }
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * 달력 날짜(KST 자정)에 해당하는 실제 시각(epoch ms).
+ * parseISODate는 UTC 자정을 주므로 그대로 쓰면 9시간이 어긋난다.
+ */
+export function kstMidnight(date: ISODate): number {
+  return parseISODate(date).getTime() - KST_OFFSET_MS;
+}
+
 /** 한국 시간 기준 오늘 날짜. */
 export function todayInSeoul(now: Date = new Date()): ISODate {
   return new Intl.DateTimeFormat("en-CA", {

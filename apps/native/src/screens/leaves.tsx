@@ -35,17 +35,29 @@ export function LeavesScreen() {
 
   // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫(upcomingDays)까지
   // 더한다. 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
+  //
+  // 남은 일수는 오늘까지 다녀온 몫만 뺀다(remainingAsOfTodayDays). 아직 가지 않은 계획을
+  // 미리 빼면 통장에 있는 휴가보다 적게 보인다 — 계획은 아래 "계획 N일"로 따로 알린다.
   const holdings = (balances.data?.balances ?? []).reduce(
     (sum, item) => ({
       remaining:
         sum.remaining +
-        item.remainingDays +
+        item.remainingAsOfTodayDays +
         (item.cycleScoped ? item.upcomingDays : 0),
+      planned: sum.planned + item.plannedDays,
       expiringSoon: sum.expiringSoon + item.expiringSoonDays,
       expired: sum.expired + item.expiredDays,
     }),
-    { remaining: 0, expiringSoon: 0, expired: 0 },
+    { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
   );
+  /** 만료·소멸처럼 눈에 띄어야 하는 것만 경고 색으로. 계획은 경고가 아니다. */
+  const holdingsWarning = [
+    holdings.expiringSoon > 0 ? `만료 임박 ${holdings.expiringSoon}일` : null,
+    holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const visibleBalances = (balances.data?.balances ?? []).filter(
     (item) =>
       item.totalDays > 0 ||
@@ -90,21 +102,20 @@ export function LeavesScreen() {
                 <Text style={styles.holdingsValue} selectable>
                   남은 {holdings.remaining}일
                 </Text>
-                {holdings.expiringSoon > 0 || holdings.expired > 0 ? (
-                  <Text style={styles.holdingsMeta} selectable>
-                    {holdings.expiringSoon > 0
-                      ? `만료 임박 ${holdings.expiringSoon}일`
-                      : ""}
-                    {holdings.expiringSoon > 0 && holdings.expired > 0
-                      ? " · "
-                      : ""}
-                    {holdings.expired > 0 ? `소멸 ${holdings.expired}일` : ""}
+                {holdings.planned > 0 ? (
+                  <Text style={styles.holdingsHint} selectable>
+                    계획 {holdings.planned}일
                   </Text>
-                ) : (
+                ) : null}
+                {holdingsWarning ? (
+                  <Text style={styles.holdingsMeta} selectable>
+                    {holdingsWarning}
+                  </Text>
+                ) : holdings.planned === 0 ? (
                   <Text style={styles.holdingsHint} selectable>
                     만기 기한과 정기외박 주기를 관리해요
                   </Text>
-                )}
+                ) : null}
               </View>
               <Text style={styles.detailLink}>자세히</Text>
             </Pressable>
@@ -125,14 +136,17 @@ export function LeavesScreen() {
                     {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
                     <Text style={styles.balanceMeta} selectable>
                       {item.cycleScoped ? "이번 주기 · " : ""}총{" "}
-                      {item.totalDays}일 · 사용 {item.usedDays}일
+                      {item.totalDays}일 · 사용 {item.usedToDateDays}일
+                      {item.plannedDays > 0
+                        ? ` · 계획 ${item.plannedDays}일`
+                        : ""}
                       {item.expiredDays > 0
                         ? ` · 만료 ${item.expiredDays}일`
                         : ""}
                     </Text>
                   </View>
                   <Text style={styles.balanceValue} selectable>
-                    {item.remainingDays}일
+                    {item.remainingAsOfTodayDays}일
                   </Text>
                 </View>
               ))}

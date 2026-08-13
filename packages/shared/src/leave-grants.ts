@@ -56,8 +56,10 @@ export type LeaveGrant = {
 
 export type GrantAllocation = {
   grant: LeaveGrant;
-  /** 이 적립분에서 빠져나간 일수. */
+  /** 이 적립분에서 빠져나간 일수. 미래에 계획해 둔 몫까지 센다. */
   usedDays: number;
+  /** 그중 오늘까지 실제로 나갔다 온 일수. 미래 계획은 빼고 센다. */
+  usedToDateDays: number;
   /** 아직 쓰지 않은 일수 (days - usedDays). */
   unusedDays: number;
   /** 오늘 기준 지금 쓸 수 있는 일수. active가 아니면 0. */
@@ -71,10 +73,22 @@ export type BalanceAllocation = {
   balanceKey: BalanceKey;
   /** 받은 모든 적립분의 합 (만료·예정 포함). */
   totalDays: number;
-  /** 이 재원으로 실제 쓴 총 일수 (배분된 일수 + unattributedDays). */
+  /** 이 재원으로 쓴 총 일수 (배분된 일수 + unattributedDays). 미래 계획까지 센다. */
   usedDays: number;
-  /** 오늘 기준 쓸 수 있는 잔여. 만료·예정 적립분은 빠진다. */
+  /** 그중 오늘까지 지나간 일수. 오늘은 이미 나간 것으로 본다. */
+  usedToDateDays: number;
+  /** 미래에 계획만 해둔 일수 (usedDays - usedToDateDays). 아직 쓴 것이 아니다. */
+  plannedDays: number;
+  /** 오늘 기준 쓸 수 있는 잔여. 만료·예정 적립분은 빠진다. 미래 계획도 빠진다. */
   remainingDays: number;
+  /**
+   * 미래 계획을 빼지 않은 잔여 — "오늘까지 쓴 것만 뺀 남은 휴가".
+   *
+   * `remainingDays`는 계획한 휴가까지 미리 차감해 "앞으로 더 쓸 수 있는 양"을 말하므로
+   * 새 휴가를 넣을 수 있는지 판단할 때 쓴다. 반면 사용자가 "내 휴가가 며칠 남았나"라고
+   * 물을 때 기대하는 값은 이쪽이다 — 아직 다녀오지 않은 계획은 통장에서 빠지지 않는다.
+   */
+  remainingAsOfTodayDays: number;
   /** 만료된 적립분 중 못 쓰고 날린 일수. */
   expiredDays: number;
   /** 아직 부여일이 오지 않은 적립분의 미사용분. */
@@ -181,10 +195,16 @@ export function allocateBalanceGrants(
 
   // mine은 이미 만기 빠른 순이므로, 그날 쓸 수 있는 첫 적립분이 곧 만기가 가장 이른 것이다.
   const consumed = new Map<string, number>();
+  // 오늘까지의 몫만 따로 센다. dates가 오름차순이라 오늘 이전 날짜는 미래 날짜보다 항상
+  // 먼저 처리되고, 따라서 이 값은 "미래 구간을 빼고 다시 배분한 결과"와 정확히 같다.
+  const consumedToDate = new Map<string, number>();
   const unattributedDates: ISODate[] = [];
   let unattributedDays = 0;
+  let usedToDateDays = 0;
 
   for (const date of dates) {
+    const isPast = date <= today;
+    if (isPast) usedToDateDays += 1;
     const grant = mine.find(
       (candidate) =>
         isUsableOn(candidate, date) &&
@@ -196,27 +216,35 @@ export function allocateBalanceGrants(
       continue;
     }
     consumed.set(grant.id, (consumed.get(grant.id) ?? 0) + 1);
+    if (isPast) {
+      consumedToDate.set(grant.id, (consumedToDate.get(grant.id) ?? 0) + 1);
+    }
   }
 
   let totalDays = 0;
   let remainingDays = 0;
+  let remainingAsOfTodayDays = 0;
   let expiredDays = 0;
   let upcomingDays = 0;
 
   const allocations: GrantAllocation[] = mine.map((grant) => {
     const usedDays = consumed.get(grant.id) ?? 0;
+    const usedToDate = consumedToDate.get(grant.id) ?? 0;
     const unusedDays = grant.days - usedDays;
     const status = grantStatus(grant, today);
     const availableDays = status === "active" ? unusedDays : 0;
 
     totalDays += grant.days;
-    if (status === "active") remainingDays += unusedDays;
-    else if (status === "expired") expiredDays += unusedDays;
+    if (status === "active") {
+      remainingDays += unusedDays;
+      remainingAsOfTodayDays += grant.days - usedToDate;
+    } else if (status === "expired") expiredDays += unusedDays;
     else upcomingDays += unusedDays;
 
     return {
       grant,
       usedDays,
+      usedToDateDays: usedToDate,
       unusedDays,
       availableDays,
       status,
@@ -230,7 +258,10 @@ export function allocateBalanceGrants(
     balanceKey,
     totalDays,
     usedDays: dates.length,
+    usedToDateDays,
+    plannedDays: dates.length - usedToDateDays,
     remainingDays,
+    remainingAsOfTodayDays,
     expiredDays,
     upcomingDays,
     unattributedDays,

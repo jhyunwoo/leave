@@ -12,6 +12,7 @@ import {
   addDays,
   addMonthsClamped,
   diffDays,
+  kstMidnight,
   parseISODate,
   toISODate,
   type ISODate,
@@ -162,6 +163,24 @@ export interface RankInfo {
   serviceProgress: number;
   /** 전역까지 남은 일수(오늘 포함 안 함). 전역일이 지났으면 0. */
   daysUntilDischarge: number;
+}
+
+/**
+ * 입대일~전역일 사이 경과 비율(0~1)을 시각 단위로.
+ *
+ * `getRankInfo`의 serviceProgress는 하루 격자라 화면에서 실시간으로 차오르는
+ * 숫자를 만들 수 없다. 네이티브 복무 진행률 표시와 온보딩 히어로가 같은 값을
+ * 그려야 해서 여기 둔다.
+ */
+export function serviceProgressAt(
+  enlistedAt: ISODate,
+  dischargeAt: ISODate,
+  now: number,
+): number {
+  const start = kstMidnight(enlistedAt);
+  const end = kstMidnight(dischargeAt);
+  if (!(end > start)) return 0;
+  return Math.min(Math.max((now - start) / (end - start), 0), 1);
 }
 
 export function getRankInfo(params: {

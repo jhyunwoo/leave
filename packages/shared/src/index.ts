@@ -9,6 +9,7 @@
  * 구성:
  *  - dates/calendar : 날짜 계산과 한국어 표기
  *  - rank           : 군 종류별 복무 기간과 자동 진급
+ *  - onboarding     : 가입 직후 단계 구성과 히어로 일러스트 기하
  *  - leave          : 휴가 종류·상태·구간의 정의
  *  - leave-grants   : 적립분(언제 얼마가 부여됐고 언제 만료되는가)
  *  - regular-overnight : 주기 기반 정기외박
@@ -27,6 +28,7 @@ export * from "./http";
 export * from "./leave";
 export * from "./leave-draft";
 export * from "./leave-grants";
+export * from "./onboarding";
 export * from "./regular-overnight";
 export * from "./regular-overnight-guidance";
 export * from "./availability";

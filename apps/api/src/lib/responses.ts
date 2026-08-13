@@ -234,8 +234,16 @@ export const leaveBalanceItemSchema = z.object({
   key: z.enum(BALANCE_KEYS),
   label: z.string(),
   totalDays: z.number(),
+  /** 미래 계획까지 포함한 사용 일수. */
   usedDays: z.number(),
+  /** 오늘까지 실제로 지나간 사용 일수. */
+  usedToDateDays: z.number(),
+  /** 미래에 계획만 해둔 일수. 아직 쓴 것이 아니다. */
+  plannedDays: z.number(),
+  /** 계획까지 미리 뺀 잔여 — 새 휴가를 더 넣을 수 있는지 판단할 때 쓴다. */
   remainingDays: z.number(),
+  /** 오늘까지 쓴 것만 뺀 잔여 — 화면에서 "남은 휴가"로 보여주는 값. */
+  remainingAsOfTodayDays: z.number(),
   automaticDays: z.number(),
   /** 총량·사용량이 이번 주기 기준인지 (정기외박 자동 적립). */
   cycleScoped: z.boolean(),
@@ -256,7 +264,10 @@ export const leaveGrantSchema = z
     id: z.string(),
     balanceKey: z.enum(BALANCE_KEYS),
     days: z.number(),
+    /** 이 적립분에 달린 사용 일수. 미래 계획까지 센다. */
     usedDays: z.number(),
+    /** 그중 오늘까지 실제로 지나간 일수. */
+    usedToDateDays: z.number(),
     /** 오늘 기준 지금 쓸 수 있는 일수. 만료·예정이면 0. */
     availableDays: z.number(),
     unusedDays: z.number(),
@@ -277,7 +288,10 @@ export const leaveGrantFundSchema = z
     cycleScoped: z.boolean(),
     totalDays: z.number(),
     usedDays: z.number(),
+    usedToDateDays: z.number(),
+    plannedDays: z.number(),
     remainingDays: z.number(),
+    remainingAsOfTodayDays: z.number(),
     expiredDays: z.number(),
     upcomingDays: z.number(),
     unattributedDays: z.number(),
@@ -292,7 +306,9 @@ export const regularOvernightCycleSchema = z
     end: z.string(),
     grantDays: z.number(),
     usedDays: z.number(),
+    usedToDateDays: z.number(),
     remainingDays: z.number(),
+    remainingAsOfTodayDays: z.number(),
     state: z.enum(["past", "current", "future"]),
     color: z.string(),
   })
@@ -305,7 +321,10 @@ export const leaveGrantsPageSchema = z
     totals: z.object({
       totalDays: z.number(),
       usedDays: z.number(),
+      usedToDateDays: z.number(),
+      plannedDays: z.number(),
       remainingDays: z.number(),
+      remainingAsOfTodayDays: z.number(),
       expiredDays: z.number(),
       upcomingDays: z.number(),
       unattributedDays: z.number(),

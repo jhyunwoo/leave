@@ -24,7 +24,7 @@ test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async
   await expect(page.getByRole("link", { name: "가입하기" })).toBeVisible();
 });
 
-test("회원가입 후 복무정보·정기외박·공유 온보딩", async ({ page }) => {
+test("회원가입 후 한 화면 한 입력 온보딩 8단계", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -44,24 +44,49 @@ test("회원가입 후 복무정보·정기외박·공유 온보딩", async ({ p
   await checks.nth(2).check();
   await page.getByRole("button", { name: "가입하고 시작" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "내 복무 정보" }),
-  ).toBeVisible();
-  await page.getByPlaceholder("예: 라임고래").fill("푸른고래");
-  await page.getByRole("button", { name: "공군", exact: true }).click();
-  const militaryDates = page.locator('input[type="date"]');
-  await militaryDates.first().fill("2026-03-23");
-  await expect(militaryDates.nth(1)).toHaveValue("2027-12-22");
-  await page.getByRole("button", { name: "다음" }).click();
+  const next = page.getByTestId("onboarding-next");
+  // 단계마다 입력이 하나뿐이라, 화면이 바뀌었는지는 단계 id로 확인한다.
+  const step = (id: string) => page.getByTestId(`onboarding-step-${id}`);
 
-  await expect(
-    page.getByRole("heading", { name: "정기외박 설정" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /나중에 설정/ }).click();
-  await expect(
-    page.getByRole("heading", { name: "함께 관리하면 더 정확해요" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "나중에 하기" }).click();
+  await expect(step("welcome")).toBeVisible();
+  await next.click();
+
+  await expect(step("name")).toBeVisible();
+  await page.getByTestId("onboarding-name").fill("푸른고래");
+  await next.click();
+
+  await expect(step("branch")).toBeVisible();
+  await page.getByTestId("onboarding-branch-air_force").click();
+  await next.click();
+
+  await expect(step("dates")).toBeVisible();
+  await page.getByTestId("onboarding-enlisted-at").fill("2026-03-23");
+  // 전역 예정일은 입대일 + 군종 복무기간에서 자동으로 채워진다.
+  await expect(page.getByTestId("onboarding-discharge-at")).toHaveValue(
+    "2027-12-22",
+  );
+  await next.click();
+
+  // 계급은 입대일 기준 표준 진급표로 미리 골라져 있다. 어떤 계급이 나올지는
+  // 실행 시점에 따라 달라지므로, 정확히 하나가 선택돼 있다는 것만 확인한다.
+  await expect(step("rank")).toBeVisible();
+  await expect(step("rank").locator('[role="radio"][aria-checked="true"]')).toHaveCount(1);
+  await expect(step("rank").getByText("자동 계산")).toBeVisible();
+  await next.click();
+
+  // 공군이므로 정기외박 단계가 있다(육군이면 건너뛴다).
+  await expect(step("overnight")).toBeVisible();
+  await page.getByTestId("onboarding-overnight-skip").click();
+
+  await expect(step("group")).toBeVisible();
+  await page.getByTestId("onboarding-group-skip").click();
+
+  // 마지막 요약에는 앞서 답한 값이 그대로 되짚어져야 한다.
+  await expect(step("done")).toBeVisible();
+  await expect(step("done")).toContainText("푸른고래");
+  await expect(step("done")).toContainText("공군");
+  await page.getByTestId("onboarding-complete").click();
+
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
   expect(consoleErrors).toEqual([]);
 });

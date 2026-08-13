@@ -14,7 +14,7 @@
  * 화면이 앞에 있고 앱이 포그라운드일 때만 시계와 프레임 콜백이 돈다.
  */
 
-import { parseISODate, type ISODate } from "@leave/shared";
+import { kstMidnight, serviceProgressAt, type ISODate } from "@leave/shared";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Text, TextInput, View } from "react-native";
@@ -34,31 +34,9 @@ const DRAW_INTERVAL_MS = 1000 / MAX_FPS;
 /** 막대와 접근성 값은 분 단위 갱신으로 충분하며 화면·배터리 노이즈를 만들지 않는다. */
 const TICK_MS = 60_000;
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-/** 달력 날짜(KST 자정)를 실제 시각으로. parseISODate는 UTC 자정을 준다. */
-function kstMidnight(date: ISODate): number {
-  return parseISODate(date).getTime() - KST_OFFSET_MS;
-}
-
-/**
- * 입대일~전역일 사이 경과 비율(0~1). 서버가 주는 serviceProgress는 하루 단위라
- * 화면에서는 시각 단위로 다시 계산해 실시간으로 올라가는 값을 보여준다.
- */
-export function serviceProgressAt(
-  enlistedAt: ISODate,
-  dischargeAt: ISODate,
-  now: number,
-): number {
-  const start = kstMidnight(enlistedAt);
-  const end = kstMidnight(dischargeAt);
-  if (!(end > start)) return 0;
-  return Math.min(Math.max((now - start) / (end - start), 0), 1);
-}
-
-/** 위와 같은 계산의 퍼센트 판. 워클릿에서도 부르므로 순수하게 유지한다. */
+/** `serviceProgressAt`과 같은 계산의 퍼센트 판. 워클릿에서도 부르므로 순수하게 유지한다. */
 function percentBetween(start: number, span: number, now: number): number {
   "worklet";
   if (span <= 0) return 0;

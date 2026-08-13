@@ -20,16 +20,20 @@ export function LeavesPage() {
 
   // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫(upcomingDays)까지
   // 더한다. 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
+  //
+  // 남은 일수는 오늘까지 다녀온 몫만 뺀다(remainingAsOfTodayDays). 아직 가지 않은 계획을
+  // 미리 빼면 통장에 있는 휴가보다 적게 보인다 — 계획은 아래 "계획 N일"로 따로 알린다.
   const holdings = (balances.data?.balances ?? []).reduce(
     (sum, item) => ({
       remaining:
         sum.remaining +
-        item.remainingDays +
+        item.remainingAsOfTodayDays +
         (item.cycleScoped ? item.upcomingDays : 0),
+      planned: sum.planned + item.plannedDays,
       expiringSoon: sum.expiringSoon + item.expiringSoonDays,
       expired: sum.expired + item.expiredDays,
     }),
-    { remaining: 0, expiringSoon: 0, expired: 0 },
+    { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
   );
   const visibleBalances = (balances.data?.balances ?? []).filter(
     (item) =>
@@ -105,16 +109,15 @@ export function LeavesPage() {
               className="caption"
               style={{ display: "block", marginTop: 2 }}
             >
-              {holdings.expiringSoon > 0 || holdings.expired > 0
-                ? [
-                    holdings.expiringSoon > 0
-                      ? `만료 임박 ${holdings.expiringSoon}일`
-                      : null,
-                    holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "만기 기한과 정기외박 주기를 관리해요"}
+              {[
+                holdings.planned > 0 ? `계획 ${holdings.planned}일` : null,
+                holdings.expiringSoon > 0
+                  ? `만료 임박 ${holdings.expiringSoon}일`
+                  : null,
+                holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "만기 기한과 정기외박 주기를 관리해요"}
             </span>
           </span>
           <span aria-hidden="true" style={{ fontSize: 24 }}>
@@ -129,12 +132,13 @@ export function LeavesPage() {
             <div key={item.key} className="metric-strip__item">
               <p className="caption text-mute">{item.label}</p>
               <p className="display-xs" style={{ marginTop: 2 }}>
-                {item.remainingDays}일
+                {item.remainingAsOfTodayDays}일
               </p>
               {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
               <p className="caption text-mute">
                 {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} · 사용{" "}
-                {item.usedDays}
+                {item.usedToDateDays}
+                {item.plannedDays > 0 ? ` · 계획 ${item.plannedDays}` : ""}
               </p>
               {item.expiredDays > 0 && (
                 <p className="caption" style={{ color: "#a72027" }}>

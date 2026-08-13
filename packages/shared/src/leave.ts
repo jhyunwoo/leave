@@ -147,6 +147,23 @@ export function sortSegments<
   );
 }
 
+/**
+ * 기준일까지 지나간 부분만 남기고 미래를 잘라낸 구간들. 원본은 건드리지 않는다.
+ *
+ * "오늘까지 실제로 쓴 휴가"를 셀 때 쓴다. 오늘 시작해 다음 주에 끝나는 휴가는 종료일을
+ * 오늘로 당겨 그만큼만 세고, 아예 미래에 시작하는 구간은 통째로 빠진다.
+ * 기준일 당일은 이미 나가 있는 날이므로 사용에 포함한다.
+ */
+export function clipSegmentsTo<
+  T extends { startDate: ISODate; endDate: ISODate },
+>(segments: readonly T[], date: ISODate): T[] {
+  return segments
+    .filter((segment) => segment.startDate <= date)
+    .map((segment) =>
+      segment.endDate <= date ? segment : { ...segment, endDate: date },
+    );
+}
+
 /** 그날에 해당하는 구간. 없으면 undefined. */
 export function segmentOnDate<
   T extends { startDate: ISODate; endDate: ISODate },

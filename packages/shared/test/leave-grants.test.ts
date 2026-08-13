@@ -302,6 +302,102 @@ describe("만기·부여일 경계", () => {
   });
 });
 
+describe("오늘 기준 잔여 (미래 계획은 아직 쓴 것이 아니다)", () => {
+  it("전체 107일 · 사용 13일 · 계획 12일이면 오늘 기준 잔여는 94일", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [grant({ id: "a", days: 107 })],
+      [used("2026-07-01", "2026-07-13"), used("2026-09-01", "2026-09-12")],
+      TODAY,
+    );
+    expect(result.totalDays).toBe(107);
+    expect(result.usedToDateDays).toBe(13);
+    expect(result.plannedDays).toBe(12);
+    // 오늘까지 쓴 13일만 뺀다.
+    expect(result.remainingAsOfTodayDays).toBe(94);
+    // 계획까지 미리 뺀 값은 그대로 남아 새 휴가 검증에 쓰인다.
+    expect(result.usedDays).toBe(25);
+    expect(result.remainingDays).toBe(82);
+    expectBalanced(result);
+  });
+
+  it("오늘을 걸친 구간은 오늘까지만 쓴 것으로 센다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [grant({ id: "a", days: 10 })],
+      [used("2026-08-01", "2026-08-05")],
+      TODAY, // 2026-08-02 — 오늘은 이미 나가 있는 날이므로 사용에 넣는다.
+    );
+    expect(result.usedToDateDays).toBe(2);
+    expect(result.plannedDays).toBe(3);
+    expect(result.remainingAsOfTodayDays).toBe(8);
+    expect(result.remainingDays).toBe(5);
+  });
+
+  it("계획이 없으면 두 잔여가 같다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [grant({ id: "a", days: 10 })],
+      [used("2026-07-01", "2026-07-04")],
+      TODAY,
+    );
+    expect(result.plannedDays).toBe(0);
+    expect(result.remainingAsOfTodayDays).toBe(result.remainingDays);
+  });
+
+  it("적립분별 사용도 오늘까지와 계획을 나눠 센다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [
+        grant({ id: "soon", days: 3, expiresOn: "2026-12-31" }),
+        grant({ id: "never", days: 5 }),
+      ],
+      // 만기 임박분(soon)이 먼저 소진되고, 남는 날짜가 never로 넘어간다.
+      [used("2026-07-01", "2026-07-02"), used("2026-09-01", "2026-09-03")],
+      TODAY,
+    );
+    const byId = new Map(
+      result.grants.map((e) => [e.grant.id, e.usedToDateDays]),
+    );
+    expect(byId.get("soon")).toBe(2);
+    expect(byId.get("never")).toBe(0);
+    expect(result.usedToDateDays).toBe(2);
+    expect(result.plannedDays).toBe(3);
+    expect(result.remainingAsOfTodayDays).toBe(6);
+    expect(result.remainingDays).toBe(3);
+  });
+
+  it("아직 부여되지 않은 적립분은 오늘 기준 잔여에 들어가지 않는다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [grant({ id: "later", days: 5, grantedOn: "2026-09-01" })],
+      [used("2026-09-02", "2026-09-03")],
+      TODAY,
+    );
+    // 부여 전이라 지금 쓸 수 있는 몫이 아니다 — 두 잔여 모두 0.
+    expect(result.remainingAsOfTodayDays).toBe(0);
+    expect(result.remainingDays).toBe(0);
+    expect(result.upcomingDays).toBe(3);
+    expect(result.plannedDays).toBe(2);
+  });
+
+  it("만료된 적립분에 달린 지난 사용은 오늘 기준 잔여를 늘리지 않는다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [
+        grant({ id: "gone", days: 4, expiresOn: "2026-07-31" }),
+        grant({ id: "live", days: 6 }),
+      ],
+      [used("2026-07-10", "2026-07-13")],
+      TODAY,
+    );
+    expect(result.usedToDateDays).toBe(4);
+    // 만료분에서 4일이 빠졌으므로 살아 있는 적립분 6일만 남는다.
+    expect(result.remainingAsOfTodayDays).toBe(6);
+    expect(result.remainingDays).toBe(6);
+  });
+});
+
 describe("적립분 상태", () => {
   it("부여일 전이면 예정, 만기 후면 만료, 그 사이는 사용 가능", () => {
     expect(

@@ -13,6 +13,7 @@ import {
   BALANCE_KEYS,
   BALANCE_LABELS,
   checkRegularOvernight,
+  clipSegmentsTo,
   cycleFor,
   cycleUsedDays,
   fmtDateShort,
@@ -50,8 +51,16 @@ export type LeaveBalanceItem = {
   key: BalanceKey;
   label: string;
   totalDays: number;
+  /** 미래 계획까지 포함한 사용 일수. */
   usedDays: number;
+  /** 오늘까지 실제로 지나간 사용 일수. */
+  usedToDateDays: number;
+  /** 미래에 계획만 해둔 일수. 아직 쓴 것이 아니다. */
+  plannedDays: number;
+  /** 계획까지 미리 뺀 잔여 — 새 휴가를 더 넣을 수 있는지 판단할 때 쓴다. */
   remainingDays: number;
+  /** 오늘까지 쓴 것만 뺀 잔여 — 화면에서 "남은 휴가"로 보여주는 값. */
+  remainingAsOfTodayDays: number;
   automaticDays: number;
   /**
    * 총량·사용량이 이번 주기 기준인지. 정기외박 자동 적립을 쓰면 true가 되고,
@@ -139,12 +148,19 @@ export async function getLeaveBalanceSummary(
       const usedDays = currentCycle
         ? cycleUsedDays(currentCycle, regularSegments)
         : 0;
+      // 이번 주기 안에서도 아직 다녀오지 않은 계획은 "쓴 것"에 넣지 않는다.
+      const usedToDateDays = currentCycle
+        ? cycleUsedDays(currentCycle, clipSegmentsTo(regularSegments, today))
+        : 0;
       return {
         key,
         label: BALANCE_LABELS[key],
         totalDays: grantDays,
         usedDays,
+        usedToDateDays,
+        plannedDays: usedDays - usedToDateDays,
         remainingDays: grantDays - usedDays,
+        remainingAsOfTodayDays: grantDays - usedToDateDays,
         automaticDays: grantDays,
         cycleScoped: true,
         // 지난 주기에서 날린 몫은 주기별로 봐야 뜻이 통해 보유 휴가 화면에만 둔다.
@@ -161,7 +177,10 @@ export async function getLeaveBalanceSummary(
       label: BALANCE_LABELS[key],
       totalDays: allocation.totalDays,
       usedDays: allocation.usedDays,
+      usedToDateDays: allocation.usedToDateDays,
+      plannedDays: allocation.plannedDays,
       remainingDays: allocation.remainingDays,
+      remainingAsOfTodayDays: allocation.remainingAsOfTodayDays,
       automaticDays: 0,
       cycleScoped: false,
       expiredDays: allocation.expiredDays,
