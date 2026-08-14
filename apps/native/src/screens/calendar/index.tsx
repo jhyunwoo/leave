@@ -32,7 +32,6 @@ import {
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
-import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import {
   CalendarScroll,
   type CalendarScrollHandle,
@@ -51,7 +50,8 @@ import { DayPanel } from "./day-panel";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
-const UNIT_ROW_HEIGHT = 60;
+/** 동기화 시각 한 줄. 아래 styles.syncStatus의 height와 같아야 한다. */
+const STATUS_ROW_HEIGHT = 20;
 const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
 
 const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
@@ -131,7 +131,7 @@ export function CalendarScreen() {
   const hasBanner = Boolean(currentCycle || pendingFirstGrant);
 
   const glassStripHeight =
-    UNIT_ROW_HEIGHT + WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
+    STATUS_ROW_HEIGHT + WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
   const headerHeight = insets.top + NATIVE_HEADER_HEIGHT + glassStripHeight;
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
@@ -216,8 +216,6 @@ export function CalendarScreen() {
     );
   }
 
-  const limitSummary = `여유·보통·임박·초과 상태 · 공식 승인과 무관`;
-
   /**
    * 휴가 등록 폼을 연다. 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌 뒤에 연다.
    *
@@ -250,7 +248,6 @@ export function CalendarScreen() {
             unitId={unit.id}
             selectedDate={selectedDate}
             contentTopInset={headerHeight}
-            limitSummary={limitSummary}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
@@ -272,10 +269,6 @@ export function CalendarScreen() {
             },
           ]}
         >
-          <Text style={styles.unitName} numberOfLines={1} selectable>
-            {unit.name}
-          </Text>
-          <OfficialDisclaimer compact />
           <Text
             accessibilityLiveRegion="polite"
             style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
@@ -385,14 +378,6 @@ const useStyles = makeStyles(({ colors }) => ({
     borderRadius: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.hairline,
-  },
-  unitName: {
-    height: 24,
-    lineHeight: 24,
-    paddingHorizontal: spacing.lg,
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.body,
   },
   syncStatus: {
     height: 20,

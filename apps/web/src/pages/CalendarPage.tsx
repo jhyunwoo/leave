@@ -22,7 +22,6 @@ import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
 import { LeaveFormModal } from "../components/LeaveFormModal";
-import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { fmtDateShort } from "@leave/shared";
 import { buildMyLeaveDayMap } from "@leave/client";
 
@@ -104,11 +103,7 @@ export function CalendarPage(props: { me: Me }) {
         }}
       >
         <div>
-          <p className="eyebrow">{unit.name}</p>
-          <h1 className="display-md" style={{ marginTop: 6 }}>
-            휴가 계획 달력
-          </h1>
-          <OfficialDisclaimer compact />
+          <h1 className="display-md">휴가 계획 달력</h1>
         </div>
         <div
           style={{ display: "flex", gap: "var(--sp-sm)", alignItems: "center" }}

@@ -49,7 +49,7 @@ const PREPEND_INTERVAL_MS = 250;
 const CELL_H = 92; // month-calendar 셀 minHeight와 동일
 const ROW_GAP = 2; // weekRow marginBottom
 const ROWS = 6; // 그리드 최대 주 수
-const LABEL_H = 64;
+const LABEL_H = 44;
 
 /** 한 달 블록의 고정 높이. getItemLayout·snapToInterval이 이 값에 의존한다. */
 const ITEM_H = LABEL_H + ROWS * (CELL_H + ROW_GAP);
@@ -81,7 +81,6 @@ export const CalendarScroll = forwardRef<
     selectedDate: ISODate | null;
     onSelectDate: (date: ISODate) => void;
     contentTopInset: number;
-    limitSummary: string;
     myLeaveDays: Map<ISODate, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
     currentCycle: RegularOvernightCycle | null;
@@ -94,7 +93,6 @@ export const CalendarScroll = forwardRef<
     selectedDate,
     onSelectDate,
     contentTopInset,
-    limitSummary,
     myLeaveDays,
     regularOvernight,
     currentCycle,
@@ -241,7 +239,6 @@ export const CalendarScroll = forwardRef<
             height={ITEM_H}
             selectedDate={selectedDate}
             onSelectDate={onSelectDate}
-            limitSummary={item === currentMonth ? limitSummary : undefined}
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
@@ -288,7 +285,6 @@ function MonthBlock(props: {
   height: number;
   selectedDate: ISODate | null;
   onSelectDate: (date: ISODate) => void;
-  limitSummary?: string;
   myLeaveDays: Map<ISODate, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
@@ -305,11 +301,6 @@ function MonthBlock(props: {
     <View style={[styles.monthBlock, { height: props.height }]}>
       <View style={styles.monthHeading}>
         <Text style={styles.monthLabel}>{monthLabel(props.month)}</Text>
-        {props.limitSummary ? (
-          <Text style={styles.limitSummary} numberOfLines={1}>
-            {props.limitSummary}
-          </Text>
-        ) : null}
       </View>
       {calendar.isPending ? (
         <View style={styles.monthLoading}>
@@ -339,7 +330,6 @@ const useStyles = makeStyles(({ colors }) => ({
   monthHeading: {
     height: LABEL_H,
     justifyContent: "center",
-    gap: 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.canvasSoft,
   },
@@ -349,7 +339,6 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.ink,
     letterSpacing: -0.4,
   },
-  limitSummary: { fontSize: 11, color: colors.mute },
   monthLoading: { paddingVertical: spacing.xxxl, alignItems: "center" },
   monthError: { fontSize: 14, color: colors.body, paddingVertical: spacing.lg },
 }));

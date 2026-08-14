@@ -81,7 +81,7 @@ env:
     id: "onboarding-complete"
 
 # 달력에서 기본 날짜를 시뮬레이션·저장한다.
-- assertVisible: "참고용 추정치"
+- assertVisible: "부대 달력"
 - tapOn: "휴가 등록"
 - assertVisible: "이 계획을 더하면"
 - tapOn:
