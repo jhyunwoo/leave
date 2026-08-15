@@ -89,13 +89,7 @@ export function LeaveFormModal(props: {
             autoFocus
           />
         </Field>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--sp-md)",
-          }}
-        >
+        <div className="field-pair">
           <Field label="시작일">
             <input
               className="input"

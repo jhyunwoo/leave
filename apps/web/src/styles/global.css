@@ -43,6 +43,9 @@
   --sp-3xl: 48px;
   --sp-section: 96px;
 
+  /* 상단 내비 높이. 아래에 붙는 sticky 헤더들이 이 값만큼 내려가야 한다. */
+  --nav-h: 64px;
+
   --font-display:
     "Manrope", "Pretendard Variable", Pretendard, "Apple SD Gothic Neo",
     "Noto Sans KR", system-ui, sans-serif;
@@ -396,6 +399,72 @@ a {
   font-weight: 600;
 }
 
+/* 여러 칸을 나란히 놓는 입력 줄.
+ *
+ * 그냥 `1fr`로 두면 안 된다. `1fr`은 `minmax(auto, 1fr)`이라 트랙이 내용의
+ * min-content 아래로 못 줄어드는데, `type="date"` 인풋의 min-content가
+ * 175px(사파리는 더 넓다)이다. 그래서 날짜가 낀 `1fr 1fr 1fr`은 실제로
+ * 177/66.5/66.5px처럼 갈라지고, 좁은 화면에서는 칸끼리 겹치거나 화면 밖으로
+ * 밀려난다. minmax(0, …)로 바닥을 풀고, 좁아지면 줄을 나눈다. */
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-md);
+}
+
+.field-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-sm);
+}
+
+@media (max-width: 640px) {
+  .field-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 날짜는 한 줄을 다 쓰고 숫자 두 칸만 나란히 남는다. */
+  .field-trio {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-trio > .field-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 체크박스 + 제목 + 설명 한 줄. 규칙이 없으면 strong과 small이 인라인으로
+   붙어 "정기외박 자동 적립한 주기를 채울 때마다…" 한 문장처럼 읽힌다. */
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-sm);
+  cursor: pointer;
+}
+
+.check-field > input[type="checkbox"] {
+  flex: 0 0 auto;
+  /* 제목 첫 줄의 광학 중심에 맞춘다. */
+  margin-top: 2px;
+}
+
+.check-field > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.check-field strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.check-field small {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mute);
+}
+
 .input {
   width: 100%;
   min-height: 48px;
@@ -532,8 +601,10 @@ textarea.input {
 }
 
 /* 인증 후 앱 셸 */
+/* 높이는 dvh로 잰다. 모바일 주소창이 접혔다 펴지는 동안 100vh는 실제 보이는
+   높이보다 커서, 화면 끝에 빈 공간이 딸려 오는 여분 스크롤이 생긴다. */
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--canvas-soft);
 }
 
@@ -541,7 +612,7 @@ textarea.input {
   position: sticky;
   top: 0;
   z-index: 40;
-  height: 64px;
+  height: var(--nav-h);
   background: var(--glass-chrome);
   border-bottom: 1px solid var(--glass-chrome-border);
   box-shadow: var(--glass-shadow);
@@ -634,7 +705,7 @@ textarea.input {
 }
 
 .app-main {
-  min-height: calc(100vh - 64px);
+  min-height: calc(100dvh - var(--nav-h));
 }
 
 .spinner {

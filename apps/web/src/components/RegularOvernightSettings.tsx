@@ -66,14 +66,8 @@ export function RegularOvernightSettings(props: {
       </label>
 
       {enabled && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: "var(--sp-sm)",
-          }}
-        >
-          <label className="field">
+        <div className="field-trio">
+          <label className="field field-wide">
             <span>주기 시작일</span>
             <input
               className="input"

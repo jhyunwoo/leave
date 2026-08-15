@@ -505,13 +505,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
         등록하면, 참여자 달력에 "제한 가능"으로 표시됩니다.
       </p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "var(--sp-md)",
-        }}
-      >
+      <div className="field-pair">
         <Field label="시작일">
           <input
             className="input"
