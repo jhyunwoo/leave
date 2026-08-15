@@ -20,7 +20,9 @@ import { queryCacheStorage } from "./query-cache-storage";
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 
 // v2: 달력 응답에 출타 명단(attendees)이 추가됐다. 옛 캐시는 명단이 비어 보인다.
-const CACHE_BUSTER = "native-offline-read-v2";
+// v3: 잔여 응답에 upcomingAsOfTodayDays가 추가됐다. 내 휴가 탭의 보유 휴가 카드가
+//     이 값을 더하므로, 필드가 없는 옛 캐시가 되살아나면 "남은 NaN일"이 보인다.
+const CACHE_BUSTER = "native-offline-read-v3";
 const CACHE_KEY = "tanstack-query-cache";
 
 // 계정·알림·관리자 데이터와 mutation은 기기에 남기지 않는다. 오프라인에서
