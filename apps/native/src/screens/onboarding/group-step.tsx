@@ -56,7 +56,10 @@ export function GroupStep(props: {
   const createGroup = async () => {
     const parsed = unitCreateSchema.safeParse({
       name: groupName,
-      maxLeaveCount: Number(maxCount),
+      // 빈 칸은 Number("")로 0이 되고 스키마의 min(0)을 통과해 최대 0명짜리
+      // 그룹이 조용히 만들어진다. NaN으로 보내 "입력해주세요"가 뜨게 한다
+      // — 그룹 관리 화면들이 쓰는 것과 같은 방식이다.
+      maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
     });
     if (!parsed.success)
       return setError(
