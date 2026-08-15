@@ -8,7 +8,7 @@
 
 import * as SplashScreen from "expo-splash-screen";
 import { Component, Fragment, type ReactNode } from "react";
-import { Modal } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   clearPersistedFatalError,
   type FatalErrorRecord,
@@ -105,13 +105,22 @@ export class RootErrorBoundary extends Component<Props, State> {
       <Fragment key={attempt}>
         {this.props.children}
         {/* 렌더 밖에서 난 오류는 트리가 멀쩡하다. 화면만 덮어 내용을 알리고,
-            닫으면 하던 일을 그대로 이어가게 한다(앱을 다시 마운트하지 않는다). */}
-        <Modal
-          visible={record != null}
-          transparent={false}
-          animationType="fade"
-        >
-          {record ? (
+            닫으면 하던 일을 그대로 이어가게 한다(앱을 다시 마운트하지 않는다).
+
+            RN Modal이 아니라 트리 안 오버레이인 이유: iOS는 한 화면에 모달을
+            하나만 띄운다. 휴가 등록 시트 같은 게 떠 있는 동안 이 Modal을 띄우면
+            UIKit이 표시를 거부하는데, RN은 거부 전에 이미 "표시됨"으로 적어둬서
+            (RCTModalHostViewComponentView가 presentViewController 전에
+            _isPresented를 세운다) 오류 알림이 그대로 사라진다. 오버레이는
+            아무것도 present하지 않아 거부될 일이 없다. 시트가 떠 있으면 그 아래에
+            그려졌다가 시트를 닫는 순간 드러난다 — 알림을 잃는 것보다 낫다. */}
+        {record ? (
+          <View
+            style={styles.overlay}
+            // 오버레이는 모달과 달리 뒤 화면을 접근성 트리에서 가리지 않는다.
+            // 보이스오버 초점이 뒤로 새지 않게 직접 막는다.
+            accessibilityViewIsModal
+          >
             <ErrorScreen
               title="문제가 발생했어요"
               body="오류가 났지만 앱은 계속 쓸 수 있어요. 같은 일이 반복되면 아래 내용을 알려주세요."
@@ -119,9 +128,21 @@ export class RootErrorBoundary extends Component<Props, State> {
               actionLabel="계속하기"
               onAction={this.dismiss}
             />
-          ) : null}
-        </Modal>
+          </View>
+        ) : null}
       </Fragment>
     );
   }
 }
+
+const styles = StyleSheet.create({
+  // 라우터 트리 위에 겹친다. 배경은 ErrorScreen이 불투명하게 칠한다.
+  overlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
+  },
+});
