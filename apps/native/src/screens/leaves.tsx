@@ -119,7 +119,7 @@ export function LeavesScreen() {
                   보유 휴가
                 </Text>
                 <Text style={styles.holdingsValue} selectable>
-                  남은 {holdings.remaining}일
+                  남은 휴가 {holdings.remaining}일
                 </Text>
                 {holdings.planned > 0 ? (
                   <Text style={styles.holdingsHint} selectable>

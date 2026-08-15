@@ -108,7 +108,7 @@ export function LeavesPage() {
               className="display-xs"
               style={{ display: "block", marginTop: 2 }}
             >
-              남은 {holdings.remaining}일
+              남은 휴가 {holdings.remaining}일
             </span>
             <span
               className="caption"
