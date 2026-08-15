@@ -446,6 +446,111 @@ test("아직 오지 않은 정기외박 주기도 그 몫 안에서 미리 쓸 �
   assert.match(tooMuch.data.error, /몫 3일을 1일 초과/);
 });
 
+test("계획만 해둔 정기외박은 남은 휴가를 줄이지 않는다", async () => {
+  const owner = await signup({ branch: "navy" });
+  await createUnit(owner.token, { name: uniq("계획부대-") });
+  const token = owner.token;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const shift = (from, days) => {
+    const d = new Date(`${from}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  /** 내 휴가 탭 상단 "보유 휴가" 카드가 하는 셈 그대로. */
+  const card = (data) =>
+    data.balances.reduce(
+      (sum, item) => ({
+        remaining:
+          sum.remaining +
+          item.remainingAsOfTodayDays +
+          (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
+        planned:
+          sum.planned +
+          item.plannedDays +
+          (item.cycleScoped
+            ? item.upcomingAsOfTodayDays - item.upcomingDays
+            : 0),
+      }),
+      { remaining: 0, planned: 0 },
+    );
+
+  // 첫 적립이 오늘 — 1주기는 오늘~오늘+41, 2주기는 오늘+42부터.
+  await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: shift(today, -42),
+      intervalDays: 42,
+      daysPerGrant: 3,
+    },
+  });
+  const before = card((await req("GET", "/leaves/balances", { token })).data);
+  assert.equal(before.planned, 0);
+
+  // 아직 오지 않은 2주기에 3일을 계획해 둔다 — 다녀온 것이 아니므로 잔여는 그대로여야 한다.
+  const planned = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "다음 주기 계획",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 50),
+          endDate: shift(today, 52),
+        },
+      ],
+    },
+  });
+  assert.equal(planned.status, 201);
+  const afterFuture = card(
+    (await req("GET", "/leaves/balances", { token })).data,
+  );
+  assert.equal(
+    afterFuture.remaining,
+    before.remaining,
+    "미래 주기 계획이 남은 휴가를 줄이면 안 됨",
+  );
+  assert.equal(afterFuture.planned, 3, "대신 계획으로 잡혀야 함");
+
+  // 이번 주기 안이라도 아직 오지 않은 날짜면 마찬가지다.
+  const soon = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "이번 주기 계획",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 5),
+          endDate: shift(today, 7),
+        },
+      ],
+    },
+  });
+  assert.equal(soon.status, 201);
+  const afterBoth = card(
+    (await req("GET", "/leaves/balances", { token })).data,
+  );
+  assert.equal(
+    afterBoth.remaining,
+    before.remaining,
+    "이번 주기 계획도 남은 휴가를 줄이면 안 됨",
+  );
+  assert.equal(afterBoth.planned, 6);
+
+  // 보유 휴가 상세 화면과 같은 숫자를 보여야 한다.
+  const page = (await req("GET", "/leaves/grants", { token })).data;
+  assert.equal(page.totals.remainingAsOfTodayDays, afterBoth.remaining);
+  assert.equal(page.totals.plannedDays, afterBoth.planned);
+});
+
 test("적립일이 전역일 뒤인 정기외박 주기는 미리 쓸 수 없다", async () => {
   // 전역이 2026-12-31이고 주기 시작일이 2026-01-01, 주기 42일이면
   // 첫 적립은 2026-02-12, 이후 42일마다. 2027년 날짜가 속한 주기는

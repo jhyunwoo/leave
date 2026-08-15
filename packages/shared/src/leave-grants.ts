@@ -91,8 +91,13 @@ export type BalanceAllocation = {
   remainingAsOfTodayDays: number;
   /** 만료된 적립분 중 못 쓰고 날린 일수. */
   expiredDays: number;
-  /** 아직 부여일이 오지 않은 적립분의 미사용분. */
+  /** 아직 부여일이 오지 않은 적립분의 미사용분. 미래 계획도 빠진다. */
   upcomingDays: number;
+  /**
+   * 미래 계획을 빼지 않은 예정분 — `remainingAsOfTodayDays`와 같은 셈을 예정 적립분에.
+   * 아직 받지도 않은 몫에 계획을 미리 달아 두면 "앞으로 받을 휴가"가 실제보다 적게 보인다.
+   */
+  upcomingAsOfTodayDays: number;
   /** 어떤 적립분으로도 설명되지 않는 사용 일수. */
   unattributedDays: number;
   /** 위 일수에 해당하는 날짜(앞에서 최대 5개). 오류 메시지에 쓴다. */
@@ -226,6 +231,7 @@ export function allocateBalanceGrants(
   let remainingAsOfTodayDays = 0;
   let expiredDays = 0;
   let upcomingDays = 0;
+  let upcomingAsOfTodayDays = 0;
 
   const allocations: GrantAllocation[] = mine.map((grant) => {
     const usedDays = consumed.get(grant.id) ?? 0;
@@ -239,7 +245,10 @@ export function allocateBalanceGrants(
       remainingDays += unusedDays;
       remainingAsOfTodayDays += grant.days - usedToDate;
     } else if (status === "expired") expiredDays += unusedDays;
-    else upcomingDays += unusedDays;
+    else {
+      upcomingDays += unusedDays;
+      upcomingAsOfTodayDays += grant.days - usedToDate;
+    }
 
     return {
       grant,
@@ -264,6 +273,7 @@ export function allocateBalanceGrants(
     remainingAsOfTodayDays,
     expiredDays,
     upcomingDays,
+    upcomingAsOfTodayDays,
     unattributedDays,
     unattributedDates,
     grants: allocations,

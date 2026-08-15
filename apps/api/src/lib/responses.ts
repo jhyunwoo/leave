@@ -249,8 +249,10 @@ export const leaveBalanceItemSchema = z.object({
   cycleScoped: z.boolean(),
   /** 만료된 적립분 중 못 쓰고 날린 일수. */
   expiredDays: z.number(),
-  /** 아직 부여일이 오지 않은 적립분의 미사용분. */
+  /** 아직 부여일이 오지 않은 적립분의 미사용분. 미래 계획도 빠진다. */
   upcomingDays: z.number(),
+  /** 계획을 빼지 않은 예정분 — 화면의 "남은 휴가"에 더할 때 쓰는 값. */
+  upcomingAsOfTodayDays: z.number(),
   /** 어떤 적립분으로도 설명되지 않는 사용 일수. */
   unattributedDays: z.number(),
   /** 이 재원이 가진 적립분 건수. */

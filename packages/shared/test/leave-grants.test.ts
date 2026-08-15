@@ -378,7 +378,20 @@ describe("오늘 기준 잔여 (미래 계획은 아직 쓴 것이 아니다)", 
     expect(result.remainingAsOfTodayDays).toBe(0);
     expect(result.remainingDays).toBe(0);
     expect(result.upcomingDays).toBe(3);
+    // 앞으로 받을 몫은 계획으로 줄지 않는다 — 아직 다녀오지 않았으므로 5일 그대로다.
+    expect(result.upcomingAsOfTodayDays).toBe(5);
     expect(result.plannedDays).toBe(2);
+  });
+
+  it("예정 적립분에 계획이 없으면 두 예정분이 같다", () => {
+    const result = allocateBalanceGrants(
+      "award",
+      [grant({ id: "later", days: 5, grantedOn: "2026-09-01" })],
+      [],
+      TODAY,
+    );
+    expect(result.upcomingDays).toBe(5);
+    expect(result.upcomingAsOfTodayDays).toBe(5);
   });
 
   it("만료된 적립분에 달린 지난 사용은 오늘 기준 잔여를 늘리지 않는다", () => {

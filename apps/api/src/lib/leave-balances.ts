@@ -69,8 +69,10 @@ export type LeaveBalanceItem = {
   cycleScoped: boolean;
   /** 만료된 적립분 중 못 쓰고 날린 일수. */
   expiredDays: number;
-  /** 아직 부여일이 오지 않은 적립분의 미사용분. */
+  /** 아직 부여일이 오지 않은 적립분의 미사용분. 미래 계획도 빠진다. */
   upcomingDays: number;
+  /** 계획을 빼지 않은 예정분 — 화면의 "남은 휴가"에 더할 때 쓰는 값. */
+  upcomingAsOfTodayDays: number;
   /** 어떤 적립분으로도 설명되지 않는 사용 일수. */
   unattributedDays: number;
   /** 이 재원이 가진 적립분 건수. */
@@ -166,6 +168,7 @@ export async function getLeaveBalanceSummary(
         // 지난 주기에서 날린 몫은 주기별로 봐야 뜻이 통해 보유 휴가 화면에만 둔다.
         expiredDays: 0,
         upcomingDays: cycles.totals.upcomingDays,
+        upcomingAsOfTodayDays: cycles.totals.upcomingAsOfTodayDays,
         unattributedDays: 0,
         grantCount: 0,
         expiringSoonDays: 0,
@@ -185,6 +188,7 @@ export async function getLeaveBalanceSummary(
       cycleScoped: false,
       expiredDays: allocation.expiredDays,
       upcomingDays: allocation.upcomingDays,
+      upcomingAsOfTodayDays: allocation.upcomingAsOfTodayDays,
       unattributedDays: allocation.unattributedDays,
       grantCount: allocation.grants.length,
       expiringSoonDays: allocation.grants
