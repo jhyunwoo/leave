@@ -4,21 +4,35 @@
   gap: 2px;
 }
 
-/* 세로 무한 스크롤 달력 */
+/* 세로 무한 스크롤 달력.
+ *
+ * 스크롤포트가 두 가지다. 넓은 화면에서는 아래 .cal-scroll 박스가, 좁은 화면
+ * (.is-page-scroll)에서는 페이지 자체가 스크롤한다. 모바일에서 굳이 페이지로
+ * 넘기는 건, 화면 높이의 70%짜리 박스를 페이지 안에 또 넣으면 손가락이 달력
+ * 위에 있는 동안 페이지가 통째로 멈춰 버리기 때문이다.
+ */
 .cal-scroll-shell {
   display: flex;
   flex-direction: column;
+  /* 요일 줄과 달 제목이 이 값만큼 층을 지어 붙는다. */
+  --cal-weekday-h: 33px;
+  /* 날짜 칸 높이. 불러오는 중 자리표시자가 같은 값으로 높이를 잡아야
+     로딩이 끝나는 순간 달 높이가 바뀌면서 화면이 딸려 올라가지 않는다. */
+  --cal-cell-h: 92px;
 }
 .cal-weekdays-sticky {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 3;
+  height: var(--cal-weekday-h);
   background: var(--canvas);
   border-bottom: 1px solid var(--hairline);
 }
 .cal-scroll {
   max-height: min(70vh, 720px);
   overflow-y: auto;
+  /* 주기 표시선이 칸 밖으로 8px씩 번져 나가 가로 스크롤이 생기는 걸 막는다. */
+  overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-color: var(--hairline) transparent;
 }
@@ -31,6 +45,9 @@
 .cal-month-label {
   position: sticky;
   top: 0;
+  /* .cal-cell이 position: relative이고 DOM에서 뒤에 온다. z-index가 없으면
+     제자리에 붙어 있어도 날짜 칸에 덮여 보이지 않는다. */
+  z-index: 2;
   font-size: 15px;
   font-family: var(--font-display);
   font-weight: 900;
@@ -38,14 +55,30 @@
   padding: var(--sp-sm) 2px;
   background: var(--canvas);
 }
+
+/* 페이지 스크롤 모드 — 박스를 풀고 고정 헤더를 상단 내비 아래에 층으로 쌓는다. */
+.cal-scroll-shell.is-page-scroll .cal-scroll {
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+.cal-scroll-shell.is-page-scroll .cal-weekdays-sticky {
+  top: var(--nav-h);
+}
+.cal-scroll-shell.is-page-scroll .cal-month-label {
+  top: calc(var(--nav-h) + var(--cal-weekday-h));
+}
 .cal-sentinel {
   height: 1px;
 }
+/* 그 달의 실제 주 수(--cal-rows)만큼 자리를 잡아 둔다. 예전에는 540px 고정이라
+   4~6주 달(323~468px)보다 늘 커서, 불러오기가 끝날 때마다 달이 줄며 보고 있던
+   날짜가 위로 끌려 올라갔다. */
 .cal-month-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 540px;
+  min-height: calc(var(--cal-rows, 6) * (var(--cal-cell-h, 92px) + 2px));
 }
 .cal-month-error {
   padding: var(--sp-lg);
@@ -53,10 +86,14 @@
   color: var(--body);
 }
 
+/* minmax(0, …)가 없으면 트랙이 칸 안 글자의 min-content 아래로 못 줄어든다.
+   "여유 20%"·"대체공휴일"이 nowrap이라 셀 바닥이 69px로 잡히고, 7칸이면
+   483px여서 390px 화면을 가로로 뚫는다. 넘친 페이지는 상단 내비까지
+   화면 폭만 덮게 만든다. */
 .cal-weekdays,
 .cal-week {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0;
 }
 
@@ -77,7 +114,9 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  min-height: 92px;
+  /* 그리드 아이템 기본값(min-width: auto)이면 위 minmax(0,…)가 무력해진다. */
+  min-width: 0;
+  min-height: var(--cal-cell-h, 92px);
   padding: 8px;
   background: var(--canvas);
   border: 0;
@@ -179,6 +218,13 @@
   font-weight: 600;
   color: var(--ink-deep);
 }
+.cal-count-word {
+  font-style: normal;
+}
+.cal-count-pct {
+  margin-left: 3px;
+  font-weight: inherit;
+}
 /* 아무도 안 나간 날은 흐리게 깔아 그리드를 조용히 둔다. */
 .cal-count.is-empty {
   background: transparent;
@@ -211,14 +257,35 @@
 }
 
 @media (max-width: 720px) {
+  .cal-scroll-shell {
+    --cal-cell-h: 64px;
+  }
   .cal-cell {
-    min-height: 64px;
     padding: 5px;
   }
   .cal-daynum {
     min-width: 22px;
     height: 22px;
     font-size: 13px;
+  }
+}
+
+/* 여기서부터 한 칸이 50px 아래로 내려간다. 낱말까지 넣으면 통째로 잘려
+   아무것도 못 읽으니, 비율만 남기고 낱말은 aria-label에 맡긴다. */
+@media (max-width: 640px) {
+  .cal-count {
+    padding: 1px 4px;
+    font-size: 10px;
+  }
+  .cal-count-word {
+    display: none;
+  }
+  .cal-count-pct {
+    margin-left: 0;
+  }
+  .cal-holiday,
+  .cal-mine {
+    font-size: 10px;
   }
 }
 
@@ -250,15 +317,42 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
-.cal-mine[data-balance="annual"] { background: #d8f3c4; color: #1f5e10; }
-.cal-mine[data-balance="award"] { background: #ffe8c7; color: #8a4b00; }
-.cal-mine[data-balance="compensation"] { background: #e6ddff; color: #4c2c9c; }
-.cal-mine[data-balance="consolation"] { background: #ffdcea; color: #9c1d55; }
-.cal-mine[data-balance="petition"] { background: #c9efeb; color: #0b5c55; }
-.cal-mine[data-balance="sick"] { background: #ffdcdd; color: #a72027; }
-.cal-mine[data-balance="regular_overnight"] { background: #d8e6ff; color: #12439c; }
-.cal-mine[data-balance="other_overnight"] { background: #cdeaf6; color: #065b7a; }
-.cal-mine[data-balance="outing"] { background: #e4e7e2; color: #454745; }
+.cal-mine[data-balance="annual"] {
+  background: #d8f3c4;
+  color: #1f5e10;
+}
+.cal-mine[data-balance="award"] {
+  background: #ffe8c7;
+  color: #8a4b00;
+}
+.cal-mine[data-balance="compensation"] {
+  background: #e6ddff;
+  color: #4c2c9c;
+}
+.cal-mine[data-balance="consolation"] {
+  background: #ffdcea;
+  color: #9c1d55;
+}
+.cal-mine[data-balance="petition"] {
+  background: #c9efeb;
+  color: #0b5c55;
+}
+.cal-mine[data-balance="sick"] {
+  background: #ffdcdd;
+  color: #a72027;
+}
+.cal-mine[data-balance="regular_overnight"] {
+  background: #d8e6ff;
+  color: #12439c;
+}
+.cal-mine[data-balance="other_overnight"] {
+  background: #cdeaf6;
+  color: #065b7a;
+}
+.cal-mine[data-balance="outing"] {
+  background: #e4e7e2;
+  color: #454745;
+}
 
 .cal-cell.is-in-cycle {
   background: #f5f8fb;

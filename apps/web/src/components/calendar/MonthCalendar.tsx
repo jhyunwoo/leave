@@ -168,9 +168,19 @@ export function MonthCalendar(props: {
                       exceeded ? "is-exceeded" : "",
                     ].join(" ")}
                   >
-                    {signal.percent == null
-                      ? signal.label
-                      : `${signal.label} ${signal.percent}%`}
+                    {/* 좁은 화면에서는 칸이 47px까지 줄어 "여유 20%"가 통째로
+                        잘린다. 낱말과 비율을 나눠 두고 CSS가 낱말만 감춘다 —
+                        비율은 색이 아닌 정보라 그것만 남아도 색에만 기대지
+                        않는다는 원칙은 지켜지고, 위 aria-label은 늘 온전하다.
+                        비율이 없는 날은 낱말이 유일한 내용이라 그대로 둔다. */}
+                    {signal.percent == null ? (
+                      signal.label
+                    ) : (
+                      <>
+                        <i className="cal-count-word">{signal.label}</i>
+                        <b className="cal-count-pct">{signal.percent}%</b>
+                      </>
+                    )}
                   </span>
                 )}
                 {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
