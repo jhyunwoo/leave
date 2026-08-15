@@ -4,6 +4,11 @@
  * 표시 계급은 서버가 입대일에서 계산해 내려준다(getRankInfo). 그래서 "계급"을
  * 고치는 건 사실 진급 하한(signupRank)을 고치는 것이고, 입대일을 고치면 계급도
  * 따라 움직인다. 수정 시트의 안내 문구가 이 관계를 설명한다.
+ *
+ * 넓은 창에서는 카드를 두 열로 나눈다. 신원·복무 진행률과 계정·그룹 설정은 서로
+ * 다른 관심사라, 좁은 열 하나에 세로로 쌓으면 설정을 찾으려고 프로필을 지나쳐
+ * 스크롤해야 한다. 수정은 그대로 폼 시트에서 한다 — iPad에서도 가운데 뜨는
+ * 폼 시트가 맞는 표현이고, 안쪽 폼 폭만 SheetScaffold가 묶어 준다.
  */
 
 import {
@@ -54,11 +59,13 @@ import { ServiceProgress } from "@/components/service-progress";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction, notify } from "@/lib/dialog";
+import { ResponsiveGrid, useWindowSizeClass } from "@/adaptive";
 import { layout, makeStyles, spacing, useColors } from "@/theme";
 
 export function ProfileScreen() {
   const styles = useStyles();
   const colors = useColors();
+  const { sizeClass, isCompact } = useWindowSizeClass();
   const me = useMe();
   const logout = useLogout();
   const deleteAccount = useDeleteAccount();
@@ -174,7 +181,14 @@ export function ProfileScreen() {
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          {
+            maxWidth: isCompact
+              ? layout.readableContent
+              : layout.workspaceContent,
+          },
+        ]}
       >
         {process.env.EXPO_OS === "web" ? (
           <View style={styles.webHeader}>
@@ -197,110 +211,120 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
-        <ContentPanel style={styles.card}>
-          <View style={styles.profileRow}>
-            <Avatar name={user.name} size={64} source={avatarSource} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text selectable style={styles.alias}>
-                {user.name}
-              </Text>
-              <Text selectable style={styles.email}>
-                {user.email}
-              </Text>
+        <ResponsiveGrid
+          sizeClass={sizeClass}
+          // 카드 안의 글이 짧아 두 열에서도 줄이 어색해지지 않는다.
+          columns={{ compact: 1, medium: 2 }}
+        >
+          <ContentPanel style={styles.card}>
+            <View style={styles.profileRow}>
+              <Avatar name={user.name} size={64} source={avatarSource} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text selectable style={styles.alias}>
+                  {user.name}
+                </Text>
+                <Text selectable style={styles.email}>
+                  {user.email}
+                </Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.photoRow}>
-            <Button
-              title={user.profileImageKey ? "사진 변경" : "사진 추가"}
-              variant="secondary"
-              size="sm"
-              loading={uploadImage.isPending}
-              onPress={() => void pickImage()}
-              testID="pick-profile-image"
-            />
-            {user.profileImageKey ? (
+            <View style={styles.photoRow}>
               <Button
-                title="사진 삭제"
-                variant="ghost"
+                title={user.profileImageKey ? "사진 변경" : "사진 추가"}
+                variant="secondary"
                 size="sm"
-                loading={deleteImage.isPending}
-                onPress={() => void confirmDeleteImage()}
-                testID="delete-profile-image"
+                loading={uploadImage.isPending}
+                onPress={() => void pickImage()}
+                testID="pick-profile-image"
               />
-            ) : null}
-          </View>
-          <Text selectable style={styles.privacyHint}>
-            별칭만 표시합니다. 실명·군번·기수는 넣지 마세요. 프로필 사진은 나만
-            볼 수 있고 부대 화면에는 이니셜만 나갑니다. 군사시설이 찍힌 사진은
-            올리지 마세요.
-          </Text>
+              {user.profileImageKey ? (
+                <Button
+                  title="사진 삭제"
+                  variant="ghost"
+                  size="sm"
+                  loading={deleteImage.isPending}
+                  onPress={() => void confirmDeleteImage()}
+                  testID="delete-profile-image"
+                />
+              ) : null}
+            </View>
+            <Text selectable style={styles.privacyHint}>
+              별칭만 표시합니다. 실명·군번·기수는 넣지 마세요. 프로필 사진은
+              나만 볼 수 있고 부대 화면에는 이니셜만 나갑니다. 군사시설이 찍힌
+              사진은 올리지 마세요.
+            </Text>
 
-          <View style={styles.divider} />
-          <View style={styles.infoGrid}>
-            <InfoItem label="군 종류" value={user.branchLabel} />
-            <InfoItem label="계급" value={user.rankLabel} />
-            <InfoItem label="입대일" value={fmtDateK(user.enlistedAt)} />
-            <InfoItem
-              label="전역 예정일"
-              value={fmtDateK(user.dischargeAt)}
-              caption={`D-${user.daysUntilDischarge}`}
+            <View style={styles.divider} />
+            <View style={styles.infoGrid}>
+              <InfoItem label="군 종류" value={user.branchLabel} />
+              <InfoItem label="계급" value={user.rankLabel} />
+              <InfoItem label="입대일" value={fmtDateK(user.enlistedAt)} />
+              <InfoItem
+                label="전역 예정일"
+                value={fmtDateK(user.dischargeAt)}
+                caption={`D-${user.daysUntilDischarge}`}
+              />
+            </View>
+            <Button
+              title="내 정보 수정"
+              variant="secondary"
+              onPress={() => setEditing(true)}
+              testID="edit-profile"
             />
-          </View>
-          <Button
-            title="내 정보 수정"
-            variant="secondary"
-            onPress={() => setEditing(true)}
-            testID="edit-profile"
-          />
-        </ContentPanel>
+          </ContentPanel>
 
-        <ContentPanel style={styles.card}>
-          <ServiceProgress
-            enlistedAt={user.enlistedAt as ISODate}
-            dischargeAt={user.dischargeAt as ISODate}
-            daysLeft={user.daysUntilDischarge}
-            caption={
-              user.nextPromotionDate
-                ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`
-                : "더 이상 예정된 진급이 없어요"
-            }
-          />
-        </ContentPanel>
+          <ContentPanel style={styles.card}>
+            <ServiceProgress
+              enlistedAt={user.enlistedAt as ISODate}
+              dischargeAt={user.dischargeAt as ISODate}
+              daysLeft={user.daysUntilDischarge}
+              caption={
+                user.nextPromotionDate
+                  ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`
+                  : "더 이상 예정된 진급이 없어요"
+              }
+            />
+          </ContentPanel>
 
-        <ContentPanel style={styles.card}>
-          <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
-          <Button
-            title="그룹 참여·관리"
-            variant="secondary"
-            onPress={() => router.push("/units")}
-          />
-        </ContentPanel>
+          <ContentPanel style={styles.card}>
+            <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
+            <Button
+              title="그룹 참여·관리"
+              variant="secondary"
+              onPress={() => router.push("/units")}
+            />
+          </ContentPanel>
 
+          <ContentPanel style={styles.card}>
+            <Text selectable style={styles.sectionTitle}>
+              개인정보와 계정
+            </Text>
+            <Text selectable style={styles.sectionBody}>
+              앱을 삭제한 뒤에도 공개 삭제 요청 페이지에서 계정 삭제 방법을
+              확인할 수 있어요. 앱 안에서는 아래 버튼으로 바로 요청할 수
+              있습니다.
+            </Text>
+            <Button
+              title="비밀번호 변경"
+              variant="secondary"
+              onPress={() => setChangingPassword(true)}
+              testID="change-password"
+            />
+            <LegalLinks />
+            <Button
+              title={
+                deleteAccount.isPending ? "삭제 중…" : "계정과 데이터 삭제"
+              }
+              variant="danger"
+              loading={deleteAccount.isPending}
+              onPress={() => void confirmDeleteAccount()}
+              testID="delete-account"
+            />
+          </ContentPanel>
+        </ResponsiveGrid>
+
+        {/* 고지는 카드가 아니라 화면 전체에 걸리는 문장이라 열 밖에 둔다. */}
         <OfficialDisclaimer />
-
-        <ContentPanel style={styles.card}>
-          <Text selectable style={styles.sectionTitle}>
-            개인정보와 계정
-          </Text>
-          <Text selectable style={styles.sectionBody}>
-            앱을 삭제한 뒤에도 공개 삭제 요청 페이지에서 계정 삭제 방법을 확인할
-            수 있어요. 앱 안에서는 아래 버튼으로 바로 요청할 수 있습니다.
-          </Text>
-          <Button
-            title="비밀번호 변경"
-            variant="secondary"
-            onPress={() => setChangingPassword(true)}
-            testID="change-password"
-          />
-          <LegalLinks />
-          <Button
-            title={deleteAccount.isPending ? "삭제 중…" : "계정과 데이터 삭제"}
-            variant="danger"
-            loading={deleteAccount.isPending}
-            onPress={() => void confirmDeleteAccount()}
-            testID="delete-account"
-          />
-        </ContentPanel>
       </ScrollView>
 
       {editing && (
@@ -607,7 +631,6 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   content: {
     width: "100%",
-    maxWidth: layout.readableContent,
     alignSelf: "center",
     padding: spacing.lg,
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,

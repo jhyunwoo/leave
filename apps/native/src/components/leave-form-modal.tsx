@@ -11,6 +11,15 @@
  * 불필요한 개인정보와 UGC를 만들기 때문에, 등록 제목은 휴가 종류에서 자동으로 만든다.
  * 다만 수정할 때는 제목을 고칠 수 있다 — 자동으로 지은 제목은 종류를 바꾸면 따라
  * 바뀌고, 한 번 직접 고친 이름은 그대로 남는다. 사유는 여전히 묻지 않는다.
+ *
+ * ## 넓은 시트에서는 상태와 시뮬레이션을 나란히 둔다
+ *
+ * "계획 상태"와 "이 계획을 더하면"은 함께 읽는 짝이다 — 초안으로 둘지 공유할지는
+ * 그 계획이 그날을 얼마나 밀어 올리는지를 보고 정한다. 좁은 화면에서는 어쩔 수 없이
+ * 위아래로 놓지만, 폭이 있으면 나란히 둬 스크롤 없이 같이 본다.
+ *
+ * 기준은 창 폭이 아니라 **시트 자신의 폭**이다. iPad의 `pageSheet`은 창이 1366이어도
+ * 시트는 540 남짓이라, 창 폭을 믿고 두 열로 나누면 오히려 좁아진다.
  */
 import {
   isDerivedTitle,
@@ -32,8 +41,9 @@ import {
 } from "@leave/shared";
 import { useState } from "react";
 import { KeyboardAvoidingView, Text, View } from "react-native";
+import { useMeasuredSizeClass } from "@/adaptive";
 import { notify } from "@/lib/dialog";
-import { makeStyles, radius, spacing } from "@/theme";
+import { layout, makeStyles, radius, spacing } from "@/theme";
 import { Button } from "./button";
 import { DateRangePicker } from "./date-picker";
 import { Field, Input } from "./field";
@@ -69,6 +79,7 @@ export function LeaveFormModal(props: {
   onClose: () => void;
 }) {
   const styles = useStyles();
+  const sheet = useMeasuredSizeClass();
   // 이미 손으로 지은 이름을 가진 휴가(웹에서 만든 것 등)는 처음부터 직접 입력으로 연다.
   const [renamed, setRenamed] = useState(
     () => !!props.editing && !isDerivedTitle(props.editing.title),
@@ -107,11 +118,14 @@ export function LeaveFormModal(props: {
       <KeyboardAvoidingView
         behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
         style={styles.sheet}
+        onLayout={sheet.onLayout}
       >
         <SheetScaffold
           title={editing ? "휴가 수정" : "휴가 등록"}
           onClose={props.onClose}
           closeTestID="leave-form-close"
+          // 두 열을 펴려면 폼 한 벌 기준(560)보다는 넓어야 한다.
+          contentMaxWidth={layout.readableContent}
           footer={
             <View style={styles.footerActions}>
               {/* 저장을 막는 이유가 있으면 그것을, 없으면 저장될 내용을 요약한다. */}
@@ -181,51 +195,63 @@ export function LeaveFormModal(props: {
             testID="leave-date-range"
           />
 
-          <View style={styles.simulationCard}>
-            <Text selectable style={styles.simulationTitle}>
-              계획 상태
-            </Text>
-            <NativeSegmentedControl
-              values={STATUS_OPTIONS}
-              labels={LEAVE_STATUS_LABELS}
-              value={form.status as (typeof STATUS_OPTIONS)[number]}
-              onValueChange={form.setStatus}
-              testID="leave-status"
-            />
-            <Text selectable style={styles.statusHint}>
-              {statusHint(form.status)}
-            </Text>
-          </View>
+          <View style={sheet.isCompact ? styles.stack : styles.pairRow}>
+            <View
+              style={[
+                styles.simulationCard,
+                !sheet.isCompact && styles.pairItem,
+              ]}
+            >
+              <Text selectable style={styles.simulationTitle}>
+                계획 상태
+              </Text>
+              <NativeSegmentedControl
+                values={STATUS_OPTIONS}
+                labels={LEAVE_STATUS_LABELS}
+                value={form.status as (typeof STATUS_OPTIONS)[number]}
+                onValueChange={form.setStatus}
+                testID="leave-status"
+              />
+              <Text selectable style={styles.statusHint}>
+                {statusHint(form.status)}
+              </Text>
+            </View>
 
-          <View style={styles.simulationCard}>
-            <Text selectable style={styles.simulationTitle}>
-              이 계획을 더하면
-            </Text>
-            <Text selectable style={styles.simulationValue}>
-              {form.selectedSimulation
-                ? `${form.selectedSimulation.label} · 구간 최고 ${form.selectedSimulation.peak}%`
-                : "기준을 불러오는 중이거나 설정되지 않았어요"}
-            </Text>
-            {form.recommendations.length > 0 ? (
-              <View style={styles.recommendations}>
-                <Text selectable style={styles.recommendationHint}>
-                  더 여유로운 인접 날짜
-                </Text>
-                {form.recommendations.map((range) => (
-                  <Button
-                    key={`${range.startDate}-${range.endDate}`}
-                    // 하루짜리 추천이 대부분이다. 같은 날짜를 두 번 적으면 라벨이
-                    // 길어져 버튼이 카드 밖으로 밀린다.
-                    title={`${fmtRangeTiny(range.startDate, range.endDate)} · 최고 ${range.peakPercent}%`}
-                    variant="secondary"
-                    size="sm"
-                    onPress={() =>
-                      form.applyRange(range.startDate, range.endDate)
-                    }
-                  />
-                ))}
-              </View>
-            ) : null}
+            <View
+              style={[
+                styles.simulationCard,
+                !sheet.isCompact && styles.pairItem,
+              ]}
+            >
+              <Text selectable style={styles.simulationTitle}>
+                이 계획을 더하면
+              </Text>
+              <Text selectable style={styles.simulationValue}>
+                {form.selectedSimulation
+                  ? `${form.selectedSimulation.label} · 구간 최고 ${form.selectedSimulation.peak}%`
+                  : "기준을 불러오는 중이거나 설정되지 않았어요"}
+              </Text>
+              {form.recommendations.length > 0 ? (
+                <View style={styles.recommendations}>
+                  <Text selectable style={styles.recommendationHint}>
+                    더 여유로운 인접 날짜
+                  </Text>
+                  {form.recommendations.map((range) => (
+                    <Button
+                      key={`${range.startDate}-${range.endDate}`}
+                      // 하루짜리 추천이 대부분이다. 같은 날짜를 두 번 적으면 라벨이
+                      // 길어져 버튼이 카드 밖으로 밀린다.
+                      title={`${fmtRangeTiny(range.startDate, range.endDate)} · 최고 ${range.peakPercent}%`}
+                      variant="secondary"
+                      size="sm"
+                      onPress={() =>
+                        form.applyRange(range.startDate, range.endDate)
+                      }
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </View>
           </View>
 
           <View style={styles.segmentCard}>
@@ -363,6 +389,11 @@ const useStyles = makeStyles(({ colors }) => ({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  stack: { gap: spacing.lg },
+  // 두 카드가 같은 높이로 늘어나 짝처럼 보이게 한다(기본 alignItems: stretch).
+  // flex는 여기서만 준다 — 세로로 쌓을 때 flex:1을 주면 카드가 세로로 늘어난다.
+  pairRow: { flexDirection: "row", gap: spacing.lg },
+  pairItem: { flex: 1, minWidth: 0 },
   simulationCard: {
     backgroundColor: colors.surfaceCard,
     borderRadius: radius.lg,

@@ -268,10 +268,36 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
+/**
+ * 폭에 관한 토큰.
+ *
+ * "읽는 콘텐츠"와 "작업하는 콘텐츠"를 구분한다. 산문·폼은 눈이 한 줄을 따라가는
+ * 거리가 길어지면 읽기 어려워지므로 최대 폭을 건다. 반대로 달력·대시보드·목록은
+ * 폭이 곧 한눈에 보이는 정보량이라 화면을 최대한 쓰되, 초대형 창에서 여백만
+ * 늘어나지 않도록 상한만 둔다.
+ */
 export const layout = {
-  /** iPad·가로 화면에서 목록과 폼의 읽기 거리가 지나치게 길어지지 않게 한다. */
+  /** 산문·긴 목록: iPad 가로에서 읽기 거리가 지나치게 길어지지 않게 한다. */
   readableContent: 760,
+  /** 입력 폼 한 벌: 넓은 창의 시트·전체화면 폼에서 필드가 늘어지지 않게 한다. */
+  formContent: 560,
+  /** 워크스페이스(달력·대시보드)의 상한. 이보다 넓어지면 가운데로 모은다. */
+  workspaceContent: 1600,
+  /** 보조 패널(선택 대상 상세)의 폭. 크기 클래스별로 다르다. */
+  inspector: { medium: 320, expanded: 380 },
+  /** 요약·목차 성격의 사이드 컬럼 폭. */
+  sideColumn: { medium: 288, expanded: 320 },
 } as const;
+
+/**
+ * 창 크기 클래스의 경계(논리 px). 기기가 아니라 **지금 앱이 차지한 창의 폭**을
+ * 기준으로 삼는다 — 같은 iPad라도 Split View에서는 좁은 창이고, 폴더블은 한
+ * 기기 안에서 두 크기를 오간다.
+ *
+ * 값은 DESIGN.md의 반응형 표(Mobile <768 / Tablet 768–1023 / Desktop ≥1024)와
+ * 맞춘다. 웹과 네이티브가 같은 폭에서 같은 판단을 하도록.
+ */
+export const breakpoints = { medium: 768, expanded: 1024 } as const;
 
 export const type = {
   displayWeight: "900" as const,
@@ -295,6 +321,3 @@ export const motion = {
   quick: 150,
   standard: 220,
 } as const;
-
-/** iPad/가로 모드에서 달력+패널 나란히 배치하는 기준 폭. */
-export const WIDE_BREAKPOINT = 768;

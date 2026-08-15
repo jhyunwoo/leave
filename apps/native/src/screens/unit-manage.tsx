@@ -2,6 +2,11 @@
  * 그룹 관리 화면(네이티브, 관리자 전용).
  * 기본 정보와 하루 최대 출타 인원, 제한 기간(검열·훈련), 구성원과 초대코드,
  * 관리자 이관까지 그룹 운영에 필요한 조작을 한 화면에 모은다.
+ *
+ * 섹션이 많아 좁은 창에서는 한 줄로 길게 이어진다. 넓은 창(expanded)에서는 두
+ * 열로 나눠 설정과 초대·제한 기간을 나란히 둔다 — 관리자는 값을 바꾸고 그
+ * 결과(참여율·초대코드)를 함께 확인하는 일이 많다. medium에서는 폼 필드가 좁아져
+ * 손해라 한 열을 유지한다. 참여자 목록은 길어질 수 있어 늘 전체 폭을 쓴다.
  */
 
 import {
@@ -37,6 +42,7 @@ import { Field, Input } from "@/components/field";
 import { LeaveLimitFields } from "@/components/leave-limit-fields";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { confirmAction, notify } from "@/lib/dialog";
+import { ResponsiveGrid, useWindowSizeClass } from "@/adaptive";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Unit = NonNullable<Me["unit"]>;
@@ -58,6 +64,7 @@ export function UnitManageScreen() {
   const colors = useColors();
   const me = useMe();
   const insets = useSafeAreaInsets();
+  const { sizeClass, isExpanded } = useWindowSizeClass();
   const unit = me.data?.unit ?? null;
   const isAdmin = unit != null && me.data?.user.id === unit.adminId;
 
@@ -83,7 +90,9 @@ export function UnitManageScreen() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{
         width: "100%",
-        maxWidth: layout.readableContent,
+        maxWidth: isExpanded
+          ? layout.workspaceContent
+          : layout.readableContent,
         alignSelf: "center",
         padding: spacing.lg,
         paddingBottom: insets.bottom + spacing.xxxl,
@@ -96,10 +105,15 @@ export function UnitManageScreen() {
         마세요.
       </Text>
       <OfficialDisclaimer compact />
-      <ParticipationSection unit={unit} />
-      <EditUnitSection unit={unit} />
-      <InviteSection unit={unit} />
-      <BlackoutSection unit={unit} />
+      <ResponsiveGrid
+        sizeClass={sizeClass}
+        columns={{ compact: 1, medium: 1, expanded: 2 }}
+      >
+        <ParticipationSection unit={unit} />
+        <EditUnitSection unit={unit} />
+        <InviteSection unit={unit} />
+        <BlackoutSection unit={unit} />
+      </ResponsiveGrid>
       <MembersSection me={me.data} unit={unit} />
     </ScrollView>
   );

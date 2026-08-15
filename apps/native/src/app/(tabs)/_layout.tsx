@@ -9,6 +9,12 @@ import { useColors } from "@/theme";
 
 /**
  * 네이티브 시스템 탭바 — 플랫폼 관례를 유지하고 선택 상태만 딥 그린으로 통일한다.
+ *
+ * iPad에서는 `sidebarAdaptable`로 UIKit의 사이드바 적응 모드를 켠다. 탭을
+ * 흉내 낸 자체 내비게이션을 만들지 않고 시스템에 맡기는 방법이라, 사이드바 ↔
+ * 탭바 전환·Split View·Stage Manager를 OS가 알아서 처리한다. iPhone에는 효과가
+ * 없고(문서), 안드로이드·웹에는 아예 내려가지 않는다. iOS 18 미만에서는
+ * react-native-screens가 `@available` 검사로 걸러 경고만 남기고 무시한다.
  */
 export default function TabLayout() {
   const colors = useColors();
@@ -21,6 +27,7 @@ export default function TabLayout() {
       minimizeBehavior={
         process.env.EXPO_OS === "ios" ? "onScrollDown" : undefined
       }
+      sidebarAdaptable={process.env.EXPO_OS === "ios" ? true : undefined}
     >
       <NativeTabs.Trigger name="(calendar)">
         <NativeTabs.Trigger.Label>달력</NativeTabs.Trigger.Label>

@@ -11,7 +11,7 @@ import {
   type ISODate,
   type RegularOvernightCycle,
 } from "@leave/shared";
-import { Text, View } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
@@ -28,6 +28,8 @@ export function DayPanel(props: {
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
+  /** 담는 그릇에 따라 여백만 바꾼다 — 시트는 넉넉하게, 인스펙터는 좁게. */
+  style?: StyleProp<ViewStyle>;
 }) {
   const styles = useStyles();
   const { calendar, date } = props;
@@ -40,7 +42,7 @@ export function DayPanel(props: {
   );
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, props.style]}>
       <Text style={styles.eyebrow}>선택한 날짜</Text>
       <Text style={styles.date}>{fmtDateK(date)}</Text>
       {holiday && <Text style={styles.holiday}>{holiday}</Text>}

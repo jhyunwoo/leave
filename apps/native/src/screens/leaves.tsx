@@ -1,6 +1,19 @@
 /**
- * 내 휴가 목록 화면(네이티브).
+ * 내 휴가 화면(네이티브) — 잔여와 계획을 한자리에서 본다.
+ *
  * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약과 보유 휴가로 가는 길을 준다.
+ *
+ * ## 창 폭에 따라 열이 늘어난다
+ *
+ *   compact  : 지금까지처럼 한 줄로 쌓는다(잔여 → 재원 → 목록).
+ *   medium   : [잔여·재원] | [휴가 목록] 두 열. 스크롤 없이 "얼마 있고 뭘 잡아
+ *              뒀는지"를 동시에 본다.
+ *   expanded : [잔여·재원] | [목록] | [고른 휴가 상세] 세 열. 목록에서 고르면
+ *              화면을 떠나지 않고 오른쪽에서 상세를 읽는다.
+ *
+ * 세 번째 열은 `/leave/[leaveId]` 라우트와 같은 본문(`LeaveDetailContent`)을
+ * 쓴다. 딥링크·푸시·좁은 창은 여전히 라우트로 들어오고, 넓은 창에서만 그 본문이
+ * 자리를 옮긴다.
  */
 
 import { fmtRange } from "@leave/shared";
@@ -15,47 +28,38 @@ import {
   View,
 } from "react-native";
 import type { MyLeave } from "@leave/client";
-import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@leave/client";
+import {
+  summarizeHoldings,
+  useDeleteLeave,
+  useLeaveBalances,
+  useMyLeaves,
+} from "@leave/client";
+import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
+import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
+import { LeaveDetailContent } from "./leave-detail-content";
 
 export function LeavesScreen() {
   const styles = useStyles();
   const colors = useColors();
+  const { sizeClass, isCompact, isExpanded } = useWindowSizeClass();
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
+  // 넓은 창에서만 쓰는 선택. 라우트가 아니라 화면 안의 선택이라 뒤로가기를
+  // 만들지 않는다 — 목록에서 항목을 훑는 동안 히스토리가 쌓이면 안 된다.
+  const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const router = useRouter();
 
-  // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫까지 더한다.
-  // 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
-  //
-  // 남은 일수는 오늘까지 다녀온 몫만 뺀다. 아직 가지 않은 계획을 미리 빼면 통장에 있는
-  // 휴가보다 적게 보인다 — 계획은 아래 "계획 N일"로 따로 알린다. 그래서 이번 주기는
-  // remainingAsOfTodayDays를, 앞으로 받을 몫도 계획을 뺀 upcomingDays가 아니라
-  // upcomingAsOfTodayDays를 쓰고, 둘의 차이가 곧 미래 주기에 잡아 둔 계획이다.
-  const holdings = (balances.data?.balances ?? []).reduce(
-    (sum, item) => ({
-      remaining:
-        sum.remaining +
-        item.remainingAsOfTodayDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
-      planned:
-        sum.planned +
-        item.plannedDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays - item.upcomingDays : 0),
-      expiringSoon: sum.expiringSoon + item.expiringSoonDays,
-      expired: sum.expired + item.expiredDays,
-    }),
-    { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
-  );
+  const holdings = summarizeHoldings(balances.data?.balances);
   /** 만료·소멸처럼 눈에 띄어야 하는 것만 경고 색으로. 계획은 경고가 아니다. */
   const holdingsWarning = [
     holdings.expiringSoon > 0 ? `만료 임박 ${holdings.expiringSoon}일` : null,
@@ -72,6 +76,11 @@ export function LeavesScreen() {
       item.expiredDays > 0,
   );
 
+  const myLeaves = leaves.data?.leaves ?? [];
+  // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
+  const selectedLeave =
+    myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;
+
   const confirmDelete = async (leave: MyLeave) => {
     const confirmed = await confirmAction({
       title: "휴가 삭제",
@@ -79,132 +88,134 @@ export function LeavesScreen() {
       confirmLabel: "삭제",
       destructive: true,
     });
-    if (confirmed) await del.mutateAsync(leave.id);
+    if (!confirmed) return;
+    await del.mutateAsync(leave.id);
+    if (selectedLeaveId === leave.id) setSelectedLeaveId(null);
   };
 
-  return (
-    <>
-      <ScrollView
-        style={styles.root}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-      >
-        {process.env.EXPO_OS === "web" && (
-          <View style={styles.webHeader}>
-            <Text style={styles.webTitle}>내 휴가</Text>
-            {/* 웹에는 툴바가 없으므로 등록도 여기서 연다. */}
-            <WebScreenActions
-              actions={[
-                {
-                  id: "create",
-                  title: "휴가 등록",
-                  variant: "primary",
-                  onPress: () => setCreating(true),
-                  testID: "leaves-create",
-                },
-              ]}
-            />
-          </View>
-        )}
-        {balances.data ? (
-          <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="보유 휴가 자세히 보기"
-              onPress={() => router.push("/leave-grants")}
-              style={styles.holdingsCard}
-            >
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.holdingsEyebrow} selectable>
-                  보유 휴가
-                </Text>
-                <Text style={styles.holdingsValue} selectable>
-                  남은 휴가 {holdings.remaining}일
-                </Text>
-                {holdings.planned > 0 ? (
-                  <Text style={styles.holdingsHint} selectable>
-                    계획 {holdings.planned}일
-                  </Text>
-                ) : null}
-                {holdingsWarning ? (
-                  <Text style={styles.holdingsMeta} selectable>
-                    {holdingsWarning}
-                  </Text>
-                ) : holdings.planned === 0 ? (
-                  <Text style={styles.holdingsHint} selectable>
-                    만기 기한과 정기외박 주기를 관리해요
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.detailLink}>자세히</Text>
-            </Pressable>
+  /**
+   * 목록에서 한 건을 연다. 상세를 붙일 열이 있으면 그 자리에서 바꾸고, 없으면
+   * 지금까지처럼 라우트로 민다.
+   */
+  const openLeave = (leave: MyLeave) => {
+    if (isExpanded) {
+      setSelectedLeaveId((current) =>
+        current === leave.id ? null : leave.id,
+      );
+      return;
+    }
+    router.push({
+      pathname: "/leave/[leaveId]",
+      params: { leaveId: leave.id },
+    });
+  };
 
-            <ContentPanel style={styles.balancePanel}>
-              <Text style={styles.sectionTitle} selectable>
-                휴가 재원
+  const balanceColumn = (
+    <View style={styles.stack}>
+      {balances.data ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="보유 휴가 자세히 보기"
+            onPress={() => router.push("/leave-grants")}
+            style={styles.holdingsCard}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.holdingsEyebrow} selectable>
+                보유 휴가
               </Text>
-              {visibleBalances.map((item, index) => (
-                <View
-                  key={item.key}
-                  style={[styles.balanceRow, index > 0 && styles.rowDivider]}
-                >
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.balanceLabel} selectable>
-                      {item.label}
-                    </Text>
-                    {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
-                    <Text style={styles.balanceMeta} selectable>
-                      {item.cycleScoped ? "이번 주기 · " : ""}총{" "}
-                      {item.totalDays}일 · 사용 {item.usedToDateDays}일
-                      {item.plannedDays > 0
-                        ? ` · 계획 ${item.plannedDays}일`
-                        : ""}
-                      {item.expiredDays > 0
-                        ? ` · 만료 ${item.expiredDays}일`
-                        : ""}
-                    </Text>
-                  </View>
-                  <Text style={styles.balanceValue} selectable>
-                    {item.remainingAsOfTodayDays}일
+              <Text style={styles.holdingsValue} selectable>
+                남은 휴가 {holdings.remaining}일
+              </Text>
+              {holdings.planned > 0 ? (
+                <Text style={styles.holdingsHint} selectable>
+                  계획 {holdings.planned}일
+                </Text>
+              ) : null}
+              {holdingsWarning ? (
+                <Text style={styles.holdingsMeta} selectable>
+                  {holdingsWarning}
+                </Text>
+              ) : holdings.planned === 0 ? (
+                <Text style={styles.holdingsHint} selectable>
+                  만기 기한과 정기외박 주기를 관리해요
+                </Text>
+              ) : null}
+            </View>
+            <Text style={styles.detailLink}>자세히</Text>
+          </Pressable>
+
+          <ContentPanel style={styles.balancePanel}>
+            <Text style={styles.sectionTitle} selectable>
+              휴가 재원
+            </Text>
+            {visibleBalances.map((item, index) => (
+              <View
+                key={item.key}
+                style={[styles.balanceRow, index > 0 && styles.rowDivider]}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.balanceLabel} selectable>
+                    {item.label}
+                  </Text>
+                  {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
+                  <Text style={styles.balanceMeta} selectable>
+                    {item.cycleScoped ? "이번 주기 · " : ""}총 {item.totalDays}일
+                    · 사용 {item.usedToDateDays}일
+                    {item.plannedDays > 0 ? ` · 계획 ${item.plannedDays}일` : ""}
+                    {item.expiredDays > 0 ? ` · 만료 ${item.expiredDays}일` : ""}
                   </Text>
                 </View>
-              ))}
-              {visibleBalances.length < balances.data.balances.length && (
-                <Text style={styles.balanceHint} selectable>
-                  잔여가 없는 재원은 보유 휴가 상세에서 추가할 수 있어요.
+                <Text style={styles.balanceValue} selectable>
+                  {item.remainingAsOfTodayDays}일
                 </Text>
-              )}
-            </ContentPanel>
-          </>
-        ) : null}
-
-        {leaves.isPending ? (
-          <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-            <ActivityIndicator color={colors.ink} />
-          </View>
-        ) : !leaves.data || leaves.data.leaves.length === 0 ? (
-          <ContentPanel style={styles.empty}>
-            <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
-            <Text style={styles.emptyCaption}>
-              휴가를 등록하면 부대 달력에 함께 표시돼요.
-            </Text>
+              </View>
+            ))}
+            {visibleBalances.length < balances.data.balances.length && (
+              <Text style={styles.balanceHint} selectable>
+                잔여가 없는 재원은 보유 휴가 상세에서 추가할 수 있어요.
+              </Text>
+            )}
           </ContentPanel>
-        ) : (
-          <ContentPanel style={styles.leaveList}>
-            {leaves.data.leaves.map((l, index) => (
+        </>
+      ) : null}
+    </View>
+  );
+
+  const leaveList = (
+    <View style={styles.stack}>
+      {leaves.isPending ? (
+        <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+      ) : myLeaves.length === 0 ? (
+        <ContentPanel style={styles.empty}>
+          <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
+          <Text style={styles.emptyCaption}>
+            휴가를 등록하면 부대 달력에 함께 표시돼요.
+          </Text>
+        </ContentPanel>
+      ) : (
+        <ContentPanel style={styles.leaveList}>
+          {myLeaves.map((l, index) => {
+            const selected = isExpanded && l.id === selectedLeave?.id;
+            return (
               <View
                 key={l.id}
-                style={[styles.leaveRow, index > 0 && styles.rowDivider]}
+                style={[
+                  styles.leaveRow,
+                  index > 0 && styles.rowDivider,
+                  // 색만으로 선택을 알리지 않도록 왼쪽에 굵은 표시선을 함께 둔다.
+                  selected && styles.leaveRowSelected,
+                ]}
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${l.title} 자세히 보기`}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/leave/[leaveId]",
-                      params: { leaveId: l.id },
-                    })
+                  accessibilityState={
+                    isExpanded ? { selected } : undefined
                   }
+                  accessibilityLabel={`${l.title} 자세히 보기`}
+                  onPress={() => openLeave(l)}
                   style={{ flex: 1, minWidth: 0 }}
                 >
                   <Text style={styles.leaveTitle}>{l.title}</Text>
@@ -238,10 +249,97 @@ export function LeavesScreen() {
                   ]}
                 />
               </View>
-            ))}
-          </ContentPanel>
-        )}
-      </ScrollView>
+            );
+          })}
+        </ContentPanel>
+      )}
+    </View>
+  );
+
+  const detailColumn = selectedLeave ? (
+    <LeaveDetailContent
+      leave={selectedLeave}
+      header={
+        <View style={styles.detailHeader}>
+          <Text style={styles.detailHeaderTitle} numberOfLines={1}>
+            휴가 상세
+          </Text>
+          <Button
+            title="닫기"
+            variant="ghost"
+            size="sm"
+            onPress={() => setSelectedLeaveId(null)}
+          />
+        </View>
+      }
+    />
+  ) : (
+    <ContentPanel style={styles.detailEmpty}>
+      <Text style={styles.emptyTitle}>휴가를 골라주세요</Text>
+      <Text style={styles.emptyCaption}>
+        목록에서 한 건을 고르면 기간·구간과 그 기간의 그룹 출타 현황을 여기서 볼
+        수 있어요.
+      </Text>
+    </ContentPanel>
+  );
+
+  return (
+    <>
+      {isCompact ? (
+        <ScrollView
+          style={styles.root}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          <WebHeader onCreate={() => setCreating(true)} />
+          {balanceColumn}
+          {leaveList}
+        </ScrollView>
+      ) : (
+        <View style={styles.root}>
+          <View style={styles.columns}>
+            {/* 열마다 스크롤을 따로 소유한다. 잔여를 보려고 목록을 끝까지
+                내릴 필요가 없어야 넓은 화면을 쓰는 뜻이 있다.
+
+                고정 폭은 ScrollView가 아니라 감싸는 View에 준다. RN Web은
+                ScrollView 바깥 컨테이너에 flex-grow:1을 강제로 붙여, style로
+                준 width가 growth에 밀려 다른 값으로 자란다(칼럼 3개가 각자
+                지정한 폭 + 남는 폭/3만큼 넓어져 가운데 목록이 쪼그라드는
+                형태로 나타났다). View는 그 규칙이 없어 폭이 그대로 지켜진다. */}
+            <View style={{ width: sideColumnWidth(sizeClass) }}>
+              <ScrollView
+                contentInsetAdjustmentBehavior="automatic"
+                contentContainerStyle={styles.columnContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <WebHeader onCreate={() => setCreating(true)} />
+                {balanceColumn}
+              </ScrollView>
+            </View>
+
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ScrollView
+                contentInsetAdjustmentBehavior="automatic"
+                contentContainerStyle={styles.columnContent}
+              >
+                {leaveList}
+              </ScrollView>
+            </View>
+
+            {isExpanded ? (
+              <View style={styles.detailColumn}>
+                <ScrollView
+                  contentInsetAdjustmentBehavior="automatic"
+                  contentContainerStyle={styles.columnContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {detailColumn}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      )}
 
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
@@ -268,6 +366,28 @@ export function LeavesScreen() {
   );
 }
 
+/** 웹에는 네이티브 툴바가 없으므로 제목과 등록 버튼을 본문 맨 위에 둔다. */
+function WebHeader(props: { onCreate: () => void }) {
+  const styles = useStyles();
+  if (process.env.EXPO_OS !== "web") return null;
+  return (
+    <View style={styles.webHeader}>
+      <Text style={styles.webTitle}>내 휴가</Text>
+      <WebScreenActions
+        actions={[
+          {
+            id: "create",
+            title: "휴가 등록",
+            variant: "primary",
+            onPress: props.onCreate,
+            testID: "leaves-create",
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
@@ -279,6 +399,23 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.lg,
     paddingBottom: 120,
   },
+  /** 넓은 창의 열 배치. 상한을 둬 초대형 창에서 줄이 무한히 길어지지 않게 한다. */
+  columns: {
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.lg,
+    width: "100%",
+    maxWidth: layout.workspaceContent,
+    alignSelf: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  columnContent: {
+    paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: 120,
+  },
+  detailColumn: { width: layout.inspector.expanded },
+  stack: { gap: spacing.lg },
   webHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -354,16 +491,38 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: "center",
     gap: spacing.sm,
   },
+  detailEmpty: { padding: spacing.xl, gap: spacing.sm },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
-  emptyCaption: { fontSize: 13, color: colors.body },
+  emptyCaption: { fontSize: 13, lineHeight: 20, color: colors.body },
   leaveList: { paddingHorizontal: spacing.xl },
   leaveRow: {
     paddingVertical: spacing.xl,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.lg,
+    // 선택 표시선이 들어올 자리를 미리 비워 둬 행이 흔들리지 않게 한다.
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
+    paddingLeft: spacing.sm,
+    marginLeft: -spacing.sm - 3,
+  },
+  leaveRowSelected: {
+    borderLeftColor: colors.brand,
+    backgroundColor: colors.primaryPale,
   },
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },
   leaveReason: { fontSize: 12, color: colors.mute, marginTop: 4 },
+  detailHeader: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  detailHeaderTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.ink,
+  },
 }));

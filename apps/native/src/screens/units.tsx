@@ -3,6 +3,10 @@
  *
  * 그룹 검색은 일부러 없다. 부대를 검색으로 찾을 수 있으면 그 자체가 부대 목록이
  * 되기 때문이다. 초대코드로만 들어올 수 있고, 새로 만들면 코드가 한 번 노출된다.
+ *
+ * 이 화면은 폼 시트로 뜬다. 태블릿에서도 가운데 뜨는 폼 시트가 맞는 표현이라
+ * 표현 방식은 그대로 두고, 안쪽 폭만 폼 기준으로 묶는다 — 초대코드 입력칸이
+ * 700px로 늘어나 봐야 읽기만 어려워진다.
  */
 
 import {
@@ -352,7 +356,8 @@ const useStyles = makeStyles(({ colors }) => ({
   createSheet: { flex: 1 },
   content: {
     width: "100%",
-    maxWidth: layout.readableContent,
+    // 폼 기준 폭. 넓은 창에서도 입력칸이 늘어지지 않는다.
+    maxWidth: layout.formContent,
     alignSelf: "center",
     padding: spacing.lg,
     gap: spacing.lg,

@@ -6,6 +6,24 @@
  * 그룹에 속해 있으면 스크롤 달력과 하루 패널을, 아직 그룹이 없으면 참여 안내를
  * 보여준다. 날짜를 고르면 그날 기준으로 휴가 등록 시트가 열린다.
  * 웹의 CalendarPage와 같은 정보를 같은 규칙으로 보여준다.
+ *
+ * ## 창 폭에 따라 하루 상세가 사는 곳이 달라진다
+ *
+ * 좁은 창(compact)에서는 지금까지처럼 네이티브 바텀시트가 올라온다. 한 손으로
+ * 잡은 화면에서는 그게 가장 빠르고, 달력을 잠깐 덮는 대가도 크지 않다.
+ *
+ * 넓은 창(medium 이상)에서는 오른쪽 인스펙터에 붙박이로 둔다. 시트로 iPad
+ * 화면의 3/4을 덮어 놓고 계획을 짜는 건 말이 안 된다 — 달력을 보면서 그날의
+ * 명단·제한 여부를 읽고 바로 등록까지 가는 게 이 화면의 전부다. 아무 날도 고르지
+ * 않았을 때는 빈 칸 대신 오늘·잔여·주기·다음 일정·붐비는 날 요약을 둔다
+ * (overview-panel.tsx).
+ *
+ * ## 모달이 겹치지 않게 지키는 규칙
+ *
+ * iOS는 한 화면에 모달을 하나만 띄운다. 그래서 바텀시트는 세 조건이 모두 맞을
+ * 때만 뜬다 — 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 때. 특히
+ * 마지막 조건이 없으면 넓은 창에서 폼을 연 채 창을 좁혔을 때 시트와 폼이 동시에
+ * 뜨려다 UIKit이 표시를 거부하고, 그 상태가 굳어 화면 전체가 먹통이 된다.
  */
 
 import {
@@ -20,15 +38,24 @@ import { useNetInfo } from "@react-native-community/netinfo";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  buildMyLeaveDayMap,
+  summarizeHoldings,
   useCalendar,
   useLeaveBalances,
   useMe,
   useMyLeaves,
   type Calendar,
 } from "@leave/client";
+import { SplitPane, useWindowSizeClass } from "@/adaptive";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
@@ -39,7 +66,6 @@ import {
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
-import { buildMyLeaveDayMap } from "@leave/client";
 import { makeStyles, spacing, useColors } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
@@ -47,6 +73,7 @@ import {
   FirstGrantBanner,
 } from "./cycle-banner";
 import { DayPanel } from "./day-panel";
+import { CalendarOverviewPanel } from "./overview-panel";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
@@ -66,6 +93,7 @@ const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 export function CalendarScreen() {
   const styles = useStyles();
   const colors = useColors();
+  const { sizeClass, isCompact } = useWindowSizeClass();
   const me = useMe();
   const netInfo = useNetInfo();
   const queryClient = useQueryClient();
@@ -129,6 +157,8 @@ export function CalendarScreen() {
     return first && today < first ? first : null;
   }, [regularOvernight, today]);
   const hasBanner = Boolean(currentCycle || pendingFirstGrant);
+  // 넓은 창 요약 패널의 "남은 휴가". 내 휴가 화면과 같은 셈을 쓴다.
+  const holdings = summarizeHoldings(balances.data?.balances);
 
   const glassStripHeight =
     STATUS_ROW_HEIGHT + WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
@@ -217,79 +247,156 @@ export function CalendarScreen() {
   }
 
   /**
-   * 휴가 등록 폼을 연다. 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌 뒤에 연다.
+   * 휴가 등록 폼을 연다. 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌
+   * 뒤에 연다.
    *
    * iOS는 한 화면에 모달을 하나만 띄울 수 있다. 시트가 떠 있는 채로 폼을 열면
    * UIKit이 표시를 거부하는데, RN은 거부되기 전에 이미 "표시됨"으로 표시해둬서
    * 그 상태가 그대로 굳는다. 그러면 폼은 영영 뜨지 않고, 굳은 모달이 화면을
    * 덮은 채 남아 달력의 스크롤·날짜 탭까지 먹통이 된다.
+   *
+   * 넓은 창에는 시트가 아예 없으므로 선택을 지우지 않고 바로 연다 — 폼을 닫으면
+   * 인스펙터가 고르던 날짜를 그대로 들고 있다.
    */
   const openForm = (date: ISODate) => {
-    if (selectedDate == null) {
-      setFormDate(date);
+    if (isCompact && selectedDate != null) {
+      // 시트가 닫혔다고 알려오는 onClosed에서 이어서 연다.
+      pendingFormDate.current = date;
+      setSelectedDate(null);
       return;
     }
-    // 시트가 닫혔다고 알려오는 onClosed에서 이어서 연다.
-    pendingFormDate.current = date;
-    setSelectedDate(null);
+    setFormDate(date);
   };
+
+  const selectDate = (date: ISODate) => {
+    // 새 날짜를 고르면 대기 중이던 폼 요청은 무효로 본다.
+    pendingFormDate.current = null;
+    setSelectedDate((current) => (current === date ? null : date));
+  };
+
+  /**
+   * 시트를 띄워도 되는 조건. 세 가지가 모두 맞아야 한다 —
+   * 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 것.
+   */
+  const daySheetPresented = isCompact && selectedDate != null && !formDate;
+
+  const calendarPane = (
+    <View style={styles.calendarPane}>
+      <CalendarScroll
+        ref={scrollRef}
+        unitId={unit.id}
+        selectedDate={selectedDate}
+        contentTopInset={headerHeight}
+        myLeaveDays={myLeaveDays}
+        regularOvernight={regularOvernight}
+        currentCycle={currentCycle}
+        enlistedMonth={me.data?.user.enlistedAt.slice(0, 7) ?? null}
+        onSelectDate={selectDate}
+      />
+
+      <LiquidGlassSurface
+        style={[
+          styles.glassStrip,
+          {
+            top: insets.top + NATIVE_HEADER_HEIGHT,
+            height: glassStripHeight,
+          },
+        ]}
+      >
+        <Text
+          accessibilityLiveRegion="polite"
+          style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
+        >
+          {syncStatusLabel}
+        </Text>
+        {currentCycle ? (
+          <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
+        ) : pendingFirstGrant ? (
+          <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
+        ) : null}
+        <View style={styles.weekRow}>
+          {WEEKDAYS.map((weekday, index) => (
+            <Text
+              key={weekday}
+              style={[styles.weekday, index === 0 && { color: colors.negative }]}
+            >
+              {weekday}
+            </Text>
+          ))}
+        </View>
+      </LiquidGlassSurface>
+    </View>
+  );
+
+  const inspectorPane = (
+    <View style={styles.inspectorPane} testID="calendar-day-inspector">
+      <ScrollView
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.inspectorContent,
+          {
+            // 투명한 네이티브 헤더 아래에서 시작하고, 탭바에 가리지 않게 끝난다.
+            paddingTop: insets.top + NATIVE_HEADER_HEIGHT + spacing.sm,
+            paddingBottom: insets.bottom + spacing.xxxl * 2,
+          },
+        ]}
+      >
+        {selectedDate ? (
+          <>
+            <View style={styles.inspectorHeader}>
+              <Text style={styles.inspectorTitle}>날짜 상세</Text>
+              <Button
+                title="선택 해제"
+                variant="ghost"
+                size="sm"
+                onPress={() => setSelectedDate(null)}
+                testID="calendar-clear-selection"
+              />
+            </View>
+            {panelCalendar.data ? (
+              <DayPanel
+                calendar={panelCalendar.data}
+                date={selectedDate}
+                myUserId={me.data?.user.id}
+                cycle={cycleFor(regularOvernight, selectedDate)}
+                onAddLeave={() => openForm(selectedDate)}
+                style={styles.inspectorDayPanel}
+              />
+            ) : (
+              <View style={styles.inspectorLoading}>
+                <ActivityIndicator color={colors.ink} />
+              </View>
+            )}
+          </>
+        ) : (
+          <CalendarOverviewPanel
+            calendar={panelCalendar.data ?? null}
+            today={today}
+            holdings={holdings}
+            leaves={myLeaves.data?.leaves ?? []}
+            cycle={currentCycle}
+            cycleUsedDays={cycleUsage}
+            onSelectDate={selectDate}
+            onOpenLeave={(leaveId) =>
+              router.push({ pathname: "/leave/[leaveId]", params: { leaveId } })
+            }
+            onAddLeave={() => openForm(today)}
+          />
+        )}
+      </ScrollView>
+    </View>
+  );
 
   return (
     <>
-      <View style={styles.root}>
-        <View style={styles.calendarLayer}>
-          <CalendarScroll
-            ref={scrollRef}
-            unitId={unit.id}
-            selectedDate={selectedDate}
-            contentTopInset={headerHeight}
-            myLeaveDays={myLeaveDays}
-            regularOvernight={regularOvernight}
-            currentCycle={currentCycle}
-            enlistedMonth={me.data?.user.enlistedAt.slice(0, 7) ?? null}
-            onSelectDate={(d) => {
-              // 새 날짜를 고르면 대기 중이던 폼 요청은 무효로 본다.
-              pendingFormDate.current = null;
-              setSelectedDate((cur) => (cur === d ? null : d));
-            }}
-          />
-        </View>
-
-        <LiquidGlassSurface
-          style={[
-            styles.glassStrip,
-            {
-              top: insets.top + NATIVE_HEADER_HEIGHT,
-              height: glassStripHeight,
-            },
-          ]}
-        >
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
-          >
-            {syncStatusLabel}
-          </Text>
-          {currentCycle ? (
-            <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
-          ) : pendingFirstGrant ? (
-            <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
-          ) : null}
-          <View style={styles.weekRow}>
-            {WEEKDAYS.map((weekday, index) => (
-              <Text
-                key={weekday}
-                style={[
-                  styles.weekday,
-                  index === 0 && { color: colors.negative },
-                ]}
-              >
-                {weekday}
-              </Text>
-            ))}
-          </View>
-        </LiquidGlassSurface>
-      </View>
+      <SplitPane
+        sizeClass={sizeClass}
+        primary={calendarPane}
+        inspector={inspectorPane}
+        gap={0}
+        style={styles.root}
+      />
 
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
@@ -307,17 +414,19 @@ export function CalendarScreen() {
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
 
-      {/* 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
+      {/* 좁은 창의 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
       <NativeBottomSheet
-        isPresented={selectedDate != null}
+        isPresented={daySheetPresented}
         // 디텐트는 하나만 준다. 여러 개면 SwiftUI가 콘텐츠를 최대 디텐트 기준으로
         // 배치해 RN 루트가 보이는 시트보다 커지고, 안쪽 스크롤이 바닥에 닿지 못한다.
         snapPoints={[{ fraction: 0.75 }]}
         testID="calendar-day-sheet"
         // 사용자가 시트를 직접 내렸다. 대기 중이던 폼 요청은 무효로 본다.
+        // 창이 넓어져서 내려간 경우에는 선택을 지우지 않는다 — 같은 선택이
+        // 인스펙터로 자리를 옮겼을 뿐이고, 지우면 보던 날짜를 잃는다.
         onDismiss={() => {
           pendingFormDate.current = null;
-          setSelectedDate(null);
+          if (isCompact && !formDate) setSelectedDate(null);
         }}
         // 시트가 화면에서 사라진 뒤. 이제 폼 모달을 띄워도 된다.
         onClosed={() => {
@@ -362,14 +471,34 @@ export function CalendarScreen() {
 
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvas },
-  calendarLayer: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: colors.canvas,
+  /** 달력 열. 글래스 스트립이 이 열 안에서만 절대 배치되도록 기준을 잡는다. */
+  calendarPane: { flex: 1, backgroundColor: colors.canvas },
+  /**
+   * 오른쪽 붙박이 패널. 달력과 다른 표면색 + 머리카락 선으로 두 열을 가른다.
+   * 두 스킴 모두에서 canvas와 canvasSoft는 서로 다른 명도라 경계가 남는다.
+   */
+  inspectorPane: {
+    flex: 1,
+    backgroundColor: colors.canvasSoft,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.hairline,
   },
+  inspectorContent: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  inspectorHeader: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  inspectorTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.ink,
+  },
+  // 시트에서는 넉넉한 여백이 맞지만, 인스펙터는 이미 열 자체에 여백이 있다.
+  inspectorDayPanel: { padding: 0 },
+  inspectorLoading: { paddingVertical: spacing.xxxl, alignItems: "center" },
   glassStrip: {
     position: "absolute",
     left: 0,

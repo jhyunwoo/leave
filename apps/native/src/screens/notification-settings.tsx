@@ -14,10 +14,12 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { NativeCheckbox } from "@/components/native-checkbox";
 import { getPushToken } from "@/lib/notifications";
+import { ResponsiveGrid, useWindowSizeClass } from "@/adaptive";
 import { layout, makeStyles, spacing } from "@/theme";
 
 export function NotificationSettingsScreen() {
   const styles = useStyles();
+  const { sizeClass, isCompact } = useWindowSizeClass();
   const registerPush = useRegisterPushToken();
   const prefs = useNotificationPrefs();
   const updatePrefs = useUpdateNotificationPrefs();
@@ -45,11 +47,22 @@ export function NotificationSettingsScreen() {
     <ScrollView
       style={styles.root}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        {
+          maxWidth: isCompact
+            ? layout.readableContent
+            : layout.workspaceContent,
+        },
+      ]}
     >
       {process.env.EXPO_OS === "web" && (
         <Text style={styles.webTitle}>알림 설정</Text>
       )}
+      <ResponsiveGrid
+        sizeClass={sizeClass}
+        columns={{ compact: 1, medium: 2 }}
+      >
       <ContentPanel style={styles.preferenceCard}>
         <Text selectable style={styles.preferenceTitle}>
           기기 알림은 원할 때만
@@ -103,6 +116,7 @@ export function NotificationSettingsScreen() {
           testID="notification-pref-unit-notice"
         />
       </ContentPanel>
+      </ResponsiveGrid>
     </ScrollView>
   );
 }
@@ -111,7 +125,6 @@ const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
-    maxWidth: layout.readableContent,
     alignSelf: "center",
     padding: spacing.lg,
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,

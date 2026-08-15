@@ -1,10 +1,22 @@
 /**
  * 알림함 화면(네이티브).
  * 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
+ *
+ * ## 창 폭에 따라 읽는 방식이 달라진다
+ *
+ *   compact  : 최근 알림을 큰 카드로 떼어 놓고 그 아래에 이전 알림을 쌓는다.
+ *              좁은 화면에서는 "가장 최근 것"이 곧 위계라 이게 가장 빠르다.
+ *   medium+  : 왼쪽 목록 · 오른쪽 상세의 받은편지함. 알림 하나를 확인하려고
+ *              화면을 떠났다가 뒤로 돌아오는 왕복이 사라지고, 목록에서 위아래로
+ *              훑으며 어떤 날짜가 걸렸는지 비교할 수 있다. 위계는 카드 크기 대신
+ *              선택 상태와 안 읽음 표시가 진다.
+ *
+ * 어느 쪽이든 "알림 → 내 휴가" 해석 규칙은 하나뿐이다(`resolveDate`).
  */
 
 import { fmtDateShort } from "@leave/shared";
 import { Stack, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,8 +29,10 @@ import {
   useMarkNotificationsRead,
   useMyLeaves,
   useNotifications,
+  type MyLeave,
   type NotificationList,
 } from "@leave/client";
+import { inspectorWidth, useWindowSizeClass } from "@/adaptive";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { notify } from "@/lib/dialog";
@@ -37,23 +51,29 @@ function fmtTime(iso: string): string {
 export function NotificationsScreen() {
   const styles = useStyles();
   const colors = useColors();
+  const { sizeClass, isCompact } = useWindowSizeClass();
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
   const myLeaves = useMyLeaves();
   const router = useRouter();
 
+  const [pickedId, setPickedId] = useState<string | null>(null);
+
   /**
-   * 초과일 중 내 휴가가 걸린 첫 날짜와 그 휴가를 찾는다.
+   * 초과일에 걸린 내 휴가를 되짚는다.
    *
    * 알림의 leaveId는 초과를 유발한 "남의" 휴가라 이동에 쓸 수 없다. 알림을 받은
    * 사람은 정의상 초과일에 자기 휴가가 있으므로 여기서 되짚을 수 있다 —
    * 다만 알림을 받은 뒤 그 휴가를 지웠거나 기간을 바꿨으면 못 찾을 수 있다.
    */
+  const resolveDate = (date: string): MyLeave | null =>
+    myLeaves.data?.leaves.find(
+      (leave) => leave.startDate <= date && date <= leave.endDate,
+    ) ?? null;
+
   const resolveTarget = (dates: string[]) => {
     for (const date of [...dates].sort()) {
-      const mine = myLeaves.data?.leaves.find(
-        (leave) => leave.startDate <= date && date <= leave.endDate,
-      );
+      const mine = resolveDate(date);
       if (mine) return { leaveId: mine.id, date };
     }
     return null;
@@ -95,160 +115,343 @@ export function NotificationsScreen() {
   const notifications = list.data?.notifications ?? [];
   const [latest, ...earlier] = notifications;
 
+  // 넓은 창에서는 아무것도 고르지 않았으면 가장 최근 알림을 편다. 상태를 이펙트로
+  // 맞추지 않고 읽을 때 대신 고르므로, 목록이 바뀌어도 어긋나지 않는다.
+  const selected =
+    notifications.find((item) => item.id === pickedId) ?? latest ?? null;
+
+  const webHeader =
+    process.env.EXPO_OS === "web" ? (
+      <View style={styles.webHeader}>
+        <Text style={styles.webTitle}>알림</Text>
+        {/* 웹에는 툴바가 없으므로 툴바에 있던 동작을 여기서 연다. */}
+        <WebScreenActions
+          actions={[
+            {
+              id: "settings",
+              title: "설정",
+              onPress: () => router.push("/notifications/settings"),
+              testID: "notifications-settings",
+            },
+            // 읽지 않은 알림이 없으면 툴바에서도 숨는 버튼이다.
+            ...(list.data && list.data.unreadCount > 0
+              ? [
+                  {
+                    id: "read-all",
+                    title: markRead.isPending ? "처리 중…" : "모두 읽음",
+                    variant: "primary" as const,
+                    disabled: markRead.isPending,
+                    onPress: () => void markRead.mutateAsync(),
+                    testID: "notifications-read-all",
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </View>
+    ) : null;
+
+  const emptyPanel = (
+    <ContentPanel style={styles.empty}>
+      <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
+      <Text style={styles.emptyCaption}>
+        내 휴가 기간에 최대 출타 인원이 초과되면 알려드릴게요.
+      </Text>
+    </ContentPanel>
+  );
+
+  if (list.isPending) {
+    return (
+      <>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+        {/* 아직 개수를 모르므로 "모두 읽음"은 숨겨 둔다. */}
+        <NotificationsToolbar
+          hasUnread={false}
+          pending={markRead.isPending}
+          onSettings={() => router.push("/notifications/settings")}
+          onReadAll={() => void markRead.mutateAsync()}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <ScrollView
-        style={styles.root}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-      >
-        {process.env.EXPO_OS === "web" && (
-          <View style={styles.webHeader}>
-            <Text style={styles.webTitle}>알림</Text>
-            {/* 웹에는 툴바가 없으므로 툴바에 있던 동작을 여기서 연다. */}
-            <WebScreenActions
-              actions={[
-                {
-                  id: "settings",
-                  title: "설정",
-                  onPress: () => router.push("/notifications/settings"),
-                  testID: "notifications-settings",
-                },
-                // 읽지 않은 알림이 없으면 툴바에서도 숨는 버튼이다.
-                ...(list.data && list.data.unreadCount > 0
-                  ? [
-                      {
-                        id: "read-all",
-                        title: markRead.isPending ? "처리 중…" : "모두 읽음",
-                        variant: "primary" as const,
-                        disabled: markRead.isPending,
-                        onPress: () => void markRead.mutateAsync(),
-                        testID: "notifications-read-all",
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-          </View>
-        )}
-
-        {list.isPending ? (
-          <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-            <ActivityIndicator color={colors.ink} />
-          </View>
-        ) : !latest ? (
-          <ContentPanel style={styles.empty}>
-            <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
-            <Text style={styles.emptyCaption}>
-              내 휴가 기간에 최대 출타 인원이 초과되면 알려드릴게요.
-            </Text>
-          </ContentPanel>
-        ) : (
-          <>
-            {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
-              testID="latest-notification"
-              onPress={() => openDates(latest.dates)}
-            >
-              <ContentPanel
-                tone={latest.read ? "plain" : "danger"}
-                style={styles.latestCard}
+      {isCompact ? (
+        <ScrollView
+          style={styles.root}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          {webHeader}
+          {!latest ? (
+            emptyPanel
+          ) : (
+            <>
+              {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
+                testID="latest-notification"
+                onPress={() => openDates(latest.dates)}
               >
-                <View style={styles.latestHeader}>
-                  <Text style={styles.eyebrow}>최근 알림</Text>
-                  {!latest.read && <View style={styles.unreadDot} />}
-                </View>
-                <Text style={styles.latestTitle} selectable>
-                  {latest.title}
-                </Text>
-                <Text style={styles.latestBody} selectable>
-                  {latest.body}
-                </Text>
-                {renderDates(latest)}
-                <View style={styles.latestFooter}>
-                  <Text style={styles.time}>{fmtTime(latest.createdAt)}</Text>
-                  <Text style={styles.detailLink}>자세히</Text>
-                </View>
-              </ContentPanel>
-            </Pressable>
-
-            {earlier.length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>이전 알림</Text>
-                <ContentPanel style={styles.list}>
-                  {earlier.map((n, index) => (
-                    <Pressable
-                      key={n.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${n.title}. 휴가 상세 보기`}
-                      onPress={() => openDates(n.dates)}
-                      style={[
-                        styles.notificationRow,
-                        index > 0 && styles.rowDivider,
-                        !n.read && styles.unreadRow,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.dot,
-                          {
-                            backgroundColor: n.read
-                              ? colors.hairline
-                              : colors.negative,
-                          },
-                        ]}
-                      />
-                      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                        <Text
-                          style={[styles.cardTitle, n.read && styles.readText]}
-                        >
-                          {n.title}
-                        </Text>
-                        <Text
-                          style={[styles.cardBody, n.read && styles.readText]}
-                        >
-                          {n.body}
-                        </Text>
-                        {renderDates(n)}
-                        <Text style={styles.time}>{fmtTime(n.createdAt)}</Text>
-                      </View>
-                    </Pressable>
-                  ))}
+                <ContentPanel
+                  tone={latest.read ? "plain" : "danger"}
+                  style={styles.latestCard}
+                >
+                  <View style={styles.latestHeader}>
+                    <Text style={styles.eyebrow}>최근 알림</Text>
+                    {!latest.read && <View style={styles.unreadDot} />}
+                  </View>
+                  <Text style={styles.latestTitle} selectable>
+                    {latest.title}
+                  </Text>
+                  <Text style={styles.latestBody} selectable>
+                    {latest.body}
+                  </Text>
+                  {renderDates(latest)}
+                  <View style={styles.latestFooter}>
+                    <Text style={styles.time}>{fmtTime(latest.createdAt)}</Text>
+                    <Text style={styles.detailLink}>자세히</Text>
+                  </View>
                 </ContentPanel>
-              </>
-            )}
-          </>
-        )}
-      </ScrollView>
+              </Pressable>
 
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon="gearshape"
-          onPress={() => router.push("/notifications/settings")}
-        >
-          설정
-        </Stack.Toolbar.Button>
-        <Stack.Toolbar.Button
-          hidden={!list.data || list.data.unreadCount === 0}
-          disabled={markRead.isPending}
-          onPress={() => void markRead.mutateAsync()}
-        >
-          {markRead.isPending ? "처리 중…" : "모두 읽음"}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+              {earlier.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>이전 알림</Text>
+                  <ContentPanel style={styles.list}>
+                    {earlier.map((n, index) => (
+                      <NotificationRow
+                        key={n.id}
+                        notification={n}
+                        divider={index > 0}
+                        onPress={() => openDates(n.dates)}
+                        dates={renderDates(n)}
+                      />
+                    ))}
+                  </ContentPanel>
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      ) : (
+        <View style={styles.root}>
+          <View style={styles.columns}>
+            {/* 고정 폭은 ScrollView가 아니라 감싸는 View에 준다 — RN Web은
+                ScrollView 바깥 컨테이너에 flex-grow:1을 강제로 붙여, style로
+                준 width가 growth에 밀려 다른 값으로 자란다. View는 그 규칙이
+                없어 폭이 그대로 지켜진다. */}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ScrollView
+                contentInsetAdjustmentBehavior="automatic"
+                contentContainerStyle={styles.columnContent}
+              >
+                {webHeader}
+                {!latest ? (
+                  emptyPanel
+                ) : (
+                  <ContentPanel style={styles.list}>
+                    {notifications.map((n, index) => (
+                      <NotificationRow
+                        key={n.id}
+                        notification={n}
+                        divider={index > 0}
+                        selected={n.id === selected?.id}
+                        onPress={() => setPickedId(n.id)}
+                      />
+                    ))}
+                  </ContentPanel>
+                )}
+              </ScrollView>
+            </View>
+
+            <View style={{ width: inspectorWidth(sizeClass) }}>
+              <ScrollView
+                contentInsetAdjustmentBehavior="automatic"
+                contentContainerStyle={styles.columnContent}
+                showsVerticalScrollIndicator={false}
+              >
+              {selected ? (
+                <ContentPanel
+                  tone={selected.read ? "plain" : "danger"}
+                  style={styles.latestCard}
+                  testID="notification-detail"
+                >
+                  <View style={styles.latestHeader}>
+                    <Text style={styles.eyebrow}>
+                      {selected.read ? "알림" : "안 읽음"}
+                    </Text>
+                    {!selected.read && <View style={styles.unreadDot} />}
+                  </View>
+                  <Text style={styles.latestTitle} selectable>
+                    {selected.title}
+                  </Text>
+                  <Text style={styles.latestBody} selectable>
+                    {selected.body}
+                  </Text>
+                  <Text style={styles.time}>{fmtTime(selected.createdAt)}</Text>
+
+                  {selected.dates.length > 0 ? (
+                    <View style={styles.affected}>
+                      <Text style={styles.sectionTitle}>걸린 날짜</Text>
+                      {selected.dates.map((date) => {
+                        const mine = resolveDate(date);
+                        return (
+                          <Pressable
+                            key={date}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              mine
+                                ? `${fmtDateShort(date)}, ${mine.title} 상세 보기`
+                                : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
+                            }
+                            disabled={!mine}
+                            onPress={() => openDates([date])}
+                            style={styles.affectedRow}
+                          >
+                            <Text style={styles.affectedDate}>
+                              {fmtDateShort(date)}
+                            </Text>
+                            <Text
+                              style={styles.affectedLeave}
+                              numberOfLines={1}
+                            >
+                              {mine ? mine.title : "연결된 계획 없음"}
+                            </Text>
+                            {mine ? (
+                              <Text style={styles.detailLink}>열기</Text>
+                            ) : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </ContentPanel>
+              ) : (
+                emptyPanel
+              )}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <NotificationsToolbar
+        hasUnread={Boolean(list.data && list.data.unreadCount > 0)}
+        pending={markRead.isPending}
+        onSettings={() => router.push("/notifications/settings")}
+        onReadAll={() => void markRead.mutateAsync()}
+      />
     </>
+  );
+}
+
+function NotificationsToolbar(props: {
+  hasUnread: boolean;
+  pending: boolean;
+  onSettings: () => void;
+  onReadAll: () => void;
+}) {
+  return (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button icon="gearshape" onPress={props.onSettings}>
+        설정
+      </Stack.Toolbar.Button>
+      <Stack.Toolbar.Button
+        hidden={!props.hasUnread}
+        disabled={props.pending}
+        onPress={props.onReadAll}
+      >
+        {props.pending ? "처리 중…" : "모두 읽음"}
+      </Stack.Toolbar.Button>
+    </Stack.Toolbar>
+  );
+}
+
+/**
+ * 목록 한 줄. 좁은 창에서는 눌러서 휴가 상세로 가고, 넓은 창에서는 눌러서
+ * 오른쪽 상세를 바꾼다 — 그래서 동작은 호출자가 준다.
+ */
+function NotificationRow(props: {
+  notification: Notification;
+  divider: boolean;
+  selected?: boolean;
+  onPress: () => void;
+  /** 좁은 창에서만 줄 안에 날짜 배지를 함께 그린다. */
+  dates?: React.ReactNode;
+}) {
+  const styles = useStyles();
+  const colors = useColors();
+  const n = props.notification;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={
+        props.selected === undefined ? undefined : { selected: props.selected }
+      }
+      accessibilityLabel={`${n.title}${n.read ? "" : ", 안 읽음"}`}
+      onPress={props.onPress}
+      style={[
+        styles.notificationRow,
+        props.divider && styles.rowDivider,
+        !n.read && styles.unreadRow,
+        props.selected && styles.selectedRow,
+      ]}
+    >
+      <View
+        style={[
+          styles.dot,
+          { backgroundColor: n.read ? colors.hairline : colors.negative },
+        ]}
+      />
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        <Text style={[styles.cardTitle, n.read && styles.readText]}>
+          {n.title}
+        </Text>
+        <Text
+          style={[styles.cardBody, n.read && styles.readText]}
+          numberOfLines={props.selected === undefined ? undefined : 2}
+        >
+          {n.body}
+        </Text>
+        {props.dates}
+        <Text style={styles.time}>{fmtTime(n.createdAt)}</Text>
+      </View>
+    </Pressable>
   );
 }
 
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
+  loading: {
+    flex: 1,
+    backgroundColor: colors.canvasSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   content: {
     width: "100%",
     maxWidth: layout.readableContent,
     alignSelf: "center",
     padding: spacing.lg,
+    paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: 120,
+  },
+  columns: {
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.lg,
+    width: "100%",
+    maxWidth: layout.workspaceContent,
+    alignSelf: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  columnContent: {
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
     gap: spacing.lg,
     paddingBottom: 120,
@@ -266,7 +469,7 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.sm,
   },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
-  emptyCaption: { fontSize: 13, color: colors.body },
+  emptyCaption: { fontSize: 13, color: colors.body, textAlign: "center" },
   latestCard: { padding: spacing.xl, gap: spacing.sm },
   latestHeader: {
     flexDirection: "row",
@@ -302,18 +505,48 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingHorizontal: spacing.sm,
     marginBottom: -spacing.sm,
   },
+  affected: {
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  affectedRow: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderCurve: "continuous",
+    backgroundColor: colors.canvas,
+  },
+  affectedDate: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.negativeDeep,
+    fontVariant: ["tabular-nums"],
+  },
+  affectedLeave: { flex: 1, minWidth: 0, fontSize: 13, color: colors.body },
   list: { paddingHorizontal: spacing.lg, overflow: "hidden" },
   notificationRow: {
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.sm,
     flexDirection: "row",
     gap: spacing.md,
+    // 선택 표시선 자리를 미리 비워 둬 고를 때 줄이 흔들리지 않게 한다.
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
   unreadRow: { backgroundColor: colors.negativeTint },
+  selectedRow: {
+    borderLeftColor: colors.brand,
+    backgroundColor: colors.primaryPale,
+  },
   dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
   cardTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   cardBody: { fontSize: 14, color: colors.body, lineHeight: 20 },

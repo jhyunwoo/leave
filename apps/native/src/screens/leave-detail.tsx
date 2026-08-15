@@ -1,48 +1,23 @@
 /**
- * 휴가 상세 화면(네이티브).
- * 구간별 재원과 기간, 그 기간의 그룹 출타 현황을 함께 보여주고 수정·삭제를 제공한다.
+ * 휴가 상세 화면(네이티브) — 라우트 껍데기.
+ *
+ * 본문은 `leave-detail-content.tsx`에 있다. 이 파일이 맡는 건 라우트에 딸린
+ * 일들뿐이다 — 파라미터 읽기, 없는 휴가 처리, 툴바, 삭제 후 뒤로가기.
+ * 넓은 창의 내 휴가 화면은 같은 본문을 오른쪽 패널에 그대로 그린다.
  */
 
-import {
-  availabilitySignal,
-  cycleFor,
-  fmtDateK,
-  fmtDateShort,
-  fmtRange,
-  fmtRangeTiny,
-  isConfirmedLeaveStatus,
-  LEAVE_STATUS_LABELS,
-  monthsSpanning,
-  type ISODate,
-} from "@leave/shared";
+import type { ISODate } from "@leave/shared";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import {
-  useCalendar,
-  useCalendarDays,
-  useDeleteLeave,
-  useLeaveBalances,
-  useMe,
-  useMyLeaves,
-} from "@leave/client";
-import { Badge } from "@/components/badge";
+import { useState } from "react";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { useDeleteLeave, useMyLeaves } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
-import { OfficialDisclaimer } from "@/components/official-disclaimer";
-import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction, notify } from "@/lib/dialog";
-import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
-import { DayRoster } from "./calendar/day-roster";
+import { layout, makeStyles, spacing, useColors } from "@/theme";
+import { LeaveDetailContent } from "./leave-detail-content";
 
 /**
  * 내 휴가 한 건의 상세.
@@ -59,43 +34,11 @@ export function LeaveDetailScreen() {
     date?: string;
   }>();
   const router = useRouter();
-  const me = useMe();
   const myLeaves = useMyLeaves();
-  const balances = useLeaveBalances();
   const del = useDeleteLeave();
   const [editing, setEditing] = useState(false);
-  // 알림에서 온 날짜를 우선 보여준다. 없으면 아래에서 첫 초과일로 채운다.
-  const [pickedDate, setPickedDate] = useState<ISODate | null>(date ?? null);
 
   const leave = myLeaves.data?.leaves.find((l) => l.id === leaveId) ?? null;
-  const unitId = me.data?.unit?.id ?? null;
-
-  const months = useMemo(
-    () => (leave ? monthsSpanning(leave.startDate, leave.endDate) : []),
-    [leave],
-  );
-  const spanDays = useCalendarDays(unitId, months);
-
-  // 이 휴가 기간 안에서 지금도 초과인 날짜들. 알림 이후 남이 계획을 물리면 사라진다.
-  const exceededDates = useMemo(() => {
-    if (!leave) return [];
-    return spanDays.days
-      .filter(
-        (day) =>
-          day.exceeded &&
-          leave.startDate <= day.date &&
-          day.date <= leave.endDate,
-      )
-      .map((day) => day.date);
-  }, [spanDays.days, leave]);
-
-  const selectedDate =
-    pickedDate ?? exceededDates[0] ?? leave?.startDate ?? null;
-  // 휴가를 못 찾으면 볼 날짜도 없다. unitId를 비워 빈 달 조회가 나가지 않게 한다.
-  const dayCalendar = useCalendar(
-    selectedDate ? unitId : null,
-    selectedDate ? selectedDate.slice(0, 7) : "",
-  );
 
   if (myLeaves.isPending) {
     return (
@@ -106,7 +49,7 @@ export function LeaveDetailScreen() {
   }
 
   // 알림을 받은 뒤 계획을 지웠거나 기간을 바꾼 경우.
-  if (!leave || !selectedDate) {
+  if (!leave) {
     return (
       <View style={[styles.center, { padding: spacing.xl }]}>
         <ContentPanel style={styles.emptyCard}>
@@ -119,13 +62,6 @@ export function LeaveDetailScreen() {
       </View>
     );
   }
-
-  const stat = dayCalendar.data?.days.find((d) => d.date === selectedDate);
-  const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
-  const blackout = dayCalendar.data?.blackouts.find(
-    (b) => b.startDate <= selectedDate && selectedDate <= b.endDate,
-  );
-  const cycle = cycleFor(balances.data?.regularOvernight ?? null, selectedDate);
 
   const confirmDelete = async () => {
     const confirmed = await confirmAction({
@@ -149,147 +85,38 @@ export function LeaveDetailScreen() {
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          // 상세는 읽는 화면이라 넓은 창에서도 줄 길이를 묶어 둔다.
+          { maxWidth: layout.readableContent },
+        ]}
       >
-        {/* 웹에는 툴바가 없으므로 수정·삭제를 본문 맨 위에서 연다. */}
-        <WebScreenActions
-          actions={[
-            {
-              id: "edit",
-              title: "수정",
-              variant: "primary",
-              onPress: () => setEditing(true),
-              testID: "leave-detail-edit",
-            },
-            {
-              id: "delete",
-              title: "삭제",
-              variant: "danger",
-              disabled: del.isPending,
-              onPress: () => void confirmDelete(),
-              testID: "leave-detail-delete",
-            },
-          ]}
-        />
-
-        <ContentPanel style={styles.panel}>
-          <Text style={styles.leaveTitle} selectable>
-            {leave.title}
-          </Text>
-          <Text style={styles.leaveDates} selectable>
-            {fmtRange(leave.startDate, leave.endDate)}
-          </Text>
-          {leave.reason ? (
-            <Text style={styles.leaveReason} selectable>
-              {leave.reason}
-            </Text>
-          ) : null}
-          {!isConfirmedLeaveStatus(leave.status) && (
-            <View style={styles.statusChip}>
-              <Text style={styles.statusChipText}>
-                {LEAVE_STATUS_LABELS[leave.status]}
-              </Text>
-            </View>
-          )}
-          <SegmentBadges segments={leave.segments} />
-        </ContentPanel>
-
-        <ContentPanel style={styles.panel}>
-          <Text style={styles.sectionTitle} selectable>
-            최대 출타 인원 초과
-          </Text>
-          {spanDays.isPending ? (
-            <ActivityIndicator color={colors.ink} />
-          ) : exceededDates.length === 0 ? (
-            <Text style={styles.sectionCaption} selectable>
-              지금은 이 휴가 기간에 초과된 날짜가 없어요. 다른 사람이 계획을
-              바꾸면 알림을 받은 뒤에도 해소될 수 있어요.
-            </Text>
-          ) : (
-            <>
-              <Text style={styles.sectionCaption} selectable>
-                날짜를 고르면 그날 함께 나가는 사람을 볼 수 있어요.
-              </Text>
-              <View style={styles.dateRow}>
-                {exceededDates.map((d) => (
-                  <Pressable
-                    key={d}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: d === selectedDate }}
-                    accessibilityLabel={`${fmtDateShort(d)} 상세 보기`}
-                    onPress={() => setPickedDate(d)}
-                    style={[
-                      styles.dateChip,
-                      d === selectedDate && styles.dateChipSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dateChipText,
-                        d === selectedDate && styles.dateChipTextSelected,
-                      ]}
-                    >
-                      {fmtDateShort(d)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-        </ContentPanel>
-
-        <ContentPanel style={styles.panel}>
-          <Text style={styles.eyebrow} selectable>
-            선택한 날짜
-          </Text>
-          <Text style={styles.date} selectable>
-            {fmtDateK(selectedDate)}
-          </Text>
-          {stat && (
-            <View style={styles.statusRow}>
-              <Badge
-                text={
-                  signal?.percent == null
-                    ? "기준 미설정"
-                    : `${signal.label} ${signal.percent}%`
-                }
-                kind={stat.exceeded ? "negative" : "positive"}
-              />
-              <Text style={styles.statLine} selectable>
-                {stat.count}명 / 기준 {stat.allowed}명
-              </Text>
-            </View>
-          )}
-          {blackout ? (
-            <ContentPanel tone="danger" style={styles.blackoutCard}>
-              <Text selectable style={styles.blackoutTitle}>
-                제한 가능 기간
-              </Text>
-              <Text selectable style={styles.sectionCaption}>
-                {blackout.reason ?? "관리자가 등록한 기간입니다."} 출타율과
-                무관하게 지휘관이 휴가를 제한할 수 있어요.
-              </Text>
-            </ContentPanel>
-          ) : null}
-          {cycle && (
-            <Text style={styles.cycleLine} selectable>
-              정기외박 {cycle.index}주기 {fmtRangeTiny(cycle.start, cycle.end)}{" "}
-              안에 속한 날이에요.
-            </Text>
-          )}
-          <OfficialDisclaimer />
-          {dayCalendar.data ? (
-            <DayRoster
-              attendees={dayCalendar.data.attendees}
-              date={selectedDate}
-              myUserId={me.data?.user.id}
+        <LeaveDetailContent
+          leave={leave}
+          focusDate={(date as ISODate | undefined) ?? null}
+          header={
+            /* 웹에는 툴바가 없으므로 수정·삭제를 본문 맨 위에서 연다. */
+            <WebScreenActions
+              actions={[
+                {
+                  id: "edit",
+                  title: "수정",
+                  variant: "primary",
+                  onPress: () => setEditing(true),
+                  testID: "leave-detail-edit",
+                },
+                {
+                  id: "delete",
+                  title: "삭제",
+                  variant: "danger",
+                  disabled: del.isPending,
+                  onPress: () => void confirmDelete(),
+                  testID: "leave-detail-delete",
+                },
+              ]}
             />
-          ) : (
-            <View style={{ padding: spacing.xxl, alignItems: "center" }}>
-              <ActivityIndicator color={colors.ink} />
-            </View>
-          )}
-        </ContentPanel>
+          }
+        />
       </ScrollView>
 
       <Stack.Toolbar placement="right">
@@ -320,7 +147,6 @@ const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
-    maxWidth: layout.readableContent,
     alignSelf: "center",
     padding: spacing.lg,
     paddingTop: process.env.EXPO_OS === "web" ? 80 : spacing.lg,
@@ -341,48 +167,4 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   emptyTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   emptyBody: { fontSize: 15, lineHeight: 22, color: colors.body },
-  panel: { padding: spacing.xl, gap: spacing.md },
-  leaveTitle: { fontSize: 22, fontWeight: "700", color: colors.ink },
-  leaveDates: { fontSize: 15, color: colors.body, marginTop: -spacing.sm },
-  leaveReason: { fontSize: 13, color: colors.mute },
-  statusChip: {
-    alignSelf: "flex-start",
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  statusChipText: { fontSize: 10, fontWeight: "600", color: colors.mute },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
-  sectionCaption: { fontSize: 12, lineHeight: 18, color: colors.mute },
-  dateRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  dateChip: {
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.negativeTint,
-  },
-  dateChipSelected: { backgroundColor: colors.negativeDeep },
-  dateChipText: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
-  // negativeDeep 채움 위에 얹히는 글자. canvas를 쓰면 스킴에 따라 대비가
-  // 뒤집혀(다크에서 밝은 분홍 위 어두운 회색) 읽히지 않는다.
-  dateChipTextSelected: { color: colors.onNegativeBg },
-  eyebrow: { fontSize: 12, fontWeight: "500", color: colors.mute },
-  date: { fontSize: 20, fontWeight: "600", color: colors.ink, marginTop: -8 },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    flexWrap: "wrap",
-  },
-  statLine: { fontSize: 12, color: colors.body },
-  blackoutCard: { padding: spacing.lg, gap: spacing.xs },
-  blackoutTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    // danger 톤 패널 위에 얹히므로 경고(노랑) 계열이 아니라 같은 계열을 쓴다.
-    color: colors.negativeDeep,
-  },
-  cycleLine: { fontSize: 12, color: colors.body },
 }));

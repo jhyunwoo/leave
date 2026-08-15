@@ -3,6 +3,10 @@
  *
  * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
  * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
+ *
+ * 넓은 창에서는 왼쪽에 합계를 고정하고 오른쪽에 재원별 카드를 편다. 재원 카드는
+ * 서로 비교하려고 보는 것이라, 한 줄로 쌓아 두면 위아래로 스크롤하며 숫자를
+ * 외워야 한다. 주기 설정과 주기 목록은 아래에서 두 열로 나뉜다.
  */
 
 import { fmtDateShort, fmtRangeTiny, type BalanceKey } from "@leave/shared";
@@ -27,6 +31,11 @@ import {
 import { RegularOvernightSettings } from "@/components/regular-overnight-settings";
 import { StackedBar } from "@/components/stacked-bar";
 import {
+  ResponsiveGrid,
+  sideColumnWidth,
+  useWindowSizeClass,
+} from "@/adaptive";
+import {
   layout,
   makeStyles,
   radius,
@@ -47,6 +56,7 @@ export function LeaveGrantsScreen() {
   const styles = useStyles();
   const colors = useColors();
   const balance = useBalanceColors();
+  const { sizeClass, isCompact } = useWindowSizeClass();
   const page = useLeaveGrants();
   const me = useMe();
   const del = useDeleteLeaveGrant();
@@ -84,14 +94,8 @@ export function LeaveGrantsScreen() {
       !fund.cycleScoped && fund.grants.length === 0 && fund.usedDays === 0,
   );
 
-  return (
-    <>
-      <ScrollView
-        style={styles.root}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-      >
-        <ContentPanel tone="accent" style={styles.dashboard}>
+  const summary = (
+    <ContentPanel tone="accent" style={styles.dashboard}>
           <Text style={styles.eyebrow} selectable>
             보유 휴가
           </Text>
@@ -160,62 +164,106 @@ export function LeaveGrantsScreen() {
             </Text>
           )}
 
-          {/* 배분 규칙이 보이지 않으면 건별 사용 일수를 믿기 어렵다. */}
-          <Text style={styles.rule} selectable>
-            만기가 빠른 적립분부터 자동으로 차감돼요.
+      {/* 배분 규칙이 보이지 않으면 건별 사용 일수를 믿기 어렵다. */}
+      <Text style={styles.rule} selectable>
+        만기가 빠른 적립분부터 자동으로 차감돼요.
+      </Text>
+    </ContentPanel>
+  );
+
+  const fundCards = (
+    <ResponsiveGrid
+      sizeClass={sizeClass}
+      // 적립분 행이 길어 좁은 열에서는 만기·사용이 두 줄로 접힌다. 두 열은
+      // 실제로 넉넉한 expanded에서만 편다.
+      columns={{ compact: 1, medium: 1, expanded: 2 }}
+    >
+      {active.map((fund) => (
+        <FundCard
+          key={fund.key}
+          fund={fund}
+          onAdd={() => setEditing({ newKey: fund.key })}
+          onEdit={(grant) => setEditing({ grant })}
+          onDelete={(grant) =>
+            void confirmGrantDelete(grant, () => void del.mutateAsync(grant.id))
+          }
+        />
+      ))}
+      {empty.length > 0 ? (
+        <ContentPanel style={styles.addCard}>
+          <Text style={styles.addTitle} selectable>
+            다른 재원 추가
           </Text>
-        </ContentPanel>
-
-        {active.map((fund) => (
-          <FundCard
-            key={fund.key}
-            fund={fund}
-            onAdd={() => setEditing({ newKey: fund.key })}
-            onEdit={(grant) => setEditing({ grant })}
-            onDelete={(grant) =>
-              void confirmGrantDelete(
-                grant,
-                () => void del.mutateAsync(grant.id),
-              )
-            }
-          />
-        ))}
-
-        {empty.length > 0 && (
-          <ContentPanel style={styles.addCard}>
-            <Text style={styles.addTitle} selectable>
-              다른 재원 추가
-            </Text>
-            <View style={styles.chips}>
-              {empty.map((fund) => {
-                const tone = balance[fund.key];
-                return (
-                  <Pressable
-                    key={fund.key}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${fund.label} 적립분 추가`}
-                    onPress={() => setEditing({ newKey: fund.key })}
-                    style={[styles.chip, { backgroundColor: tone.bg }]}
-                  >
-                    <Text style={[styles.chipText, { color: tone.fg }]}>
-                      + {fund.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ContentPanel>
-        )}
-
-        {me.data && me.data.user.branch !== "army" && (
-          <View style={{ gap: spacing.lg }}>
-            <RegularOvernightSettings config={regularOvernight} />
-            <CycleList
-              cycles={regularOvernight.cycles}
-              expanded={showPastCycles}
-              onToggle={() => setShowPastCycles((open) => !open)}
-            />
+          <View style={styles.chips}>
+            {empty.map((fund) => {
+              const tone = balance[fund.key];
+              return (
+                <Pressable
+                  key={fund.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${fund.label} 적립분 추가`}
+                  onPress={() => setEditing({ newKey: fund.key })}
+                  style={[styles.chip, { backgroundColor: tone.bg }]}
+                >
+                  <Text style={[styles.chipText, { color: tone.fg }]}>
+                    + {fund.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
+        </ContentPanel>
+      ) : null}
+    </ResponsiveGrid>
+  );
+
+  const overnight =
+    me.data && me.data.user.branch !== "army" ? (
+      <ResponsiveGrid
+        sizeClass={sizeClass}
+        columns={{ compact: 1, medium: 1, expanded: 2 }}
+      >
+        <RegularOvernightSettings config={regularOvernight} />
+        <CycleList
+          cycles={regularOvernight.cycles}
+          expanded={showPastCycles}
+          onToggle={() => setShowPastCycles((open) => !open)}
+        />
+      </ResponsiveGrid>
+    ) : null;
+
+  return (
+    <>
+      <ScrollView
+        style={styles.root}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.content,
+          {
+            maxWidth: isCompact
+              ? layout.readableContent
+              : layout.workspaceContent,
+          },
+        ]}
+      >
+        {isCompact ? (
+          <>
+            {summary}
+            {fundCards}
+            {overnight}
+          </>
+        ) : (
+          <>
+            {/* 합계는 왼쪽에 고정하고 재원 카드를 오른쪽에 편다 — 총량을 보면서
+                어느 재원이 그 숫자를 만들었는지 짚을 수 있어야 한다. */}
+            <View style={styles.topRow}>
+              <View style={{ width: sideColumnWidth(sizeClass) }}>
+                {summary}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>{fundCards}</View>
+            </View>
+            {overnight}
+          </>
         )}
       </ScrollView>
 
@@ -467,12 +515,12 @@ const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   content: {
     width: "100%",
-    maxWidth: layout.readableContent,
     alignSelf: "center",
     padding: spacing.lg,
     gap: spacing.lg,
     paddingBottom: 80,
   },
+  topRow: { flexDirection: "row", gap: spacing.lg, alignItems: "flex-start" },
   loading: {
     flex: 1,
     alignItems: "center",
