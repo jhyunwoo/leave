@@ -7,16 +7,22 @@
 import { BottomSheet } from "@expo/ui/community/bottom-sheet";
 import type { ReactElement } from "react";
 import { View } from "react-native";
+import { useSheetClosed } from "./use-sheet-closed";
 
 type SnapPoint = "half" | "full" | { fraction: number } | { height: number };
 
 export function NativeBottomSheet(props: {
   isPresented: boolean;
+  /** 사용자가 시트를 직접 내렸다. 화면 상태를 닫힘으로 맞추는 용도. */
   onDismiss: () => void;
+  /** 시트가 닫힌 뒤. 코드로 닫은 경우에도 온다(useSheetClosed 주석 참고). */
+  onClosed?: () => void;
   snapPoints?: SnapPoint[];
   testID?: string;
   children: ReactElement;
 }) {
+  useSheetClosed(props.isPresented, props.onClosed);
+
   if (!props.isPresented) return null;
 
   const snapPoints = props.snapPoints?.map((point) => {

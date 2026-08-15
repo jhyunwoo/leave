@@ -229,14 +229,9 @@ export function CalendarScreen() {
       setFormDate(date);
       return;
     }
+    // 시트가 닫혔다고 알려오는 onClosed에서 이어서 연다.
+    pendingFormDate.current = date;
     setSelectedDate(null);
-    if (process.env.EXPO_OS === "ios") {
-      // 시트의 onDismiss(닫힘 애니메이션까지 끝난 시점)에서 이어서 연다.
-      pendingFormDate.current = date;
-    } else {
-      // 안드로이드 모달은 Dialog라 겹쳐도 되고, onDismiss도 오지 않는다.
-      setFormDate(date);
-    }
   };
 
   return (
@@ -319,8 +314,13 @@ export function CalendarScreen() {
         // 배치해 RN 루트가 보이는 시트보다 커지고, 안쪽 스크롤이 바닥에 닿지 못한다.
         snapPoints={[{ fraction: 0.75 }]}
         testID="calendar-day-sheet"
+        // 사용자가 시트를 직접 내렸다. 대기 중이던 폼 요청은 무효로 본다.
         onDismiss={() => {
+          pendingFormDate.current = null;
           setSelectedDate(null);
+        }}
+        // 시트가 화면에서 사라진 뒤. 이제 폼 모달을 띄워도 된다.
+        onClosed={() => {
           const pending = pendingFormDate.current;
           if (!pending) return;
           pendingFormDate.current = null;
