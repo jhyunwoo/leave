@@ -302,29 +302,13 @@
 
 /* -------------------------------------------------- 정기외박 · 그룹 부속 */
 
+/* 주기·회당 두 입력. 예전에는 값을 못 고치는 타일이라 테두리를 둘렀는데,
+   이제 입력칸이므로 껍데기를 걷고 나란히 놓기만 한다. minmax(0, …)이 없으면
+   숫자 스피너 때문에 좁은 화면에서 트랙이 안 줄어든다. */
 .ob-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-md);
-}
-
-.ob-metrics > div {
-  padding: var(--sp-lg);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.ob-metrics span {
-  font-size: 13px;
-  color: var(--body);
-}
-
-.ob-metrics strong {
-  font-size: 20px;
-  font-weight: 800;
 }
 
 .ob-details {
@@ -390,7 +374,11 @@
   background: var(--primary-pale);
   padding: 26px 20px;
   text-align: center;
-  font: 800 24px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font:
+    800 24px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
   overflow-wrap: anywhere;
   animation: ob-pop 420ms var(--ease-out) both;
 }

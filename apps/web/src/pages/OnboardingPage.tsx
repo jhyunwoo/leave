@@ -73,6 +73,21 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
   const [startDate, setStartDate] = useState(
     props.status.regularOvernight?.startDate ?? "",
   );
+  // 주기·회당은 통상 운영값을 깔아 두되 고칠 수 있게 한다. 이어하기를 위해
+  // 저장된 값이 있으면 그쪽을 먼저 쓴다(startDate와 같은 규칙).
+  // 문자열로 드는 이유는 OvernightStep의 주석 참고.
+  const [intervalDays, setIntervalDays] = useState(
+    String(
+      props.status.regularOvernight?.intervalDays ??
+        REGULAR_OVERNIGHT_DEFAULTS.intervalDays,
+    ),
+  );
+  const [daysPerGrant, setDaysPerGrant] = useState(
+    String(
+      props.status.regularOvernight?.daysPerGrant ??
+        REGULAR_OVERNIGHT_DEFAULTS.daysPerGrant,
+    ),
+  );
   const [inGroup, setInGroup] = useState(Boolean(props.status.unitId));
   const [error, setError] = useState<string | null>(null);
 
@@ -144,7 +159,12 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
       await saveRegular.mutateAsync(
         skip || !isValidISODate(startDate)
           ? { enabled: false }
-          : { enabled: true, startDate, ...REGULAR_OVERNIGHT_DEFAULTS },
+          : {
+              enabled: true,
+              startDate,
+              intervalDays: Number(intervalDays),
+              daysPerGrant: Number(daysPerGrant),
+            },
       );
       if (skip) setStartDate("");
       advance();
@@ -276,6 +296,10 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
               branch={branch}
               value={startDate}
               onChange={setStartDate}
+              intervalDays={intervalDays}
+              onIntervalDaysChange={setIntervalDays}
+              daysPerGrant={daysPerGrant}
+              onDaysPerGrantChange={setDaysPerGrant}
               error={error}
               pending={saveRegular.isPending}
               onNext={() => void submitOvernight()}

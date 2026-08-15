@@ -9,7 +9,6 @@
  */
 
 import {
-  REGULAR_OVERNIGHT_DEFAULTS,
   REGULAR_OVERNIGHT_SOURCES,
   REGULAR_OVERNIGHT_VERIFIED_AT,
   addDays,
@@ -25,6 +24,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
+import { Input } from "@/components/field";
 import { makeStyles, radius, spacing } from "@/theme";
 import { StepError, StepNext, StepShell, StepSkip } from "./step-shell";
 
@@ -32,6 +32,11 @@ export function OvernightStep(props: {
   branch: Branch;
   value: string;
   onChange: (value: string) => void;
+  /** 주기·회당은 문자열로 들고 있는다 — 아래 주석 참고. */
+  intervalDays: string;
+  onIntervalDaysChange: (value: string) => void;
+  daysPerGrant: string;
+  onDaysPerGrantChange: (value: string) => void;
   error: string | null;
   pending: boolean;
   onNext: () => void;
@@ -42,6 +47,15 @@ export function OvernightStep(props: {
   const guidance = regularOvernightGuidance(props.branch);
   if (!guidance) return null;
 
+  const interval = Number(props.intervalDays);
+  const perGrant = Number(props.daysPerGrant);
+  // 서버 스키마(regularOvernightConfigSchema)와 같은 범위를 미리 막아 준다.
+  const intervalOk =
+    Number.isInteger(interval) && interval >= 1 && interval <= 365;
+  const perGrantOk =
+    Number.isInteger(perGrant) && perGrant >= 1 && perGrant <= 30;
+  const ready = isValidISODate(props.value) && intervalOk && perGrantOk;
+
   return (
     <StepShell step="overnight" lead={guidance.summary}>
       <DatePickerRow
@@ -51,29 +65,39 @@ export function OvernightStep(props: {
         testID="onboarding-overnight-start"
       />
 
+      {/* 기본값은 해군·공군의 통상 운영(6주마다 2박 3일)이지만 부대마다 다르다.
+          예전에는 읽기 전용 타일이라 온보딩을 끝내고 보유 휴가 화면까지 들어가야
+          고칠 수 있었다.
+          값을 문자열로 들고 있는 건 지우는 중간 상태를 허용하기 위해서다.
+          숫자로 강제하면 마지막 한 자를 지우는 순간 1로 튀어 되고쳐야 한다. */}
       <View style={styles.metrics}>
-        <ContentPanel style={styles.metric}>
-          <Text style={styles.metricLabel}>주기</Text>
-          <Text style={styles.metricValue}>
-            {REGULAR_OVERNIGHT_DEFAULTS.intervalDays}일
-          </Text>
-        </ContentPanel>
-        <ContentPanel style={styles.metric}>
-          <Text style={styles.metricLabel}>회당</Text>
-          <Text style={styles.metricValue}>
-            {REGULAR_OVERNIGHT_DEFAULTS.daysPerGrant}일
-          </Text>
-        </ContentPanel>
+        <View style={styles.metric}>
+          <Text style={styles.metricLabel}>주기 (일)</Text>
+          <Input
+            value={props.intervalDays}
+            onChangeText={props.onIntervalDaysChange}
+            keyboardType="number-pad"
+            accessibilityLabel="정기외박 주기 일수"
+            testID="onboarding-overnight-interval"
+          />
+        </View>
+        <View style={styles.metric}>
+          <Text style={styles.metricLabel}>회당 적립 (일)</Text>
+          <Input
+            value={props.daysPerGrant}
+            onChangeText={props.onDaysPerGrantChange}
+            keyboardType="number-pad"
+            accessibilityLabel="정기외박 회당 적립 일수"
+            testID="onboarding-overnight-days"
+          />
+        </View>
       </View>
 
-      {isValidISODate(props.value) ? (
+      {isValidISODate(props.value) && intervalOk ? (
         <Animated.Text entering={FadeIn.duration(240)} style={styles.live}>
           첫 사용 가능 주기는{" "}
           <Text style={styles.liveStrong}>
-            {addDays(
-              props.value as ISODate,
-              REGULAR_OVERNIGHT_DEFAULTS.intervalDays,
-            )}
+            {addDays(props.value as ISODate, interval)}
           </Text>
           부터예요.
         </Animated.Text>
@@ -118,7 +142,7 @@ export function OvernightStep(props: {
 
       <StepError message={props.error} />
       <StepNext
-        disabled={!isValidISODate(props.value)}
+        disabled={!ready}
         pending={props.pending}
         onPress={props.onNext}
       />
@@ -133,15 +157,10 @@ export function OvernightStep(props: {
 
 const useStyles = makeStyles(({ colors }) => ({
   metrics: { flexDirection: "row", gap: spacing.md },
-  metric: {
-    flex: 1,
-    padding: spacing.lg,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-  },
-  metricLabel: { fontSize: 13, color: colors.body },
-  metricValue: { fontSize: 20, fontWeight: "800", color: colors.ink },
+  /* 값을 못 고치던 시절엔 테두리 두른 타일이었다. 이제 입력칸이라 껍데기를
+     걷고 라벨 + 인풋 한 벌로 둔다. */
+  metric: { flex: 1, gap: spacing.xs },
+  metricLabel: { fontSize: 13, fontWeight: "600", color: colors.ink },
   live: { fontSize: 13, lineHeight: 20, color: colors.body },
   liveStrong: { fontWeight: "700", color: colors.ink },
   disclosure: {

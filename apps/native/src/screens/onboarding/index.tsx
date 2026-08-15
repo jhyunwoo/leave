@@ -40,7 +40,13 @@ import {
   type OnboardingStatus,
 } from "@leave/client";
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { makeStyles, radius, spacing } from "@/theme";
 import { DoneStep } from "./done-step";
 import { GroupStep } from "./group-step";
@@ -76,6 +82,21 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
   const [rankTouched, setRankTouched] = useState(Boolean(profile));
   const [startDate, setStartDate] = useState(
     status.regularOvernight?.startDate ?? "",
+  );
+  // 주기·회당은 통상 운영값을 깔아 두되 고칠 수 있게 한다. 이어하기를 위해
+  // 저장된 값이 있으면 그쪽을 먼저 쓴다(startDate와 같은 규칙).
+  // 문자열로 드는 이유는 OvernightStep의 주석 참고.
+  const [intervalDays, setIntervalDays] = useState(
+    String(
+      status.regularOvernight?.intervalDays ??
+        REGULAR_OVERNIGHT_DEFAULTS.intervalDays,
+    ),
+  );
+  const [daysPerGrant, setDaysPerGrant] = useState(
+    String(
+      status.regularOvernight?.daysPerGrant ??
+        REGULAR_OVERNIGHT_DEFAULTS.daysPerGrant,
+    ),
   );
   const [inGroup, setInGroup] = useState(Boolean(status.unitId));
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +147,9 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
       await saveProfile.mutateAsync(parsed.data);
       advance();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "저장하지 못했습니다");
+      setError(
+        caught instanceof Error ? caught.message : "저장하지 못했습니다",
+      );
     }
   };
 
@@ -136,12 +159,19 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
       await saveRegular.mutateAsync(
         skip || !isValidISODate(startDate)
           ? { enabled: false }
-          : { enabled: true, startDate, ...REGULAR_OVERNIGHT_DEFAULTS },
+          : {
+              enabled: true,
+              startDate,
+              intervalDays: Number(intervalDays),
+              daysPerGrant: Number(daysPerGrant),
+            },
       );
       if (skip) setStartDate("");
       advance();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "저장하지 못했습니다");
+      setError(
+        caught instanceof Error ? caught.message : "저장하지 못했습니다",
+      );
     }
   };
 
@@ -150,7 +180,9 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
     try {
       await complete.mutateAsync();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "완료하지 못했습니다");
+      setError(
+        caught instanceof Error ? caught.message : "완료하지 못했습니다",
+      );
     }
   };
 
@@ -266,6 +298,10 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
               branch={branch}
               value={startDate}
               onChange={setStartDate}
+              intervalDays={intervalDays}
+              onIntervalDaysChange={setIntervalDays}
+              daysPerGrant={daysPerGrant}
+              onDaysPerGrantChange={setDaysPerGrant}
               error={error}
               pending={saveRegular.isPending}
               onNext={() => void submitOvernight()}
