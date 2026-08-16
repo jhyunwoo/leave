@@ -61,28 +61,6 @@ import { rateLimit } from "../middleware/rate-limit";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** 프로필 이미지 상한. 관리자 워커(admins-images.ts)와 같은 기준을 쓴다. */
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const IMAGE_EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/avif": "avif",
-};
-
-/** multipart 본문에서 image 파트를 꺼내 형식·크기를 확인한다. */
-async function readImageFile(c: {
-  req: { parseBody: () => Promise<Record<string, string | File>> };
-}): Promise<File | null> {
-  const body = await c.req.parseBody();
-  const image = body.image;
-  if (!(image instanceof File)) return null;
-  if (!IMAGE_EXTENSIONS[image.type]) return null;
-  if (image.size > MAX_IMAGE_BYTES) return null;
-  return image;
-}
-
 async function createSession(
   db: DrizzleD1Database,
   userId: string,
@@ -330,7 +308,6 @@ app.use(
 app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/me/password", authMiddleware);
-app.use("/me/image", authMiddleware);
 app.use("/onboarding", authMiddleware);
 app.use("/onboarding/*", authMiddleware);
 app.use("/activity", authMiddleware);
@@ -362,7 +339,6 @@ export const authRoutes = app
       enlistedAt: input.enlistedAt ?? "2000-01-01",
       dischargeAt: input.dischargeAt ?? "2000-01-02",
       signupRank: input.rank ?? "private",
-      profileImageKey: null,
       unitId: null,
       expoPushToken: null,
       // 가입 시 개인정보 수집·이용에 동의했음을 기록 (동의는 스키마에서 필수)
@@ -712,11 +688,6 @@ export const authRoutes = app
     const user = c.get("user");
     const db = drizzle(c.env.DB);
 
-    // R2에 저장된 프로필 이미지 삭제
-    if (user.profileImageKey) {
-      await c.env.BUCKET.delete(user.profileImageKey).catch(() => {});
-    }
-
     // 탈퇴자가 관리자면 부대가 관리자 없이 남지 않도록 먼저 정리한다.
     // (남은 부대원이 있으면 이관, 혼자였다면 빈 부대를 삭제)
     if (user.unitId) {
@@ -742,9 +713,6 @@ export const authRoutes = app
             .delete(unitInvites)
             .where(eq(unitInvites.unitId, user.unitId));
           await db.delete(units).where(eq(units.id, user.unitId));
-          if (unit.imageKey) {
-            await c.env.BUCKET.delete(unit.imageKey).catch(() => {});
-          }
         }
       }
     }
@@ -772,71 +740,5 @@ export const authRoutes = app
     // 부대원 수 변동 → 해당 부대 달력 통계 캐시 무효화
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
-    return c.json({ ok: true as const }, 200);
-  })
-  /**
-   * 프로필 이미지 — 업로드·열람·삭제.
-   *
-   * multipart와 바이너리 스트림이라 zod-openapi(createRoute)의 JSON 스키마
-   * 모델에 얹기 어렵다. OpenAPIHono는 Hono를 상속하므로 평범한 메서드로 붙여도
-   * RPC 타입(AppType)에는 그대로 실린다. 그래서 여기만 createRoute를 쓰지 않는다.
-   *
-   * 내 이미지만 다룬다 — 키를 쿼리로 받지 않으므로 남의 오브젝트를 넘볼 수 없다.
-   */
-  .put("/me/image", async (c) => {
-    const image = await readImageFile(c);
-    if (!image) {
-      return c.json(
-        {
-          error: "5MB 이하의 JPEG, PNG, WebP, GIF, AVIF 이미지를 선택해주세요",
-        },
-        400,
-      );
-    }
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-    const key = `profiles/${user.id}/${crypto.randomUUID()}.${IMAGE_EXTENSIONS[image.type]}`;
-    await c.env.BUCKET.put(key, image.stream(), {
-      httpMetadata: { contentType: image.type },
-      customMetadata: { uploadedBy: user.id, source: "app" },
-    });
-    await db
-      .update(users)
-      .set({ profileImageKey: key })
-      .where(eq(users.id, user.id));
-    // 이전 오브젝트는 참조가 끊긴 뒤에 지운다. 실패해도 요청은 성공으로 둔다.
-    if (user.profileImageKey) {
-      await c.env.BUCKET.delete(user.profileImageKey).catch(() => undefined);
-    }
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
-    return c.json({ profileImageKey: key }, 200);
-  })
-  .get("/me/image", async (c) => {
-    const user = c.get("user");
-    if (!user.profileImageKey) {
-      return c.json({ error: "등록된 프로필 이미지가 없습니다" }, 404);
-    }
-    const object = await c.env.BUCKET.get(user.profileImageKey);
-    if (!object) {
-      return c.json({ error: "이미지를 찾을 수 없습니다" }, 404);
-    }
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    // 개인 이미지라 공용 캐시에 남기지 않는다.
-    headers.set("Cache-Control", "private, no-store");
-    headers.set("X-Content-Type-Options", "nosniff");
-    return new Response(object.body, { headers });
-  })
-  .delete("/me/image", async (c) => {
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-    await db
-      .update(users)
-      .set({ profileImageKey: null })
-      .where(eq(users.id, user.id));
-    if (user.profileImageKey) {
-      await c.env.BUCKET.delete(user.profileImageKey).catch(() => undefined);
-    }
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   });

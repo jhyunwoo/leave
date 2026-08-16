@@ -42,7 +42,6 @@ export function serializeUser(
     enlistedAt: user.enlistedAt,
     dischargeAt,
     unitId: user.unitId,
-    profileImageKey: user.profileImageKey,
     rank: info.rank,
     rankLabel: info.rankLabel,
     nextPromotionDate: info.nextPromotionDate,
@@ -73,7 +72,6 @@ export function serializeMember(
     branchLabel: BRANCH_LABELS[user.branch],
     rank: info.rank,
     rankLabel: info.rankLabel,
-    profileImageKey: user.profileImageKey,
     enlistedAt: user.enlistedAt,
     dischargeAt,
   };
@@ -93,7 +91,6 @@ export function serializeUnit(
     lastTotalUpdatedAt: unit.lastTotalUpdatedAt,
     memberCount,
     adminId: unit.adminId,
-    imageKey: unit.imageKey,
     createdAt: unit.createdAt,
   };
 }

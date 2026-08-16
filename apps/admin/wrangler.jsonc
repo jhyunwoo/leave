@@ -24,12 +24,6 @@
       "migrations_dir": "../api/migrations",
     },
   ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "leave-images",
-    },
-  ],
   "kv_namespaces": [
     {
       "binding": "CACHE",

@@ -24,7 +24,6 @@ import {
   type ProfileUpdateInput,
   type Rank,
 } from "@leave/shared";
-import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -38,14 +37,11 @@ import {
 import {
   useChangePassword,
   useDeleteAccount,
-  useDeleteProfileImage,
   useLogout,
   useMe,
   useUpdateProfile,
-  useUploadProfileImage,
   type Me,
 } from "@leave/client";
-import { API_URL, getAuthToken } from "@/api/client";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -70,8 +66,6 @@ export function ProfileScreen() {
   const logout = useLogout();
   const deleteAccount = useDeleteAccount();
   const router = useRouter();
-  const uploadImage = useUploadProfileImage();
-  const deleteImage = useDeleteProfileImage();
   const [editing, setEditing] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
@@ -84,68 +78,6 @@ export function ProfileScreen() {
   }
 
   const { user, unit } = me.data;
-
-  /**
-   * 사진 선택 → 업로드. 서버는 multipart를 받으므로 선택한 uri를 fetch로 읽어
-   * Blob으로 바꾼 뒤 넘긴다(RN의 file:// uri도 fetch로 읽을 수 있다).
-   */
-  const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      notify(
-        "사진 접근 권한이 필요해요",
-        "설정에서 사진 접근을 허용하면 프로필 사진을 바꿀 수 있어요.",
-      );
-      return;
-    }
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1],
-      // 5MB 상한에 걸리지 않도록 미리 줄인다.
-      quality: 0.8,
-    });
-    if (picked.canceled || !picked.assets[0]) return;
-    const asset = picked.assets[0];
-    try {
-      const blob = await fetch(asset.uri).then((res) => res.blob());
-      await uploadImage.mutateAsync(blob);
-    } catch (caught) {
-      notify(
-        "사진 업로드 실패",
-        caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
-      );
-    }
-  };
-
-  const confirmDeleteImage = async () => {
-    const confirmed = await confirmAction({
-      title: "프로필 사진 삭제",
-      message: "이니셜 아바타로 돌아갑니다.",
-      confirmLabel: "삭제",
-      destructive: true,
-    });
-    if (!confirmed) return;
-    try {
-      await deleteImage.mutateAsync();
-    } catch (caught) {
-      notify(
-        "삭제 실패",
-        caught instanceof Error ? caught.message : "잠시 후 다시 시도해주세요",
-      );
-    }
-  };
-
-  // 이미지 라우트는 Bearer 인증을 요구한다. 키가 바뀌면 uri도 바뀌어야
-  // expo-image 캐시가 옛 사진을 계속 들고 있지 않는다.
-  const token = getAuthToken();
-  const avatarSource =
-    user.profileImageKey && token
-      ? {
-          uri: `${API_URL}/auth/me/image?v=${encodeURIComponent(user.profileImageKey)}`,
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      : null;
 
   const confirmLogout = async () => {
     const confirmed = await confirmAction({
@@ -218,7 +150,7 @@ export function ProfileScreen() {
         >
           <ContentPanel style={styles.card}>
             <View style={styles.profileRow}>
-              <Avatar name={user.name} size={64} source={avatarSource} />
+              <Avatar name={user.name} size={64} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text selectable style={styles.alias}>
                   {user.name}
@@ -228,30 +160,9 @@ export function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            <View style={styles.photoRow}>
-              <Button
-                title={user.profileImageKey ? "사진 변경" : "사진 추가"}
-                variant="secondary"
-                size="sm"
-                loading={uploadImage.isPending}
-                onPress={() => void pickImage()}
-                testID="pick-profile-image"
-              />
-              {user.profileImageKey ? (
-                <Button
-                  title="사진 삭제"
-                  variant="ghost"
-                  size="sm"
-                  loading={deleteImage.isPending}
-                  onPress={() => void confirmDeleteImage()}
-                  testID="delete-profile-image"
-                />
-              ) : null}
-            </View>
             <Text selectable style={styles.privacyHint}>
               별칭만 표시합니다. 실명·군번·기수는 넣지 마세요. 프로필 사진은
-              나만 볼 수 있고 부대 화면에는 이니셜만 나갑니다. 군사시설이 찍힌
-              사진은 올리지 마세요.
+              올릴 수 없고 부대 화면에도 이니셜만 나갑니다.
             </Text>
 
             <View style={styles.divider} />
@@ -647,12 +558,6 @@ const useStyles = makeStyles(({ colors }) => ({
   card: { padding: spacing.xl, gap: spacing.lg },
   sheet: { flex: 1 },
   profileRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
-  photoRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
   alias: { fontSize: 22, fontWeight: "700", color: colors.ink },
   email: { fontSize: 12, color: colors.mute, marginTop: 2 },
   privacyHint: { fontSize: 13, lineHeight: 19, color: colors.body },

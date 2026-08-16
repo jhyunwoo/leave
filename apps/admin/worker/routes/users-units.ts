@@ -100,7 +100,6 @@ function userDto(user: typeof users.$inferSelect) {
     enlistedAt: user.enlistedAt,
     dischargeAt: user.dischargeAt,
     signupRank: user.signupRank,
-    profileImageKey: user.profileImageKey,
     unitId: user.unitId,
     pushTokenRegistered: Boolean(user.expoPushToken),
     consentedAt: user.consentedAt,
@@ -201,7 +200,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       enlistedAt: input.data.enlistedAt,
       dischargeAt: input.data.dischargeAt,
       signupRank: input.data.signupRank,
-      profileImageKey: null,
       unitId: input.data.unitId ?? null,
       expoPushToken: null,
       consentedAt: now,
@@ -319,11 +317,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     await db.delete(sessions).where(eq(sessions.userId, id));
     // 접속·푸시 로그는 운영 감사 기록이므로 보존한다.
     await db.delete(users).where(eq(users.id, id));
-    if (before.profileImageKey) {
-      await c.env.BUCKET.delete(before.profileImageKey).catch((error) => {
-        console.error("profile image delete failed", error);
-      });
-    }
     if (before.unitId) await bumpUnitVersion(c.env.CACHE, before.unitId);
     await writeAudit(c, {
       action: "delete",
@@ -387,7 +380,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       maxLeaveCount: input.data.maxLeaveCount,
       creatorId: creator.id,
       adminId: admin.id,
-      imageKey: null,
       createdAt: nowIso(),
     };
     await db.insert(units).values(unit);
@@ -452,11 +444,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     await db.delete(unitInvites).where(eq(unitInvites.unitId, id));
     await db.update(users).set({ unitId: null }).where(eq(users.unitId, id));
     await db.delete(units).where(eq(units.id, id));
-    if (before.imageKey) {
-      await c.env.BUCKET.delete(before.imageKey).catch((error) => {
-        console.error("unit image delete failed", error);
-      });
-    }
     await bumpUnitVersion(c.env.CACHE, id);
     await writeAudit(c, {
       action: "delete",

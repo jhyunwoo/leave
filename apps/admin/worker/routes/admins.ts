@@ -1,5 +1,5 @@
 /**
- * 관리자 계정 관리와 이미지(R2) 라우트.
+ * 관리자 계정·세션 라우트.
  *
  * 마운트 위치: `/api` (worker/index.ts).
  *
@@ -8,13 +8,7 @@
  * 실려 나가고 저장되지 않는다.
  */
 
-import {
-  adminAccounts,
-  adminSessions,
-  hashPassword,
-  units,
-  users,
-} from "@leave/api/server";
+import { adminAccounts, adminSessions, hashPassword } from "@leave/api/server";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
@@ -54,29 +48,7 @@ async function activeOwnerCount(
   );
 }
 
-async function readImageFile(c: {
-  req: { parseBody: () => Promise<Record<string, string | File>> };
-}): Promise<File | null> {
-  const body = await c.req.parseBody();
-  const image = body.image;
-  if (!(image instanceof File)) return null;
-  if (!image.type.startsWith("image/")) return null;
-  if (image.size > 5 * 1024 * 1024) return null;
-  return image;
-}
-
-function extensionFor(type: string): string {
-  const extensions: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-    "image/avif": "avif",
-  };
-  return extensions[type] ?? "bin";
-}
-
-export const adminImageRoutes = new Hono<AdminAppEnv>()
+export const adminAccountRoutes = new Hono<AdminAppEnv>()
   .get("/admins", ownerMiddleware, async (c) => {
     const db = drizzle(c.env.DB);
     const rows = await db
@@ -273,131 +245,6 @@ export const adminImageRoutes = new Hono<AdminAppEnv>()
       entityType: "admin_session",
       entityId: id,
       before,
-    });
-    return c.json({ ok: true as const });
-  })
-  .get("/image", async (c) => {
-    const key = c.req.query("key");
-    if (!key || key.includes("..") || key.length > 512) {
-      return c.json({ error: "유효하지 않은 이미지 키입니다" }, 400);
-    }
-    const object = await c.env.BUCKET.get(key);
-    if (!object) return c.json({ error: "이미지를 찾을 수 없습니다" }, 404);
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set("Cache-Control", "private, no-store");
-    headers.set("X-Content-Type-Options", "nosniff");
-    return new Response(object.body, { headers });
-  })
-  .put("/users/:id/image", async (c) => {
-    const image = await readImageFile(c);
-    if (!image) {
-      return c.json(
-        {
-          error: "5MB 이하의 JPEG, PNG, WebP, GIF, AVIF 이미지를 선택해주세요",
-        },
-        400,
-      );
-    }
-    const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
-    const before = await db.select().from(users).where(eq(users.id, id)).get();
-    if (!before) return c.json({ error: "사용자를 찾을 수 없습니다" }, 404);
-    const key = `profiles/${id}/${crypto.randomUUID()}.${extensionFor(image.type)}`;
-    await c.env.BUCKET.put(key, image.stream(), {
-      httpMetadata: { contentType: image.type },
-      customMetadata: {
-        uploadedBy: c.get("admin").email,
-        source: "admin",
-      },
-    });
-    await db
-      .update(users)
-      .set({ profileImageKey: key })
-      .where(eq(users.id, id));
-    if (before.profileImageKey) {
-      await c.env.BUCKET.delete(before.profileImageKey).catch(() => undefined);
-    }
-    await writeAudit(c, {
-      action: "update_image",
-      entityType: "user",
-      entityId: id,
-      before: { profileImageKey: before.profileImageKey },
-      after: { profileImageKey: key },
-    });
-    return c.json({ key });
-  })
-  .delete("/users/:id/image", async (c) => {
-    const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
-    const before = await db.select().from(users).where(eq(users.id, id)).get();
-    if (!before) return c.json({ error: "사용자를 찾을 수 없습니다" }, 404);
-    await db
-      .update(users)
-      .set({ profileImageKey: null })
-      .where(eq(users.id, id));
-    if (before.profileImageKey) {
-      await c.env.BUCKET.delete(before.profileImageKey).catch(() => undefined);
-    }
-    await writeAudit(c, {
-      action: "delete_image",
-      entityType: "user",
-      entityId: id,
-      before: { profileImageKey: before.profileImageKey },
-      after: { profileImageKey: null },
-    });
-    return c.json({ ok: true as const });
-  })
-  .put("/units/:id/image", async (c) => {
-    const image = await readImageFile(c);
-    if (!image) {
-      return c.json(
-        {
-          error: "5MB 이하의 JPEG, PNG, WebP, GIF, AVIF 이미지를 선택해주세요",
-        },
-        400,
-      );
-    }
-    const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
-    const before = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!before) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    const key = `units/${id}/${crypto.randomUUID()}.${extensionFor(image.type)}`;
-    await c.env.BUCKET.put(key, image.stream(), {
-      httpMetadata: { contentType: image.type },
-      customMetadata: {
-        uploadedBy: c.get("admin").email,
-        source: "admin",
-      },
-    });
-    await db.update(units).set({ imageKey: key }).where(eq(units.id, id));
-    if (before.imageKey) {
-      await c.env.BUCKET.delete(before.imageKey).catch(() => undefined);
-    }
-    await writeAudit(c, {
-      action: "update_image",
-      entityType: "unit",
-      entityId: id,
-      before: { imageKey: before.imageKey },
-      after: { imageKey: key },
-    });
-    return c.json({ key });
-  })
-  .delete("/units/:id/image", async (c) => {
-    const db = drizzle(c.env.DB);
-    const id = c.req.param("id");
-    const before = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!before) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-    await db.update(units).set({ imageKey: null }).where(eq(units.id, id));
-    if (before.imageKey) {
-      await c.env.BUCKET.delete(before.imageKey).catch(() => undefined);
-    }
-    await writeAudit(c, {
-      action: "delete_image",
-      entityType: "unit",
-      entityId: id,
-      before: { imageKey: before.imageKey },
-      after: { imageKey: null },
     });
     return c.json({ ok: true as const });
   });

@@ -21,7 +21,7 @@ import {
   logoutAdmin,
   passwordChangedMiddleware,
 } from "./auth";
-import { adminImageRoutes } from "./routes/admins-images";
+import { adminAccountRoutes } from "./routes/admins";
 import { leaveContentRoutes } from "./routes/leaves-content";
 import { overviewLogRoutes } from "./routes/overview-logs";
 import { userUnitRoutes } from "./routes/users-units";
@@ -56,7 +56,7 @@ operations.use("*", passwordChangedMiddleware);
 operations.route("/", overviewLogRoutes);
 operations.route("/", userUnitRoutes);
 operations.route("/", leaveContentRoutes);
-operations.route("/", adminImageRoutes);
+operations.route("/", adminAccountRoutes);
 protectedApi.route("/", operations);
 
 app.route("/api", protectedApi);

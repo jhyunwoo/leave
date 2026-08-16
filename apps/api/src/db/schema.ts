@@ -9,6 +9,8 @@
  *
  * 개인정보 최소 수집 원칙: 접속 로그에 IP·국가·User-Agent를 두지 않고,
  * 푸시 로그에 메시지 원문을 두지 않는다. 초대코드는 해시만 저장한다.
+ * 사용자·부대 이미지는 아예 다루지 않는다 — 군사시설 촬영 위험과 사진 권한
+ * 요구를 없애려고 업로드 경로와 R2 저장소를 통째로 걷어냈다(0018).
  */
 
 import {
@@ -40,7 +42,6 @@ export const users = sqliteTable(
     enlistedAt: text("enlisted_at").notNull(),
     dischargeAt: text("discharge_at").notNull(),
     signupRank: text("signup_rank", { enum: RANKS }).notNull(),
-    profileImageKey: text("profile_image_key"),
     unitId: text("unit_id"),
     expoPushToken: text("expo_push_token"),
     // 개인정보(접속 기록·푸시 로그) 수집에 동의한 시각. 미동의(구 사용자)면 null.
@@ -86,8 +87,6 @@ export const units = sqliteTable("units", {
   creatorId: text("creator_id").notNull(),
   // 부대 관리자. 생성 시 생성자로 초기화되며 이관으로 바뀔 수 있다.
   adminId: text("admin_id").notNull(),
-  // 부대 대표 이미지 R2 키.
-  imageKey: text("image_key"),
   createdAt: text("created_at").notNull(),
 });
 

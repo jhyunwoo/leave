@@ -127,6 +127,13 @@
       "when": 1786352400000,
       "tag": "0017_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1786956000000,
+      "tag": "0018_drop_images",
+      "breakpoints": true
     }
   ]
 }
