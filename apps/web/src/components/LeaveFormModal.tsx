@@ -7,7 +7,7 @@
  * `useLeaveForm`에 있고, 이 파일은 그 결과를 HTML로 그리기만 한다. 같은 규칙을
  * 네이티브 앱도 쓴다(apps/native/src/components/leave-form-modal.tsx).
  */
-import { useLeaveForm, type MyLeave } from "@leave/client";
+import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
   addDays,
   BALANCE_KEYS,
@@ -52,7 +52,8 @@ export function LeaveFormModal(props: {
   initialDate?: string;
   editing?: MyLeave | null;
   onClose: () => void;
-  onSaved: (exceededDates: string[]) => void;
+  // 붙어 있는 휴가에 흡수되면 저장된 휴가의 id가 요청한 id와 다를 수 있다.
+  onSaved: (result: LeaveResult) => void;
 }) {
   const form = useLeaveForm({
     initialDate: props.initialDate,
@@ -63,7 +64,7 @@ export function LeaveFormModal(props: {
   const save = async () => {
     const result = await form.submit();
     if (!result) return;
-    props.onSaved(result.exceededDates);
+    props.onSaved(result);
     props.onClose();
   };
 

@@ -16,7 +16,7 @@ import {
 } from "@leave/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
-import type { Me } from "@leave/client";
+import type { LeaveResult, Me } from "@leave/client";
 import { useCalendar, useLeaveBalances, useMyLeaves } from "@leave/client";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
@@ -83,9 +83,9 @@ export function CalendarPage(props: { me: Me }) {
 
   const allowed = maxAllowedOut(unit.maxLeaveCount);
 
-  const onSaved = (exceededDates: string[]) => {
-    if (exceededDates.length > 0) {
-      const list = exceededDates.map(fmtDateShort).join(", ");
+  const onSaved = (result: LeaveResult) => {
+    if (result.exceededDates.length > 0) {
+      const list = result.exceededDates.map(fmtDateShort).join(", ");
       setToast(
         `등록은 완료됐지만 ${list}에 최대 출타 인원을 초과해요. 해당 날짜의 부대원들에게 알림을 보냈어요.`,
       );
