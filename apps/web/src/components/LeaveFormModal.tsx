@@ -70,7 +70,13 @@ export function LeaveFormModal(props: {
   };
 
   return (
-    <Modal title={editing ? "휴가 수정" : "휴가 등록"} onClose={props.onClose}>
+    <Modal
+      title={editing ? "휴가 수정" : "휴가 등록"}
+      onClose={props.onClose}
+      // 입력이 가장 많은 폼이다. 데스크톱에서는 넓게 펴서 달력·구간 편집기가
+      // 제 폭을 쓰게 하고, 좁은 화면에서는 그대로 화면 폭을 채운다.
+      size="wide"
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();

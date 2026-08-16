@@ -15,6 +15,7 @@ import {
   todayInSeoul,
 } from "@leave/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Navigate, useNavigate } from "react-router";
 import type { LeaveResult, Me } from "@leave/client";
 import { useCalendar, useLeaveBalances, useMyLeaves } from "@leave/client";
@@ -213,57 +214,67 @@ export function CalendarPage(props: { me: Me }) {
         />
       )}
 
-      {toast && (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            bottom: "var(--sp-xl)",
-            left: "50%",
-            transform: "translateX(-50%)",
-            maxWidth: 520,
-            width: "calc(100% - 32px)",
-            background: "var(--negative-bg)",
-            color: "#fff",
-            borderRadius: "var(--r-lg)",
-            padding: "var(--sp-lg) var(--sp-xl)",
-            boxShadow: "var(--shadow-toast)",
-            display: "flex",
-            gap: "var(--sp-md)",
-            alignItems: "flex-start",
-            animation: "toast-in 240ms var(--ease-out) both",
-            zIndex: 60,
-          }}
-        >
-          <span className="body-sm" style={{ flex: 1 }}>
-            {toast}
-          </span>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            aria-label="닫기"
+      {/* 토스트도 모달과 같은 이유로 body에 그린다 — 페이지 트리 안에 두면
+          조상의 transform이 `position: fixed`의 기준을 가로채, 달력이 길어질수록
+          토스트가 화면 아래로 내려가 보이지 않는다(components/Modal.tsx 주석). */}
+      {toast &&
+        createPortal(
+          <div
+            role="status"
             style={{
-              background: "none",
-              border: "none",
+              position: "fixed",
+              bottom: "var(--sp-xl)",
+              left: "50%",
+              transform: "translateX(-50%)",
+              maxWidth: 520,
+              width: "calc(100% - 32px)",
+              background: "var(--negative-bg)",
               color: "#fff",
-              cursor: "pointer",
-              padding: 0,
-              fontSize: 16,
-              lineHeight: 1,
+              borderRadius: "var(--r-lg)",
+              padding: "var(--sp-lg) var(--sp-xl)",
+              boxShadow: "var(--shadow-toast)",
+              display: "flex",
+              gap: "var(--sp-md)",
+              alignItems: "flex-start",
+              animation: "toast-in 240ms var(--ease-out) both",
+              zIndex: 60,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M3 3l10 10M13 3 3 13"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
+            <span className="body-sm" style={{ flex: 1 }}>
+              {toast}
+            </span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              aria-label="닫기"
+              style={{
+                background: "none",
+                border: "none",
+                color: "#fff",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: 16,
+                lineHeight: 1,
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 3l10 10M13 3 3 13"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+          </div>,
+          document.body,
+        )}
 
       <style>{`
         @media (max-width: 900px) {

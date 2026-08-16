@@ -570,8 +570,16 @@ textarea.input {
   }
 }
 
+/* fill-mode는 `both`가 아니라 `backwards`다. `both`로 두면 애니메이션이 끝난
+   뒤에도 마지막 키프레임의 transform이 계속 남고(값이 항등이어도 `none`이 아닌
+   행렬로 계산된다), transform이 걸린 요소는 자손 `position: fixed`의 컨테이닝
+   블록이 된다. 그러면 이 안에 그린 모달·토스트가 화면이 아니라 이 칸을 기준으로
+   놓여 화면 밖으로 밀려난다. `backwards`는 시작 전 상태만 채우고 끝난 뒤에는
+   기본값(transform 없음)으로 돌아오므로, 보이는 모션은 같고 함정만 사라진다.
+   그래도 애니메이션이 도는 240ms 동안은 컨테이닝 블록이 생기므로, 화면 기준으로
+   떠야 하는 UI는 여기 기대지 말고 body로 포털한다(components/Modal.tsx). */
 .anim-rise {
-  animation: rise-in 240ms var(--ease-out) both;
+  animation: rise-in 240ms var(--ease-out) backwards;
 }
 
 .container {
