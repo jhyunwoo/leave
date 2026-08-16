@@ -47,6 +47,8 @@ export type Palette = {
   surfaceStrong: string;
   hairline: string;
   brand: string;
+  /** `brand` 채움 위에 얹는 글자색. 달력의 전역일 배지처럼 brand를 배경으로 쓸 때만. */
+  onBrand: string;
   positive: string;
   positiveDeep: string;
   warning: string;
@@ -89,6 +91,7 @@ const lightColors: Palette = {
   surfaceStrong: "#d8ddd5",
   hairline: "#d7dbd4",
   brand: "#347a1f",
+  onBrand: "#ffffff",
   positive: "#2ead4b",
   positiveDeep: "#054d28",
   warning: "#ffd11a",
@@ -120,6 +123,7 @@ const darkColors: Palette = {
   surfaceStrong: "#3a3a3c",
   hairline: "#38383a",
   brand: "#79d553",
+  onBrand: "#071005",
   positive: "#45d265",
   positiveDeep: "#8be7a2",
   warning: "#ffd60a",

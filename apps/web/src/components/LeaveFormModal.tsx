@@ -22,6 +22,7 @@ import {
   type BalanceKey,
   type LeaveStatus,
 } from "@leave/shared";
+import { DateRangePicker } from "./DateRangePicker";
 import { Field } from "./Field";
 import { Modal } from "./Modal";
 import { OfficialDisclaimer } from "./OfficialDisclaimer";
@@ -89,34 +90,14 @@ export function LeaveFormModal(props: {
             autoFocus
           />
         </Field>
-        <div className="field-pair">
-          <Field label="시작일">
-            <input
-              className="input"
-              type="date"
-              value={startDate}
-              onChange={(event) => {
-                // 시작일이 종료일을 넘어서면 종료일을 함께 끌고 간다.
-                const next = event.target.value;
-                form.applyRange(
-                  next,
-                  !endDate || endDate < next ? next : endDate,
-                );
-              }}
-            />
-          </Field>
-          <Field label="종료일">
-            <input
-              className="input"
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(event) =>
-                form.applyRange(startDate, event.target.value)
-              }
-            />
-          </Field>
-        </div>
+        {/* `<input type="date">`가 아닌 이유는 공휴일이다. 브라우저 기본 달력에는
+            한국 공휴일이 없어서, 휴가를 잡다 말고 달력 화면으로 나갔다 와야 했다. */}
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onChange={form.applyRange}
+          testId="leave-date-range"
+        />
 
         <Field label="계획 상태" hint={statusHint(form.status)}>
           <select

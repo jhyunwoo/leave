@@ -343,7 +343,10 @@ export function CalendarScreen() {
           {WEEKDAYS.map((weekday, index) => (
             <Text
               key={weekday}
-              style={[styles.weekday, index === 0 && { color: colors.negative }]}
+              style={[
+                styles.weekday,
+                (index === 0 || index === 6) && { color: colors.negative },
+              ]}
             >
               {weekday}
             </Text>

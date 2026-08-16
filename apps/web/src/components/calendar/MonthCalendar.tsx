@@ -14,6 +14,7 @@ import {
   BALANCE_LABELS,
   cycleColor,
   getHoliday,
+  isWeekend,
   todayInSeoul,
   type RegularOvernightCycle,
 } from "@leave/shared";
@@ -66,7 +67,7 @@ export function MonthCalendar(props: {
             <div
               key={w}
               role="columnheader"
-              className={`cal-weekday ${i === 0 ? "is-sunday" : ""}`}
+              className={`cal-weekday ${i === 0 || i === 6 ? "is-red" : ""}`}
             >
               {w}
             </div>
@@ -87,7 +88,7 @@ export function MonthCalendar(props: {
             // 블랙아웃은 출타율과 무관하게 제한될 수 있는 날이다.
             const blocked = stat?.blocked ?? false;
             const dayNum = Number(cell.date.slice(8));
-            const sunday = new Date(cell.date).getUTCDay() === 0;
+            const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
             const isDischarge =
@@ -127,6 +128,7 @@ export function MonthCalendar(props: {
                   cell.inMonth ? "" : "is-out",
                   inCycle ? "is-in-cycle" : "",
                   exceeded ? "is-exceeded" : "",
+                  isDischarge ? "is-discharge" : "",
                   isSelected ? "is-selected" : "",
                 ].join(" ")}
                 onClick={() => cell.inMonth && onSelectDate(cell.date)}
@@ -135,7 +137,7 @@ export function MonthCalendar(props: {
                   className={[
                     "cal-daynum",
                     isToday ? "is-today" : "",
-                    (sunday || holiday) && cell.inMonth ? "is-sunday" : "",
+                    (weekend || holiday) && cell.inMonth ? "is-red" : "",
                     exceeded ? "is-exceeded" : "",
                   ].join(" ")}
                 >

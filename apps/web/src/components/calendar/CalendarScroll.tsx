@@ -266,7 +266,7 @@ export const CalendarScroll = forwardRef<
           <div
             key={w}
             role="columnheader"
-            className={`cal-weekday ${i === 0 ? "is-sunday" : ""}`}
+            className={`cal-weekday ${i === 0 || i === 6 ? "is-red" : ""}`}
           >
             {w}
           </div>

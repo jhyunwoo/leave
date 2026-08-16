@@ -11,6 +11,17 @@ import { addDays, parseISODate, toISODate, type ISODate } from "./dates";
 
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
+/**
+ * 토·일 여부. 달력에서 "빨간 날"의 절반을 이룬다(나머지 절반은 `getHoliday`).
+ *
+ * 호출부가 `new Date(date).getUTCDay()`를 직접 쓰지 않게 하려고 둔다 — 이 파일의
+ * 규칙대로 Date는 안에서만 만들고 밖으로 내보내지 않는다.
+ */
+export function isWeekend(date: ISODate): boolean {
+  const day = parseISODate(date).getUTCDay();
+  return day === 0 || day === 6;
+}
+
 export function splitMonth(month: string): { year: number; monthNum: number } {
   const [y, m] = month.split("-").map(Number) as [number, number];
   return { year: y, monthNum: m };

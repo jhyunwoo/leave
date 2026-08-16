@@ -18,6 +18,8 @@
   --hairline: #d7dbd4;
   --hairline-soft: #edf0eb;
   --brand: #347a1f;
+  /* `--brand` 채움 위에 얹는 글자색. 달력의 전역일 배지처럼 brand가 배경일 때만. */
+  --on-brand: #ffffff;
   --positive: #2ead4b;
   --positive-deep: #054d28;
   --warning: #ffd11a;
