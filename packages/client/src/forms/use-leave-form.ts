@@ -75,25 +75,8 @@ export type LeaveFormOptions = {
   deriveTitle?: (drafts: readonly SegmentDraft[]) => string;
 };
 
-/** 네이티브처럼 제목 입력을 두지 않는 화면이 쓰는 기본 제목 생성기. */
-export function titleFromDrafts(drafts: readonly SegmentDraft[]): string {
-  const first = drafts[0];
-  return first ? `${BALANCE_LABELS[first.key]} 계획` : "휴가 계획";
-}
-
-/**
- * `titleFromDrafts`가 지어준 제목인지 판별한다.
- *
- * 자동 제목과 사용자가 직접 붙인 이름을 갈라야, 종류를 바꿨을 때 자동 제목만
- * 따라 바뀌고 손으로 지은 이름은 그대로 남는다.
- */
-export function isDerivedTitle(title: string): boolean {
-  const trimmed = title.trim();
-  return (
-    trimmed === "휴가 계획" ||
-    BALANCE_KEYS.some((key) => trimmed === `${BALANCE_LABELS[key]} 계획`)
-  );
-}
+// 제목 규칙은 서버도 쓰므로 @leave/shared에 산다. 기존 import 경로를 깨지 않도록 재수출한다.
+export { isDerivedTitle, titleFromDrafts } from "@leave/shared";
 
 export function useLeaveForm(options: LeaveFormOptions) {
   const editing = options.editing ?? null;

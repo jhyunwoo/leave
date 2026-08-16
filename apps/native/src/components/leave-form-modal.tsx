@@ -21,21 +21,18 @@
  * 기준은 창 폭이 아니라 **시트 자신의 폭**이다. iPad의 `pageSheet`은 창이 1366이어도
  * 시트는 540 남짓이라, 창 폭을 믿고 두 열로 나누면 오히려 좁아진다.
  */
-import {
-  isDerivedTitle,
-  titleFromDrafts,
-  useLeaveForm,
-  type MyLeave,
-} from "@leave/client";
+import { useLeaveForm, type MyLeave } from "@leave/client";
 import {
   addDays,
   fmtDateShort,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
+  isDerivedTitle,
   LEAVE_STATUS_LABELS,
   removeDraft,
   setDraftEnd,
   splitLastDraft,
+  titleFromDrafts,
   todayInSeoul,
   type LeaveStatus,
 } from "@leave/shared";
