@@ -165,28 +165,28 @@ export function LeaveFormModal(props: {
             </View>
           ) : null}
 
-          {/* 등록은 종류에서 제목을 자동으로 만들고, 이름은 수정할 때 고친다. */}
-          {editing ? (
-            <Field
-              label="휴가 제목"
-              hint={
-                renamed
-                  ? undefined
-                  : "지금은 휴가 종류를 따라 자동으로 지어져요. 직접 고치면 그대로 유지돼요."
-              }
-            >
-              <Input
-                value={shownTitle}
-                onChangeText={(text) => {
-                  setRenamed(true);
-                  form.setTitle(text);
-                }}
-                placeholder="예: 제주도 가족여행"
-                maxLength={80}
-                testID="leave-title"
-              />
-            </Field>
-          ) : null}
+          {/* 등록·수정 모두 제목을 보여준다. 비워 두면 휴가 종류를 따라 자동으로
+              지어지므로 이름을 신경 쓰지 않아도 등록을 막지 않고, 손대는 순간부터는
+              그 사람이 지은 이름으로 본다(위 renamed). */}
+          <Field
+            label="휴가 제목"
+            hint={
+              renamed
+                ? undefined
+                : "휴가 종류를 따라 자동으로 지어져요. 직접 고치면 그대로 유지돼요."
+            }
+          >
+            <Input
+              value={shownTitle}
+              onChangeText={(text) => {
+                setRenamed(true);
+                form.setTitle(text);
+              }}
+              placeholder="예: 제주도 가족여행"
+              maxLength={80}
+              testID="leave-title"
+            />
+          </Field>
 
           <DateRangePicker
             startDate={startDate}

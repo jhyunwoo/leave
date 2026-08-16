@@ -93,6 +93,8 @@ export const CalendarScroll = forwardRef<
     myLeaveDays: Map<string, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
     currentCycle: RegularOvernightCycle | null;
+    /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
+    dischargeAt: string | null;
   }
 >(function CalendarScroll(
   {
@@ -102,6 +104,7 @@ export const CalendarScroll = forwardRef<
     myLeaveDays,
     regularOvernight,
     currentCycle,
+    dischargeAt,
   },
   ref,
 ) {
@@ -289,6 +292,7 @@ export const CalendarScroll = forwardRef<
               myLeaveDays={myLeaveDays}
               regularOvernight={regularOvernight}
               currentCycle={currentCycle}
+              dischargeAt={dischargeAt}
             />
           </section>
         ))}
@@ -306,6 +310,7 @@ function MonthBlock(props: {
   myLeaveDays: Map<string, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
+  dischargeAt: string | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
   const cycles = useMemo(() => {
@@ -341,6 +346,7 @@ function MonthBlock(props: {
       myLeaveDays={props.myLeaveDays}
       cycles={cycles}
       currentCycle={props.currentCycle}
+      dischargeAt={props.dischargeAt}
     />
   );
 }

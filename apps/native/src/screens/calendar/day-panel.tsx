@@ -28,6 +28,10 @@ export function DayPanel(props: {
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
+  /** 내 전역일. 이 날이 전역일이면 한 줄로 알린다. */
+  dischargeAt?: ISODate | null;
+  /** 명단의 내 계획 행을 눌러 그 휴가로 갈 수 있게 한다. */
+  onOpenLeave?: (leaveId: string) => void;
   /** 담는 그릇에 따라 여백만 바꾼다 — 시트는 넉넉하게, 인스펙터는 좁게. */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -45,6 +49,9 @@ export function DayPanel(props: {
     <View style={[styles.card, props.style]}>
       <Text style={styles.eyebrow}>선택한 날짜</Text>
       <Text style={styles.date}>{fmtDateK(date)}</Text>
+      {date === props.dischargeAt && (
+        <Text style={styles.discharge}>전역일</Text>
+      )}
       {holiday && <Text style={styles.holiday}>{holiday}</Text>}
 
       {stat && (
@@ -86,6 +93,7 @@ export function DayPanel(props: {
         attendees={calendar.attendees}
         date={date}
         myUserId={props.myUserId}
+        onOpenLeave={props.onOpenLeave}
       />
 
       <Button title="이 날부터 휴가 등록" onPress={props.onAddLeave} />
@@ -109,6 +117,12 @@ const useStyles = makeStyles(({ colors }) => ({
     fontSize: 13,
     fontWeight: "600",
     color: colors.negative,
+    marginTop: -8,
+  },
+  discharge: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.brand,
     marginTop: -8,
   },
   statusRow: {

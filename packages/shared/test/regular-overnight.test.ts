@@ -4,6 +4,7 @@ import {
   checkRegularOvernight,
   cycleColor,
   cycleFor,
+  cycleForDisplay,
   cycleState,
   cycleRemainingDays,
   cycleUsedDays,
@@ -302,6 +303,62 @@ describe("정기외박은 주기 안에서만 쓰고 이월되지 않는다", ()
     ]);
     expect(usage.cycles).toEqual([]);
     expect(usage.beforeFirstGrantDays).toBe(3);
+  });
+});
+
+describe("전역일 이후에는 주기를 보여주지 않는다", () => {
+  // 2주기는 2026-06-22 ~ 2026-08-02. 전역일을 그 한가운데에 둔다.
+  const discharge = "2026-07-15";
+
+  it("전역일 당일까지는 그 주기를 그대로 보여준다", () => {
+    expect(cycleForDisplay(config, "2026-06-22", discharge)).toEqual(
+      cycleFor(config, "2026-06-22"),
+    );
+    expect(cycleForDisplay(config, discharge, discharge)).toMatchObject({
+      index: 2,
+      start: "2026-06-22",
+      end: "2026-08-02",
+    });
+  });
+
+  it("전역일 다음 날부터는 주기가 없다 — 그 주기의 남은 날도, 이후 주기도", () => {
+    // 아직 2주기 안이지만 이미 전역했다.
+    expect(cycleForDisplay(config, addDays(discharge, 1), discharge)).toBe(null);
+    expect(cycleForDisplay(config, "2026-08-02", discharge)).toBe(null);
+    // 적립일이 통째로 전역 뒤인 3주기.
+    expect(cycleForDisplay(config, "2026-08-03", discharge)).toBe(null);
+    expect(cycleForDisplay(config, "2030-01-01", discharge)).toBe(null);
+  });
+
+  it("전역일을 모르면 자르지 않는다", () => {
+    for (const date of ["2026-06-22", "2026-08-03", "2030-01-01"]) {
+      expect(cycleForDisplay(config, date, null)).toEqual(
+        cycleFor(config, date),
+      );
+      expect(cycleForDisplay(config, date, undefined)).toEqual(
+        cycleFor(config, date),
+      );
+    }
+  });
+
+  it("표시용 컷오프는 잔여량 셈을 건드리지 않는다", () => {
+    // 화면만 자르고 셈은 그대로여야 한다. 여기가 깨지면 달력을 고치다 잔여량을 바꾼 것이다.
+    // 전역일(7/15)이 한가운데인데도 겹치는 주기를 하나도 빼지 않는다.
+    const range = cyclesInRange(config, "2026-06-01", "2026-09-30");
+    expect(range.map((cycle) => cycle.index)).toEqual([1, 2, 3, 4]);
+
+    const used: SegmentLike[] = [
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-07-20",
+        endDate: "2026-07-22",
+      },
+    ];
+    const usage = regularOvernightUsageByCycle(config, used);
+    expect(usage.cycles).toHaveLength(1);
+    expect(usage.cycles[0]!.cycle.index).toBe(2);
+    expect(usage.cycles[0]!.usedDays).toBe(3);
   });
 });
 

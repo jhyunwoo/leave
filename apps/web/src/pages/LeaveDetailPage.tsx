@@ -6,7 +6,7 @@
 import {
   availabilitySignal,
   BALANCE_LABELS,
-  cycleFor,
+  cycleForDisplay,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
   LEAVE_STATUS_LABELS,
@@ -124,7 +124,12 @@ export function LeaveDetailPage(props: { me: Me }) {
   const blackout = dayCalendar.data?.blackouts.find(
     (b) => b.startDate <= selectedDate && selectedDate <= b.endDate,
   );
-  const cycle = cycleFor(balances.data?.regularOvernight ?? null, selectedDate);
+  // 달력과 같은 규칙으로 자른다 — 같은 날에 두 화면이 다른 말을 하면 안 된다.
+  const cycle = cycleForDisplay(
+    balances.data?.regularOvernight ?? null,
+    selectedDate,
+    props.me.user.dischargeAt,
+  );
 
   return (
     <div

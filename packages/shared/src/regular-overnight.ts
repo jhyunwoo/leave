@@ -104,6 +104,29 @@ export function cycleFor(
   return start ? buildCycle(active, start) : null;
 }
 
+/**
+ * 화면에 그릴 주기. 전역일 다음 날부터는 아무 주기도 돌려주지 않는다.
+ *
+ * 주기는 저장되지 않고 설정에서 무한히 파생하므로, 그냥 두면 달력을 아래로 굴릴 때
+ * 전역 후 몇 년치 주기가 계속 나온다. 복무가 끝난 뒤의 주기는 받을 일도 쓸 일도 없어
+ * 화면에 있을 이유가 없다 — `checkRegularOvernight`도 적립일이 전역 뒤인 주기를 이미
+ * 막고 있어(`after_discharge`), 안 자르면 화면과 규칙이 서로 다른 말을 한다.
+ *
+ * 전역일 **당일까지는** 보여준다. 그날은 아직 복무 중이고, 전역일이 낀 주기의 몫은
+ * 그날까지 쓸 수 있기 때문이다.
+ *
+ * 표시 전용이다. 잔여량 계산은 `cycleFor`/`cyclesInRange`를 그대로 써야 한다 —
+ * 여기서 자른 값을 셈에 넣으면 화면이 아니라 셈이 바뀐다.
+ */
+export function cycleForDisplay(
+  config: RegularOvernightConfig | null | undefined,
+  date: ISODate,
+  dischargeAt: ISODate | null | undefined,
+): RegularOvernightCycle | null {
+  if (dischargeAt && date > dischargeAt) return null;
+  return cycleFor(config, date);
+}
+
 /** [rangeStart, rangeEnd]와 하루라도 겹치는 모든 주기. 설정이 없으면 빈 배열. */
 export function cyclesInRange(
   config: RegularOvernightConfig | null | undefined,

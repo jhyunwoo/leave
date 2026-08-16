@@ -13,7 +13,7 @@ import {
   segmentOnDate,
   type ISODate,
 } from "@leave/shared";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Avatar } from "@/components/avatar";
 import { ContentPanel } from "@/components/content-panel";
@@ -29,6 +29,14 @@ export function DayRoster(props: {
   date: ISODate;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
+  /**
+   * 내 계획 행을 눌러 그 휴가로 갈 수 있게 한다. 넘기지 않으면 명단은 읽기 전용이다.
+   *
+   * 옵트인인 이유: 휴가 상세 화면도 이 명단을 쓰는데, 거기서는 이미 그 휴가를 보고
+   * 있으므로 눌러 갈 곳이 없다. 남의 행은 어느 경우에도 눌리지 않는다 — 볼 상세가
+   * 없고, 서버가 남의 휴가 제목·사유를 애초에 내려주지 않는다.
+   */
+  onOpenLeave?: (leaveId: string) => void;
 }) {
   const styles = useStyles();
   const balance = useBalanceColors();
@@ -59,9 +67,19 @@ export function DayRoster(props: {
         const key = segment ? segmentBalanceKey(segment) : null;
         const tone = key ? balance[key] : null;
         const isMine = attendee.userId === props.myUserId;
+        const openLeave = isMine ? props.onOpenLeave : undefined;
+        // 눌리는 행과 그냥 보는 행이 같은 크기여야 한다. 태그만 바뀌고 스타일은 같다.
+        const Row = openLeave ? Pressable : View;
         return (
-          <View
+          <Row
             key={attendee.leaveId}
+            {...(openLeave
+              ? {
+                  accessibilityRole: "button" as const,
+                  accessibilityLabel: "내 계획 자세히 보기",
+                  onPress: () => openLeave(attendee.leaveId),
+                }
+              : {})}
             style={[styles.leaveRow, isMine && styles.myLeaveRow]}
           >
             <Avatar name={attendee.name} size={36} />
@@ -91,7 +109,7 @@ export function DayRoster(props: {
                 {fmtRange(attendee.startDate, attendee.endDate)}
               </Text>
             </View>
-          </View>
+          </Row>
         );
       })}
     </View>
