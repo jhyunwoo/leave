@@ -143,9 +143,19 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   await page.goto("/leaves");
   await page.getByRole("button", { name: "휴가 등록" }).click();
   await page.getByPlaceholder("예: 제주도 가족여행").fill("복합 휴가");
-  const dates = page.locator('input[type="date"]');
-  await dates.nth(0).fill("2026-09-01");
-  await dates.nth(1).fill("2026-09-05");
+  // 휴가 기간은 자체 달력으로 고른다. `input[type="date"]`로 잡으면 구간 편집기의
+  // 종료일 칸에 걸려 조용히 엉뚱한 값이 들어간다.
+  const range = page.getByTestId("leave-date-range");
+  await range.getByTestId("leave-date-range-start").click();
+  const panel = page.getByTestId("leave-date-range-calendar");
+  // 패널은 오늘이 속한 달에서 열린다. 클릭 횟수를 오늘 날짜로 역산하면 시간이
+  // 지나며 깨지므로, 달 표시를 보고 맞을 때까지 넘긴다.
+  while ((await panel.getAttribute("data-month")) !== "2026-09") {
+    await page.getByTestId("leave-date-range-calendar-next").click();
+  }
+  await page.getByTestId("leave-date-range-calendar-day-2026-09-01").click();
+  // 시작일을 고르면 종료일 선택으로 넘어가고 달도 9월로 따라온다.
+  await page.getByTestId("leave-date-range-calendar-day-2026-09-05").click();
   await page.getByLabel("연가 사용 일수").fill("3");
   await page.getByLabel("포상휴가 사용 일수").fill("2");
   await page.getByRole("button", { name: "휴가 등록" }).last().click();

@@ -6,13 +6,19 @@
  * 시스템 DatePicker를 쓰지 않는 이유는 기간 선택 때문이다. 시작일과 종료일을
  * 각각 고르게 하면 "언제부터 언제까지"가 한눈에 보이지 않는다. 달력 위에서
  * 두 번 눌러 구간을 칠하는 방식이라야 며칠짜리인지 즉시 이해된다.
+ *
+ * 날짜 색은 달력 탭(month-calendar.tsx)과 같은 규칙을 쓴다 — 주말·공휴일은 빨강이고
+ * 공휴일은 이름까지 적는다. 휴가를 잡는 자리에서 "이 날이 쉬는 날인가"를 확인하러
+ * 달력 탭으로 나갔다 오게 만들지 않기 위해서다.
  */
 
 import {
   buildMonthGrid,
   fmtDateK,
   fmtDateShort,
+  getHoliday,
   inclusiveDays,
+  isWeekend,
   shiftMonth,
   todayInSeoul,
   WEEKDAYS,
@@ -105,7 +111,10 @@ function CalendarPanel(props: {
         {WEEKDAYS.map((weekday, index) => (
           <Text
             key={weekday}
-            style={[styles.weekday, index === 0 && { color: colors.negative }]}
+            style={[
+              styles.weekday,
+              (index === 0 || index === 6) && { color: colors.negative },
+            ]}
           >
             {weekday}
           </Text>
@@ -129,13 +138,16 @@ function CalendarPanel(props: {
               cell.date <= props.rangeEnd,
             );
             const isToday = cell.date === today;
+            const holiday = cell.inMonth ? getHoliday(cell.date) : null;
+            // 달력 탭과 같은 규칙 — 주말과 공휴일을 한 가지 "빨간 날"로 묶는다.
+            const red = cell.inMonth && (isWeekend(cell.date) || holiday != null);
 
             return (
               <Pressable
                 key={cell.date}
                 accessible={cell.inMonth}
                 accessibilityRole="button"
-                accessibilityLabel={`${fmtDateK(cell.date)}${isToday ? ", 오늘" : ""}`}
+                accessibilityLabel={`${fmtDateK(cell.date)}${holiday ? `, ${holiday}` : ""}${isToday ? ", 오늘" : ""}`}
                 accessibilityState={{
                   disabled,
                   selected: selected || rangeEdge,
@@ -159,12 +171,28 @@ function CalendarPanel(props: {
                 <Text
                   style={[
                     styles.dayText,
+                    // 빨강은 "이 달의 평범한 날"에만 남는다. 아래 세 override가
+                    // 뒤에 와서 달 밖·비활성·선택 상태를 각각 되찾아 간다.
+                    red && styles.dayTextRed,
                     !cell.inMonth && styles.dayOutside,
                     disabled && cell.inMonth && styles.dayDisabled,
                     (selected || rangeEdge) && styles.dayTextSelected,
                   ]}
                 >
                   {Number(cell.date.slice(8))}
+                </Text>
+                {/* 공휴일이 없는 날도 빈 줄로 자리를 남긴다 — 이름 있는 날만 키우면
+                    그 주만 날짜 숫자가 위로 밀려 한 줄 안에서 높이가 어긋난다. */}
+                <Text
+                  style={[
+                    styles.dayHoliday,
+                    disabled && cell.inMonth && styles.dayDisabled,
+                    (selected || rangeEdge) && styles.dayHolidaySelected,
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="clip"
+                >
+                  {holiday ?? ""}
                 </Text>
               </Pressable>
             );
@@ -524,6 +552,8 @@ const useStyles = makeStyles(({ colors }) => ({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
+    gap: 1,
+    paddingVertical: 4,
     borderRadius: radius.md,
   },
   dayInRange: { backgroundColor: colors.primaryPale },
@@ -535,11 +565,31 @@ const useStyles = makeStyles(({ colors }) => ({
   dayPressed: { opacity: 0.72 },
   dayText: {
     fontSize: 14,
+    // 명시해 둬야 아래 이름 줄과 합친 높이(18+1+11=30)가 44 칸 안에 든다는 계산이
+    // 폰트에 따라 흔들리지 않는다.
+    lineHeight: 18,
     fontWeight: "600",
     color: colors.ink,
     fontVariant: ["tabular-nums"],
   },
   dayTextSelected: { color: colors.onPrimary, fontWeight: "800" },
+  dayTextRed: { color: colors.negative },
   dayDisabled: { color: colors.mutedSoft },
   dayOutside: { color: "transparent" },
+  // 이름 줄은 있든 없든 높이를 차지한다. 숫자(18) + gap 1 + 11 = 30이라 기존 44 칸
+  // 안에 그대로 들어가고, 피커 전체 높이는 변하지 않는다.
+  //
+  // alignSelf: "stretch"가 핵심이다. 이게 없으면 Text가 제 내용 폭으로 재서
+  // "부처님오신날"처럼 긴 이름이 칸(≈59px)을 넘어 이웃 날짜를 덮는다. 칸 폭으로
+  // 늘려 놓아야 numberOfLines·clip이 그 안에서 잘라 준다.
+  dayHoliday: {
+    alignSelf: "stretch",
+    height: 11,
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "600",
+    textAlign: "center",
+    color: colors.negative,
+  },
+  dayHolidaySelected: { color: colors.onPrimary },
 }));
