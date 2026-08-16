@@ -18,13 +18,6 @@
 			"migrations_dir": "migrations"
 		}
 	],
-	"r2_buckets": [
-		{
-			"binding": "BUCKET",
-			// 실배포 전 `wrangler r2 bucket create leave-images`로 생성
-			"bucket_name": "leave-images"
-		}
-	],
 	"kv_namespaces": [
 		{
 			"binding": "CACHE",

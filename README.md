@@ -14,7 +14,7 @@
 
 | 경로 | 내용 | 스택 |
 |---|---|---|
-| `apps/api` | 백엔드 API | Hono + Cloudflare Workers, D1(Drizzle), R2, **KV 캐시**, 접속/푸시 로깅, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
+| `apps/api` | 백엔드 API | Hono + Cloudflare Workers, D1(Drizzle), **KV 캐시**, 접속/푸시 로깅, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
 | `apps/web` | 웹 앱 | Vite + React SPA, Jotai, TanStack Query, Cloudflare Workers 정적 에셋 배포, Playwright e2e |
 | `apps/native` | iOS/Android 앱 | Expo SDK 57, expo-router(NativeTabs — iOS 26 Liquid Glass), expo-notifications, iPad 대응, Maestro e2e |
 | `packages/shared` | 공유 도메인 로직 | 계급 자동진급 계산, 출타 인원 계산, zod 스키마, 날짜/달력 유틸, 공용 HTTP 유틸(`unwrap`/`ApiError`) + vitest 테스트 |
@@ -26,7 +26,7 @@
 ```bash
 pnpm install
 
-# 1. API (D1/R2 로컬 에뮬레이션) — http://localhost:8787
+# 1. API (D1/KV 로컬 에뮬레이션) — http://localhost:8787
 cd apps/api
 pnpm db:migrate:local     # 최초 1회: 로컬 D1에 마이그레이션 적용
 pnpm dev

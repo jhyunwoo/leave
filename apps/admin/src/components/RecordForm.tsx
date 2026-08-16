@@ -5,7 +5,6 @@
  *
  * 휴가 폼은 앱과 같은 구간 편집 규칙(@leave/shared의 draft 함수들)을 쓴다.
  * 관리자가 만든 데이터도 앱에서 그대로 계산돼야 하기 때문이다.
- * 이미지는 multipart라 이 폼이 아니라 ImageManager가 맡는다.
  */
 
 import {

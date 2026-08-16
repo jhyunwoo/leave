@@ -4,7 +4,6 @@ import type { UserRow } from "../db/schema";
 
 export type AppBindings = {
   DB: D1Database;
-  BUCKET: R2Bucket;
   // 성능 최적화용 캐시(부대 달력·검색 결과 등). 로컬 dev는 자동으로 로컬 KV를 사용.
   CACHE: KVNamespace;
   CORS_ORIGIN?: string;

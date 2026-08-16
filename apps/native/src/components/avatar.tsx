@@ -3,7 +3,6 @@
  * 사용처: 출타 명단, 구성원 목록, 프로필.
  */
 
-import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import { makeStyles, useAppColorScheme } from "@/theme";
 
@@ -18,36 +17,15 @@ const PALETTE = {
 } as const;
 
 /**
- * 별칭 이니셜 아바타. `source`를 주면 그 이미지를 대신 그린다.
- *
- * 부대원 목록·출타 명단에서는 source를 주지 않는다. 서버가 내 이미지만
- * 내려주기도 하고, 남의 얼굴을 그룹 화면에 뿌리지 않는 편이 이 앱의
- * 비식별 원칙에 맞기 때문이다.
+ * 별칭 이니셜만 그린다. 사진 업로드·열람 경로를 없앴으므로 이미지 분기도 없다.
+ * 군사시설 촬영 위험과 사진 권한 요구를 애초에 만들지 않기 위한 선택이다.
  */
-export function Avatar(props: {
-  name: string;
-  size?: number;
-  /** 인증 헤더가 필요한 이미지라 uri만으로는 부족하다. */
-  source?: { uri: string; headers?: Record<string, string> } | null;
-}) {
+export function Avatar(props: { name: string; size?: number }) {
   const styles = useStyles();
   const palette = PALETTE[useAppColorScheme()];
   const size = props.size ?? 40;
   const box = { width: size, height: size, borderRadius: size / 2 };
   const bg = palette[props.name.charCodeAt(0) % palette.length];
-
-  if (props.source) {
-    return (
-      <Image
-        source={props.source}
-        style={box}
-        contentFit="cover"
-        accessibilityLabel={`${props.name} 프로필 사진`}
-        // 사진은 색 반전 대상이 아니다.
-        accessibilityIgnoresInvertColors
-      />
-    );
-  }
 
   return (
     <View style={[styles.fallback, box, { backgroundColor: bg }]}>

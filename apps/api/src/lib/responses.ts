@@ -34,7 +34,6 @@ export const userSchema = z
     enlistedAt: z.string(),
     dischargeAt: z.string(),
     unitId: z.string().nullable(),
-    profileImageKey: z.string().nullable(),
     rank: z.enum(RANKS),
     rankLabel: z.string(),
     nextPromotionDate: z.string().nullable(),
@@ -51,7 +50,6 @@ export const memberSchema = z
     branchLabel: z.string(),
     rank: z.enum(RANKS),
     rankLabel: z.string(),
-    profileImageKey: z.string().nullable(),
     enlistedAt: z.string(),
     dischargeAt: z.string(),
   })
@@ -73,8 +71,6 @@ export const unitSchema = z
     memberCount: z.number(),
     // 부대 관리자 사용자 id.
     adminId: z.string(),
-    // 부대 대표 이미지 R2 키.
-    imageKey: z.string().nullable(),
     createdAt: z.string(),
   })
   .openapi("Unit");

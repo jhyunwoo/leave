@@ -116,7 +116,6 @@ export const unitRoutes = app
       lastTotalUpdatedAt,
       creatorId: user.id,
       adminId: user.id,
-      imageKey: null,
       createdAt: now,
     };
     await db.insert(units).values(unit);
@@ -378,13 +377,10 @@ export const unitRoutes = app
           409,
         );
       }
-      // 혼자 남은 관리자가 나가면 빈 그룹·초대코드·이미지를 정리한다.
+      // 혼자 남은 관리자가 나가면 빈 그룹과 초대코드를 정리한다.
       await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
       await db.delete(unitInvites).where(eq(unitInvites.unitId, unitId));
       await db.delete(units).where(eq(units.id, unitId));
-      if (unit.imageKey) {
-        c.executionCtx.waitUntil(c.env.BUCKET.delete(unit.imageKey));
-      }
       await bumpUnitVersion(c.env.CACHE, unitId);
       return c.json({ ok: true as const }, 200);
     }

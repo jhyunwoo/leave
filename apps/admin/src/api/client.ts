@@ -90,9 +90,6 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  putForm<T>(path: string, form: FormData) {
-    return request<T>(path, { method: "PUT", body: form });
-  },
   delete<T>(path: string) {
     return request<T>(path, { method: "DELETE" });
   },

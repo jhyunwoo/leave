@@ -13,7 +13,6 @@ import { KeyRound, Pencil, ShieldOff, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { api, ApiError, downloadCsv, type ListResponse } from "../api/client";
-import { ImageManager } from "../components/ImageManager";
 import { RecordForm, type EditableResource } from "../components/RecordForm";
 import {
   ConfirmDialog,
@@ -393,16 +392,7 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
             onSubmit={(body) => save.mutate(body)}
           />
         ) : selected ? (
-          <>
-            <RecordDetails item={selected} />
-            {resource === "users" || resource === "units" ? (
-              <ImageManager
-                resource={resource}
-                id={selected.id}
-                onChanged={invalidate}
-              />
-            ) : null}
-          </>
+          <RecordDetails item={selected} />
         ) : null}
       </Drawer>
 

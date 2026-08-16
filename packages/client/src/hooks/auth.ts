@@ -107,45 +107,6 @@ export function useUpdateProfile() {
 }
 
 /**
- * 프로필 이미지 업로드. 파일을 multipart로 보낸다.
- *
- * 네이티브는 파일 시스템 경로를 그대로 쓸 수 없어서, 화면 쪽에서 uri를 읽어
- * Blob/File로 만들어 넘긴다(profile.tsx의 pickImage 참고).
- */
-export function useUploadProfileImage() {
-  const { client, unwrap } = useLeaveApi();
-  const invalidate = useInvalidateKeys([
-    queryKeys.me,
-    queryKeys.calendars,
-    queryKeys.allUnitMembers,
-  ]);
-  return useMutation({
-    mutationFn: async (image: Blob) => {
-      const form = new FormData();
-      form.append("image", image);
-      return unwrap<{ profileImageKey: string }>(
-        await client.auth.me.image.$put({ form: form as never }),
-      );
-    },
-    onSuccess: invalidate,
-  });
-}
-
-/** 프로필 이미지 삭제. 이니셜 아바타로 되돌아간다. */
-export function useDeleteProfileImage() {
-  const { client, unwrap } = useLeaveApi();
-  const invalidate = useInvalidateKeys([
-    queryKeys.me,
-    queryKeys.calendars,
-    queryKeys.allUnitMembers,
-  ]);
-  return useMutation({
-    mutationFn: async () => unwrap(await client.auth.me.image.$delete()),
-    onSuccess: invalidate,
-  });
-}
-
-/**
  * 비밀번호 변경. 서버가 기존 세션을 전부 끊으므로, 돌려받은 새 토큰으로
  * 즉시 갈아끼워야 이 기기가 그대로 로그아웃되지 않는다.
  */

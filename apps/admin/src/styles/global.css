@@ -1160,30 +1160,13 @@ textarea:hover {
   color: var(--negative);
 }
 
-.image-manager {
-  display: grid;
-  gap: 7px;
-  margin-top: 20px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-}
-
-.image-manager h3,
 .secret-panel h3 {
   font-size: 16px;
 }
 
-.image-manager p,
 .secret-panel p {
   color: var(--body);
   font-size: 12px;
-}
-
-.image-manager > div {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
 }
 
 .secret-panel {
