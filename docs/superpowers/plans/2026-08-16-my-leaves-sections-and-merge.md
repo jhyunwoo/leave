@@ -2149,8 +2149,12 @@ Run: `pnpm exec agent-browser skills get core`
 - [ ] **Step 2: API와 두 앱을 띄운다**
 
 ```bash
-pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:8081 &
-pnpm dev:web &
+# CORS_ORIGIN을 주지 않으면 "*"로 열린다(apps/api/src/index.ts:34). 웹은 5173,
+# 네이티브 web target은 8081이라 오리진이 둘이므로 하나로 못 고정한다. 인증이
+# Bearer 헤더라 쿠키 문제도 없다. `pnpm dev:web`은 API를 5173으로 고정해 띄우므로
+# 쓰지 말고 아래처럼 따로 띄운다.
+pnpm --filter @leave/api exec wrangler dev --port 8787 &
+pnpm --filter @leave/web dev &
 EXPO_PUBLIC_API_URL=http://localhost:8787 pnpm --filter @leave/native exec expo start --web --port 8081 &
 ```
 
