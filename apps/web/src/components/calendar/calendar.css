@@ -204,6 +204,14 @@
   line-height: 1.2;
 }
 
+/* 전역일 배지. 공휴일과 같은 자리를 쓰되(칸 높이가 꽉 차 있다) 색으로 갈라 놓는다 —
+   공휴일은 빨강, 전역은 brand. 선택된 칸에서는 위의
+   `.cal-cell.is-selected .cal-holiday`가 명시도로 이겨 글자색만 되돌린다. */
+.cal-holiday.is-discharge {
+  color: var(--brand);
+  font-weight: 700;
+}
+
 /* 혼잡도 신호 — 색만으로 구분하지 않도록 라벨과 비율을 함께 적는다. */
 .cal-count {
   margin-top: auto;

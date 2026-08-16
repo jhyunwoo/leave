@@ -22,6 +22,10 @@ export function DayPanel(props: {
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
   cycle?: RegularOvernightCycle | null;
+  /** 내 전역일. 이 날이 전역일이면 한 줄로 알린다. */
+  dischargeAt?: string | null;
+  /** 명단의 내 계획 행을 눌러 그 휴가로 갈 수 있게 한다. */
+  onOpenLeave?: (leaveId: string) => void;
 }) {
   const { calendar, date } = props;
   const stat = calendar.days.find((d) => d.date === date);
@@ -42,6 +46,14 @@ export function DayPanel(props: {
         <h2 className="display-xs" style={{ marginTop: 4 }}>
           {fmtDateK(date)}
         </h2>
+        {date === props.dischargeAt && (
+          <p
+            className="caption"
+            style={{ marginTop: 4, color: "var(--brand)", fontWeight: 700 }}
+          >
+            전역일
+          </p>
+        )}
         {holiday && (
           <p
             className="caption"
@@ -113,6 +125,7 @@ export function DayPanel(props: {
         attendees={calendar.attendees}
         date={date}
         myUserId={props.myUserId}
+        onOpenLeave={props.onOpenLeave}
       />
 
       <button

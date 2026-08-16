@@ -75,6 +75,8 @@ export function MonthCalendar(props: {
   cycles?: RegularOvernightCycle[];
   /** 오늘이 속한 정기외박 주기. 해당 날짜 칸에 옅은 배경을 깐다. */
   currentCycle?: RegularOvernightCycle | null;
+  /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
+  dischargeAt?: ISODate | null;
 }) {
   const {
     calendar,
@@ -85,6 +87,7 @@ export function MonthCalendar(props: {
     myLeaveDays,
     cycles,
     currentCycle,
+    dischargeAt,
   } = props;
   const styles = useStyles();
   const { colors, balance } = useTheme();
@@ -141,16 +144,22 @@ export function MonthCalendar(props: {
             const sunday = new Date(cell.date).getUTCDay() === 0;
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
+            const isDischarge =
+              cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
+            // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
+            const pastDischarge = dischargeAt != null && cell.date > dischargeAt;
             const inCycle =
               cell.inMonth &&
+              !pastDischarge &&
               currentCycle != null &&
               currentCycle.start <= cell.date &&
               cell.date <= currentCycle.end;
             const tone = mine ? balance[mine.key] : null;
             // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
-            const cycle = cell.inMonth
-              ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
-              : undefined;
+            const cycle =
+              cell.inMonth && !pastDischarge
+                ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
+                : undefined;
             const preview =
               cell.inMonth && showAttendees
                 ? attendeePreview.get(cell.date)
@@ -163,7 +172,7 @@ export function MonthCalendar(props: {
                 accessibilityRole="button"
                 accessibilityLabel={
                   cell.inMonth
-                    ? `${dayNum}일${holiday ? `, ${holiday}` : ""}${
+                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${
                         cycle ? `, 정기외박 ${cycle.index}주기` : ""
                       }${
                         mine
@@ -215,13 +224,19 @@ export function MonthCalendar(props: {
                         {dayNum}
                       </Text>
                     </View>
-                    {!compact && holiday && (
+                    {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 아래 칸 높이
+                        예산이 꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는
+                        날에는 전역이 이기고, 공휴일 이름은 날짜 상세에서 그대로 보인다. */}
+                    {!compact && (isDischarge || holiday) && (
                       <Text
-                        style={styles.holiday}
+                        style={[
+                          styles.holiday,
+                          isDischarge && styles.dischargeLabel,
+                        ]}
                         numberOfLines={1}
                         ellipsizeMode="clip"
                       >
-                        {holiday}
+                        {isDischarge ? "전역" : holiday}
                       </Text>
                     )}
                     {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
@@ -315,7 +330,9 @@ export function MonthCalendar(props: {
                           styles.cycleBar,
                           { backgroundColor: cycleColor(cycle.index) },
                           cell.date === cycle.start && styles.cycleBarStart,
-                          cell.date === cycle.end && styles.cycleBarEnd,
+                          // 전역일에서 잘린 주기도 뚝 끊기지 않고 둥글게 닫는다.
+                          (cell.date === cycle.end || isDischarge) &&
+                            styles.cycleBarEnd,
                         ]}
                       />
                     )}
@@ -371,6 +388,8 @@ const useStyles = makeStyles(({ colors }) => ({
     maxWidth: "100%",
     paddingHorizontal: 2,
   },
+  // 공휴일과 같은 자리를 쓰므로 색으로 가른다 — 공휴일은 빨강, 전역은 brand.
+  dischargeLabel: { color: colors.brand, fontWeight: "700" },
   countPill: {
     minHeight: 14,
     justifyContent: "center",

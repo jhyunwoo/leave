@@ -6,7 +6,7 @@
  */
 
 import {
-  cycleFor,
+  cycleForDisplay,
   cycleUsedDays,
   diffDays,
   firstGrantDate,
@@ -15,7 +15,7 @@ import {
   todayInSeoul,
 } from "@leave/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import type { Me } from "@leave/client";
 import { useCalendar, useLeaveBalances, useMyLeaves } from "@leave/client";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
@@ -28,6 +28,8 @@ import { buildMyLeaveDayMap } from "@leave/client";
 export function CalendarPage(props: { me: Me }) {
   const unit = props.me.unit;
   const today = todayInSeoul();
+  const dischargeAt = props.me.user.dischargeAt;
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -43,8 +45,8 @@ export function CalendarPage(props: { me: Me }) {
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
   const currentCycle = useMemo(
-    () => cycleFor(regularOvernight, today),
-    [regularOvernight, today],
+    () => cycleForDisplay(regularOvernight, today, dischargeAt),
+    [regularOvernight, today, dischargeAt],
   );
   const cycleUsage = useMemo(
     () =>
@@ -56,11 +58,13 @@ export function CalendarPage(props: { me: Me }) {
         : 0,
     [currentCycle, myLeaves.data],
   );
-  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다.
+  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다. 다만 그 적립일이 전역일보다
+  // 뒤면 끝내 받지 못하므로 기다리라고 하지 않는다.
   const pendingFirstGrant = useMemo(() => {
     const first = firstGrantDate(regularOvernight);
-    return first && today < first ? first : null;
-  }, [regularOvernight, today]);
+    if (!first || today >= first) return null;
+    return first <= dischargeAt ? first : null;
+  }, [regularOvernight, today, dischargeAt]);
 
   // 선택한 날짜가 속한 달의 달력(사이드 패널용). 스크롤 블록과 같은 캐시를 재사용한다.
   const selectedMonth = selectedDate ? selectedDate.slice(0, 7) : null;
@@ -161,6 +165,7 @@ export function CalendarPage(props: { me: Me }) {
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
+            dischargeAt={dischargeAt}
             onSelectDate={(d) =>
               setSelectedDate((cur) => (cur === d ? null : d))
             }
@@ -189,7 +194,9 @@ export function CalendarPage(props: { me: Me }) {
             calendar={panelCalendar.data}
             date={selectedDate}
             myUserId={props.me.user.id}
-            cycle={cycleFor(regularOvernight, selectedDate)}
+            cycle={cycleForDisplay(regularOvernight, selectedDate, dischargeAt)}
+            dischargeAt={dischargeAt}
+            onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
             onAddLeave={() => setFormOpen(true)}
           />
         )}

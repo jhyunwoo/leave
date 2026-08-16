@@ -120,6 +120,8 @@ export const CalendarScroll = forwardRef<
     currentCycle: RegularOvernightCycle | null;
     /** 입대한 달(YYYY-MM). 상태바 탭이 데려갈 목적지. 모르면 null. */
     enlistedMonth: string | null;
+    /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
+    dischargeAt: ISODate | null;
   }
 >(function CalendarScroll(
   {
@@ -131,6 +133,7 @@ export const CalendarScroll = forwardRef<
     regularOvernight,
     currentCycle,
     enlistedMonth,
+    dischargeAt,
   },
   ref,
 ) {
@@ -325,6 +328,7 @@ export const CalendarScroll = forwardRef<
             myLeaveDays={myLeaveDays}
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
+            dischargeAt={dischargeAt}
           />
         )}
         getItemLayout={(_, index) => ({
@@ -373,6 +377,7 @@ function MonthBlock(props: {
   myLeaveDays: Map<ISODate, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
+  dischargeAt: ISODate | null;
 }) {
   const styles = useStyles();
   const colors = useColors();
@@ -404,6 +409,7 @@ function MonthBlock(props: {
           myLeaveDays={props.myLeaveDays}
           cycles={cycles}
           currentCycle={props.currentCycle}
+          dischargeAt={props.dischargeAt}
         />
       )}
     </View>

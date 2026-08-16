@@ -27,7 +27,7 @@
  */
 
 import {
-  cycleFor,
+  cycleForDisplay,
   cycleUsedDays,
   firstGrantDate,
   todayInSeoul,
@@ -103,8 +103,16 @@ export function CalendarScreen() {
   // 폼을 열었는지와 폼의 시작일을 한 값으로 둔다. 날짜 시트를 닫으면서 열어야
   // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
   const [formDate, setFormDate] = useState<ISODate | null>(null);
-  // 시트가 닫히기를 기다리는 폼 시작일. 아래 openForm 주석 참고.
-  const pendingFormDate = useRef<ISODate | null>(null);
+  /**
+   * 시트가 닫히기를 기다리는 다음 행동. 아래 openForm 주석 참고.
+   *
+   * 폼과 상세를 각각 다른 ref에 두면 둘이 동시에 차 있을 수 있고, 그러면 onClosed가
+   * 무엇을 해야 하는지가 "누가 먼저 지웠나"에 달린다. 한 값으로 두면 애초에 둘이
+   * 동시에 존재할 수 없다 — 새 의도가 이전 의도를 덮어쓴다.
+   */
+  const pendingAfterSheet = useRef<
+    { kind: "form"; date: ISODate } | { kind: "leave"; leaveId: string } | null
+  >(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
@@ -127,6 +135,7 @@ export function CalendarScreen() {
       ? (cachedCalendar?.unit ?? null)
       : null;
   const unit = me.data?.unit ?? offlineCachedUnit;
+  const dischargeAt = me.data?.user.dischargeAt ?? null;
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
 
@@ -138,8 +147,8 @@ export function CalendarScreen() {
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
   const currentCycle = useMemo(
-    () => cycleFor(regularOvernight, today),
-    [regularOvernight, today],
+    () => cycleForDisplay(regularOvernight, today, dischargeAt),
+    [regularOvernight, today, dischargeAt],
   );
   const cycleUsage = useMemo(
     () =>
@@ -151,11 +160,13 @@ export function CalendarScreen() {
         : 0,
     [currentCycle, myLeaves.data],
   );
-  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다.
+  // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다. 다만 그 적립일이 전역일보다
+  // 뒤면 끝내 받지 못하므로 기다리라고 하지 않는다.
   const pendingFirstGrant = useMemo(() => {
     const first = firstGrantDate(regularOvernight);
-    return first && today < first ? first : null;
-  }, [regularOvernight, today]);
+    if (!first || today >= first) return null;
+    return !dischargeAt || first <= dischargeAt ? first : null;
+  }, [regularOvernight, today, dischargeAt]);
   const hasBanner = Boolean(currentCycle || pendingFirstGrant);
   // 넓은 창 요약 패널의 "남은 휴가". 내 휴가 화면과 같은 셈을 쓴다.
   const holdings = summarizeHoldings(balances.data?.balances);
@@ -261,16 +272,29 @@ export function CalendarScreen() {
   const openForm = (date: ISODate) => {
     if (isCompact && selectedDate != null) {
       // 시트가 닫혔다고 알려오는 onClosed에서 이어서 연다.
-      pendingFormDate.current = date;
+      pendingAfterSheet.current = { kind: "form", date };
       setSelectedDate(null);
       return;
     }
     setFormDate(date);
   };
 
+  /**
+   * 명단에서 고른 내 휴가의 상세로 간다. 좁은 창에서는 폼과 같은 이유로 시트를 먼저
+   * 닫는다 — 시트가 떠 있는 채로 화면을 밀면 시트가 새 화면 위에 그대로 남는다.
+   */
+  const openLeave = (leaveId: string) => {
+    if (isCompact && selectedDate != null) {
+      pendingAfterSheet.current = { kind: "leave", leaveId };
+      setSelectedDate(null);
+      return;
+    }
+    router.push({ pathname: "/leave/[leaveId]", params: { leaveId } });
+  };
+
   const selectDate = (date: ISODate) => {
-    // 새 날짜를 고르면 대기 중이던 폼 요청은 무효로 본다.
-    pendingFormDate.current = null;
+    // 새 날짜를 고르면 대기 중이던 요청은 무효로 본다.
+    pendingAfterSheet.current = null;
     setSelectedDate((current) => (current === date ? null : date));
   };
 
@@ -291,6 +315,7 @@ export function CalendarScreen() {
         regularOvernight={regularOvernight}
         currentCycle={currentCycle}
         enlistedMonth={me.data?.user.enlistedAt.slice(0, 7) ?? null}
+        dischargeAt={dischargeAt}
         onSelectDate={selectDate}
       />
 
@@ -359,7 +384,13 @@ export function CalendarScreen() {
                 calendar={panelCalendar.data}
                 date={selectedDate}
                 myUserId={me.data?.user.id}
-                cycle={cycleFor(regularOvernight, selectedDate)}
+                cycle={cycleForDisplay(
+                  regularOvernight,
+                  selectedDate,
+                  dischargeAt,
+                )}
+                dischargeAt={dischargeAt}
+                onOpenLeave={openLeave}
                 onAddLeave={() => openForm(selectedDate)}
                 style={styles.inspectorDayPanel}
               />
@@ -425,15 +456,22 @@ export function CalendarScreen() {
         // 창이 넓어져서 내려간 경우에는 선택을 지우지 않는다 — 같은 선택이
         // 인스펙터로 자리를 옮겼을 뿐이고, 지우면 보던 날짜를 잃는다.
         onDismiss={() => {
-          pendingFormDate.current = null;
+          pendingAfterSheet.current = null;
           if (isCompact && !formDate) setSelectedDate(null);
         }}
         // 시트가 화면에서 사라진 뒤. 이제 폼 모달을 띄워도 된다.
         onClosed={() => {
-          const pending = pendingFormDate.current;
+          const pending = pendingAfterSheet.current;
           if (!pending) return;
-          pendingFormDate.current = null;
-          setFormDate(pending);
+          pendingAfterSheet.current = null;
+          if (pending.kind === "form") {
+            setFormDate(pending.date);
+            return;
+          }
+          router.push({
+            pathname: "/leave/[leaveId]",
+            params: { leaveId: pending.leaveId },
+          });
         }}
       >
         <SheetScaffold
@@ -447,7 +485,13 @@ export function CalendarScreen() {
                 calendar={panelCalendar.data}
                 date={selectedDate}
                 myUserId={me.data?.user.id}
-                cycle={cycleFor(regularOvernight, selectedDate)}
+                cycle={cycleForDisplay(
+                  regularOvernight,
+                  selectedDate,
+                  dischargeAt,
+                )}
+                dischargeAt={dischargeAt}
+                onOpenLeave={openLeave}
                 onAddLeave={() => openForm(selectedDate)}
               />
             ) : (
