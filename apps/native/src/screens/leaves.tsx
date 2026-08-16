@@ -377,6 +377,17 @@ export function LeavesScreen() {
             setCreating(false);
             setEditing(null);
           }}
+          onSaved={(result) => {
+            // 세 번째 열이 지금 보여주던 휴가를 수정한 경우에만 따라간다. 편집 대상은
+            // 목록 행의 메뉴에서 고르므로 선택과 무관한 행을 고쳤을 땐 건드리지 않는다.
+            if (
+              editing &&
+              selectedLeaveId === editing.id &&
+              result.leave.id !== editing.id
+            ) {
+              setSelectedLeaveId(result.leave.id);
+            }
+          }}
         />
       )}
     </>

@@ -58,14 +58,20 @@ async function loadMergeCandidates(
     db,
     rows.map((row) => row.id),
   );
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    reason: row.reason,
-    status: row.status,
-    createdAt: row.createdAt,
-    segments: segments.get(row.id) ?? [],
-  }));
+  // 구간이 하나도 없는 행은 정상 경로로는 생길 수 없지만(스키마가 min(1)),
+  // 등록과 구간 삽입을 나눠 하는 관리자 경로가 중간에 실패하면 남을 수 있다.
+  // 그런 행을 후보로 넘기면 뒤의 rangeOf가 non-null 단정에서 그대로 죽으므로,
+  // 병합 후보에서 조용히 걸러 그 행은 흡수 대상에서 빠지게 한다.
+  return rows
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      reason: row.reason,
+      status: row.status,
+      createdAt: row.createdAt,
+      segments: segments.get(row.id) ?? [],
+    }))
+    .filter((candidate) => candidate.segments.length > 0);
 }
 
 /**
@@ -138,8 +144,8 @@ export async function saveLeaveWithMerge(
   const clearIds = [saved.id, ...saved.absorbedIds];
 
   try {
-    // 흡수될 이웃의 구간은 이미 DB에 있다. 빼지 않으면 같은 날을 두 번 세고
-    // 잔여가 모자란다고 잘못 막는다.
+    // host(흡수될 이웃 포함)의 구간은 이미 DB에 있다. clearIds로 빼지 않으면
+    // host를 두 번 세어(위 주석 참고) 잔여가 모자란다고 잘못 막는다.
     await assertSegmentsAvailable(db, user, saved.segments, [
       ...clearIds,
       incoming.id,
@@ -176,7 +182,9 @@ export async function saveLeaveWithMerge(
             reason: row.reason,
             status: row.status,
           })
-          .where(eq(leaves.id, row.id)),
+          // id만으로도 오늘은 안전하다(후보 풀도 existingId도 이미 사용자로 좁혀져 있다) —
+          // 하지만 그 전제가 나중에 깨지더라도 남의 행을 건드리지 않도록 userId도 같이 건다.
+          .where(and(eq(leaves.id, row.id), eq(leaves.userId, user.id))),
   );
   statements.push(
     db.insert(leaveSegments).values(segmentRowsFor(row.id, saved.segments)),
