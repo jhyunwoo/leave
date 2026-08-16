@@ -2,12 +2,16 @@
  * 알림함·알림 설정 라우트.
  *
  * 마운트 위치: `/notifications` (apps/api/src/index.ts).
- * 알림 본문은 서버가 만들고(lib/overage.ts) 여기서는 조회·읽음 처리·수신 설정만 한다.
+ * 알림 본문은 서버가 만들고(lib/overage.ts) 여기서는 조회·읽음 처리·삭제·수신 설정만 한다.
+ *
+ * 삭제는 soft delete다 — `deletedAt`을 찍고 행은 남긴다. 그래서 여기의 모든 조회는
+ * `isNull(notifications.deletedAt)`을 함께 걸어야 한다. 하나라도 빠뜨리면 지운 알림이
+ * 목록에 되살아나거나 탭 배지의 안 읽음 수에 남는다.
  */
 
 import { createRoute, z } from "@hono/zod-openapi";
 import { notificationPrefsSchema } from "@leave/shared";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
   notifications,
@@ -52,6 +56,21 @@ const readAllRoute = createRoute({
   responses: {
     200: jsonContent(okSchema, "처리 완료"),
     401: errorResponse("인증 실패"),
+  },
+});
+
+const deleteRoute = createRoute({
+  method: "delete",
+  path: "/{id}",
+  tags: ["알림"],
+  summary: "알림 삭제",
+  description: "내 알림함에서만 지웁니다. 되돌릴 수 없습니다.",
+  security: [{ Bearer: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: jsonContent(okSchema, "삭제 완료"),
+    401: errorResponse("인증 실패"),
+    404: errorResponse("알림 없음 또는 권한 없음"),
   },
 });
 
@@ -120,13 +139,22 @@ export const notificationRoutes = app
     const rows = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.userId, user.id))
+      .where(
+        and(
+          eq(notifications.userId, user.id),
+          isNull(notifications.deletedAt),
+        ),
+      )
       .orderBy(desc(notifications.createdAt))
       .limit(50)
       .all();
     const unreadCount = await db.$count(
       notifications,
-      and(eq(notifications.userId, user.id), eq(notifications.read, false)),
+      and(
+        eq(notifications.userId, user.id),
+        eq(notifications.read, false),
+        isNull(notifications.deletedAt),
+      ),
     );
     return c.json(
       {
@@ -151,8 +179,38 @@ export const notificationRoutes = app
       .update(notifications)
       .set({ read: true })
       .where(
-        and(eq(notifications.userId, user.id), eq(notifications.read, false)),
+        and(
+          eq(notifications.userId, user.id),
+          eq(notifications.read, false),
+          isNull(notifications.deletedAt),
+        ),
       );
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(deleteRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    // 남의 알림도 없는 알림과 똑같이 404로 답한다 — id의 존재 여부를 알려주지 않는다.
+    const existing = await db
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.id, id),
+          eq(notifications.userId, user.id),
+          isNull(notifications.deletedAt),
+        ),
+      )
+      .get();
+    if (!existing) {
+      return c.json({ error: "알림을 찾을 수 없습니다" }, 404);
+    }
+    await db
+      .update(notifications)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(notifications.id, id));
     return c.json({ ok: true as const }, 200);
   })
   .openapi(prefsRoute, async (c) => {

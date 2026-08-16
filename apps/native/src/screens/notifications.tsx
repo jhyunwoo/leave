@@ -26,6 +26,7 @@ import {
   View,
 } from "react-native";
 import {
+  useDeleteNotification,
   useMarkNotificationsRead,
   useMyLeaves,
   useNotifications,
@@ -33,6 +34,7 @@ import {
   type NotificationList,
 } from "@leave/client";
 import { inspectorWidth, useWindowSizeClass } from "@/adaptive";
+import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { notify } from "@/lib/dialog";
@@ -54,6 +56,7 @@ export function NotificationsScreen() {
   const { sizeClass, isCompact } = useWindowSizeClass();
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
+  const del = useDeleteNotification();
   const myLeaves = useMyLeaves();
   const router = useRouter();
 
@@ -93,6 +96,41 @@ export function NotificationsScreen() {
       params: { leaveId: target.leaveId, date: target.date },
     });
   };
+
+  /**
+   * 알림 한 건을 지운다. 확인을 묻지 않는다 — 메일함처럼, 알림을 지워도 잃는 것이
+   * 없고 되짚을 휴가는 캘린더에 그대로 남는다.
+   */
+  const remove = (notification: Notification) => {
+    void del.mutateAsync(notification.id).then(
+      // 넓은 창에서 고른 알림을 지웠으면 선택을 놓는다. selected는 매 렌더에 다시
+      // 계산되므로 화면은 알아서 최신 알림으로 떨어지고, 여기서는 죽은 id만 치운다.
+      () =>
+        setPickedId((current) =>
+          current === notification.id ? null : current,
+        ),
+      () => notify("삭제하지 못했어요", "잠시 후 다시 시도해주세요."),
+    );
+  };
+
+  /** 알림 하나의 부가 동작. 행 전체 탭(휴가 이동)과 섞이지 않게 메뉴 뒤에 둔다. */
+  const renderMenu = (notification: Notification) => (
+    <ActionMenu
+      label={`${notification.title} 알림 작업`}
+      buttonLabel="관리"
+      testID={`notification-actions-${notification.id}`}
+      actions={[
+        {
+          id: "delete",
+          title: "삭제",
+          systemImage: "trash",
+          destructive: true,
+          disabled: del.isPending,
+          onPress: () => remove(notification),
+        },
+      ]}
+    />
+  );
 
   /** 날짜 배지 줄. 배지 하나하나가 그 날짜의 상세로 가는 입구다. */
   const renderDates = (notification: Notification) =>
@@ -190,34 +228,45 @@ export function NotificationsScreen() {
             emptyPanel
           ) : (
             <>
-              {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다. */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
-                testID="latest-notification"
-                onPress={() => openDates(latest.dates)}
+              {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다.
+                  카드 전체가 아니라 제목·본문만 탭 대상이다 — 관리 메뉴가 카드
+                  안에 들어오면서, 누르는 곳마다 다른 일이 일어나면 안 된다. */}
+              <ContentPanel
+                tone={latest.read ? "plain" : "danger"}
+                style={styles.latestCard}
               >
-                <ContentPanel
-                  tone={latest.read ? "plain" : "danger"}
-                  style={styles.latestCard}
+                <View style={styles.latestHeader}>
+                  <Text style={styles.eyebrow}>최근 알림</Text>
+                  {!latest.read && <View style={styles.unreadDot} />}
+                  <View style={styles.headerSpacer} />
+                  {renderMenu(latest)}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
+                  testID="latest-notification"
+                  onPress={() => openDates(latest.dates)}
+                  style={styles.latestTap}
                 >
-                  <View style={styles.latestHeader}>
-                    <Text style={styles.eyebrow}>최근 알림</Text>
-                    {!latest.read && <View style={styles.unreadDot} />}
-                  </View>
                   <Text style={styles.latestTitle} selectable>
                     {latest.title}
                   </Text>
                   <Text style={styles.latestBody} selectable>
                     {latest.body}
                   </Text>
-                  {renderDates(latest)}
-                  <View style={styles.latestFooter}>
-                    <Text style={styles.time}>{fmtTime(latest.createdAt)}</Text>
+                </Pressable>
+                {renderDates(latest)}
+                <View style={styles.latestFooter}>
+                  <Text style={styles.time}>{fmtTime(latest.createdAt)}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${latest.title} 휴가 상세 보기`}
+                    onPress={() => openDates(latest.dates)}
+                  >
                     <Text style={styles.detailLink}>자세히</Text>
-                  </View>
-                </ContentPanel>
-              </Pressable>
+                  </Pressable>
+                </View>
+              </ContentPanel>
 
               {earlier.length > 0 && (
                 <>
@@ -230,6 +279,7 @@ export function NotificationsScreen() {
                         divider={index > 0}
                         onPress={() => openDates(n.dates)}
                         dates={renderDates(n)}
+                        menu={renderMenu(n)}
                       />
                     ))}
                   </ContentPanel>
@@ -262,6 +312,7 @@ export function NotificationsScreen() {
                         divider={index > 0}
                         selected={n.id === selected?.id}
                         onPress={() => setPickedId(n.id)}
+                        menu={renderMenu(n)}
                       />
                     ))}
                   </ContentPanel>
@@ -286,6 +337,8 @@ export function NotificationsScreen() {
                       {selected.read ? "알림" : "안 읽음"}
                     </Text>
                     {!selected.read && <View style={styles.unreadDot} />}
+                    <View style={styles.headerSpacer} />
+                    {renderMenu(selected)}
                   </View>
                   <Text style={styles.latestTitle} selectable>
                     {selected.title}
@@ -383,45 +436,56 @@ function NotificationRow(props: {
   onPress: () => void;
   /** 좁은 창에서만 줄 안에 날짜 배지를 함께 그린다. */
   dates?: React.ReactNode;
+  /** 삭제 등 부가 동작 메뉴. 탭 대상 바깥에 두어 눌러야 열린다. */
+  menu?: React.ReactNode;
 }) {
   const styles = useStyles();
   const colors = useColors();
   const n = props.notification;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={
-        props.selected === undefined ? undefined : { selected: props.selected }
-      }
-      accessibilityLabel={`${n.title}${n.read ? "" : ", 안 읽음"}`}
-      onPress={props.onPress}
+    // 배경·구분선·선택 표시는 껍데기가 진다. 안쪽 Pressable은 탭 범위만 맡아,
+    // 메뉴 버튼이 "행 전체 누르기"에 먹히지 않는다.
+    <View
       style={[
-        styles.notificationRow,
+        styles.rowShell,
         props.divider && styles.rowDivider,
         !n.read && styles.unreadRow,
         props.selected && styles.selectedRow,
       ]}
     >
-      <View
-        style={[
-          styles.dot,
-          { backgroundColor: n.read ? colors.hairline : colors.negative },
-        ]}
-      />
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text style={[styles.cardTitle, n.read && styles.readText]}>
-          {n.title}
-        </Text>
-        <Text
-          style={[styles.cardBody, n.read && styles.readText]}
-          numberOfLines={props.selected === undefined ? undefined : 2}
-        >
-          {n.body}
-        </Text>
-        {props.dates}
-        <Text style={styles.time}>{fmtTime(n.createdAt)}</Text>
-      </View>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={
+          props.selected === undefined
+            ? undefined
+            : { selected: props.selected }
+        }
+        accessibilityLabel={`${n.title}${n.read ? "" : ", 안 읽음"}`}
+        onPress={props.onPress}
+        style={styles.rowTap}
+      >
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: n.read ? colors.hairline : colors.negative },
+          ]}
+        />
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <Text style={[styles.cardTitle, n.read && styles.readText]}>
+            {n.title}
+          </Text>
+          <Text
+            style={[styles.cardBody, n.read && styles.readText]}
+            numberOfLines={props.selected === undefined ? undefined : 2}
+          >
+            {n.body}
+          </Text>
+          {props.dates}
+          <Text style={styles.time}>{fmtTime(n.createdAt)}</Text>
+        </View>
+      </Pressable>
+      {props.menu}
+    </View>
   );
 }
 
@@ -476,6 +540,9 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: "center",
     gap: spacing.sm,
   },
+  // 머리글 왼쪽 표시들과 오른쪽 관리 메뉴를 갈라 놓는다.
+  headerSpacer: { flex: 1 },
+  latestTap: { gap: spacing.sm },
   eyebrow: {
     fontSize: 12,
     fontWeight: "700",
@@ -529,14 +596,22 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   affectedLeave: { flex: 1, minWidth: 0, fontSize: 13, color: colors.body },
   list: { paddingHorizontal: spacing.lg, overflow: "hidden" },
-  notificationRow: {
+  rowShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+    // 선택 표시선 자리를 미리 비워 둬 고를 때 줄이 흔들리지 않게 한다.
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
+  },
+  rowTap: {
+    flex: 1,
+    minWidth: 0,
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.sm,
     flexDirection: "row",
     gap: spacing.md,
-    // 선택 표시선 자리를 미리 비워 둬 고를 때 줄이 흔들리지 않게 한다.
-    borderLeftWidth: 3,
-    borderLeftColor: "transparent",
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,

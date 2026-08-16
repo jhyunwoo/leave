@@ -33,6 +33,17 @@ export function useMarkNotificationsRead() {
   });
 }
 
+/** 알림 한 건을 알림함에서 지운다. 안 읽은 알림이었다면 탭 배지도 함께 줄어든다. */
+export function useDeleteNotification() {
+  const { client, unwrap } = useLeaveApi();
+  const invalidate = useInvalidateKeys([queryKeys.notifications]);
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await client.notifications[":id"].$delete({ param: { id } })),
+    onSuccess: invalidate,
+  });
+}
+
 export function useNotificationPrefs() {
   const { client, unwrap } = useLeaveApi();
   return useQuery({

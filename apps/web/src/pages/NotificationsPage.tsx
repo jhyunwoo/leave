@@ -5,6 +5,7 @@
 import type { KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import {
+  useDeleteNotification,
   useMarkNotificationsRead,
   useMyLeaves,
   useNotifications,
@@ -22,6 +23,7 @@ function fmtTime(iso: string): string {
 export function NotificationsPage() {
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
+  const del = useDeleteNotification();
   const myLeaves = useMyLeaves();
   const navigate = useNavigate();
 
@@ -52,6 +54,32 @@ export function NotificationsPage() {
     }
     void navigate(`/leaves/${target.leaveId}?date=${target.date}`);
   };
+
+  /**
+   * 알림 한 건을 지운다. 확인을 묻지 않는다 — 메일함처럼, 알림은 지워도 잃는 것이
+   * 없고 되짚을 휴가는 캘린더에 그대로 남는다.
+   */
+  const remove = (notification: Notification) => {
+    void del.mutateAsync(notification.id).catch(() => {
+      alert("삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
+    });
+  };
+
+  /** 카드·행 전체가 클릭 대상이라 삭제 클릭이 그 위로 새지 않게 막는다. */
+  const renderDelete = (notification: Notification) => (
+    <button
+      type="button"
+      className="btn btn-danger btn-sm"
+      aria-label={`${notification.title} 알림 삭제`}
+      disabled={del.isPending}
+      onClick={(e) => {
+        e.stopPropagation();
+        remove(notification);
+      }}
+    >
+      삭제
+    </button>
+  );
 
   // 카드·행 전체가 클릭 대상이라 키보드로도 같은 동작이 되게 한다.
   const onCardKeyDown = (dates: string[]) => (e: KeyboardEvent) => {
@@ -203,16 +231,19 @@ export function NotificationsPage() {
               <span className="caption text-mute">
                 {fmtTime(latest.createdAt)}
               </span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openDates(latest.dates);
-                }}
-              >
-                자세히
-              </button>
+              <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
+                {renderDelete(latest)}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDates(latest.dates);
+                  }}
+                >
+                  자세히
+                </button>
+              </div>
             </div>
           </section>
 
@@ -258,7 +289,7 @@ export function NotificationsPage() {
                           : "var(--negative)",
                       }}
                     />
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p className="body-sm strong">{n.title}</p>
                       <p className="body-sm text-body" style={{ marginTop: 2 }}>
                         {n.body}
@@ -271,6 +302,7 @@ export function NotificationsPage() {
                         {fmtTime(n.createdAt)}
                       </p>
                     </div>
+                    <div style={{ flexShrink: 0 }}>{renderDelete(n)}</div>
                   </li>
                 ))}
               </ul>

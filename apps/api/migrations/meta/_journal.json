@@ -134,6 +134,13 @@
       "when": 1786956000000,
       "tag": "0018_drop_images",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1787184000000,
+      "tag": "0019_notification_soft_delete",
+      "breakpoints": true
     }
   ]
 }

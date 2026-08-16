@@ -269,6 +269,9 @@ export const notifications = sqliteTable(
     datesJson: text("dates_json"),
     read: integer("read", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
+    // 사용자가 알림함에서 지운 시각. 값이 있으면 사용자 API에서 보이지 않는다.
+    // 행은 남겨 둔다 — 관리자 화면의 발송 이력이 사용자 조작으로 사라지면 안 된다.
+    deletedAt: text("deleted_at"),
   },
   (t) => [index("notifications_user_idx").on(t.userId)],
 );
