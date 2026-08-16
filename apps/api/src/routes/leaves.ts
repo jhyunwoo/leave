@@ -19,14 +19,13 @@ import {
   leaveGrantUpdateSchema,
   leaveUpdateSchema,
   regularOvernightConfigSchema,
-  segmentsRange,
   sortSegments,
   type LeaveCreateInput,
   type LeaveSegment,
 } from "@leave/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { leaves, leaveSegments, type LeaveRow } from "../db/schema";
+import { leaves, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
 import {
@@ -36,14 +35,12 @@ import {
   updateGrant,
 } from "../lib/leave-grants";
 import {
-  assertSegmentsAvailable,
   getLeaveBalanceSummary,
-  insertLeaveSegments,
   saveRegularOvernightConfig,
-  segmentRowsFor,
   segmentsForLeaves,
   updateLeaveBalanceTotals,
 } from "../lib/leave-balances";
+import { saveLeaveWithMerge } from "../lib/leave-merge";
 import { checkOverageAndNotify } from "../lib/overage";
 import {
   errorResponse,
@@ -396,43 +393,33 @@ export const leaveRoutes = app
     }
     const db = drizzle(c.env.DB);
     const segments = toSegments(input);
-    const range = segmentsRange(segments)!;
-    try {
-      await assertSegmentsAvailable(db, user, segments);
-    } catch (error) {
-      return c.json(
-        {
-          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
-        },
-        400,
-      );
-    }
 
-    const leave: LeaveRow = {
+    const saved = await saveLeaveWithMerge(db, user, {
       id: crypto.randomUUID(),
-      userId: user.id,
       title: input.title,
-      startDate: range.startDate,
-      endDate: range.endDate,
       reason: input.reason ?? null,
       // 생략하면 기존 동작대로 "희망"(집계 반영)으로 저장한다.
       status: input.status ?? "shared",
       createdAt: new Date().toISOString(),
-    };
-    await db.insert(leaves).values(leave);
-    await insertLeaveSegments(db, leave.id, segments);
+      segments,
+    });
+    if (!saved.ok) return c.json({ error: saved.error }, 400);
+
     // 휴가가 추가되면 부대 달력이 바뀌므로 캐시를 무효화한다.
     await bumpUnitVersion(c.env.CACHE, user.unitId);
 
     const exceededDates = await checkOverageAndNotify({
       db,
       unitId: user.unitId,
-      changedLeave: leave,
+      changedLeave: saved.row,
       waitUntil: (p) => c.executionCtx.waitUntil(p),
     });
     return c.json(
       {
-        leave: serializeLeave(leave, new Map([[leave.id, segments]])),
+        leave: serializeLeave(
+          saved.row,
+          new Map([[saved.row.id, saved.segments]]),
+        ),
         exceededDates,
       },
       201,
@@ -452,55 +439,39 @@ export const leaveRoutes = app
     if (!existing) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
-    const segments = toSegments(input);
-    const range = segmentsRange(segments)!;
-    try {
-      await assertSegmentsAvailable(db, user, segments, [id]);
-    } catch (error) {
-      return c.json(
-        {
-          error: error instanceof Error ? error.message : "잔여량이 부족합니다",
-        },
-        400,
-      );
-    }
 
-    const updated: LeaveRow = {
-      ...existing,
-      title: input.title,
-      startDate: range.startDate,
-      endDate: range.endDate,
-      reason: input.reason ?? null,
-      // 상태를 보내지 않으면 지금 상태를 유지한다(초안이 조용히 공유되지 않게).
-      status: input.status ?? existing.status,
-    };
-    await db.batch([
-      db
-        .update(leaves)
-        .set({
-          title: updated.title,
-          startDate: updated.startDate,
-          endDate: updated.endDate,
-          reason: updated.reason,
-          status: updated.status,
-        })
-        .where(eq(leaves.id, id)),
-      db.delete(leaveSegments).where(eq(leaveSegments.leaveId, id)),
-      db.insert(leaveSegments).values(segmentRowsFor(id, segments)),
-    ]);
+    const saved = await saveLeaveWithMerge(
+      db,
+      user,
+      {
+        id,
+        title: input.title,
+        reason: input.reason ?? null,
+        // 상태를 보내지 않으면 지금 상태를 유지한다(초안이 조용히 공유되지 않게).
+        status: input.status ?? existing.status,
+        createdAt: existing.createdAt,
+        segments: toSegments(input),
+      },
+      { existingId: id },
+    );
+    if (!saved.ok) return c.json({ error: saved.error }, 400);
+
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
 
     const exceededDates = user.unitId
       ? await checkOverageAndNotify({
           db,
           unitId: user.unitId,
-          changedLeave: updated,
+          changedLeave: saved.row,
           waitUntil: (p) => c.executionCtx.waitUntil(p),
         })
       : [];
     return c.json(
       {
-        leave: serializeLeave(updated, new Map([[id, segments]])),
+        leave: serializeLeave(
+          saved.row,
+          new Map([[saved.row.id, saved.segments]]),
+        ),
         exceededDates,
       },
       200,

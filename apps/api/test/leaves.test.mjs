@@ -1023,3 +1023,190 @@ test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", 
   assert.equal(flipped.status, 400);
   assert.match(flipped.data.error, /부여일과 같거나 뒤/);
 });
+
+/**
+ * 정기외박·포상 같은 재원은 가입 직후 잔여가 0이라 그대로 쓰면 잔여 검사에서 막힌다.
+ * 병합을 보려는 테스트가 잔여 때문에 실패하지 않도록 먼저 채워 둔다.
+ */
+async function seedBalances(token, overrides) {
+  const totals = {};
+  for (const item of (await req("GET", "/leaves/balances", { token })).data
+    .balances) {
+    totals[item.key] = item.totalDays;
+  }
+  Object.assign(totals, overrides);
+  await req("PUT", "/leaves/balances", { token, body: { totals } });
+}
+
+test("붙어 있는 휴가는 한 건으로 합쳐진다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+  await seedBalances(token, { regular_overnight: 8 });
+
+  const first = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-02-03", endDate: "2026-02-05" },
+      ],
+    },
+  });
+  assert.equal(first.status, 201);
+
+  const second = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "정기외박 계획",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-02-06",
+          endDate: "2026-02-09",
+        },
+      ],
+    },
+  });
+  assert.equal(second.status, 201);
+  // 앞 휴가에 흡수되므로 살아남는 id는 먼저 만든 쪽이다.
+  assert.equal(second.data.leave.id, first.data.leave.id);
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
+  const merged = mine.data.leaves[0];
+  assert.equal(merged.startDate, "2026-02-03");
+  assert.equal(merged.endDate, "2026-02-09");
+  // 재원이 다르므로 구간은 둘로 남고 일수가 보존된다.
+  assert.equal(merged.segments.length, 2);
+  assert.equal(merged.segments[0].category, "annual");
+  assert.equal(merged.segments[0].days, 3);
+  assert.equal(merged.segments[1].overnightKind, "regular");
+  assert.equal(merged.segments[1].days, 4);
+});
+
+test("같은 재원이 붙으면 한 구간으로 이어진다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+
+  await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-04-01", endDate: "2026-04-03" },
+      ],
+    },
+  });
+  await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-04-04", endDate: "2026-04-06" },
+      ],
+    },
+  });
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
+  assert.equal(mine.data.leaves[0].segments.length, 1);
+  assert.equal(mine.data.leaves[0].segments[0].days, 6);
+});
+
+test("겹치는 휴가는 날짜를 짚어 막는다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+
+  await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-05-10", endDate: "2026-05-14" },
+      ],
+    },
+  });
+  const overlapping = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-05-12", endDate: "2026-05-16" },
+      ],
+    },
+  });
+  assert.equal(overlapping.status, 400);
+  assert.match(overlapping.data.error, /5월 12일/);
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
+});
+
+test("상태가 다르면 붙어 있어도 따로 남는다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+
+  await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      status: "draft",
+      segments: [
+        { category: "annual", startDate: "2026-06-01", endDate: "2026-06-02" },
+      ],
+    },
+  });
+  await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-06-03", endDate: "2026-06-04" },
+      ],
+    },
+  });
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 2);
+});
+
+test("흡수된 휴가의 id는 더 이상 수정할 수 없다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+
+  const first = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-07-01", endDate: "2026-07-02" },
+      ],
+    },
+  });
+  const second = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-06-29", endDate: "2026-06-30" },
+      ],
+    },
+  });
+  // 새 휴가가 앞에 오므로 이번에는 새 휴가가 살아남고 먼저 것이 흡수된다.
+  assert.equal(second.status, 201);
+  assert.notEqual(second.data.leave.id, first.data.leave.id);
+  assert.equal(second.data.leave.startDate, "2026-06-29");
+  assert.equal(second.data.leave.endDate, "2026-07-02");
+
+  const gone = await req("PATCH", `/leaves/${first.data.leave.id}`, {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-07-01", endDate: "2026-07-02" },
+      ],
+    },
+  });
+  assert.equal(gone.status, 404);
+});
