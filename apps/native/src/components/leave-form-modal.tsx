@@ -21,21 +21,18 @@
  * 기준은 창 폭이 아니라 **시트 자신의 폭**이다. iPad의 `pageSheet`은 창이 1366이어도
  * 시트는 540 남짓이라, 창 폭을 믿고 두 열로 나누면 오히려 좁아진다.
  */
-import {
-  isDerivedTitle,
-  titleFromDrafts,
-  useLeaveForm,
-  type MyLeave,
-} from "@leave/client";
+import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
   addDays,
   fmtDateShort,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
+  isDerivedTitle,
   LEAVE_STATUS_LABELS,
   removeDraft,
   setDraftEnd,
   splitLastDraft,
+  titleFromDrafts,
   todayInSeoul,
   type LeaveStatus,
 } from "@leave/shared";
@@ -77,6 +74,8 @@ export function LeaveFormModal(props: {
   initialDate?: string;
   editing?: MyLeave | null;
   onClose: () => void;
+  // 붙어 있는 휴가에 흡수되면 저장된 휴가의 id가 요청한 id와 다를 수 있다.
+  onSaved?: (result: LeaveResult) => void;
 }) {
   const styles = useStyles();
   const sheet = useMeasuredSizeClass();
@@ -98,6 +97,7 @@ export function LeaveFormModal(props: {
   const save = async () => {
     const result = await form.submit();
     if (!result) return;
+    props.onSaved?.(result);
     props.onClose();
     // 저장은 됐지만 그날이 초과라면, 공식 승인 여부는 부대에 확인해야 한다.
     if (result.exceededDates.length > 0) {

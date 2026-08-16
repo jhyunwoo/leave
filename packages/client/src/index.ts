@@ -11,6 +11,7 @@ export * from "./context";
 export * from "./types";
 export * from "./query-keys";
 export * from "./my-leave-days";
+export * from "./my-leaves-sections";
 export * from "./leave-holdings";
 
 export * from "./hooks/auth";

@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import type { MyLeave } from "@leave/client";
 import {
+  partitionMyLeaves,
   summarizeHoldings,
   useDeleteLeave,
   useLeaveBalances,
@@ -77,6 +78,7 @@ export function LeavesScreen() {
   );
 
   const myLeaves = leaves.data?.leaves ?? [];
+  const sections = partitionMyLeaves(leaves.data?.leaves);
   // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
   const selectedLeave =
     myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;
@@ -182,6 +184,59 @@ export function LeavesScreen() {
     </View>
   );
 
+  const renderLeaveRow = (l: MyLeave, index: number) => {
+    const selected = isExpanded && l.id === selectedLeave?.id;
+    return (
+      <View
+        key={l.id}
+        style={[
+          styles.leaveRow,
+          index > 0 && styles.rowDivider,
+          // 색만으로 선택을 알리지 않도록 왼쪽에 굵은 표시선을 함께 둔다.
+          selected && styles.leaveRowSelected,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={isExpanded ? { selected } : undefined}
+          accessibilityLabel={`${l.title} 자세히 보기`}
+          onPress={() => openLeave(l)}
+          style={{ flex: 1, minWidth: 0 }}
+        >
+          <Text style={styles.leaveTitle}>{l.title}</Text>
+          <Text style={styles.leaveDates}>
+            {fmtRange(l.startDate, l.endDate)}
+          </Text>
+          {l.reason ? (
+            <Text style={styles.leaveReason}>{l.reason}</Text>
+          ) : null}
+          <SegmentBadges segments={l.segments} />
+        </Pressable>
+        <ActionMenu
+          label={`${l.title} 작업`}
+          buttonLabel="휴가 관리"
+          testID={`leave-actions-${l.id}`}
+          actions={[
+            {
+              id: "edit",
+              title: "수정",
+              systemImage: "pencil",
+              onPress: () => setEditing(l),
+            },
+            {
+              id: "delete",
+              title: "삭제",
+              systemImage: "trash",
+              destructive: true,
+              disabled: del.isPending,
+              onPress: () => void confirmDelete(l),
+            },
+          ]}
+        />
+      </View>
+    );
+  };
+
   const leaveList = (
     <View style={styles.stack}>
       {leaves.isPending ? (
@@ -196,62 +251,24 @@ export function LeavesScreen() {
           </Text>
         </ContentPanel>
       ) : (
-        <ContentPanel style={styles.leaveList}>
-          {myLeaves.map((l, index) => {
-            const selected = isExpanded && l.id === selectedLeave?.id;
-            return (
-              <View
-                key={l.id}
-                style={[
-                  styles.leaveRow,
-                  index > 0 && styles.rowDivider,
-                  // 색만으로 선택을 알리지 않도록 왼쪽에 굵은 표시선을 함께 둔다.
-                  selected && styles.leaveRowSelected,
-                ]}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={
-                    isExpanded ? { selected } : undefined
-                  }
-                  accessibilityLabel={`${l.title} 자세히 보기`}
-                  onPress={() => openLeave(l)}
-                  style={{ flex: 1, minWidth: 0 }}
-                >
-                  <Text style={styles.leaveTitle}>{l.title}</Text>
-                  <Text style={styles.leaveDates}>
-                    {fmtRange(l.startDate, l.endDate)}
-                  </Text>
-                  {l.reason ? (
-                    <Text style={styles.leaveReason}>{l.reason}</Text>
-                  ) : null}
-                  <SegmentBadges segments={l.segments} />
-                </Pressable>
-                <ActionMenu
-                  label={`${l.title} 작업`}
-                  buttonLabel="휴가 관리"
-                  testID={`leave-actions-${l.id}`}
-                  actions={[
-                    {
-                      id: "edit",
-                      title: "수정",
-                      systemImage: "pencil",
-                      onPress: () => setEditing(l),
-                    },
-                    {
-                      id: "delete",
-                      title: "삭제",
-                      systemImage: "trash",
-                      destructive: true,
-                      disabled: del.isPending,
-                      onPress: () => void confirmDelete(l),
-                    },
-                  ]}
-                />
-              </View>
-            );
-          })}
-        </ContentPanel>
+        <>
+          {sections.upcoming.length > 0 ? (
+            <ContentPanel style={styles.leaveList}>
+              <Text style={styles.sectionTitle} selectable>
+                다가오는 휴가 {sections.upcoming.length}건
+              </Text>
+              {sections.upcoming.map(renderLeaveRow)}
+            </ContentPanel>
+          ) : null}
+          {sections.past.length > 0 ? (
+            <ContentPanel style={styles.leaveList}>
+              <Text style={styles.sectionTitle} selectable>
+                지난 휴가 {sections.past.length}건
+              </Text>
+              {sections.past.map(renderLeaveRow)}
+            </ContentPanel>
+          ) : null}
+        </>
       )}
     </View>
   );
@@ -359,6 +376,17 @@ export function LeavesScreen() {
           onClose={() => {
             setCreating(false);
             setEditing(null);
+          }}
+          onSaved={(result) => {
+            // 세 번째 열이 지금 보여주던 휴가를 수정한 경우에만 따라간다. 편집 대상은
+            // 목록 행의 메뉴에서 고르므로 선택과 무관한 행을 고쳤을 땐 건드리지 않는다.
+            if (
+              editing &&
+              selectedLeaveId === editing.id &&
+              result.leave.id !== editing.id
+            ) {
+              setSelectedLeaveId(result.leave.id);
+            }
           }}
         />
       )}

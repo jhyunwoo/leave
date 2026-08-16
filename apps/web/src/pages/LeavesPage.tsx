@@ -7,7 +7,12 @@ import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { MyLeave } from "@leave/client";
-import { useDeleteLeave, useLeaveBalances, useMyLeaves } from "@leave/client";
+import {
+  partitionMyLeaves,
+  useDeleteLeave,
+  useLeaveBalances,
+  useMyLeaves,
+} from "@leave/client";
 import { LeaveFormModal } from "../components/LeaveFormModal";
 import { fmtRange } from "@leave/shared";
 
@@ -48,6 +53,13 @@ export function LeavesPage() {
       item.expiringSoonDays > 0 ||
       item.expiredDays > 0,
   );
+
+  const sections = partitionMyLeaves(leaves.data?.leaves);
+  const onDelete = (leave: MyLeave) => {
+    if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
+      void del.mutateAsync(leave.id);
+    }
+  };
 
   return (
     <div
@@ -179,88 +191,28 @@ export function LeavesPage() {
           </p>
         </div>
       ) : (
-        <ul
-          className="content-panel"
+        <div
           style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--sp-xl)",
           }}
         >
-          {leaves.data.leaves.map((l) => (
-            <li
-              key={l.id}
-              className="content-row"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "var(--sp-lg)",
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <Link
-                  to={`/leaves/${l.id}`}
-                  className="body-lg strong"
-                  style={{ textDecoration: "none" }}
-                >
-                  {l.title}
-                </Link>
-                <p className="body-sm text-body" style={{ marginTop: 2 }}>
-                  {fmtRange(l.startDate, l.endDate)}
-                </p>
-                {l.reason && (
-                  <p className="caption text-mute" style={{ marginTop: 4 }}>
-                    {l.reason}
-                  </p>
-                )}
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                    marginTop: 8,
-                  }}
-                >
-                  {l.segments.map((segment) => {
-                    const key = segmentBalanceKey(segment);
-                    return (
-                      <span
-                        key={`${key}-${segment.startDate}`}
-                        className="badge"
-                      >
-                        {BALANCE_LABELS[key]}{" "}
-                        {fmtRangeTiny(segment.startDate, segment.endDate)}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setEditing(l)}
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  disabled={del.isPending}
-                  onClick={() => {
-                    if (confirm(`"${l.title}" 휴가를 삭제할까요?`)) {
-                      void del.mutateAsync(l.id);
-                    }
-                  }}
-                >
-                  삭제
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+          <LeaveSection
+            title="다가오는 휴가"
+            leaves={sections.upcoming}
+            deleting={del.isPending}
+            onEdit={setEditing}
+            onDelete={onDelete}
+          />
+          <LeaveSection
+            title="지난 휴가"
+            leaves={sections.past}
+            deleting={del.isPending}
+            onEdit={setEditing}
+            onDelete={onDelete}
+          />
+        </div>
       )}
 
       {(creating || editing) && (
@@ -274,5 +226,108 @@ export function LeavesPage() {
         />
       )}
     </div>
+  );
+}
+
+/** 목록의 한 줄. 다가오는 섹션과 지난 섹션이 같은 모양을 쓴다. */
+function LeaveRow(props: {
+  leave: MyLeave;
+  deleting: boolean;
+  onEdit: (leave: MyLeave) => void;
+  onDelete: (leave: MyLeave) => void;
+}) {
+  const l = props.leave;
+  return (
+    <li
+      className="content-row"
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "var(--sp-lg)",
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <Link
+          to={`/leaves/${l.id}`}
+          className="body-lg strong"
+          style={{ textDecoration: "none" }}
+        >
+          {l.title}
+        </Link>
+        <p className="body-sm text-body" style={{ marginTop: 2 }}>
+          {fmtRange(l.startDate, l.endDate)}
+        </p>
+        {l.reason && (
+          <p className="caption text-mute" style={{ marginTop: 4 }}>
+            {l.reason}
+          </p>
+        )}
+        <div
+          style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}
+        >
+          {l.segments.map((segment) => {
+            const key = segmentBalanceKey(segment);
+            return (
+              <span key={`${key}-${segment.startDate}`} className="badge">
+                {BALANCE_LABELS[key]}{" "}
+                {fmtRangeTiny(segment.startDate, segment.endDate)}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => props.onEdit(l)}
+        >
+          수정
+        </button>
+        <button
+          type="button"
+          className="btn btn-danger btn-sm"
+          disabled={props.deleting}
+          onClick={() => props.onDelete(l)}
+        >
+          삭제
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/** 섹션 하나. 비어 있으면 아무것도 그리지 않는다. */
+function LeaveSection(props: {
+  title: string;
+  leaves: MyLeave[];
+  deleting: boolean;
+  onEdit: (leave: MyLeave) => void;
+  onDelete: (leave: MyLeave) => void;
+}) {
+  if (props.leaves.length === 0) return null;
+  return (
+    <section>
+      <h2 className="body-lg strong" style={{ marginBottom: "var(--sp-sm)" }}>
+        {props.title}{" "}
+        <span className="caption text-mute">{props.leaves.length}건</span>
+      </h2>
+      <ul
+        className="content-panel"
+        style={{ listStyle: "none", margin: 0, padding: 0 }}
+      >
+        {props.leaves.map((leave) => (
+          <LeaveRow
+            key={leave.id}
+            leave={leave}
+            deleting={props.deleting}
+            onEdit={props.onEdit}
+            onDelete={props.onDelete}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }

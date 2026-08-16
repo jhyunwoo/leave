@@ -30,7 +30,7 @@ import {
   type RegularOvernightConfigInput,
   type SegmentLike,
 } from "@leave/shared";
-import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
 import {
   leaveGrants,
   leaves,
@@ -83,12 +83,12 @@ export type LeaveBalanceItem = {
 
 /**
  * 정기외박 잔여량 계산에 필요한, 날짜가 살아 있는 내 정기외박 구간들.
- * excludeLeaveId를 주면 그 휴가의 구간은 뺀다(수정 중인 휴가를 자기 자신과 겹쳐 세지 않도록).
+ * excludeLeaveIds를 주면 그 휴가들의 구간은 뺀다(수정 중인 휴가, 그리고 이번 저장으로 흡수될 이웃들).
  */
 async function regularOvernightSegments(
   db: Db,
   userId: string,
-  excludeLeaveId?: string,
+  excludeLeaveIds: readonly string[] = [],
 ) {
   return db
     .select({
@@ -104,7 +104,10 @@ async function regularOvernightSegments(
         eq(leaves.userId, userId),
         eq(leaveSegments.category, "overnight"),
         eq(leaveSegments.overnightKind, "regular"),
-        ...(excludeLeaveId ? [ne(leaveSegments.leaveId, excludeLeaveId)] : []),
+        // 빈 배열로 notInArray를 부르면 드라이버마다 결과가 갈린다. 아예 조건을 뺀다.
+        ...(excludeLeaveIds.length
+          ? [notInArray(leaveSegments.leaveId, [...excludeLeaveIds])]
+          : []),
       ),
     )
     .all();
@@ -349,13 +352,13 @@ async function assertRegularOvernightAvailable(
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   config: RegularOvernightConfigRow | undefined,
   requested: SegmentLike[],
-  replacingLeaveId?: string,
+  replacingLeaveIds: readonly string[],
 ) {
-  // 수정이면 교체될 휴가의 구간은 빼야 자기 자신과 부딪히지 않는다.
+  // 이번 저장으로 사라질 휴가들의 구간은 빼야 자기 자신과 부딪히지 않는다.
   const existing = await regularOvernightSegments(
     db,
     user.id,
-    replacingLeaveId,
+    replacingLeaveIds,
   );
   const block = checkRegularOvernight({
     config,
@@ -373,19 +376,19 @@ async function assertRegularOvernightAvailable(
  * 사용분(unattributedDays)이 늘어나면 거절한다. 이 한 조건이 "잔여 초과"와
  * "만기가 지난 날짜에 사용"을 모두 흡수한다.
  *
- * 수정일 때 기존 구간을 빼고 배분하므로 환급 계산이 따로 필요 없고, 이미 미귀속이
+ * 수정이거나 이웃을 흡수할 때 사라질 구간을 빼고 배분하므로 환급 계산이 따로 필요 없고, 이미 미귀속이
  * 쌓여 있는 사용자도 그것을 더 악화시키지 않는 한 다른 휴가를 계속 고칠 수 있다.
  */
 export async function assertSegmentsAvailable(
   db: Db,
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   segments: LeaveSegment[],
-  replacingLeaveId?: string,
+  replacingLeaveIds: readonly string[] = [],
 ) {
   const [grantRows, allSegments, config] = await Promise.all([
     listGrants(db, user.id),
-    replacingLeaveId
-      ? userSegmentsExcluding(db, user.id, replacingLeaveId)
+    replacingLeaveIds.length
+      ? userSegmentsExcluding(db, user.id, replacingLeaveIds)
       : userSegments(db, user.id),
     db
       .select()
@@ -428,16 +431,16 @@ export async function assertSegmentsAvailable(
       user,
       config,
       segments,
-      replacingLeaveId,
+      replacingLeaveIds,
     );
   }
 }
 
-/** 수정 중인 휴가의 구간을 뺀, 이 사용자의 나머지 구간들. */
+/** 이번 저장으로 사라지거나 교체될 휴가의 구간을 뺀, 이 사용자의 나머지 구간들. */
 async function userSegmentsExcluding(
   db: Db,
   userId: string,
-  excludeLeaveId: string,
+  excludeLeaveIds: readonly string[],
 ) {
   return db
     .select({
@@ -449,7 +452,10 @@ async function userSegmentsExcluding(
     .from(leaveSegments)
     .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
     .where(
-      and(eq(leaves.userId, userId), ne(leaveSegments.leaveId, excludeLeaveId)),
+      and(
+        eq(leaves.userId, userId),
+        notInArray(leaveSegments.leaveId, [...excludeLeaveIds]),
+      ),
     )
     .all();
 }
