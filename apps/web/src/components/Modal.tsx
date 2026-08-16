@@ -15,7 +15,7 @@
  * 닿을 방법이 없어진다. 조상의 스타일에 기대지 않도록 body로 꺼내 그린다.
  */
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /** 모달 최대 폭. 폼이 넓을수록 데스크톱에서 스크롤이 줄어든다. */
@@ -28,6 +28,9 @@ export function Modal(props: {
   size?: keyof typeof MAX_WIDTH;
   children: ReactNode;
 }) {
+  // 배경을 누른 곳이 어디인지 기억해 둔다. 아래 onPointerUp 참고.
+  const pressedOverlay = useRef(false);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") props.onClose();
@@ -43,8 +46,20 @@ export function Modal(props: {
   return createPortal(
     <div
       role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
+      // 배경 클릭으로 닫되, **누른 곳과 뗀 곳이 모두 배경일 때만** 닫는다.
+      //
+      // `onClick`만 보면 안 되는 이유: click의 target은 누른 노드와 뗀 노드의
+      // 공통 조상이다. 모달 안에서 글자를 드래그하다가 손이 모달 밖으로 나간 채
+      // 버튼을 놓으면 공통 조상이 이 오버레이가 되어, 안에서 시작한 드래그인데도
+      // `e.target === e.currentTarget`이 참이 되고 모달이 닫힌다(입력 내용 유실).
+      // 데스크톱에서 텍스트를 조금만 길게 끌어도 재현된다.
+      onPointerDown={(e) => {
+        pressedOverlay.current = e.target === e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        const startedOnOverlay = pressedOverlay.current;
+        pressedOverlay.current = false;
+        if (startedOnOverlay && e.target === e.currentTarget) props.onClose();
       }}
       style={{
         position: "fixed",

@@ -130,9 +130,11 @@ a {
   border-radius: var(--r-sm);
 }
 
+/* 드래그 선택 강조는 primary. 예전에는 배경이 --ink였는데 글자색 --on-primary와
+   같은 색(#0e0f0c)이라 선택한 글자가 그대로 사라졌다. */
 ::selection {
   color: var(--on-primary);
-  background: var(--ink);
+  background: var(--primary);
 }
 
 /* 타이포 */

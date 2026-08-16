@@ -12,7 +12,16 @@ packages:
 # 기준 버전은 Expo SDK 57 / React Native 0.86이 요구하는 값이다. Expo를 올릴 때는
 # `npx expo install --check`가 알려주는 버전으로 여기도 같이 올린다.
 # 회귀 감시는 packages/client/test/single-instance.test.ts.
+#
+# hono도 워크스페이스 전체가 한 버전이어야 한다. 이유는 react와 다르다.
+# 웹은 apps/api의 `AppType`(hono 사본 A의 타입으로 만들어진 것)을 hc<AppType>에
+# 넣는데, 웹이 사본 B를 잡고 있으면 두 `Hono` 타입이 이름만 같은 남남이라
+# `hc`의 제약(Hono<any, any, any>)을 통과하지 못한다. 그러면 타입 검사에서
+# api 클라이언트 전체가 unknown이 되고 `pnpm build`(=tsc && vite build)가 죽는다.
+# 실제로 web만 ^4.13.2로 올라가 있고 나머지는 ^4.13.0이라 4.13.1로 묶여 있어서
+# 두 벌이 깔렸다(@hono/zod-openapi의 peer 해석이 4.13.1을 고정한다).
 overrides:
+  hono: "4.13.2"
   react: "19.2.3"
   react-dom: "19.2.3"
 

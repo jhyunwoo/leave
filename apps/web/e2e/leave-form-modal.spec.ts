@@ -95,6 +95,50 @@ test("목록이 길어도 휴가 수정 모달의 저장 버튼이 화면 안에
   await expect(submit).toBeEnabled();
 });
 
+test("모달 안에서 시작한 드래그를 배경에서 놓아도 모달이 닫히지 않는다", async ({
+  page,
+  request,
+}) => {
+  const token = await seedLongLeaveList(request);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+
+  await page.goto("/leaves");
+  await page.getByRole("button", { name: "수정" }).first().click();
+
+  const dialog = page.getByRole("dialog", { name: "휴가 수정" });
+  await expect(dialog).toBeVisible();
+
+  const title = dialog.getByPlaceholder("예: 제주도 가족여행");
+  const titleBox = (await title.boundingBox())!;
+  const dialogBox = (await dialog.boundingBox())!;
+
+  // 제목 입력의 글자를 끌다가 손이 모달 왼쪽 배경으로 빠진 뒤 거기서 놓는다.
+  // click의 target은 누른 곳과 뗀 곳의 공통 조상(=배경)이라, 배경 클릭만 보고
+  // 닫으면 여기서 닫혀 버린다. 입력하던 내용이 통째로 날아가는 회귀.
+  await page.mouse.move(titleBox.x + 20, titleBox.y + titleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(titleBox.x + 120, titleBox.y + titleBox.height / 2);
+  await page.mouse.move(dialogBox.x / 2, dialogBox.y + dialogBox.height / 2);
+  await page.mouse.up();
+
+  await expect(dialog).toBeVisible();
+
+  // 반대로 배경에서 눌러 모달 안에서 놓는 경우도 닫히면 안 된다.
+  await page.mouse.move(dialogBox.x / 2, dialogBox.y + dialogBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(titleBox.x + 20, titleBox.y + titleBox.height / 2);
+  await page.mouse.up();
+
+  await expect(dialog).toBeVisible();
+
+  // 배경을 그냥 누르고 떼면 예전처럼 닫혀야 한다.
+  await page.mouse.click(dialogBox.x / 2, dialogBox.y + dialogBox.height / 2);
+  await expect(dialog).toBeHidden();
+});
+
 test("데스크톱에서 휴가 수정 모달이 모바일 폭보다 넓게 열린다", async ({
   page,
   request,

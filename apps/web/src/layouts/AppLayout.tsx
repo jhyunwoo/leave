@@ -3,6 +3,7 @@
  * 사용처: App.tsx의 인증된 라우트 전부.
  */
 
+import { Suspense } from "react";
 import { NavLink, Outlet } from "react-router";
 import type { Me } from "@leave/client";
 import { useNotifications } from "@leave/client";
@@ -54,8 +55,18 @@ export function AppLayout(props: { me: Me }) {
         </div>
       </nav>
 
+      {/* 화면마다 코드를 따로 받으므로(App.tsx의 lazy) 여기에 Suspense를 둔다.
+          바깥 Suspense가 받으면 내비게이션까지 통째로 스피너로 바뀐다. */}
       <main className="container app-main">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div style={{ padding: "var(--sp-3xl) 0", textAlign: "center" }}>
+              <div className="spinner" aria-label="불러오는 중" />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );
