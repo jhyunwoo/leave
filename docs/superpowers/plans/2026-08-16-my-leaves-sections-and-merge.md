@@ -2149,11 +2149,16 @@ Run: `pnpm exec agent-browser skills get core`
 - [ ] **Step 2: API와 두 앱을 띄운다**
 
 ```bash
-# CORS_ORIGIN을 주지 않으면 "*"로 열린다(apps/api/src/index.ts:34). 웹은 5173,
-# 네이티브 web target은 8081이라 오리진이 둘이므로 하나로 못 고정한다. 인증이
-# Bearer 헤더라 쿠키 문제도 없다. `pnpm dev:web`은 API를 5173으로 고정해 띄우므로
-# 쓰지 말고 아래처럼 따로 띄운다.
-pnpm --filter @leave/api exec wrangler dev --port 8787 &
+# 웹은 5173, 네이티브 web target은 8081이라 오리진이 둘이므로 하나로 못 고정한다.
+# 인증이 Bearer 헤더라 "*"로 열어도 쿠키 문제가 없다.
+#
+# 주의: 변수를 "생략"해도 "*"가 되지 않는다. apps/api/wrangler.jsonc의 top-level
+# vars.CORS_ORIGIN이 "https://leave.moveto.kr"로 박혀 있고 wrangler dev에도 적용돼,
+# 모든 브라우저 fetch가 CORS로 막힌다(스피너가 영원히 도는 증상, API 로그에는
+# OPTIONS만 찍힌다). CLI로 명시해 덮어써야 한다.
+#
+# `pnpm dev:web`은 API를 5173으로 고정해 띄우므로 쓰지 말고 아래처럼 따로 띄운다.
+pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:'*' &
 pnpm --filter @leave/web dev &
 EXPO_PUBLIC_API_URL=http://localhost:8787 pnpm --filter @leave/native exec expo start --web --port 8081 &
 ```
