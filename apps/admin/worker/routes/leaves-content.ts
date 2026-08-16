@@ -270,7 +270,7 @@ export const leaveContentRoutes = new Hono<AdminAppEnv>()
         db,
         newUser,
         segments,
-        newUser.id === before.userId ? id : undefined,
+        newUser.id === before.userId ? [id] : undefined,
       );
     } catch (error) {
       return c.json(

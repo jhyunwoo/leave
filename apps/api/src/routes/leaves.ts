@@ -455,7 +455,7 @@ export const leaveRoutes = app
     const segments = toSegments(input);
     const range = segmentsRange(segments)!;
     try {
-      await assertSegmentsAvailable(db, user, segments, id);
+      await assertSegmentsAvailable(db, user, segments, [id]);
     } catch (error) {
       return c.json(
         {
