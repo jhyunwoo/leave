@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthGrid, fmtRange, shiftMonth, splitMonth } from "../src";
+import {
+  buildMonthGrid,
+  fmtRange,
+  isWeekend,
+  shiftMonth,
+  splitMonth,
+} from "../src";
 
 describe("shiftMonth", () => {
   it("연도 경계를 넘어 이동", () => {
@@ -33,6 +39,22 @@ describe("buildMonthGrid", () => {
     expect(inMonth).toContain("2026-02-01");
     expect(inMonth).toContain("2026-02-28");
     expect(inMonth.length).toBe(28);
+  });
+});
+
+describe("isWeekend", () => {
+  it("토·일만 true", () => {
+    expect(isWeekend("2026-08-14")).toBe(false); // 금
+    expect(isWeekend("2026-08-15")).toBe(true); // 토
+    expect(isWeekend("2026-08-16")).toBe(true); // 일
+    expect(isWeekend("2026-08-17")).toBe(false); // 월
+  });
+
+  it("달 경계에서도 요일이 밀리지 않는다", () => {
+    expect(isWeekend("2026-02-28")).toBe(true); // 토
+    expect(isWeekend("2026-03-01")).toBe(true); // 일
+    expect(isWeekend("2026-08-31")).toBe(false); // 월
+    expect(isWeekend("2026-09-01")).toBe(false); // 화
   });
 });
 
