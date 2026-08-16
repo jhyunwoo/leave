@@ -104,8 +104,12 @@ export async function saveLeaveWithMerge(
           title: plan.title,
           reason: plan.reason,
           segments: plan.segments,
-          // incoming은 아직 행이 없을 수 있다(등록). 지울 대상에서 뺀다.
-          absorbedIds: plan.absorbedIds.filter((id) => id !== incoming.id),
+          // incoming이 아직 행이 없는 등록일 때만 지울 대상에서 뺀다. 수정(PATCH)이면
+          // incoming.id는 이미 있는 행이라 다른 이웃에 흡수될 수 있고, 그때는
+          // absorbedIds에 그대로 남아야 옛 구간이 지워지고 옛 행도 삭제된다.
+          absorbedIds: options.existingId
+            ? plan.absorbedIds
+            : plan.absorbedIds.filter((id) => id !== incoming.id),
         }
       : {
           id: incoming.id,
@@ -128,13 +132,18 @@ export async function saveLeaveWithMerge(
     createdAt: saved.createdAt,
   };
 
+  // 이번 저장으로 지워지거나 통째로 다시 쓰이는 행 전부. host(saved.id)도 포함된다 —
+  // host가 기존 이웃이면 그 구간이 이미 테이블에 있고 saved.segments 안에도 들어
+  // 있으므로, 빼지 않으면 host의 날짜를 두 번 세게 된다.
+  const clearIds = [saved.id, ...saved.absorbedIds];
+
   try {
     // 흡수될 이웃의 구간은 이미 DB에 있다. 빼지 않으면 같은 날을 두 번 세고
     // 잔여가 모자란다고 잘못 막는다.
     await assertSegmentsAvailable(db, user, saved.segments, [
+      ...clearIds,
       incoming.id,
       ...(options.existingId ? [options.existingId] : []),
-      ...saved.absorbedIds,
     ]);
   } catch (error) {
     return {
@@ -145,7 +154,6 @@ export async function saveLeaveWithMerge(
 
   // 살아남는 행이 이미 DB에 있는지. 등록인데 host가 자기 자신이면 그때만 insert다.
   const inserting = !options.existingId && saved.id === incoming.id;
-  const clearIds = [saved.id, ...saved.absorbedIds];
 
   type BatchItem = Parameters<typeof db.batch>[0][number];
   const statements: BatchItem[] = [

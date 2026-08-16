@@ -1210,3 +1210,101 @@ test("흡수된 휴가의 id는 더 이상 수정할 수 없다", async () => {
   });
   assert.equal(gone.status, 404);
 });
+
+test("수정으로 이웃과 붙게 되면 그 자리에서 흡수되고 옛 행은 사라진다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+
+  const first = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-09-01", endDate: "2026-09-02" },
+      ],
+    },
+  });
+  const second = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-09-10", endDate: "2026-09-11" },
+      ],
+    },
+  });
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+
+  // 두 번째 휴가를 첫 번째 바로 뒤에 붙게 고친다.
+  const patched = await req("PATCH", `/leaves/${second.data.leave.id}`, {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-09-03", endDate: "2026-09-04" },
+      ],
+    },
+  });
+  assert.equal(patched.status, 200);
+  // 앞 휴가에 흡수되므로 살아남는 id는 첫 번째 것이다 — 수정을 요청한 id가 아니다.
+  assert.equal(patched.data.leave.id, first.data.leave.id);
+  assert.equal(patched.data.leave.startDate, "2026-09-01");
+  assert.equal(patched.data.leave.endDate, "2026-09-04");
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
+  const merged = mine.data.leaves[0];
+  assert.equal(merged.startDate, "2026-09-01");
+  assert.equal(merged.endDate, "2026-09-04");
+  assert.equal(merged.segments.length, 1);
+  assert.equal(merged.segments[0].days, 4);
+
+  // 수정 전 두 번째 휴가의 옛 id는 흡수되며 지워졌으므로 더 이상 고칠 수 없다.
+  const gone = await req("PATCH", `/leaves/${second.data.leave.id}`, {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-09-10", endDate: "2026-09-11" },
+      ],
+    },
+  });
+  assert.equal(gone.status, 404);
+});
+
+test("합쳐진 휴가는 호스트 구간을 이중으로 세지 않아 잔여를 꽉 채워도 저장된다", async () => {
+  const { token } = await signup();
+  await createUnit(token, { name: uniq("병합부대-") });
+  await seedBalances(token, { annual: 5 });
+
+  const first = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-11-02", endDate: "2026-11-04" },
+      ],
+    },
+  });
+  assert.equal(first.status, 201);
+
+  // 이어 붙는 2일을 더하면 정확히 5일(잔여 전부)이 된다. 병합 전 호스트 구간을
+  // 잔여 검사에서 빼지 않으면 3일이 두 번 세져 거짓으로 잔여 부족 400이 난다.
+  const second = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "연가 계획",
+      segments: [
+        { category: "annual", startDate: "2026-11-05", endDate: "2026-11-06" },
+      ],
+    },
+  });
+  assert.equal(second.status, 201);
+  assert.equal(second.data.leave.id, first.data.leave.id);
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
+  assert.equal(mine.data.leaves[0].segments.length, 1);
+  assert.equal(mine.data.leaves[0].segments[0].days, 5);
+});
