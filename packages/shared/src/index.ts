@@ -12,6 +12,7 @@
  *  - onboarding     : 가입 직후 단계 구성과 히어로 일러스트 기하
  *  - leave          : 휴가 종류·상태·구간의 정의
  *  - leave-title    : 자동 제목과 사람이 지은 이름의 구분
+ *  - leave-merge    : 붙어 있는 휴가를 한 건으로 합치는 규칙
  *  - leave-grants   : 적립분(언제 얼마가 부여됐고 언제 만료되는가)
  *  - regular-overnight : 주기 기반 정기외박
  *  - overage/availability : 하루 출타 인원 집계와 대안 날짜 추천
@@ -29,6 +30,7 @@ export * from "./http";
 export * from "./leave";
 export * from "./leave-draft";
 export * from "./leave-title";
+export * from "./leave-merge";
 export * from "./leave-grants";
 export * from "./onboarding";
 export * from "./regular-overnight";
