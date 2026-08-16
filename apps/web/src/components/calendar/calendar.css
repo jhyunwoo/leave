@@ -104,7 +104,8 @@
   color: var(--mute);
   padding: var(--sp-sm) 0;
 }
-.cal-weekday.is-sunday {
+/* 토·일·공휴일을 한 가지 "빨간 날"로 묶는다. */
+.cal-weekday.is-red {
   color: var(--negative);
 }
 
@@ -157,7 +158,7 @@
   border-color: var(--primary);
 }
 .cal-cell.is-selected .cal-daynum,
-.cal-cell.is-selected .cal-daynum.is-sunday,
+.cal-cell.is-selected .cal-daynum.is-red,
 .cal-cell.is-selected .cal-daynum.is-exceeded,
 .cal-cell.is-selected .cal-holiday,
 .cal-cell.is-selected .cal-count,
@@ -181,7 +182,7 @@
   font-size: 14px;
   font-weight: 600;
 }
-.cal-daynum.is-sunday {
+.cal-daynum.is-red {
   color: var(--negative);
 }
 .cal-daynum.is-exceeded {
@@ -204,12 +205,16 @@
   line-height: 1.2;
 }
 
-/* 전역일 배지. 공휴일과 같은 자리를 쓰되(칸 높이가 꽉 차 있다) 색으로 갈라 놓는다 —
-   공휴일은 빨강, 전역은 brand. 선택된 칸에서는 위의
-   `.cal-cell.is-selected .cal-holiday`가 명시도로 이겨 글자색만 되돌린다. */
+/* 전역일 배지. 공휴일과 같은 자리를 쓰되(칸 높이가 꽉 차 있다) 채운 배지로 세운다.
+   세로 패딩을 두지 않아 줄 높이는 공휴일 이름과 같다. `.cal-cell`이
+   `align-items: flex-start`라 배지가 칸 폭을 다 먹지 않는다.
+   채움이 primary가 아니라 brand인 이유는 아래 `.cal-cell.is-discharge` 참고. */
 .cal-holiday.is-discharge {
-  color: var(--brand);
-  font-weight: 700;
+  background: var(--brand);
+  color: var(--on-brand);
+  border-radius: var(--r-sm);
+  padding: 0 5px;
+  font-weight: 800;
 }
 
 /* 혼잡도 신호 — 색만으로 구분하지 않도록 라벨과 비율을 함께 적는다. */
@@ -368,6 +373,28 @@
 .cal-cell.is-in-cycle.is-exceeded,
 .cal-cell.is-in-cycle.is-selected {
   background: unset;
+}
+
+/* --- 전역일 --- */
+
+/* 복무에서 한 번뿐인 날이라 칸 전체를 brand 계열로 세운다. 배경 규칙들이 전부 같은
+   명시도(0,2,0)라 순서가 승패를 정한다 — 주기 틴트·초과 틴트보다 뒤에 와야 이긴다.
+   진짜 border는 쓸 수 없다. `.cal-cell`은 오른쪽·아래 헤어라인만 그려서, 여기에만
+   4면 테두리를 주면 그 칸의 내용이 1px씩 밀려 그리드 정렬이 깨진다. */
+.cal-cell.is-discharge {
+  background: var(--primary-pale);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+  border-radius: var(--r-lg);
+}
+/* 선택은 순간의 조작이라 늘 먼저 읽혀야 한다. 배경만 양보하고 링은 남긴다 —
+   배지가 여전히 전역일을 말해 준다. */
+.cal-cell.is-discharge.is-selected {
+  background: var(--primary);
+}
+/* 위 `.cal-cell.is-selected .cal-holiday`가 글자색을 ink로 일괄 되돌리는 바람에
+   brand 채움 위에 어두운 글자가 얹힌다. 클래스가 하나 많아 명시도로 이긴다. */
+.cal-cell.is-selected .cal-holiday.is-discharge {
+  color: var(--on-brand);
 }
 
 /* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */

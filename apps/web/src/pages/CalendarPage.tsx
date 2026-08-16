@@ -184,7 +184,10 @@ export function CalendarPage(props: { me: Me }) {
               <strong style={{ color: "var(--ink)" }}>{allowed}명</strong>
             </span>
             <span className="caption" style={{ color: "var(--negative-deep)" }}>
-              ● 빨간 날 = 최대 출타 인원 초과 · 공휴일은 빨간 날짜
+              ● 빨간 칸 = 최대 출타 인원 초과 · 빨간 날짜 = 주말·공휴일
+            </span>
+            <span className="caption" style={{ color: "var(--brand)" }}>
+              ● 초록 칸 = 전역일
             </span>
           </div>
         </div>

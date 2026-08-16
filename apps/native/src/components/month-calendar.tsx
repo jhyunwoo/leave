@@ -18,6 +18,7 @@ import {
   buildMonthGrid,
   cycleColor,
   getHoliday,
+  isWeekend,
   todayInSeoul,
   WEEKDAYS,
   type ISODate,
@@ -121,7 +122,10 @@ export function MonthCalendar(props: {
           {WEEKDAYS.map((w, i) => (
             <Text
               key={w}
-              style={[styles.weekday, i === 0 && { color: colors.negative }]}
+              style={[
+                styles.weekday,
+                (i === 0 || i === 6) && { color: colors.negative },
+              ]}
             >
               {w}
             </Text>
@@ -141,7 +145,7 @@ export function MonthCalendar(props: {
             const isToday = cell.date === today;
             const isSelected = cell.date === selectedDate;
             const dayNum = Number(cell.date.slice(8));
-            const sunday = new Date(cell.date).getUTCDay() === 0;
+            const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
             const isDischarge =
@@ -199,6 +203,12 @@ export function MonthCalendar(props: {
                   { minHeight: cellHeight },
                   inCycle && { backgroundColor: colors.cycleTint },
                   exceeded && { backgroundColor: colors.negativeTint },
+                  // 전역일은 복무에서 한 번뿐이라 주기·초과 배경을 이기고 칸 전체를
+                  // 가져간다. cell이 이미 투명 1px 테두리를 갖고 있어 높이는 그대로다.
+                  isDischarge && {
+                    backgroundColor: colors.primaryPale,
+                    borderColor: colors.brand,
+                  },
                   pressed && { transform: [{ scale: 0.97 }] },
                 ]}
               >
@@ -214,7 +224,7 @@ export function MonthCalendar(props: {
                       <Text
                         style={[
                           styles.dayNum,
-                          (sunday || holiday) && { color: colors.negative },
+                          (weekend || holiday) && { color: colors.negative },
                           exceeded && { color: colors.negativeDeep },
                           (isToday || isSelected) && {
                             color: colors.onPrimary,
@@ -227,18 +237,21 @@ export function MonthCalendar(props: {
                     {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 아래 칸 높이
                         예산이 꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는
                         날에는 전역이 이기고, 공휴일 이름은 날짜 상세에서 그대로 보인다. */}
-                    {!compact && (isDischarge || holiday) && (
+                    {!compact && isDischarge ? (
+                      <View style={styles.dischargeBadge}>
+                        <Text style={styles.dischargeText} numberOfLines={1}>
+                          전역
+                        </Text>
+                      </View>
+                    ) : !compact && holiday ? (
                       <Text
-                        style={[
-                          styles.holiday,
-                          isDischarge && styles.dischargeLabel,
-                        ]}
+                        style={styles.holiday}
                         numberOfLines={1}
                         ellipsizeMode="clip"
                       >
-                        {isDischarge ? "전역" : holiday}
+                        {holiday}
                       </Text>
-                    )}
+                    ) : null}
                     {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
                     {!compact && mine && tone && (
                       <View
@@ -388,8 +401,21 @@ const useStyles = makeStyles(({ colors }) => ({
     maxWidth: "100%",
     paddingHorizontal: 2,
   },
-  // 공휴일과 같은 자리를 쓰므로 색으로 가른다 — 공휴일은 빨강, 전역은 brand.
-  dischargeLabel: { color: colors.brand, fontWeight: "700" },
+  // 공휴일 이름과 같은 자리를 쓰지만 전역일은 채운 배지로 세운다. 세로 패딩을 두지
+  // 않아 높이가 공휴일 줄(11)과 같고, 그래서 칸 높이 예산이 그대로 유지된다.
+  // 채움은 primary가 아니라 brand다 — 칸 배경이 이미 primaryPale이라 primary 배지를
+  // 얹으면 초록 위 초록(대비 1.3:1)이 되어 배지 모양이 사라진다.
+  dischargeBadge: {
+    paddingHorizontal: 5,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brand,
+  },
+  dischargeText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "800",
+    color: colors.onBrand,
+  },
   countPill: {
     minHeight: 14,
     justifyContent: "center",
