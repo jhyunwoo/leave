@@ -171,16 +171,20 @@ client에 있을 이유가 없다.
 
 `routes/leaves.ts`의 POST·PATCH가 각각 이 헬퍼 하나를 부른다.
 
+헬퍼 안에만 있는 조회 함수:
+
 ```ts
-export async function loadMergeCandidates(
+async function loadMergeCandidates(
   db: Db,
   userId: string,
-  input: { excludeLeaveId?: string; status: LeaveStatus; startDate: ISODate; endDate: ISODate },
+  input: { excludeLeaveId?: string; status: LeaveStatus },
 ): Promise<MergeCandidate[]>;
 ```
 
-`status`가 같고 기간이 `[startDate - 1일, endDate + 1일]`에 걸치는 휴가만 구간과 함께
-읽는다. 내 휴가 전부를 읽지 않는다.
+`status`가 같은 내 휴가를 구간과 함께 읽는다. 날짜로 좁히지 않는다 — 연쇄 병합은
+흡수할 때마다 기간이 늘어나므로, `[startDate - 1일, endDate + 1일]` 창으로 좁히면 창
+밖의 이웃이 애초에 안 읽혀 한 홉에서 멈춘다. 한 사용자의 휴가는 수십 건 규모라
+상태로만 좁혀도 충분히 싸다.
 
 라우트의 순서:
 
