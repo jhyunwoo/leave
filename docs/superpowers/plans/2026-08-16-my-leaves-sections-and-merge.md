@@ -1177,10 +1177,12 @@ test("흡수된 휴가의 id는 더 이상 수정할 수 없다", async () => {
 - [ ] **Step 2: 실패를 확인한다**
 
 ```bash
-pnpm --filter @leave/api exec wrangler dev --port 8799 &
-# 8799가 응답할 때까지 기다린 뒤
 pnpm --filter @leave/api test
 ```
+
+`apps/api/scripts/run-tests.mjs`가 격리된 상태(`--persist-to`)로 dev 서버를 직접 띄우고
+마이그레이션을 적용한 뒤 정리한다. **따로 `wrangler dev`를 띄우지 않는다** — 같은 포트에
+두 서버가 뜨면 이 변경과 무관한 401·레이트리밋 실패가 난다.
 
 Expected: 새 테스트 5건 FAIL (`/leaves/mine`이 2건을 주고, 겹치는 등록이 201로 통과한다).
 
@@ -1489,7 +1491,6 @@ Run: `grep -n "assertSegmentsAvailable\|insertLeaveSegments\|segmentRowsFor\|seg
 
 ```bash
 pnpm check-types
-# 8799 dev 서버가 떠 있는 상태에서
 pnpm --filter @leave/api test
 ```
 
@@ -2212,7 +2213,7 @@ Expected: 이번 변경과 관련된 오류 없음.
 pnpm browser:close
 pnpm check-types
 pnpm lint
-pnpm test          # apps/api는 8799 dev 서버가 필요하다
+pnpm test          # apps/api 테스트는 자체 dev 서버를 띄운다(8799). 수동으로 띄우지 말 것
 ```
 
 Expected: PASS. 웹 e2e가 깨지면 8787 상주 서버의 CORS 설정과 알려진 stale 테스트 1건을 먼저 의심한다.
