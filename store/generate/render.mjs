@@ -6,8 +6,8 @@ import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
-import { SCREENS, C } from "./screens.mjs";
 import { SLIDES, SHOTS, SRC, TINTS, B, framedDevice, bareDevice } from "./shots.mjs";
+import { TABLET_SLIDES, tabletSlideHTML } from "./ipad.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -110,39 +110,6 @@ function docHead() {
     .screen-root{width:100%;height:100%;position:relative;overflow:hidden;display:flex;flex-direction:column}
   </style>`;
 }
-// 슬라이드: 상단 카피 + 하단 기기(스케일된 화면)
-function slideHTML({ W, H, caption, sub, screenHTML, logicalW, logicalH, accent }) {
-  const capH = Math.round(H * 0.19);
-  const marginX = Math.round(W * 0.06);
-  const areaH = H - capH - Math.round(H * 0.05);
-  const bezel = Math.max(14, Math.round(W * 0.012));
-  const kH = (areaH - bezel * 2) / logicalH;
-  const kW = (W * 0.82 - bezel * 2) / logicalW;
-  const k = Math.min(kH, kW);
-  const devW = Math.round(logicalW * k) + bezel * 2;
-  const devH = Math.round(logicalH * k) + bezel * 2;
-  const screenR = Math.round(bezel * 2.4);
-  return `<!doctype html><html><head>${docHead()}</head><body>
-  <div style="width:${W}px;height:${H}px;background:linear-gradient(165deg,#f4faee 0%,#d9f1c2 55%,#9fe870 100%);position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center">
-    <div style="position:absolute;top:${-W*0.2}px;right:${-W*0.15}px;width:${W*0.6}px;height:${W*0.6}px;border-radius:999px;background:rgba(255,255,255,.28)"></div>
-    <div style="height:${capH}px;width:100%;padding:${Math.round(H*0.045)}px ${marginX}px 0;text-align:center;position:relative;z-index:2">
-      <div style="font-size:${Math.round(W*0.062)}px;font-weight:800;color:${C.ink};letter-spacing:-1.5px;line-height:1.12">${caption}</div>
-      <div style="font-size:${Math.round(W*0.032)}px;font-weight:600;color:${C.inkDeep};opacity:.85;margin-top:${Math.round(H*0.012)}px;line-height:1.35">${sub}</div>
-    </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;position:relative;z-index:2">
-      <div style="width:${devW}px;height:${devH}px;background:#0e0f0c;border-radius:${screenR+bezel}px;padding:${bezel}px;box-shadow:0 ${Math.round(W*0.03)}px ${Math.round(W*0.06)}px rgba(22,51,0,.30)">
-        <div style="width:100%;height:100%;border-radius:${screenR}px;overflow:hidden;position:relative;background:#fff">
-          <div style="position:absolute;top:0;left:0;width:${logicalW}px;height:${logicalH}px;transform:scale(${k});transform-origin:top left">${screenHTML}</div>
-        </div>
-      </div>
-    </div>
-  </div></body></html>`;
-}
-
-// ── 콘텐츠 정의 ────────────────────────────────────────────────
-// 휴대전화 슬라이드는 실제 캡처(shots.mjs)를 쓰고, 태블릿만 합성 화면(screens.mjs)을 유지한다.
-const TABLET = { logicalW: 1200, logicalH: 1600 };
-
 // ── 실제 캡처 기반 스토어 슬라이드 ─────────────────────────────
 // store/assets/screens 의 실제 앱 캡처를 브랜드 민트 배경 위에 합성한다.
 // 목업 처리(기울임/베젤/블리드)는 슬라이드마다 다르게 섞어 덱이 단조롭지 않게 한다.
@@ -258,11 +225,6 @@ function captureSlideHTML({ W, H, slide }) {
   );
 }
 
-const tabletShots = [
-  { id: "01-calendar", screen: "tabletCalendar", caption: "넓은 화면에서 달력과 상세를 나란히", sub: "가상 그룹 일정과 혼잡 신호를 한눈에" },
-  { id: "02-register", screen: "tabletUnit", caption: "그룹 확인과 휴가 등록을 한 번에", sub: "사용자 입력에 따른 비공식 계획 참고 도구" },
-];
-
 // 아이콘 페이지(풀블리드, 흰 배경 합성)
 function iconHTML(size) {
   return `<!doctype html><html><head>${docHead()}</head><body>
@@ -340,9 +302,15 @@ const run = async () => {
     const html = captureSlideHTML({ W: 1320, H: 2868, slide: s });
     await shoot(page, html, 1320, 2868, path.join(OUT, `appstore/iphone-6.9/${s.id}.png`));
   }
-  // iPad 13" (2064x2752)
-  for (const s of tabletShots) {
-    const html = slideHTML({ W: 2064, H: 2752, caption: s.caption, sub: s.sub, screenHTML: SCREENS[s.screen](), ...TABLET });
+  // iPhone 6.5" (1284x2778) — App Store Connect의 6.5" 슬롯은 6.9" 규격을 받지 않는다.
+  // captureSlideHTML은 모든 치수를 W/H 비율로 계산하므로 해상도만 바꿔 다시 렌더한다.
+  for (const s of SLIDES) {
+    const html = captureSlideHTML({ W: 1284, H: 2778, slide: s });
+    await shoot(page, html, 1284, 2778, path.join(OUT, `appstore/iphone-6.5/${s.id}.png`));
+  }
+  // iPad 13" (2064x2752) — capture-web.mjs가 찍은 실제 웹 데스크탑 뷰 합성
+  for (const s of TABLET_SLIDES) {
+    const html = tabletSlideHTML({ W: 2064, H: 2752, slide: s, head: docHead(), iconUri: ICON_URI });
     await shoot(page, html, 2064, 2752, path.join(OUT, `appstore/ipad-13/${s.id}.png`));
   }
   await page.close();

@@ -42,3 +42,6 @@ yarn-error.log*
 
 # Google Service Key
 leave-504802-81ac1ab95dea.json
+
+# 스토어 캡처용 로컬 시딩이 남기는 세션 토큰 (로컬 D1 전용, 커밋 금지)
+store/generate/.seed-session.json
