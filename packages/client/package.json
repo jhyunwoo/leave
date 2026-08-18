@@ -25,10 +25,10 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
-    "hono": "^4.13.0",
+    "hono": "4.13.2",
     "jsdom": "^27.4.0",
     "react": "19.2.3",
-    "typescript": "5.9.2",
-    "vitest": "^3.2.4"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.7"
   }
 }

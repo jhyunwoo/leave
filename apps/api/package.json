@@ -21,17 +21,17 @@
     "types:check": "wrangler types --include-runtime false --strict-vars false --env-interface WorkerEnv worker-env.d.ts --check"
   },
   "dependencies": {
-    "@hono/zod-openapi": "^1.5.1",
+    "@hono/zod-openapi": "^1.6.0",
     "@leave/shared": "workspace:*",
-    "@scalar/hono-api-reference": "^0.11.12",
+    "@scalar/hono-api-reference": "^0.11.14",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.0",
+    "hono": "4.13.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260804.1",
+    "@cloudflare/workers-types": "^5.20260817.1",
     "drizzle-kit": "^0.31.10",
     "typescript": "5.9.2",
-    "wrangler": "^4.118.0"
+    "wrangler": "^4.123.0"
   }
 }
