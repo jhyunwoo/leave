@@ -70,7 +70,9 @@ test("회원가입 후 한 화면 한 입력 온보딩 8단계", async ({ page }
   // 계급은 입대일 기준 표준 진급표로 미리 골라져 있다. 어떤 계급이 나올지는
   // 실행 시점에 따라 달라지므로, 정확히 하나가 선택돼 있다는 것만 확인한다.
   await expect(step("rank")).toBeVisible();
-  await expect(step("rank").locator('[role="radio"][aria-checked="true"]')).toHaveCount(1);
+  await expect(
+    step("rank").locator('[role="radio"][aria-checked="true"]'),
+  ).toHaveCount(1);
   await expect(step("rank").getByText("자동 계산")).toBeVisible();
   await next.click();
 

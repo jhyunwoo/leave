@@ -32,6 +32,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ListMeta } from "../api/client";
+import { detailText } from "../lib/format";
 
 export function LoadingScreen({ label = "불러오는 중" }: { label?: string }) {
   return (
@@ -339,13 +340,7 @@ export function RecordDetails({ item }: { item: Record<string, unknown> }) {
       {Object.entries(item).map(([key, value]) => (
         <div key={key}>
           <dt>{key}</dt>
-          <dd>
-            {value === null || value === undefined
-              ? "—"
-              : typeof value === "object"
-                ? JSON.stringify(value, null, 2)
-                : String(value)}
-          </dd>
+          <dd>{detailText(value)}</dd>
         </div>
       ))}
     </dl>
@@ -373,9 +368,43 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const [typed, setTyped] = useState("");
-  useEffect(() => setTyped(""), [open]);
+  // 닫힌 동안에는 아예 마운트하지 않는다. 그래야 다시 열 때 입력이 비어 있는
+  // 상태로 시작한다 — effect로 비우면 열자마자 한 번 더 렌더된다.
   if (!open) return null;
+  return (
+    <ConfirmDialogBody
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      confirmationText={confirmationText}
+      destructive={destructive}
+      pending={pending}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+function ConfirmDialogBody({
+  title,
+  description,
+  confirmLabel,
+  confirmationText,
+  destructive,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmationText?: string;
+  destructive: boolean;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [typed, setTyped] = useState("");
   const disabled =
     pending || (confirmationText !== undefined && typed !== confirmationText);
   return (

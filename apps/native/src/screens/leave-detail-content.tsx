@@ -133,8 +133,8 @@ export function LeaveDetailContent(props: {
           <ActivityIndicator color={colors.ink} />
         ) : exceededDates.length === 0 ? (
           <Text style={styles.sectionCaption} selectable>
-            지금은 이 휴가 기간에 초과된 날짜가 없어요. 다른 사람이 계획을 바꾸면
-            알림을 받은 뒤에도 해소될 수 있어요.
+            지금은 이 휴가 기간에 초과된 날짜가 없어요. 다른 사람이 계획을
+            바꾸면 알림을 받은 뒤에도 해소될 수 있어요.
           </Text>
         ) : (
           <>
@@ -197,15 +197,15 @@ export function LeaveDetailContent(props: {
               제한 가능 기간
             </Text>
             <Text selectable style={styles.sectionCaption}>
-              {blackout.reason ?? "관리자가 등록한 기간입니다."} 출타율과 무관하게
-              지휘관이 휴가를 제한할 수 있어요.
+              {blackout.reason ?? "관리자가 등록한 기간입니다."} 출타율과
+              무관하게 지휘관이 휴가를 제한할 수 있어요.
             </Text>
           </ContentPanel>
         ) : null}
         {cycle && (
           <Text style={styles.cycleLine} selectable>
-            정기외박 {cycle.index}주기 {fmtRangeTiny(cycle.start, cycle.end)} 안에
-            속한 날이에요.
+            정기외박 {cycle.index}주기 {fmtRangeTiny(cycle.start, cycle.end)}{" "}
+            안에 속한 날이에요.
           </Text>
         )}
         <OfficialDisclaimer />

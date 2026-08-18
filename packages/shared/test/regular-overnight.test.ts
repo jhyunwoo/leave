@@ -323,7 +323,9 @@ describe("전역일 이후에는 주기를 보여주지 않는다", () => {
 
   it("전역일 다음 날부터는 주기가 없다 — 그 주기의 남은 날도, 이후 주기도", () => {
     // 아직 2주기 안이지만 이미 전역했다.
-    expect(cycleForDisplay(config, addDays(discharge, 1), discharge)).toBe(null);
+    expect(cycleForDisplay(config, addDays(discharge, 1), discharge)).toBe(
+      null,
+    );
     expect(cycleForDisplay(config, "2026-08-02", discharge)).toBe(null);
     // 적립일이 통째로 전역 뒤인 3주기.
     expect(cycleForDisplay(config, "2026-08-03", discharge)).toBe(null);

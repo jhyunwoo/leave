@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import {
   planLeaveMerge,
   type LeaveSegment,
-  type LeaveStatus,
   type MergeCandidate,
 } from "../src/index";
 
@@ -21,7 +20,8 @@ function seg(
   overnightKind?: LeaveSegment["overnightKind"],
 ): LeaveSegment {
   const days =
-    (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) /
+    (Date.parse(`${endDate}T00:00:00Z`) -
+      Date.parse(`${startDate}T00:00:00Z`)) /
       86_400_000 +
     1;
   return { category, overnightKind, startDate, endDate, days };
@@ -36,7 +36,7 @@ function leave(
     id,
     title: "연가 계획",
     reason: null,
-    status: "shared" as LeaveStatus,
+    status: "shared",
     createdAt: `2026-01-01T00:00:0${id.length % 10}.000Z`,
     segments,
     ...extra,
@@ -45,7 +45,10 @@ function leave(
 
 describe("planLeaveMerge — 붙음/겹침/상태", () => {
   it("이웃이 없으면 alone이다", () => {
-    const plan = planLeaveMerge(leave("a", [seg("annual", "2026-02-03", "2026-02-05")]), []);
+    const plan = planLeaveMerge(
+      leave("a", [seg("annual", "2026-02-03", "2026-02-05")]),
+      [],
+    );
     expect(plan.kind).toBe("alone");
   });
 
@@ -79,7 +82,9 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
     const touching = leave("a", [seg("annual", "2026-02-01", "2026-02-02")]);
     const overlapping = leave("c", [seg("annual", "2026-02-04", "2026-02-06")]);
     const incoming = leave("b", [seg("annual", "2026-02-03", "2026-02-05")]);
-    expect(planLeaveMerge(incoming, [touching, overlapping]).kind).toBe("conflict");
+    expect(planLeaveMerge(incoming, [touching, overlapping]).kind).toBe(
+      "conflict",
+    );
   });
 
   it("상태가 다르면 붙어 있어도 손대지 않는다", () => {
@@ -108,7 +113,13 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
     expect(plan.hostId).toBe("a");
     expect(plan.absorbedIds.sort()).toEqual(["b", "c"]);
     expect(plan.segments).toEqual([
-      { category: "annual", overnightKind: undefined, startDate: "2026-02-01", endDate: "2026-02-12", days: 12 },
+      {
+        category: "annual",
+        overnightKind: undefined,
+        startDate: "2026-02-01",
+        endDate: "2026-02-12",
+        days: 12,
+      },
     ]);
   });
 
@@ -128,13 +139,27 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
 describe("planLeaveMerge — 구간과 일수 보존", () => {
   it("재원이 다르면 구간을 따로 남기고 일수를 유지한다", () => {
     const before = leave("a", [seg("annual", "2026-02-03", "2026-02-05")]);
-    const incoming = leave("b", [seg("overnight", "2026-02-06", "2026-02-09", "regular")]);
+    const incoming = leave("b", [
+      seg("overnight", "2026-02-06", "2026-02-09", "regular"),
+    ]);
     const plan = planLeaveMerge(incoming, [before]);
     expect(plan.kind).toBe("merged");
     if (plan.kind !== "merged") return;
     expect(plan.segments).toEqual([
-      { category: "annual", overnightKind: undefined, startDate: "2026-02-03", endDate: "2026-02-05", days: 3 },
-      { category: "overnight", overnightKind: "regular", startDate: "2026-02-06", endDate: "2026-02-09", days: 4 },
+      {
+        category: "annual",
+        overnightKind: undefined,
+        startDate: "2026-02-03",
+        endDate: "2026-02-05",
+        days: 3,
+      },
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-02-06",
+        endDate: "2026-02-09",
+        days: 4,
+      },
     ]);
   });
 
@@ -149,8 +174,12 @@ describe("planLeaveMerge — 구간과 일수 보존", () => {
   });
 
   it("외박은 종류가 다르면 따로 남는다", () => {
-    const before = leave("a", [seg("overnight", "2026-02-03", "2026-02-04", "regular")]);
-    const incoming = leave("b", [seg("overnight", "2026-02-05", "2026-02-06", "other")]);
+    const before = leave("a", [
+      seg("overnight", "2026-02-03", "2026-02-04", "regular"),
+    ]);
+    const incoming = leave("b", [
+      seg("overnight", "2026-02-05", "2026-02-06", "other"),
+    ]);
     const plan = planLeaveMerge(incoming, [before]);
     expect(plan.kind).toBe("merged");
     if (plan.kind !== "merged") return;
@@ -197,9 +226,13 @@ describe("planLeaveMerge — 제목·사유·살아남는 행", () => {
   });
 
   it("전부 자동 제목이면 합친 첫 구간으로 다시 짓는다", () => {
-    const before = leave("a", [seg("overnight", "2026-02-03", "2026-02-05", "regular")], {
-      title: "정기외박 계획",
-    });
+    const before = leave(
+      "a",
+      [seg("overnight", "2026-02-03", "2026-02-05", "regular")],
+      {
+        title: "정기외박 계획",
+      },
+    );
     const incoming = leave("b", [seg("annual", "2026-02-06", "2026-02-09")], {
       title: "연가 계획",
     });
@@ -220,7 +253,9 @@ describe("planLeaveMerge — 제목·사유·살아남는 행", () => {
     expect(plan.reason).toBe("본가 방문\n가족 행사");
 
     const same = planLeaveMerge(
-      leave("b", [seg("annual", "2026-02-06", "2026-02-09")], { reason: "본가 방문" }),
+      leave("b", [seg("annual", "2026-02-06", "2026-02-09")], {
+        reason: "본가 방문",
+      }),
       [before],
     );
     if (same.kind !== "merged") throw new Error("merged가 아니다");

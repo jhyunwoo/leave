@@ -22,7 +22,10 @@ import {
   passwordChangedMiddleware,
 } from "./auth";
 import { adminAccountRoutes } from "./routes/admins";
-import { leaveContentRoutes } from "./routes/leaves-content";
+import { contentReportRoutes } from "./routes/content-reports";
+import { adminLeaveRoutes } from "./routes/leaves";
+import { adminNotificationRoutes } from "./routes/notifications";
+import { unitInviteRoutes } from "./routes/unit-invites";
 import { overviewLogRoutes } from "./routes/overview-logs";
 import { userUnitRoutes } from "./routes/users-units";
 import type { AdminAppEnv } from "./types";
@@ -55,7 +58,10 @@ const operations = new Hono<AdminAppEnv>();
 operations.use("*", passwordChangedMiddleware);
 operations.route("/", overviewLogRoutes);
 operations.route("/", userUnitRoutes);
-operations.route("/", leaveContentRoutes);
+operations.route("/", adminLeaveRoutes);
+operations.route("/", unitInviteRoutes);
+operations.route("/", contentReportRoutes);
+operations.route("/", adminNotificationRoutes);
 operations.route("/", adminAccountRoutes);
 protectedApi.route("/", operations);
 

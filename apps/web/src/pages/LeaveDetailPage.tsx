@@ -346,7 +346,7 @@ export function LeaveDetailPage(props: { me: Me }) {
           onSaved={(result) => {
             // 앞 휴가에 흡수되면 이 화면이 가리키던 휴가가 사라진다. 합쳐진 쪽으로 옮긴다.
             if (result.leave.id !== leaveId) {
-              navigate(`/leaves/${result.leave.id}`, { replace: true });
+              void navigate(`/leaves/${result.leave.id}`, { replace: true });
             }
           }}
         />

@@ -1,7 +1,21 @@
-/// <reference types="@cloudflare/workers-types" />
+// Workers 런타임 타입(D1Database·KVNamespace)은 apps/api/tsconfig.json의
+// `types: ["@cloudflare/workers-types"]`로 들어온다. 여기에 삼중 슬래시 참조를
+// 두면 이 파일을 타입으로 가져가는 쪽(@leave/client → 웹·네이티브)까지 Workers
+// 전역이 딸려 들어가 브라우저/Node 전역과 충돌한다.
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { UserRow } from "../db/schema";
 
+/**
+ * 워커가 받는 바인딩.
+ *
+ * wrangler.jsonc가 실제로 주는 것과 어긋나지 않는지는 생성된 타입과 대조해
+ * 컴파일 타임에 확인한다 — apps/api/bindings-drift.d.ts 참고.
+ * (여기서 생성 타입을 직접 확장하지 않는 이유: 이 파일의 타입은 @leave/client가
+ * AppType으로 가져간다. 전역 선언에 의존하면 클라이언트 쪽 타입 검사가 깨진다.)
+ *
+ * 뒤의 세 값은 wrangler.jsonc의 vars에 없다 — 배포본에는 설정하지 않고
+ * 로컬/테스트에서 `--var`로만 넣는 스위치라 선택 값이다.
+ */
 export type AppBindings = {
   DB: D1Database;
   // 성능 최적화용 캐시(부대 달력·검색 결과 등). 로컬 dev는 자동으로 로컬 KV를 사용.

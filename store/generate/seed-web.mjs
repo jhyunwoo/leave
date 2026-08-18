@@ -57,13 +57,23 @@ async function api(pathname, { method = "GET", token, body } = {}) {
     json = { raw: text };
   }
   if (!res.ok) {
-    throw new Error(`${method} ${pathname} → ${res.status} ${text.slice(0, 400)}`);
+    throw new Error(
+      `${method} ${pathname} → ${res.status} ${text.slice(0, 400)}`,
+    );
   }
   return json;
 }
 
 /** 가입 → 온보딩 3단계 → 완료. 반환: 세션 토큰. */
-async function createUser({ email, name, branch, rank, enlistedAt, dischargeAt, overnight }) {
+async function createUser({
+  email,
+  name,
+  branch,
+  rank,
+  enlistedAt,
+  dischargeAt,
+  overnight,
+}) {
   const signup = await api("/auth/signup", {
     method: "POST",
     body: { email, password: PASSWORD, dataConsent: true },
@@ -86,14 +96,62 @@ async function createUser({ email, name, branch, rank, enlistedAt, dischargeAt, 
 // ── 가상 인물 ──────────────────────────────────────────────────
 // 이름은 실명이 아니라 별칭체다. 웹 온보딩도 "별칭"을 받는다(schemas.ts).
 const MEMBERS = [
-  { name: "푸른고래", branch: "air_force", rank: "corporal", enlistedAt: "2025-11-03", dischargeAt: "2027-06-02" },
-  { name: "새벽하늘", branch: "army", rank: "sergeant", enlistedAt: "2025-06-16", dischargeAt: "2026-12-15" },
-  { name: "밤바다", branch: "navy", rank: "corporal", enlistedAt: "2025-09-01", dischargeAt: "2027-05-31" },
-  { name: "구름따라", branch: "army", rank: "private_first", enlistedAt: "2026-02-09", dischargeAt: "2027-08-08" },
-  { name: "노을진", branch: "air_force", rank: "sergeant", enlistedAt: "2025-04-07", dischargeAt: "2026-11-06" },
-  { name: "산들바람", branch: "army", rank: "corporal", enlistedAt: "2025-12-15", dischargeAt: "2027-06-14" },
-  { name: "돌담길", branch: "navy", rank: "private_first", enlistedAt: "2026-01-19", dischargeAt: "2027-09-18" },
-  { name: "고요한밤", branch: "army", rank: "corporal", enlistedAt: "2025-10-13", dischargeAt: "2027-04-12" },
+  {
+    name: "푸른고래",
+    branch: "air_force",
+    rank: "corporal",
+    enlistedAt: "2025-11-03",
+    dischargeAt: "2027-06-02",
+  },
+  {
+    name: "새벽하늘",
+    branch: "army",
+    rank: "sergeant",
+    enlistedAt: "2025-06-16",
+    dischargeAt: "2026-12-15",
+  },
+  {
+    name: "밤바다",
+    branch: "navy",
+    rank: "corporal",
+    enlistedAt: "2025-09-01",
+    dischargeAt: "2027-05-31",
+  },
+  {
+    name: "구름따라",
+    branch: "army",
+    rank: "private_first",
+    enlistedAt: "2026-02-09",
+    dischargeAt: "2027-08-08",
+  },
+  {
+    name: "노을진",
+    branch: "air_force",
+    rank: "sergeant",
+    enlistedAt: "2025-04-07",
+    dischargeAt: "2026-11-06",
+  },
+  {
+    name: "산들바람",
+    branch: "army",
+    rank: "corporal",
+    enlistedAt: "2025-12-15",
+    dischargeAt: "2027-06-14",
+  },
+  {
+    name: "돌담길",
+    branch: "navy",
+    rank: "private_first",
+    enlistedAt: "2026-01-19",
+    dischargeAt: "2027-09-18",
+  },
+  {
+    name: "고요한밤",
+    branch: "army",
+    rank: "corporal",
+    enlistedAt: "2025-10-13",
+    dischargeAt: "2027-04-12",
+  },
 ];
 
 // 하루 최대 출타 4명 기준으로, 며칠은 여유롭고 22일은 넘치고(초과) 27일은 꽉 차도록
@@ -106,7 +164,9 @@ const MEMBERS = [
 const overnight = (startDate, endDate) => [
   { category: "overnight", overnightKind: "regular", startDate, endDate },
 ];
-const annual = (startDate, endDate) => [{ category: "annual", startDate, endDate }];
+const annual = (startDate, endDate) => [
+  { category: "annual", startDate, endDate },
+];
 
 const LEAVES = [
   { who: 0, title: "정기외박", segments: overnight(day(14), day(16)) },
@@ -129,12 +189,45 @@ const LEAVES = [
 
 // 주 계정의 적립분 — 재원별 잔여와 만기 자동 차감을 보여주는 데이터.
 const GRANTS = [
-  { balanceKey: "annual", days: 12, grantedOn: "2026-01-02", expiresOn: "2026-12-31", note: "2026년 연가" },
-  { balanceKey: "award", days: 6, grantedOn: "2026-03-11", expiresOn: "2026-09-30", note: "체력 검정 우수" },
-  { balanceKey: "award", days: 4, grantedOn: "2026-06-22", expiresOn: "2027-06-21", note: "분기 표창" },
-  { balanceKey: "consolation", days: 4, grantedOn: "2026-05-08", expiresOn: "2026-11-07" },
-  { balanceKey: "petition", days: 3, grantedOn: "2026-07-01", expiresOn: "2027-06-30" },
-  { balanceKey: "compensation", days: 2, grantedOn: "2026-04-19", expiresOn: "2026-10-18" },
+  {
+    balanceKey: "annual",
+    days: 12,
+    grantedOn: "2026-01-02",
+    expiresOn: "2026-12-31",
+    note: "2026년 연가",
+  },
+  {
+    balanceKey: "award",
+    days: 6,
+    grantedOn: "2026-03-11",
+    expiresOn: "2026-09-30",
+    note: "체력 검정 우수",
+  },
+  {
+    balanceKey: "award",
+    days: 4,
+    grantedOn: "2026-06-22",
+    expiresOn: "2027-06-21",
+    note: "분기 표창",
+  },
+  {
+    balanceKey: "consolation",
+    days: 4,
+    grantedOn: "2026-05-08",
+    expiresOn: "2026-11-07",
+  },
+  {
+    balanceKey: "petition",
+    days: 3,
+    grantedOn: "2026-07-01",
+    expiresOn: "2027-06-30",
+  },
+  {
+    balanceKey: "compensation",
+    days: 2,
+    grantedOn: "2026-04-19",
+    expiresOn: "2026-10-18",
+  },
 ];
 
 async function run() {
@@ -150,7 +243,12 @@ async function run() {
       // 정기외박 적립분이라, 켜두지 않으면 아래 LEAVES의 외박 등록이
       // "쓸 수 있는 적립분이 없어요"로 막힌다. 시작일은 기준월보다 넉넉히 앞에 둔다.
       overnight: HAS_OVERNIGHT.has(m.branch)
-        ? { enabled: true, startDate: OVERNIGHT_START, intervalDays: 21, daysPerGrant: 4 }
+        ? {
+            enabled: true,
+            startDate: OVERNIGHT_START,
+            intervalDays: 21,
+            daysPerGrant: 4,
+          }
         : { enabled: false },
     });
     tokens.push(token);
@@ -174,7 +272,11 @@ async function run() {
   console.log(`  · 그룹 생성 ${created.unit.name} (${unitId})`);
 
   for (let i = 1; i < tokens.length; i += 1) {
-    await api("/units/join", { method: "POST", token: tokens[i], body: { code } });
+    await api("/units/join", {
+      method: "POST",
+      token: tokens[i],
+      body: { code },
+    });
   }
   console.log(`  · ${tokens.length - 1}명 가입 완료`);
 
@@ -194,7 +296,9 @@ async function run() {
 
   const session = { token: tokens[0], unitId, month: BASE_MONTH, api: API };
   fs.writeFileSync(OUT_FILE, JSON.stringify(session, null, 2) + "\n");
-  console.log(`\n완료. 세션을 ${path.relative(process.cwd(), OUT_FILE)} 에 저장했습니다.`);
+  console.log(
+    `\n완료. 세션을 ${path.relative(process.cwd(), OUT_FILE)} 에 저장했습니다.`,
+  );
 }
 
 run().catch((e) => {

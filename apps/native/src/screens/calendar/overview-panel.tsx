@@ -62,8 +62,7 @@ export function CalendarOverviewPanel(props: {
     .filter((day) => day.date >= today)
     .map((day) => ({ day, signal: availabilitySignal(day.count, day.allowed) }))
     .filter(
-      (entry) =>
-        entry.signal.key === "exceeded" || entry.signal.key === "near",
+      (entry) => entry.signal.key === "exceeded" || entry.signal.key === "near",
     )
     .slice(0, CROWDED_LIMIT);
 

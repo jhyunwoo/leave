@@ -30,7 +30,6 @@ import {
   standardDischargeDate,
   todayInSeoul,
   type Branch,
-  type ISODate,
   type OnboardingStepId,
   type Rank,
 } from "@leave/shared";
@@ -190,7 +189,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
   /** 날짜를 이미 받았다면 계급 기본값을 표준 진급표로 맞춰둔다. */
   const enterRankStep = () => {
     if (!rankTouched && isValidISODate(enlistedAt))
-      setRank(scheduledRank(enlistedAt as ISODate, today));
+      setRank(scheduledRank(enlistedAt, today));
     advance();
   };
 
@@ -260,9 +259,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
                 setBranch(next);
                 // 전역일은 군종에 딸린 값이라 함께 다시 계산한다.
                 if (isValidISODate(enlistedAt))
-                  setDischargeAt(
-                    standardDischargeDate(enlistedAt as ISODate, next),
-                  );
+                  setDischargeAt(standardDischargeDate(enlistedAt, next));
               }}
               onNext={advance}
             />

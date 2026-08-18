@@ -33,7 +33,7 @@ export function DoneStep(props: {
 }) {
   const daysLeft =
     props.enlistedAt && props.dischargeAt
-      ? Math.max(diffDays(props.today, props.dischargeAt as ISODate), 0)
+      ? Math.max(diffDays(props.today, props.dischargeAt), 0)
       : null;
 
   const rows: [string, string][] = [

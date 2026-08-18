@@ -19,7 +19,6 @@ import {
   isValidISODate,
   regularOvernightGuidance,
   type Branch,
-  type ISODate,
 } from "@leave/shared";
 import { Field } from "../../components/Field";
 import { StepError, StepNext, StepShell, StepSkip } from "./StepShell";
@@ -100,8 +99,7 @@ export function OvernightStep(props: {
 
       {isValidISODate(props.value) && intervalOk && (
         <p className="ob-note is-live">
-          첫 사용 가능 주기는{" "}
-          <strong>{addDays(props.value as ISODate, interval)}</strong>
+          첫 사용 가능 주기는 <strong>{addDays(props.value, interval)}</strong>
           부터예요.
         </p>
       )}

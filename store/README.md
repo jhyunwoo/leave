@@ -4,15 +4,15 @@
 
 ## 원본과 공개 URL
 
-| 자료 | 저장소 원본 | 공개 URL |
-|---|---|---|
-| 개인정보 처리방침 | `legal/privacy-policy.ko.md`, `legal/privacy-policy.html` | `https://leave.moveto.kr/privacy` |
-| 이용약관 | `legal/terms-of-service.ko.md`, `legal/terms-of-service.html` | `https://leave.moveto.kr/terms` |
-| 지원·문의 | `legal/support.html` | `https://leave.moveto.kr/support` |
-| 계정 삭제 안내 | `legal/delete-account.html` | `https://leave.moveto.kr/delete-account` |
-| Apple 메타데이터 | `metadata/appstore.ko.md`, `metadata/appstore.en.md` | App Store Connect |
-| Google 메타데이터 | `metadata/googleplay.ko.md`, `metadata/googleplay.en.md` | Play Console |
-| 개인정보 라벨 답변 | `metadata/data-safety-and-ratings.md` | 두 스토어 콘솔 |
+| 자료               | 저장소 원본                                                   | 공개 URL                                 |
+| ------------------ | ------------------------------------------------------------- | ---------------------------------------- |
+| 개인정보 처리방침  | `legal/privacy-policy.ko.md`, `legal/privacy-policy.html`     | `https://leave.moveto.kr/privacy`        |
+| 이용약관           | `legal/terms-of-service.ko.md`, `legal/terms-of-service.html` | `https://leave.moveto.kr/terms`          |
+| 지원·문의          | `legal/support.html`                                          | `https://leave.moveto.kr/support`        |
+| 계정 삭제 안내     | `legal/delete-account.html`                                   | `https://leave.moveto.kr/delete-account` |
+| Apple 메타데이터   | `metadata/appstore.ko.md`, `metadata/appstore.en.md`          | App Store Connect                        |
+| Google 메타데이터  | `metadata/googleplay.ko.md`, `metadata/googleplay.en.md`      | Play Console                             |
+| 개인정보 라벨 답변 | `metadata/data-safety-and-ratings.md`                         | 두 스토어 콘솔                           |
 
 공개 HTML은 `apps/web/public/`에도 같은 내용으로 복사됩니다. 문서를 수정하면 두 위치의 의미와 시행일이 일치하는지 확인하세요.
 
@@ -45,12 +45,12 @@ iPad 슬라이드는 **웹 앱의 데스크탑 뷰 실캡처**를 브라우저 �
 
 App Store Connect는 슬롯마다 받는 크기가 다릅니다. **6.9" 규격을 6.5" 슬롯에 올리면 거절**되므로 슬롯을 확인하고 올립니다.
 
-| 디렉터리 | 크기 | 올리는 곳 |
-|---|---|---|
-| `images/appstore/iphone-6.5/` | 1284×2778 | App Store Connect · iPhone 6.5" 디스플레이 |
-| `images/appstore/iphone-6.9/` | 1320×2868 | App Store Connect · iPhone 6.9" 디스플레이 |
-| `images/appstore/ipad-13/` | 2064×2752 | App Store Connect · iPad 12.9"/13" 디스플레이 |
-| `images/googleplay/phone/` | 1080×2160 | Play Console · 휴대전화 |
+| 디렉터리                      | 크기      | 올리는 곳                                     |
+| ----------------------------- | --------- | --------------------------------------------- |
+| `images/appstore/iphone-6.5/` | 1284×2778 | App Store Connect · iPhone 6.5" 디스플레이    |
+| `images/appstore/iphone-6.9/` | 1320×2868 | App Store Connect · iPhone 6.9" 디스플레이    |
+| `images/appstore/ipad-13/`    | 2064×2752 | App Store Connect · iPad 12.9"/13" 디스플레이 |
+| `images/googleplay/phone/`    | 1080×2160 | Play Console · 휴대전화                       |
 
 두 스토어 모두 알파 채널을 허용하지 않습니다. `render.mjs`가 알파를 제거해 colorType 2(RGB)로 저장하므로, 다른 도구로 다시 저장하지 마세요.
 
@@ -101,12 +101,12 @@ node render.mjs
 
 `shots.mjs`의 `redact`(흰 박스)와 `cropTop`/`cropBottom`(잘라내기)이 아래를 처리합니다. 캡처를 새로 교체하면 좌표를 다시 맞춰야 합니다.
 
-| 화면 | 처리 | 대상 |
-|---|---|---|
-| `04-notify` | redact 2개 | 알림 본문의 실제 부대명 |
-| `05-profile` | redact 1개 | 프로필의 실제 이메일 주소 |
-| `05-profile` | cropBottom 1795 | 탭바 뒤로 비치는 실제 부대명 잔상 |
-| `01-calendar` | cropBottom 1795 | 탭바 뒤로 비치는 스크롤 잔상 |
+| 화면          | 처리            | 대상                              |
+| ------------- | --------------- | --------------------------------- |
+| `04-notify`   | redact 2개      | 알림 본문의 실제 부대명           |
+| `05-profile`  | redact 1개      | 프로필의 실제 이메일 주소         |
+| `05-profile`  | cropBottom 1795 | 탭바 뒤로 비치는 실제 부대명 잔상 |
+| `01-calendar` | cropBottom 1795 | 탭바 뒤로 비치는 스크롤 잔상      |
 
 가림 좌표는 빨간 박스로 렌더해 눈으로 검증할 수 있습니다.
 

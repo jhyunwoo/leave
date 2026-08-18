@@ -52,7 +52,8 @@ function buildAttendeePreview(
         continue;
       }
       entry.total += 1;
-      if (entry.initials.length < PREVIEW_ATTENDEES) entry.initials.push(initial);
+      if (entry.initials.length < PREVIEW_ATTENDEES)
+        entry.initials.push(initial);
     }
   }
   return byDate;
@@ -151,7 +152,8 @@ export function MonthCalendar(props: {
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
-            const pastDischarge = dischargeAt != null && cell.date > dischargeAt;
+            const pastDischarge =
+              dischargeAt != null && cell.date > dischargeAt;
             const inCycle =
               cell.inMonth &&
               !pastDischarge &&
@@ -162,7 +164,9 @@ export function MonthCalendar(props: {
             // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
             const cycle =
               cell.inMonth && !pastDischarge
-                ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
+                ? cycles?.find(
+                    (c) => c.start <= cell.date && cell.date <= c.end,
+                  )
                 : undefined;
             const preview =
               cell.inMonth && showAttendees
@@ -286,7 +290,9 @@ export function MonthCalendar(props: {
                       <View style={styles.attendeeRow}>
                         {preview.initials.map((initial, index) => (
                           <View key={index} style={styles.attendeeDot}>
-                            <Text style={styles.attendeeDotText}>{initial}</Text>
+                            <Text style={styles.attendeeDotText}>
+                              {initial}
+                            </Text>
                           </View>
                         ))}
                         {preview.total > preview.initials.length && (
@@ -487,7 +493,12 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "700",
     color: colors.body,
   },
-  attendeeMore: { fontSize: 9, lineHeight: 11, fontWeight: "700", color: colors.mute },
+  attendeeMore: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "700",
+    color: colors.mute,
+  },
   cycleBar: {
     alignSelf: "stretch",
     // 칸 사이 간격(2)만큼 밖으로 빼 같은 주기의 날들이 끊기지 않게 잇는다.

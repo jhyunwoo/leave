@@ -15,7 +15,10 @@
     "test": "node scripts/run-tests.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply leave-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply leave-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply leave-db --remote",
+    "lint": "eslint . --max-warnings 0",
+    "types": "wrangler types --include-runtime false --strict-vars false --env-interface WorkerEnv worker-env.d.ts",
+    "types:check": "wrangler types --include-runtime false --strict-vars false --env-interface WorkerEnv worker-env.d.ts --check"
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.5.1",

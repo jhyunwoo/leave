@@ -61,15 +61,15 @@ Leave 1.0
 This is an unofficial reference tool. Actual leave remains subject to commander approval and unit rules.
 ```
 
-| Field | Value |
-|---|---|
-| Primary Category | Productivity |
-| Secondary Category | Utilities |
-| Support URL | `https://leave.moveto.kr/support` |
-| Marketing URL | Leave blank |
+| Field              | Value                             |
+| ------------------ | --------------------------------- |
+| Primary Category   | Productivity                      |
+| Secondary Category | Utilities                         |
+| Support URL        | `https://leave.moveto.kr/support` |
+| Marketing URL      | Leave blank                       |
 | Privacy Policy URL | `https://leave.moveto.kr/privacy` |
-| Tracking | No |
-| Sign-in required | Yes |
+| Tracking           | No                                |
+| Sign-in required   | Yes                               |
 
 Answer “Yes” for user-generated content because group members share schedule titles and notes. Do not submit until in-app reporting and blocking requirements are satisfied.
 

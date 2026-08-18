@@ -7,7 +7,11 @@
  * 존재하지도 않는 그룹의 정원을 먼저 정하게 돼 오히려 헷갈린다.
  */
 
-import { unitCreateSchema, unitJoinSchema } from "@leave/shared";
+import {
+  fmtDateTimeFull,
+  unitCreateSchema,
+  unitJoinSchema,
+} from "@leave/shared";
 import {
   useCreateUnit,
   useJoinUnit,
@@ -49,7 +53,9 @@ export function GroupStep(props: {
       await join.mutateAsync(parsed.data);
       props.onDone(true);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "참여하지 못했습니다");
+      setError(
+        caught instanceof Error ? caught.message : "참여하지 못했습니다",
+      );
     }
   };
 
@@ -98,8 +104,8 @@ export function GroupStep(props: {
           </Text>
         </ContentPanel>
         <Text style={styles.fineprint}>
-          {new Date(invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
-          {invite.maxUses}회 · 서버에는 해시값만 저장됩니다.
+          {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회 ·
+          서버에는 해시값만 저장됩니다.
         </Text>
         <StepNext label="안전하게 공유" onPress={share} />
         <StepSkip

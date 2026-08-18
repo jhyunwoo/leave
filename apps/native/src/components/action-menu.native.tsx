@@ -6,7 +6,7 @@
  * 파괴적 동작은 시스템이 붉게 표시하도록 destructive 플래그를 넘긴다.
  */
 
-import MenuView, { type MenuAction } from "@expo/ui/community/menu";
+import { MenuView, type MenuAction } from "@expo/ui/community/menu";
 import { Pressable, Text } from "react-native";
 import { makeStyles, radius } from "@/theme";
 

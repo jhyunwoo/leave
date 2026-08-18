@@ -48,6 +48,12 @@ const UNPAGED_RESOURCES: readonly EntityResource[] = [
   "admin-sessions",
 ];
 
+/**
+ * 생성·수정 응답. 두 경로가 같은 모양을 돌려주므로 한 타입으로 받는다.
+ * `temporaryPassword`는 관리자 계정 생성 응답에만 실려 온다.
+ */
+type SaveResponse = { item: Entity; temporaryPassword?: string };
+
 /** 상세 서랍에서 누를 수 있는 행 단위 작업. */
 type RowAction = "revoke" | "reset-password" | "reviewing" | "resolved";
 
@@ -116,22 +122,34 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
   const [status, setStatus] = useState("");
 
   const [selected, setSelected] = useState<Entity | null>(null);
-  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
+  // 다른 화면에서 `?create=1`로 넘어오면 생성 서랍을 연 채로 시작한다.
+  // 렌더 후 effect로 열면 목록이 한 번 그려졌다가 서랍이 덧붙는 깜빡임이 생긴다.
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(() =>
+    searchParams.get("create") === "1" && config.createLabel ? "create" : null,
+  );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [formError, setFormError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
 
   // 조건이 바뀌면 보고 있던 페이지 번호는 의미가 없다.
-  useEffect(() => setPage(1), [deferredQuery, platform, status]);
+  // effect 대신 렌더 중에 되돌린다 — effect로 하면 낡은 페이지 번호로 한 번
+  // 요청한 뒤 1페이지로 다시 요청하는 왕복이 생긴다.
+  // https://react.dev/learn/you-might-not-need-an-effect
+  const filterKey = JSON.stringify([deferredQuery, platform, status]);
+  const [pagedFilterKey, setPagedFilterKey] = useState(filterKey);
+  if (filterKey !== pagedFilterKey) {
+    setPagedFilterKey(filterKey);
+    setPage(1);
+  }
 
-  // 다른 화면에서 `?create=1`로 넘어오면 생성 서랍을 바로 연다.
+  // 서랍을 연 뒤에는 `create=1`을 URL에서 지운다. 남겨 두면 새로고침이나
+  // 뒤로가기에서 서랍이 계속 다시 열린다.
   useEffect(() => {
-    if (searchParams.get("create") !== "1" || !config.createLabel) return;
-    setEditorMode("create");
+    if (searchParams.get("create") !== "1") return;
     const next = new URLSearchParams(searchParams);
     next.delete("create");
     setSearchParams(next, { replace: true });
-  }, [config.createLabel, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
@@ -177,13 +195,10 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
   const save = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
       if (editorMode === "create") {
-        return api.post<{ item: Entity; temporaryPassword?: string }>(
-          `/${resource}`,
-          body,
-        );
+        return await api.post<SaveResponse>(`/${resource}`, body);
       }
       if (!selected) throw new Error("선택된 레코드가 없습니다");
-      return api.patch<{ item: Entity }>(`/${resource}/${selected.id}`, body);
+      return await api.patch<SaveResponse>(`/${resource}/${selected.id}`, body);
     },
     onSuccess: (result) => {
       const created = editorMode === "create";
@@ -191,8 +206,8 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
       setEditorMode(null);
       setSelected(result.item);
       // 관리자 계정을 새로 만들면 임시 비밀번호가 이 응답에만 실려 온다.
-      if ("temporaryPassword" in result && result.temporaryPassword) {
-        setTemporaryPassword(String(result.temporaryPassword));
+      if (result.temporaryPassword) {
+        setTemporaryPassword(result.temporaryPassword);
       }
       invalidate();
       toast.success(

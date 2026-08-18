@@ -17,10 +17,9 @@
 
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
 /** @leave/client를 한 번들 안에 함께 넣는 워크스페이스들. */
 const consumers = ["apps/native", "apps/web"];

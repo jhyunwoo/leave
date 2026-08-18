@@ -65,7 +65,7 @@ export function onboardingStepIndex(
  */
 export function onboardingResumeStep(status: {
   profile: { branch: Branch } | null;
-  regularOvernight: unknown | null;
+  regularOvernight: object | null;
   unitId: string | null;
 }): OnboardingStepId {
   if (!status.profile) return "welcome";
@@ -335,7 +335,9 @@ export function heroGeometry(input: {
     (input.enlistedAt as ISODate) < (input.dischargeAt as ISODate);
 
   const preview = previewDates(input.branch, input.today);
-  const enlistedAt = hasDates ? (input.enlistedAt as ISODate) : preview.enlistedAt;
+  const enlistedAt = hasDates
+    ? (input.enlistedAt as ISODate)
+    : preview.enlistedAt;
   const dischargeAt = hasDates
     ? (input.dischargeAt as ISODate)
     : preview.dischargeAt;
@@ -351,7 +353,13 @@ export function heroGeometry(input: {
     const ratio = clamp01(diffDays(enlistedAt, date) / totalDays);
     // 전역 뒤에 오는 진급(복무기간이 짧게 잡힌 경우)은 트랙 밖이라 그리지 않는다.
     if (date > dischargeAt) continue;
-    markers.push({ rank, label: RANK_LABELS[rank], date, ratio, x: trackX(ratio) });
+    markers.push({
+      rank,
+      label: RANK_LABELS[rank],
+      date,
+      ratio,
+      x: trackX(ratio),
+    });
   }
 
   const cyclePoints: HeroCyclePoint[] = [];

@@ -10,6 +10,7 @@
  */
 
 import {
+  fmtDateTimeFull,
   blackoutCreateSchema,
   fmtRangeTiny,
   todayInSeoul,
@@ -53,7 +54,7 @@ async function shareInvite(invite: IssuedUnitInvite) {
     message: [
       "리브 앱에서 아래 초대코드를 입력하세요.",
       invite.code,
-      `만료: ${new Date(invite.expiresAt).toLocaleString("ko-KR")}`,
+      `만료: ${fmtDateTimeFull(invite.expiresAt)}`,
       "실제 부대명·부대번호·주소·병력 현황은 입력하지 마세요.",
     ].join("\n\n"),
   });
@@ -90,9 +91,7 @@ export function UnitManageScreen() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{
         width: "100%",
-        maxWidth: isExpanded
-          ? layout.workspaceContent
-          : layout.readableContent,
+        maxWidth: isExpanded ? layout.workspaceContent : layout.readableContent,
         alignSelf: "center",
         padding: spacing.lg,
         paddingBottom: insets.bottom + spacing.xxxl,
@@ -148,8 +147,7 @@ function ParticipationSection({ unit }: { unit: Unit }) {
       </Text>
       {unit.lastTotalUpdatedAt ? (
         <Text style={styles.meta}>
-          기준 인원 마지막 갱신:{" "}
-          {new Date(unit.lastTotalUpdatedAt).toLocaleString("ko-KR")}
+          기준 인원 마지막 갱신: {fmtDateTimeFull(unit.lastTotalUpdatedAt)}
         </Text>
       ) : null}
     </ContentPanel>
@@ -269,8 +267,7 @@ function InviteSection({ unit }: { unit: Unit }) {
             {invite.code}
           </Text>
           <Text style={styles.meta}>
-            {new Date(invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
-            {invite.maxUses}회
+            {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회
           </Text>
           <Button
             title="안전하게 공유"

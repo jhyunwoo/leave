@@ -6,7 +6,15 @@ import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
-import { SLIDES, SHOTS, SRC, TINTS, B, framedDevice, bareDevice } from "./shots.mjs";
+import {
+  SLIDES,
+  SHOTS,
+  SRC,
+  TINTS,
+  B,
+  framedDevice,
+  bareDevice,
+} from "./shots.mjs";
 import { TABLET_SLIDES, tabletSlideHTML } from "./ipad.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,7 +22,9 @@ const ROOT = path.resolve(__dirname, "../..");
 const require = createRequire(path.join(ROOT, "apps/web/package.json"));
 const fontRequire = createRequire(path.join(ROOT, "apps/admin/package.json"));
 const { chromium } = require("@playwright/test");
-const FONT_CSS_PATH = fontRequire.resolve("@fontsource-variable/noto-sans-kr/index.css");
+const FONT_CSS_PATH = fontRequire.resolve(
+  "@fontsource-variable/noto-sans-kr/index.css",
+);
 const FONT_DIR = path.join(path.dirname(FONT_CSS_PATH), "files");
 const FONT_CSS = fs
   .readFileSync(FONT_CSS_PATH, "utf8")
@@ -37,61 +47,120 @@ function crc32(buf) {
   return ~c >>> 0;
 }
 function chunk(type, data) {
-  const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
   const t = Buffer.from(type, "latin1");
-  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data])), 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([t, data])), 0);
   return Buffer.concat([len, t, data, crc]);
 }
 function decodePNG(buf) {
-  let p = 8; let w, h, bitDepth, colorType, idat = [];
+  let p = 8;
+  let w,
+    h,
+    bitDepth,
+    colorType,
+    idat = [];
   while (p < buf.length) {
-    const len = buf.readUInt32BE(p); const type = buf.toString("latin1", p + 4, p + 8);
+    const len = buf.readUInt32BE(p);
+    const type = buf.toString("latin1", p + 4, p + 8);
     const data = buf.subarray(p + 8, p + 8 + len);
-    if (type === "IHDR") { w = data.readUInt32BE(0); h = data.readUInt32BE(4); bitDepth = data[8]; colorType = data[9]; }
-    else if (type === "IDAT") idat.push(data);
+    if (type === "IHDR") {
+      w = data.readUInt32BE(0);
+      h = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === "IDAT") idat.push(data);
     else if (type === "IEND") break;
     p += 12 + len;
   }
   if (bitDepth !== 8) throw new Error("bitDepth " + bitDepth + " unsupported");
-  const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 0 ? 1 : 4;
+  const channels =
+    colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 0 ? 1 : 4;
   const raw = zlib.inflateSync(Buffer.concat(idat));
-  const bpp = channels; const stride = w * bpp;
+  const bpp = channels;
+  const stride = w * bpp;
   const out = Buffer.alloc(h * stride);
   let prev = Buffer.alloc(stride);
   let rp = 0;
-  const paeth = (a, b, c) => { const pp = a + b - c, pa = Math.abs(pp - a), pb = Math.abs(pp - b), pc = Math.abs(pp - c); return pa <= pb && pa <= pc ? a : pb <= pc ? b : c; };
+  const paeth = (a, b, c) => {
+    const pp = a + b - c,
+      pa = Math.abs(pp - a),
+      pb = Math.abs(pp - b),
+      pc = Math.abs(pp - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
   for (let y = 0; y < h; y++) {
-    const f = raw[rp++]; const line = raw.subarray(rp, rp + stride); rp += stride;
+    const f = raw[rp++];
+    const line = raw.subarray(rp, rp + stride);
+    rp += stride;
     const cur = Buffer.alloc(stride);
     for (let i = 0; i < stride; i++) {
-      const a = i >= bpp ? cur[i - bpp] : 0; const b = prev[i]; const c = i >= bpp ? prev[i - bpp] : 0;
+      const a = i >= bpp ? cur[i - bpp] : 0;
+      const b = prev[i];
+      const c = i >= bpp ? prev[i - bpp] : 0;
       let v = line[i];
-      if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1; else if (f === 4) v += paeth(a, b, c);
+      if (f === 1) v += a;
+      else if (f === 2) v += b;
+      else if (f === 3) v += (a + b) >> 1;
+      else if (f === 4) v += paeth(a, b, c);
       cur[i] = v & 0xff;
     }
-    cur.copy(out, y * stride); prev = cur;
+    cur.copy(out, y * stride);
+    prev = cur;
   }
   return { w, h, channels, data: out };
 }
 function toRGBflatWhite({ w, h, channels, data }) {
   const rgb = Buffer.alloc(w * h * 3);
   for (let i = 0, o = 0; i < w * h; i++) {
-    let r, g, b, a = 255;
-    if (channels === 4) { r = data[i*4]; g = data[i*4+1]; b = data[i*4+2]; a = data[i*4+3]; }
-    else if (channels === 3) { r = data[i*3]; g = data[i*3+1]; b = data[i*3+2]; }
-    else { r = g = b = data[i]; }
-    if (a !== 255) { const t = a / 255; r = Math.round(r*t + 255*(1-t)); g = Math.round(g*t + 255*(1-t)); b = Math.round(b*t + 255*(1-t)); }
-    rgb[o++] = r; rgb[o++] = g; rgb[o++] = b;
+    let r,
+      g,
+      b,
+      a = 255;
+    if (channels === 4) {
+      r = data[i * 4];
+      g = data[i * 4 + 1];
+      b = data[i * 4 + 2];
+      a = data[i * 4 + 3];
+    } else if (channels === 3) {
+      r = data[i * 3];
+      g = data[i * 3 + 1];
+      b = data[i * 3 + 2];
+    } else {
+      r = g = b = data[i];
+    }
+    if (a !== 255) {
+      const t = a / 255;
+      r = Math.round(r * t + 255 * (1 - t));
+      g = Math.round(g * t + 255 * (1 - t));
+      b = Math.round(b * t + 255 * (1 - t));
+    }
+    rgb[o++] = r;
+    rgb[o++] = g;
+    rgb[o++] = b;
   }
   return rgb;
 }
 function encodeRGB(w, h, rgb) {
-  const stride = w * 3; const raw = Buffer.alloc(h * (stride + 1));
-  for (let y = 0; y < h; y++) { raw[y*(stride+1)] = 0; rgb.copy(raw, y*(stride+1)+1, y*stride, y*stride+stride); }
+  const stride = w * 3;
+  const raw = Buffer.alloc(h * (stride + 1));
+  for (let y = 0; y < h; y++) {
+    raw[y * (stride + 1)] = 0;
+    rgb.copy(raw, y * (stride + 1) + 1, y * stride, y * stride + stride);
+  }
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
-  const sig = Buffer.from([137,80,78,71,13,10,26,10]);
-  return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  return Buffer.concat([
+    sig,
+    chunk("IHDR", ihdr),
+    chunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 function savePngNoAlpha(file, pngBuffer) {
   const dec = decodePNG(pngBuffer);
@@ -144,7 +213,11 @@ function captureSlideHTML({ W, H, slide }) {
     const bg = "linear-gradient(158deg,#0e0f0c 0%,#163300 55%,#2f6b12 100%)";
     const cards = slide.features
       .map(
-        ([n, t, d]) => `<div style="background:rgba(255,255,255,.07);border:1px solid rgba(159,232,112,.22);border-radius:${Math.round(W * 0.028)}px;padding:${Math.round(W * 0.032)}px">
+        ([
+          n,
+          t,
+          d,
+        ]) => `<div style="background:rgba(255,255,255,.07);border:1px solid rgba(159,232,112,.22);border-radius:${Math.round(W * 0.028)}px;padding:${Math.round(W * 0.032)}px">
           <div style="font-size:${Math.round(W * 0.021)}px;font-weight:900;letter-spacing:.14em;color:${B.primary}">${n}</div>
           <div style="font-size:${Math.round(W * 0.034)}px;font-weight:850;color:#fff;margin-top:${Math.round(H * 0.005)}px">${t}</div>
           <div style="font-size:${Math.round(W * 0.023)}px;font-weight:600;color:#c9dcbb;margin-top:${Math.round(H * 0.004)}px;line-height:1.35">${d}</div>
@@ -209,7 +282,10 @@ function captureSlideHTML({ W, H, slide }) {
 
   const chips = (slide.chips || [])
     .map((text, i) => {
-      const side = i % 2 === 0 ? `left:${Math.round(W * 0.045)}px` : `right:${Math.round(W * 0.045)}px`;
+      const side =
+        i % 2 === 0
+          ? `left:${Math.round(W * 0.045)}px`
+          : `right:${Math.round(W * 0.045)}px`;
       const top = Math.round(H * (i === 0 ? 0.52 : 0.66));
       const rot = i % 2 === 0 ? -4 : 4;
       return `<div style="position:absolute;${side};top:${top}px;z-index:4;background:#fff;border-radius:999px;padding:${Math.round(H * 0.011)}px ${Math.round(W * 0.035)}px;font-size:${Math.round(W * 0.028)}px;font-weight:850;color:${B.inkDeep};box-shadow:0 ${Math.round(W * 0.018)}px ${Math.round(W * 0.04)}px rgba(22,51,0,.22);transform:rotate(${rot}deg);white-space:nowrap">${text}</div>`;
@@ -256,9 +332,12 @@ async function shoot(page, html, W, H, file, { noAlpha = true } = {}) {
   await page.setViewportSize({ width: W, height: H });
   await page.setContent(html, { waitUntil: "networkidle" });
   await page.evaluate(() => document.fonts.ready);
-  const buf = await page.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
+  const buf = await page.screenshot({
+    clip: { x: 0, y: 0, width: W, height: H },
+  });
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  if (noAlpha) savePngNoAlpha(file, buf); else fs.writeFileSync(file, buf);
+  if (noAlpha) savePngNoAlpha(file, buf);
+  else fs.writeFileSync(file, buf);
   console.log("✓", path.relative(OUT, file), `${W}x${H}`);
 }
 
@@ -287,10 +366,28 @@ const run = async () => {
   });
 
   // 아이콘
-  await shoot(page, iconHTML(1024), 1024, 1024, path.join(OUT, "appstore/icon/icon-1024.png"));
-  await shoot(page, iconHTML(512), 512, 512, path.join(OUT, "googleplay/icon/icon-512.png"));
+  await shoot(
+    page,
+    iconHTML(1024),
+    1024,
+    1024,
+    path.join(OUT, "appstore/icon/icon-1024.png"),
+  );
+  await shoot(
+    page,
+    iconHTML(512),
+    512,
+    512,
+    path.join(OUT, "googleplay/icon/icon-512.png"),
+  );
   // 피처 그래픽
-  await shoot(page, featureHTML(1024, 500), 1024, 500, path.join(OUT, "googleplay/feature-graphic/feature-1024x500.png"));
+  await shoot(
+    page,
+    featureHTML(1024, 500),
+    1024,
+    500,
+    path.join(OUT, "googleplay/feature-graphic/feature-1024x500.png"),
+  );
   if (brandOnly) {
     await browser.close();
     console.log("\n완료: 스토어 아이콘과 피처 그래픽을 갱신했습니다.");
@@ -300,18 +397,42 @@ const run = async () => {
   // iPhone 6.9" (1320x2868) — 실제 기기 캡처 합성
   for (const s of SLIDES) {
     const html = captureSlideHTML({ W: 1320, H: 2868, slide: s });
-    await shoot(page, html, 1320, 2868, path.join(OUT, `appstore/iphone-6.9/${s.id}.png`));
+    await shoot(
+      page,
+      html,
+      1320,
+      2868,
+      path.join(OUT, `appstore/iphone-6.9/${s.id}.png`),
+    );
   }
   // iPhone 6.5" (1284x2778) — App Store Connect의 6.5" 슬롯은 6.9" 규격을 받지 않는다.
   // captureSlideHTML은 모든 치수를 W/H 비율로 계산하므로 해상도만 바꿔 다시 렌더한다.
   for (const s of SLIDES) {
     const html = captureSlideHTML({ W: 1284, H: 2778, slide: s });
-    await shoot(page, html, 1284, 2778, path.join(OUT, `appstore/iphone-6.5/${s.id}.png`));
+    await shoot(
+      page,
+      html,
+      1284,
+      2778,
+      path.join(OUT, `appstore/iphone-6.5/${s.id}.png`),
+    );
   }
   // iPad 13" (2064x2752) — capture-web.mjs가 찍은 실제 웹 데스크탑 뷰 합성
   for (const s of TABLET_SLIDES) {
-    const html = tabletSlideHTML({ W: 2064, H: 2752, slide: s, head: docHead(), iconUri: ICON_URI });
-    await shoot(page, html, 2064, 2752, path.join(OUT, `appstore/ipad-13/${s.id}.png`));
+    const html = tabletSlideHTML({
+      W: 2064,
+      H: 2752,
+      slide: s,
+      head: docHead(),
+      iconUri: ICON_URI,
+    });
+    await shoot(
+      page,
+      html,
+      2064,
+      2752,
+      path.join(OUT, `appstore/ipad-13/${s.id}.png`),
+    );
   }
   await page.close();
   await browser.close();
@@ -347,4 +468,7 @@ const run = async () => {
   await androidBrowser.close();
   console.log("\n완료: 모든 이미지가", OUT, "에 생성되었습니다.");
 };
-run().catch((e) => { console.error(e); process.exit(1); });
+run().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -1,62 +1,58 @@
 /**
- * 관리자 생성·편집 폼 — 리소스마다 다른 입력 필드를 한 컴포넌트에서 그린다.
+ * 관리자 생성·편집 폼 — 리소스를 골라 그에 맞는 입력을 그린다.
  *
  * 사용처: EntityPage의 상세 서랍(생성/편집 모드).
  *
- * 휴가 폼은 앱과 같은 구간 편집 규칙(@leave/shared의 draft 함수들)을 쓴다.
- * 관리자가 만든 데이터도 앱에서 그대로 계산돼야 하기 때문이다.
+ * 여기 남긴 것은 리소스마다 다르지 않은 부분뿐이다.
+ *  - 어떤 폼을 그릴지 고르는 분기
+ *  - 제출 시 FormData를 서버 본문으로 바꾸는 호출
+ *  - 오류 표시와 취소·저장 버튼
+ *
+ * 리소스별 입력은 ./record-form/*Fields.tsx, 서버로 보낼 본문은
+ * ./record-form/payloads.ts에 있다. 분기를 표(맵)로 감추지 않고 switch로 두는 이유는
+ * 새 리소스를 붙일 때 "무엇을 더 만들어야 하는지"가 컴파일 오류로 드러나게 하려는 것이다.
  */
 
 import {
-  addDays,
-  BALANCE_KEYS,
-  BALANCE_LABELS,
-  draftsToSegments,
   fitDrafts,
-  removeDraft,
   resolveDrafts,
   segmentsToDrafts,
-  setDraftEnd,
-  splitLastDraft,
-  type BalanceKey,
   type LeaveSegment,
   type SegmentDraft,
 } from "@leave/shared";
 import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import type { InitialRecord } from "./record-form/fields";
+import { AdminFields } from "./record-form/AdminFields";
+import { LeaveFields } from "./record-form/LeaveFields";
+import { NotificationFields } from "./record-form/NotificationFields";
+import {
+  adminPayload,
+  leavePayload,
+  notificationPayload,
+  unitPayload,
+  userPayload,
+  type FormMode,
+  type RecordPayload,
+} from "./record-form/payloads";
+import { UnitFields } from "./record-form/UnitFields";
+import { UserFields } from "./record-form/UserFields";
+import { initialString } from "./record-form/fields";
 
 export type EditableResource =
   "users" | "units" | "leaves" | "notifications" | "admins";
 
 type Props = {
   resource: EditableResource;
-  mode: "create" | "edit";
-  initial?: Record<string, unknown>;
+  mode: FormMode;
+  initial?: InitialRecord;
   pending: boolean;
   error?: string;
   onCancel: () => void;
-  onSubmit: (body: Record<string, unknown>) => void;
+  onSubmit: (body: RecordPayload) => void;
 };
 
-const stringValue = (
-  initial: Record<string, unknown> | undefined,
-  key: string,
-): string => {
-  const value = initial?.[key];
-  return value === null || value === undefined ? "" : String(value);
-};
-
-function value(form: FormData, key: string): string {
-  return String(form.get(key) ?? "").trim();
-}
-
-function nullable(form: FormData, key: string): string | null {
-  return value(form, key) || null;
-}
-
-function initialSegments(
-  initial: Record<string, unknown> | undefined,
-): LeaveSegment[] {
+function initialSegments(initial: InitialRecord | undefined): LeaveSegment[] {
   return Array.isArray(initial?.segments)
     ? (initial.segments as LeaveSegment[])
     : [];
@@ -71,14 +67,17 @@ export function RecordForm({
   onCancel,
   onSubmit,
 }: Props) {
-  const [sendChecked, setSendChecked] = useState(false);
+  // 휴가·알림에서 "함께 발송할지"를 묻는 체크박스. 폼 데이터가 아니라 동작 선택이라
+  // FormData가 아닌 상태로 다룬다.
+  const [alsoSend, setAlsoSend] = useState(false);
 
-  // 휴가는 "구간" 단위로 저장하므로 이 부분만 제어 컴포넌트로 다룬다.
+  // 휴가는 "구간"의 나열로 저장하므로 이 부분만 제어 컴포넌트다. 자세한 배경은
+  // record-form/LeaveFields.tsx.
   const [leaveStart, setLeaveStart] = useState(() =>
-    stringValue(initial, "startDate"),
+    initialString(initial, "startDate"),
   );
   const [leaveEnd, setLeaveEnd] = useState(() =>
-    stringValue(initial, "endDate"),
+    initialString(initial, "endDate"),
   );
   const [drafts, setDrafts] = useState<SegmentDraft[]>(() => {
     const segments = initialSegments(initial);
@@ -86,17 +85,17 @@ export function RecordForm({
       ? segmentsToDrafts(segments)
       : fitDrafts(
           [],
-          stringValue(initial, "startDate"),
-          stringValue(initial, "endDate"),
+          initialString(initial, "startDate"),
+          initialString(initial, "endDate"),
         );
   });
+
   const leaveRangeValid = Boolean(
     leaveStart && leaveEnd && leaveStart <= leaveEnd,
   );
   const resolvedDrafts = leaveRangeValid
     ? resolveDrafts(leaveStart, drafts)
     : [];
-  const leaveDuration = resolvedDrafts.reduce((sum, d) => sum + d.days, 0);
 
   /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
   const applyLeaveRange = (nextStart: string, nextEnd: string) => {
@@ -110,62 +109,19 @@ export function RecordForm({
     const form = new FormData(event.currentTarget);
     switch (resource) {
       case "users":
-        onSubmit({
-          email: value(form, "email"),
-          ...(value(form, "password")
-            ? { password: value(form, "password") }
-            : {}),
-          name: value(form, "name"),
-          branch: value(form, "branch"),
-          enlistedAt: value(form, "enlistedAt"),
-          dischargeAt: value(form, "dischargeAt"),
-          signupRank: value(form, "signupRank"),
-          unitId: nullable(form, "unitId"),
-          ...(mode === "create"
-            ? { dataConsent: form.get("dataConsent") === "on" }
-            : { consented: form.get("consented") === "on" }),
-        });
+        onSubmit(userPayload(form, mode));
         break;
       case "units":
-        onSubmit({
-          name: value(form, "name"),
-          description: nullable(form, "description"),
-          maxLeaveCount: Number(value(form, "maxLeaveCount")),
-          ...(mode === "create" ? { creatorId: value(form, "creatorId") } : {}),
-          adminId: value(form, "adminId"),
-        });
+        onSubmit(unitPayload(form, mode));
         break;
       case "leaves":
-        onSubmit({
-          userId: value(form, "userId"),
-          title: value(form, "title"),
-          reason: nullable(form, "reason"),
-          segments: draftsToSegments(leaveStart, drafts),
-          sendNotifications: sendChecked,
-        });
+        onSubmit(leavePayload(form, leaveStart, drafts, alsoSend));
         break;
       case "notifications":
-        onSubmit({
-          ...(mode === "create" ? { userId: value(form, "userId") } : {}),
-          title: value(form, "title"),
-          body: value(form, "body"),
-          leaveId: nullable(form, "leaveId"),
-          dates: value(form, "dates")
-            .split(",")
-            .map((date) => date.trim())
-            .filter(Boolean),
-          ...(mode === "create"
-            ? { sendPush: sendChecked }
-            : { read: form.get("read") === "on" }),
-        });
+        onSubmit(notificationPayload(form, mode, alsoSend));
         break;
       case "admins":
-        onSubmit({
-          email: value(form, "email"),
-          name: value(form, "name"),
-          role: value(form, "role"),
-          ...(mode === "edit" ? { active: form.get("active") === "on" } : {}),
-        });
+        onSubmit(adminPayload(form, mode));
         break;
     }
   };
@@ -173,356 +129,33 @@ export function RecordForm({
   return (
     <form className="record-form" onSubmit={submit}>
       {resource === "users" ? (
-        <>
-          <div className="form-grid">
-            <Field
-              label="이메일"
-              name="email"
-              type="email"
-              required
-              initial={initial}
-            />
-            <Field
-              label={mode === "create" ? "임시 비밀번호" : "새 비밀번호 (선택)"}
-              name="password"
-              type="password"
-              minLength={12}
-              required={mode === "create"}
-              initial={undefined}
-            />
-            <Field label="이름" name="name" required initial={initial} />
-            <SelectField
-              label="군 종류"
-              name="branch"
-              initial={initial}
-              options={[
-                ["army", "육군"],
-                ["navy", "해군"],
-                ["air_force", "공군"],
-              ]}
-            />
-            <Field
-              label="입대일"
-              name="enlistedAt"
-              type="date"
-              required
-              initial={initial}
-            />
-            <Field
-              label="전역 예정일"
-              name="dischargeAt"
-              type="date"
-              required
-              initial={initial}
-            />
-            <SelectField
-              label="가입 계급"
-              name="signupRank"
-              initial={initial}
-              options={[
-                ["private", "이병"],
-                ["private_first", "일병"],
-                ["corporal", "상병"],
-                ["sergeant", "병장"],
-              ]}
-            />
-            <Field label="부대 ID (선택)" name="unitId" initial={initial} />
-          </div>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              name={mode === "create" ? "dataConsent" : "consented"}
-              defaultChecked={
-                mode === "create" ? false : Boolean(initial?.consentedAt)
-              }
-            />
-            <span>
-              {mode === "create"
-                ? "사용자의 개인정보 수집 동의를 확인했습니다"
-                : "개인정보 수집 동의 상태"}
-            </span>
-          </label>
-        </>
+        <UserFields mode={mode} initial={initial} />
       ) : null}
-
       {resource === "units" ? (
-        <div className="form-grid">
-          <Field label="부대 이름" name="name" required initial={initial} />
-          <Field label="설명" name="description" initial={initial} />
-          <Field
-            label="하루 최대 출타 인원"
-            name="maxLeaveCount"
-            type="number"
-            min={0}
-            required
-            initial={initial}
-          />
-          {mode === "create" ? (
-            <Field
-              label="생성자 사용자 ID"
-              name="creatorId"
-              required
-              initial={initial}
-            />
-          ) : null}
-          <Field
-            label="부대 관리자 사용자 ID"
-            name="adminId"
-            required
-            initial={initial}
-          />
-        </div>
+        <UnitFields mode={mode} initial={initial} />
       ) : null}
-
       {resource === "leaves" ? (
-        <>
-          <div className="form-grid">
-            <Field label="사용자 ID" name="userId" required initial={initial} />
-            <Field label="휴가 제목" name="title" required initial={initial} />
-            <label className="field">
-              <span>시작일</span>
-              <input
-                type="date"
-                value={leaveStart}
-                required
-                onChange={(event) => {
-                  const next = event.target.value;
-                  applyLeaveRange(
-                    next,
-                    !leaveEnd || leaveEnd < next ? next : leaveEnd,
-                  );
-                }}
-              />
-            </label>
-            <label className="field">
-              <span>종료일</span>
-              <input
-                type="date"
-                value={leaveEnd}
-                min={leaveStart || undefined}
-                required
-                onChange={(event) =>
-                  applyLeaveRange(leaveStart, event.target.value)
-                }
-              />
-            </label>
-            <label className="field form-span">
-              <span>사유</span>
-              <textarea
-                name="reason"
-                rows={4}
-                defaultValue={stringValue(initial, "reason")}
-              />
-            </label>
-          </div>
-
-          <div className="field">
-            <span>휴가 구간 — 언제부터 언제까지가 어떤 휴가인지</span>
-            {leaveRangeValid ? (
-              <>
-                {resolvedDrafts.map((draft, index) => {
-                  const isLast = index === resolvedDrafts.length - 1;
-                  // 뒤에 남은 구간 수만큼 최소 하루씩 남겨둬야 한다.
-                  const maxEnd = addDays(
-                    leaveEnd,
-                    -(resolvedDrafts.length - 1 - index),
-                  );
-                  return (
-                    <div key={index} className="form-grid">
-                      <label className="field">
-                        <span>재원</span>
-                        <select
-                          value={draft.key}
-                          onChange={(event) =>
-                            setDrafts((current) =>
-                              current.map((item, i) =>
-                                i === index
-                                  ? {
-                                      ...item,
-                                      key: event.target.value as BalanceKey,
-                                    }
-                                  : item,
-                              ),
-                            )
-                          }
-                        >
-                          {BALANCE_KEYS.map((key) => (
-                            <option key={key} value={key}>
-                              {BALANCE_LABELS[key]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>
-                          {draft.startDate} 부터 ({draft.days}일)
-                        </span>
-                        <input
-                          type="date"
-                          value={draft.endDate}
-                          min={draft.startDate}
-                          max={maxEnd}
-                          disabled={isLast}
-                          onChange={(event) =>
-                            setDrafts((current) =>
-                              setDraftEnd(
-                                current,
-                                index,
-                                event.target.value,
-                                leaveStart,
-                                leaveEnd,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        disabled={resolvedDrafts.length <= 1}
-                        onClick={() =>
-                          setDrafts((current) =>
-                            removeDraft(current, index, leaveStart, leaveEnd),
-                          )
-                        }
-                      >
-                        구간 삭제
-                      </button>
-                    </div>
-                  );
-                })}
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  disabled={leaveDuration <= resolvedDrafts.length}
-                  onClick={() =>
-                    setDrafts((current) => {
-                      const next = splitLastDraft(
-                        current,
-                        leaveStart,
-                        leaveEnd,
-                        "regular_overnight",
-                      );
-                      return next ?? current;
-                    })
-                  }
-                >
-                  구간 추가
-                </button>
-              </>
-            ) : (
-              <span>시작일과 종료일을 먼저 골라주세요.</span>
-            )}
-          </div>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={sendChecked}
-              onChange={(event) => setSendChecked(event.target.checked)}
-            />
-            <span>변경 후 최대 출타 인원 초과 알림을 발송합니다</span>
-          </label>
-        </>
+        <LeaveFields
+          initial={initial}
+          leaveStart={leaveStart}
+          leaveEnd={leaveEnd}
+          onRangeChange={applyLeaveRange}
+          resolvedDrafts={resolvedDrafts}
+          onDraftsChange={setDrafts}
+          sendNotifications={alsoSend}
+          onSendNotificationsChange={setAlsoSend}
+        />
       ) : null}
-
       {resource === "notifications" ? (
-        <>
-          <div className="form-grid">
-            {mode === "create" ? (
-              <Field
-                label="대상 사용자 ID"
-                name="userId"
-                required
-                initial={initial}
-              />
-            ) : null}
-            <Field label="제목" name="title" required initial={initial} />
-            <label className="field form-span">
-              <span>내용</span>
-              <textarea
-                name="body"
-                rows={5}
-                required
-                defaultValue={stringValue(initial, "body")}
-              />
-            </label>
-            <Field
-              label="연관 휴가 ID (선택)"
-              name="leaveId"
-              initial={initial}
-            />
-            <Field
-              label="관련 날짜 (쉼표로 구분)"
-              name="dates"
-              defaultValue={
-                Array.isArray(initial?.dates)
-                  ? initial.dates.join(", ")
-                  : stringValue(initial, "dates")
-              }
-            />
-          </div>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              name={mode === "create" ? "sendPush" : "read"}
-              checked={mode === "create" ? sendChecked : undefined}
-              defaultChecked={
-                mode === "edit" ? Boolean(initial?.read) : undefined
-              }
-              onChange={
-                mode === "create"
-                  ? (event) => setSendChecked(event.target.checked)
-                  : undefined
-              }
-            />
-            <span>
-              {mode === "create" ? "Expo 푸시도 함께 발송합니다" : "읽음 상태"}
-            </span>
-          </label>
-        </>
+        <NotificationFields
+          mode={mode}
+          initial={initial}
+          sendPush={alsoSend}
+          onSendPushChange={setAlsoSend}
+        />
       ) : null}
-
       {resource === "admins" ? (
-        <>
-          <div className="form-grid">
-            {mode === "create" ? (
-              <Field
-                label="이메일"
-                name="email"
-                type="email"
-                required
-                initial={initial}
-              />
-            ) : (
-              <div className="field">
-                <span>이메일</span>
-                <div className="read-only-field">
-                  {stringValue(initial, "email")}
-                </div>
-              </div>
-            )}
-            <Field label="이름" name="name" required initial={initial} />
-            <SelectField
-              label="역할"
-              name="role"
-              initial={initial}
-              options={[
-                ["admin", "관리자"],
-                ["owner", "Owner"],
-              ]}
-            />
-          </div>
-          {mode === "edit" ? (
-            <label className="check-field">
-              <input
-                type="checkbox"
-                name="active"
-                defaultChecked={Boolean(initial?.active)}
-              />
-              <span>활성 관리자 계정</span>
-            </label>
-          ) : null}
-        </>
+        <AdminFields mode={mode} initial={initial} />
       ) : null}
 
       {error ? (
@@ -541,60 +174,5 @@ export function RecordForm({
         </button>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  name,
-  initial,
-  defaultValue,
-  ...inputProps
-}: {
-  label: string;
-  name: string;
-  initial?: Record<string, unknown>;
-  defaultValue?: string;
-} & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "name" | "defaultValue"
->) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input
-        name={name}
-        defaultValue={defaultValue ?? stringValue(initial, name)}
-        {...inputProps}
-      />
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  initial,
-  options,
-}: {
-  label: string;
-  name: string;
-  initial?: Record<string, unknown>;
-  options: Array<[string, string]>;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <select
-        name={name}
-        defaultValue={stringValue(initial, name) || options[0]?.[0]}
-      >
-        {options.map(([optionValue, optionLabel]) => (
-          <option key={optionValue} value={optionValue}>
-            {optionLabel}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

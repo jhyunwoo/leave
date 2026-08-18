@@ -39,6 +39,7 @@ import {
   type RegularOvernightConfigRow,
 } from "../db/schema";
 import type { Db } from "./db";
+import { LeaveRuleError } from "./errors";
 import {
   cycleDischargeDate,
   listGrants,
@@ -259,7 +260,7 @@ export async function updateLeaveBalanceTotals(
   const plans = editable.map(([key, total]) => {
     const plan = planTotalChange(allocations[key], total);
     if (!plan.ok) {
-      throw new Error(
+      throw new LeaveRuleError(
         `${BALANCE_LABELS[key]}는 이미 ${plan.minimumTotal}일을 사용해 총량을 그보다 작게 설정할 수 없습니다`,
       );
     }
@@ -312,7 +313,9 @@ export async function saveRegularOvernightConfig(
   input: RegularOvernightConfigInput,
 ) {
   if (user.branch === "army" && input.enabled) {
-    throw new Error("정기외박 자동 적립은 해군과 공군에서 설정할 수 있습니다");
+    throw new LeaveRuleError(
+      "정기외박 자동 적립은 해군과 공군에서 설정할 수 있습니다",
+    );
   }
   const now = new Date().toISOString();
   const values: typeof regularOvernightConfigs.$inferInsert = input.enabled
@@ -366,7 +369,7 @@ async function assertRegularOvernightAvailable(
     requested,
     dischargeAt: cycleDischargeDate(user),
   });
-  if (block) throw new Error(regularOvernightBlockMessage(block));
+  if (block) throw new LeaveRuleError(regularOvernightBlockMessage(block));
 }
 
 /**
@@ -418,7 +421,7 @@ export async function assertSegmentsAvailable(
         (segment) => segment.startDate <= date && date <= segment.endDate,
       ),
     );
-    throw new Error(
+    throw new LeaveRuleError(
       blocked
         ? `${BALANCE_LABELS[key]} — ${fmtDateShort(blocked)}에 쓸 수 있는 적립분이 없어요 (만료됐거나 잔여가 부족합니다)`
         : `${BALANCE_LABELS[key]} 잔여 ${before[key].remainingDays}일보다 많이 사용할 수 없습니다`,

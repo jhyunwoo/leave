@@ -65,8 +65,14 @@ test("이미 지운 알림을 다시 지우면 404", async () => {
   const { token, list } = await userWithNotification();
   const id = list.data.notifications[0].id;
 
-  assert.equal((await req("DELETE", `/notifications/${id}`, { token })).status, 200);
-  assert.equal((await req("DELETE", `/notifications/${id}`, { token })).status, 404);
+  assert.equal(
+    (await req("DELETE", `/notifications/${id}`, { token })).status,
+    200,
+  );
+  assert.equal(
+    (await req("DELETE", `/notifications/${id}`, { token })).status,
+    404,
+  );
 });
 
 test("남의 알림은 지울 수 없고, 존재 여부도 알려주지 않는다", async () => {

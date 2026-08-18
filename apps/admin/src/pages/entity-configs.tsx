@@ -224,7 +224,8 @@ export const entityConfigs: Record<EntityResource, ResourceConfig> = {
       {
         key: "uses",
         label: "사용",
-        render: (item) => `${item.usedCount ?? 0} / ${item.maxUses ?? 0}`,
+        render: (item) =>
+          `${text(item.usedCount ?? 0)} / ${text(item.maxUses ?? 0)}`,
       },
       col.time("expires", "만료", "expiresAt"),
       {
@@ -314,7 +315,7 @@ export const entityConfigs: Record<EntityResource, ResourceConfig> = {
           <span
             className={Number(item.durationMs) >= 500 ? "text-negative" : ""}
           >
-            {item.durationMs == null ? "—" : `${item.durationMs}ms`}
+            {item.durationMs == null ? "—" : `${text(item.durationMs)}ms`}
           </span>
         ),
       },

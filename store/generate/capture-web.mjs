@@ -25,7 +25,9 @@ const OUT = path.resolve(__dirname, "..", "assets", "web");
 const SESSION_FILE = path.join(__dirname, ".seed-session.json");
 
 if (!fs.existsSync(SESSION_FILE)) {
-  console.error(`세션 파일이 없습니다: ${SESSION_FILE}\n먼저 'node seed-web.mjs'를 실행하세요.`);
+  console.error(
+    `세션 파일이 없습니다: ${SESSION_FILE}\n먼저 'node seed-web.mjs'를 실행하세요.`,
+  );
   process.exit(1);
 }
 const session = JSON.parse(fs.readFileSync(SESSION_FILE, "utf8"));
@@ -33,9 +35,11 @@ const session = JSON.parse(fs.readFileSync(SESSION_FILE, "utf8"));
 const BUSY_DAY = 22;
 
 function findChromium() {
-  return [process.env.CHROMIUM_PATH, "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(
-    (candidate) => candidate && fs.existsSync(candidate),
-  );
+  return [
+    process.env.CHROMIUM_PATH,
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].find((candidate) => candidate && fs.existsSync(candidate));
 }
 
 async function save(page, name) {
@@ -92,15 +96,21 @@ async function scrollToMonth(page, label) {
   const align = () =>
     page.evaluate((text) => {
       const scroller = document.querySelector(".cal-scroll");
-      const target = [...document.querySelectorAll("section.cal-month-block")].find((s) =>
+      const target = [
+        ...document.querySelectorAll("section.cal-month-block"),
+      ].find((s) =>
         s.querySelector("h3.cal-month-label")?.textContent?.includes(text),
       );
       if (!target) return false;
       if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) {
         scroller.scrollTop +=
-          target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+          target.getBoundingClientRect().top -
+          scroller.getBoundingClientRect().top;
       } else {
-        window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top, behavior: "auto" });
+        window.scrollTo({
+          top: window.scrollY + target.getBoundingClientRect().top,
+          behavior: "auto",
+        });
       }
       return true;
     }, label);
@@ -190,7 +200,10 @@ async function run() {
 
   // ── 4. 랜딩 (비로그인) ───────────────────────────────────────
   {
-    const { context, page } = await openContext(browser, { width: 1440, height: 1000 });
+    const { context, page } = await openContext(browser, {
+      width: 1440,
+      height: 1000,
+    });
     await page.goto(`${WEB}/`);
     await settle(page);
     // 랜딩 히어로는 진입 애니메이션이 있다. fill-mode가 남긴 transform이

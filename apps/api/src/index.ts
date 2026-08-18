@@ -25,6 +25,13 @@ import { notificationRoutes } from "./routes/notifications";
 import { pushRoutes } from "./routes/push";
 import { unitRoutes } from "./routes/units";
 
+/**
+ * Hono의 `app.use("*", ...)` 콜백이 받는 Context는 경로 제네릭이 `"*"`로 굳어
+ * 있어, `createMiddleware<AppEnv>()`가 기대하는 `Context<AppEnv, string, {}>`와
+ * 서로 대입되지 않는다(입력 제네릭이 any로 남는다). 감싸는 미들웨어 안에서
+ * 다른 미들웨어를 직접 부를 때마다 나오는 프레임워크 타이핑 한계이며,
+ * 런타임 계약은 동일하다 — 아래 세 곳에서만 규칙을 끈다.
+ */
 const app = createApp();
 
 // 가장 바깥에서 모든 요청을 접속 기록에 남긴다 (동의 기반, next() 이후 사용자 식별 포함).
@@ -41,6 +48,7 @@ app.use("*", async (c, next) => {
       "X-Client-Version",
     ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Hono 미들웨어 합성 타이핑 한계 (위 주석)
   })(c, next);
 });
 
@@ -56,6 +64,7 @@ app.use("*", async (c, next) => {
   ) {
     return next();
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Hono 미들웨어 합성 타이핑 한계 (위 주석)
   return minVersionMiddleware(c, next);
 });
 
@@ -72,6 +81,9 @@ app.openAPIRegistry.registerComponent("securitySchemes", "Bearer", {
   description: "로그인/회원가입 응답의 token 값",
 });
 
+// 체인의 반환값은 런타임에서 쓰이지 않는다. 존재 이유는 타입 하나 — 이 타입이
+// 그대로 AppType이 되어 웹/앱의 hc<AppType>()에 들어간다.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const routes = app
   .get("/", (c) => c.json({ name: "Leave API", status: "ok" }))
   // 앱이 차단당했을 때 무엇을 해야 하는지 알려면 인증 없이 읽을 수 있어야 한다.

@@ -45,7 +45,9 @@ export function checkRegularOvernight(input: {
 }): RegularOvernightBlock | null;
 
 /** 세 화면이 같은 문구를 쓰도록 메시지도 여기서 만든다. */
-export function regularOvernightBlockMessage(block: RegularOvernightBlock): string;
+export function regularOvernightBlockMessage(
+  block: RegularOvernightBlock,
+): string;
 
 /**
  * [from, to]가 걸친 주기 기준 잔여(여러 주기면 가장 빡빡한 쪽). 재원 칩 숫자용.

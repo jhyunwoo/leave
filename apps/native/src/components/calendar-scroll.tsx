@@ -249,7 +249,8 @@ export const CalendarScroll = forwardRef<
         setMonths((ms) => {
           const first = ms[0]!;
           const older: string[] = [];
-          for (let i = PAGE_SIZE; i >= 1; i--) older.push(shiftMonth(first, -i));
+          for (let i = PAGE_SIZE; i >= 1; i--)
+            older.push(shiftMonth(first, -i));
           return [...older, ...ms];
         });
       }

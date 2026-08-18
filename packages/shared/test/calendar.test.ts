@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMonthGrid,
+  fmtDateTimeFull,
+  fmtDateTimeShort,
   fmtRange,
   isWeekend,
   shiftMonth,
@@ -62,5 +64,23 @@ describe("fmtRange", () => {
   it("같은 날은 단일 표기, 다른 날은 범위 표기", () => {
     expect(fmtRange("2026-07-18", "2026-07-18")).toBe("7월 18일");
     expect(fmtRange("2026-07-18", "2026-07-20")).toContain("–");
+  });
+});
+
+describe("시각 표기", () => {
+  // 기기 로컬 시각으로 보여준다 — 아래 두 함수만 로컬 접근자를 쓴다.
+  const at = new Date(2026, 7, 2, 14, 5, 9); // 2026-08-02 14:05:09 (로컬)
+
+  it("목록용 짧은 표기는 분까지 두 자리로 맞춘다", () => {
+    expect(fmtDateTimeShort(at.toISOString())).toBe("8월 2일 14:05");
+  });
+
+  it("한 자리 시·분에도 자리를 채운다", () => {
+    const earlyMorning = new Date(2026, 7, 2, 9, 5).toISOString();
+    expect(fmtDateTimeShort(earlyMorning)).toBe("8월 2일 09:05");
+  });
+
+  it("전체 표기는 한국 로캘을 쓴다", () => {
+    expect(fmtDateTimeFull(at.toISOString())).toBe(at.toLocaleString("ko-KR"));
   });
 });

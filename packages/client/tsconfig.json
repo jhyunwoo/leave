@@ -1,17 +1,12 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "jsx": "react-jsx",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "noEmit": true,
     "verbatimModuleSyntax": true,
-    "types": []
+    // test/single-instance.test.ts가 node:fs로 설치 레이아웃을 직접 들여다본다.
+    // src가 플랫폼 API에 손대는 것은 ESLint의 의존 방향 규칙이 막는다.
+    "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "test", "vitest.config.ts"]
 }

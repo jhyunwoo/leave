@@ -35,6 +35,7 @@ import {
   type RegularOvernightConfigRow,
 } from "../db/schema";
 import type { Db } from "./db";
+import { LeaveRuleError } from "./errors";
 type User = {
   id: string;
   branch: Branch;
@@ -118,7 +119,7 @@ export function assertGrantEditable(
     balanceKey === "regular_overnight" &&
     isRegularOvernightCycleBased(config)
   ) {
-    throw new Error(
+    throw new LeaveRuleError(
       "정기외박은 주기 설정에서 자동으로 계산돼 적립분을 따로 만들 수 없어요",
     );
   }

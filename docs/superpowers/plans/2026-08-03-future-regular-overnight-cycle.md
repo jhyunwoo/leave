@@ -25,10 +25,12 @@
 서버 `assertRegularOvernightAvailable` 안에 있던 규칙을 순수 함수로 끌어내고 전역일 상한을 더한다.
 
 **Files:**
+
 - Modify: `packages/shared/src/regular-overnight.ts` (파일 끝에 추가)
 - Test: `packages/shared/test/regular-overnight.test.ts` (파일 끝에 `describe` 추가)
 
 **Interfaces:**
+
 - Consumes: 같은 파일에 이미 있는 `activeConfig`, `firstGrantOf`, `cycleFor`, `cyclesInRange`, `cycleRemainingDays`, `regularOvernightUsageByCycle`, 타입 `RegularOvernightConfig`, `RegularOvernightCycle`, `SegmentLike`. `./calendar`의 `fmtDateShort`, `fmtRangeTiny`. `./dates`의 `ISODate`.
 - Produces:
   - `type RegularOvernightBlock = { kind: "before_first_grant"; firstGrantDate: ISODate } | { kind: "after_discharge"; cycle: RegularOvernightCycle } | { kind: "over_cycle"; cycle: RegularOvernightCycle; usedDays: number }`
@@ -163,7 +165,11 @@ describe("정기외박 사용 가능 여부", () => {
         config,
         existing: [],
         requested: [
-          { category: "annual", startDate: "2026-05-09", endDate: "2026-05-10" },
+          {
+            category: "annual",
+            startDate: "2026-05-09",
+            endDate: "2026-05-10",
+          },
         ],
         dischargeAt: discharge,
       }),
@@ -292,10 +298,12 @@ git commit -m "feat: 정기외박 주기 검증을 공용 순수 함수로 빼�
 폼의 재원 칩이 "이 구간 날짜 기준 잔여"를 보여주려면 범위를 받아 주기별 잔여의 최솟값을 주는 함수가 필요하다.
 
 **Files:**
+
 - Modify: `packages/shared/src/regular-overnight.ts` (Task 1에서 붙인 내용 뒤)
 - Test: `packages/shared/test/regular-overnight.test.ts` (Task 1의 `describe` 뒤)
 
 **Interfaces:**
+
 - Consumes: Task 1이 쓰는 것과 같은 내부 함수들 + `cyclesInRange`, `cycleRemainingDays`, `firstGrantOf`, `activeConfig`.
 - Produces: `regularOvernightAvailableIn(input: { config: RegularOvernightConfig | null | undefined; used: readonly SegmentLike[]; dischargeAt: ISODate; from: ISODate; to: ISODate }): number`
 
@@ -475,11 +483,13 @@ git commit -m "feat: 구간 날짜가 속한 주기 기준으로 정기외박 �
 ### Task 3: 서버가 공용 함수를 쓰고 전역일을 정규화한다
 
 **Files:**
+
 - Modify: `apps/api/src/lib/leave-grants.ts` (`User` 타입, `buildGrantsPage`, 새 `cycleDischargeDate` 헬퍼)
 - Modify: `apps/api/src/lib/leave-balances.ts` (`getLeaveBalanceSummary`, `updateLeaveBalanceTotals`, `saveRegularOvernightConfig`, `assertRegularOvernightAvailable`, `assertSegmentsAvailable`)
 - Test: `apps/api/test/leaves.test.mjs` (기존 정기외박 테스트 수정 + 새 테스트 추가)
 
 **Interfaces:**
+
 - Consumes: Task 1의 `checkRegularOvernight`, `regularOvernightBlockMessage`. 기존 `normalizeLegacyDischargeDate(enlistedAt, branch, dischargeAt)`(`@leave/shared`).
 - Produces: `cycleDischargeDate(user: { enlistedAt: string; branch: Branch; dischargeAt: string }): string` — `apps/api/src/lib/leave-grants.ts`에서 export.
 
@@ -490,13 +500,13 @@ git commit -m "feat: 구간 날짜가 속한 주기 기준으로 정기외박 �
 (1) 기존 테스트 `"해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 않는다"` 안의 초과 거절 단언을 새 문구에 맞춘다. 아래 줄을
 
 ```js
-  assert.match(over.data.error, /주기.*3일보다 많이/);
+assert.match(over.data.error, /주기.*3일보다 많이/);
 ```
 
 이렇게 바꾼다:
 
 ```js
-  assert.match(over.data.error, /주기.*몫 3일을 1일 초과/);
+assert.match(over.data.error, /주기.*몫 3일을 1일 초과/);
 ```
 
 (2) 그 테스트 함수 바로 뒤에 새 테스트를 추가한다. `signup` 기본값은 육군이라 정기외박 설정이 거부되므로 `branch: "navy"`를 준다. 기본 `dischargeAt`은 `2027-07-04`이다.
@@ -675,12 +685,12 @@ export function cycleDischargeDate(user: {
 `buildGrantsPage` 안의 `regularOvernightSummary` 호출에서 `user.dischargeAt`을 `cycleDischargeDate(user)`로 바꾼다:
 
 ```ts
-  const cycles = regularOvernightSummary(
-    config,
-    segments,
-    cycleDischargeDate(user),
-    today,
-  );
+const cycles = regularOvernightSummary(
+  config,
+  segments,
+  cycleDischargeDate(user),
+  today,
+);
 ```
 
 - [ ] **Step 4: `leave-balances.ts`를 공용 함수로 갈아끼운다**
@@ -737,7 +747,11 @@ async function assertRegularOvernightAvailable(
   replacingLeaveId?: string,
 ) {
   // 수정이면 교체될 휴가의 구간은 빼야 자기 자신과 부딪히지 않는다.
-  const existing = await regularOvernightSegments(db, user.id, replacingLeaveId);
+  const existing = await regularOvernightSegments(
+    db,
+    user.id,
+    replacingLeaveId,
+  );
   const block = checkRegularOvernight({
     config,
     existing,
@@ -751,15 +765,15 @@ async function assertRegularOvernightAvailable(
 (f) `assertSegmentsAvailable` 끝의 호출을 새 시그니처에 맞춘다:
 
 ```ts
-  if (cycleBased && requested.has("regular_overnight")) {
-    await assertRegularOvernightAvailable(
-      db,
-      user,
-      config,
-      segments,
-      replacingLeaveId,
-    );
-  }
+if (cycleBased && requested.has("regular_overnight")) {
+  await assertRegularOvernightAvailable(
+    db,
+    user,
+    config,
+    segments,
+    replacingLeaveId,
+  );
+}
 ```
 
 - [ ] **Step 5: 타입 검사**
@@ -784,9 +798,11 @@ git commit -m "refactor: 서버 정기외박 검증을 공용 함수로 옮기�
 ### Task 4: 앱 휴가 폼이 주기별로 따진다
 
 **Files:**
+
 - Modify: `apps/native/src/components/leave-form-modal.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 1의 `checkRegularOvernight`, `regularOvernightBlockMessage`, Task 2의 `regularOvernightAvailableIn`. 기존 `isRegularOvernightCycleBased`, `balanceKeyToCategory`(`@leave/shared`). 기존 훅 `useMe()`, `useMyLeaves()`(`@/api/queries`).
 - Produces: 없음(화면 변경).
 
@@ -799,8 +815,8 @@ git commit -m "refactor: 서버 정기외박 검증을 공용 함수로 옮기�
 컴포넌트 안, `const balances = useLeaveBalances();` 바로 아래에 추가한다:
 
 ```ts
-  const me = useMe();
-  const myLeaves = useMyLeaves();
+const me = useMe();
+const myLeaves = useMyLeaves();
 ```
 
 - [ ] **Step 2: 주기 판정에 쓸 값들을 만든다**
@@ -808,42 +824,42 @@ git commit -m "refactor: 서버 정기외박 검증을 공용 함수로 옮기�
 `availableByKey` `useMemo` 바로 앞(즉 `remainingByKey` 다음)에 넣는다:
 
 ```ts
-  const regularConfig = balances.data?.regularOvernight ?? null;
-  const cycleBased = isRegularOvernightCycleBased(regularConfig);
-  const dischargeAt = me.data?.dischargeAt ?? "";
+const regularConfig = balances.data?.regularOvernight ?? null;
+const cycleBased = isRegularOvernightCycleBased(regularConfig);
+const dischargeAt = me.data?.dischargeAt ?? "";
 
-  // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
-  const savedRegular = useMemo<SegmentLike[]>(
-    () =>
-      (myLeaves.data?.leaves ?? [])
-        .filter((leave) => leave.id !== editing?.id)
-        .flatMap((leave) => leave.segments),
-    [myLeaves.data, editing],
-  );
+// 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+const savedRegular = useMemo<SegmentLike[]>(
+  () =>
+    (myLeaves.data?.leaves ?? [])
+      .filter((leave) => leave.id !== editing?.id)
+      .flatMap((leave) => leave.segments),
+  [myLeaves.data, editing],
+);
 
-  // 폼이 이번에 정기외박으로 잡아둔 구간.
-  const draftRegular = useMemo<SegmentLike[]>(
-    () =>
-      resolved
-        .filter((draft) => draft.key === "regular_overnight")
-        .map((draft) => ({
-          ...balanceKeyToCategory(draft.key),
-          startDate: draft.startDate,
-          endDate: draft.endDate,
-        })),
-    [resolved],
-  );
+// 폼이 이번에 정기외박으로 잡아둔 구간.
+const draftRegular = useMemo<SegmentLike[]>(
+  () =>
+    resolved
+      .filter((draft) => draft.key === "regular_overnight")
+      .map((draft) => ({
+        ...balanceKeyToCategory(draft.key),
+        startDate: draft.startDate,
+        endDate: draft.endDate,
+      })),
+  [resolved],
+);
 
-  // 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
-  const regularBlock = useMemo(() => {
-    if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
-    return checkRegularOvernight({
-      config: regularConfig,
-      existing: savedRegular,
-      requested: draftRegular,
-      dischargeAt,
-    });
-  }, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
+// 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
+const regularBlock = useMemo(() => {
+  if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
+  return checkRegularOvernight({
+    config: regularConfig,
+    existing: savedRegular,
+    requested: draftRegular,
+    dischargeAt,
+  });
+}, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
 ```
 
 `SegmentLike`의 `category`/`overnightKind`는 `balanceKeyToCategory`가 채워 준다. `MyLeave["segments"]`는 `category`, `overnightKind?`, `startDate`, `endDate`, `days`를 갖고 있어 `SegmentLike`에 그대로 맞는다.
@@ -853,64 +869,64 @@ git commit -m "refactor: 서버 정기외박 검증을 공용 함수로 옮기�
 `availableByKey` `useMemo`에서 정기외박은 주기로 따로 보므로 스칼라 계산에서 뺀다. 기존:
 
 ```ts
-  const availableByKey = useMemo(() => {
-    const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
-    const result = new Map(remainingByKey);
-    for (const [key, days] of used) {
-      result.set(key, (result.get(key) ?? 0) - days);
-    }
-    return result;
-  }, [remainingByKey, validRange, startDate, drafts]);
+const availableByKey = useMemo(() => {
+  const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
+  const result = new Map(remainingByKey);
+  for (const [key, days] of used) {
+    result.set(key, (result.get(key) ?? 0) - days);
+  }
+  return result;
+}, [remainingByKey, validRange, startDate, drafts]);
 
-  const overused = [...availableByKey.entries()].filter(
-    ([, remaining]) => remaining < 0,
-  );
-  const canSubmit =
-    validRange &&
-    drafts.length > 0 &&
-    !overused.length &&
-    title.trim().length > 0;
+const overused = [...availableByKey.entries()].filter(
+  ([, remaining]) => remaining < 0,
+);
+const canSubmit =
+  validRange &&
+  drafts.length > 0 &&
+  !overused.length &&
+  title.trim().length > 0;
 ```
 
 를 이렇게 바꾼다:
 
 ```ts
-  const availableByKey = useMemo(() => {
-    const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
-    const result = new Map(remainingByKey);
-    for (const [key, days] of used) {
-      result.set(key, (result.get(key) ?? 0) - days);
-    }
-    // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
-    // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
-    if (cycleBased) result.delete("regular_overnight");
-    return result;
-  }, [remainingByKey, validRange, startDate, drafts, cycleBased]);
+const availableByKey = useMemo(() => {
+  const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
+  const result = new Map(remainingByKey);
+  for (const [key, days] of used) {
+    result.set(key, (result.get(key) ?? 0) - days);
+  }
+  // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
+  // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
+  if (cycleBased) result.delete("regular_overnight");
+  return result;
+}, [remainingByKey, validRange, startDate, drafts, cycleBased]);
 
-  /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
-  const rowAvailable = (from: string, to: string) => {
-    if (!cycleBased) return availableByKey;
-    return new Map(availableByKey).set(
-      "regular_overnight",
-      regularOvernightAvailableIn({
-        config: regularConfig,
-        used: [...savedRegular, ...draftRegular],
-        dischargeAt,
-        from,
-        to,
-      }),
-    );
-  };
-
-  const overused = [...availableByKey.entries()].filter(
-    ([, remaining]) => remaining < 0,
+/** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
+const rowAvailable = (from: string, to: string) => {
+  if (!cycleBased) return availableByKey;
+  return new Map(availableByKey).set(
+    "regular_overnight",
+    regularOvernightAvailableIn({
+      config: regularConfig,
+      used: [...savedRegular, ...draftRegular],
+      dischargeAt,
+      from,
+      to,
+    }),
   );
-  const canSubmit =
-    validRange &&
-    drafts.length > 0 &&
-    !overused.length &&
-    !regularBlock &&
-    title.trim().length > 0;
+};
+
+const overused = [...availableByKey.entries()].filter(
+  ([, remaining]) => remaining < 0,
+);
+const canSubmit =
+  validRange &&
+  drafts.length > 0 &&
+  !overused.length &&
+  !regularBlock &&
+  title.trim().length > 0;
 ```
 
 - [ ] **Step 4: 구간 행과 오류 표시를 연결한다**
@@ -927,19 +943,19 @@ git commit -m "refactor: 서버 정기외박 검증을 공용 함수로 옮기�
 오류 표시 블록(`{overused.length > 0 && (…)}`)을 다음으로 바꾼다:
 
 ```tsx
-          {(overused.length > 0 || regularBlock) && (
-            <Text selectable style={styles.error}>
-              {[
-                ...overused.map(
-                  ([key, remaining]) =>
-                    `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
-                ),
-                ...(regularBlock
-                  ? [regularOvernightBlockMessage(regularBlock)]
-                  : []),
-              ].join(", ")}
-            </Text>
-          )}
+{
+  (overused.length > 0 || regularBlock) && (
+    <Text selectable style={styles.error}>
+      {[
+        ...overused.map(
+          ([key, remaining]) =>
+            `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
+        ),
+        ...(regularBlock ? [regularOvernightBlockMessage(regularBlock)] : []),
+      ].join(", ")}
+    </Text>
+  );
+}
 ```
 
 - [ ] **Step 5: 타입 검사**
@@ -961,9 +977,11 @@ git commit -m "fix: 앱 휴가 폼이 미래 정기외박 주기를 주기별로
 앱과 같은 변경을 웹 모달에 대칭으로 넣는다. 훅 이름(`useMe(true)`)과 렌더 방식만 다르다.
 
 **Files:**
+
 - Modify: `apps/web/src/components/LeaveFormModal.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 1의 `checkRegularOvernight`, `regularOvernightBlockMessage`, Task 2의 `regularOvernightAvailableIn`, 기존 `isRegularOvernightCycleBased`, `balanceKeyToCategory`. 기존 훅 `useMe(enabled: boolean)`, `useMyLeaves()`(`../api/queries`).
 - Produces: 없음(화면 변경).
 
@@ -976,8 +994,8 @@ git commit -m "fix: 앱 휴가 폼이 미래 정기외박 주기를 주기별로
 `const balances = useLeaveBalances();` 아래에 추가한다:
 
 ```ts
-  const me = useMe(true);
-  const myLeaves = useMyLeaves();
+const me = useMe(true);
+const myLeaves = useMyLeaves();
 ```
 
 - [ ] **Step 2: 주기 판정에 쓸 값들을 만든다**
@@ -985,42 +1003,42 @@ git commit -m "fix: 앱 휴가 폼이 미래 정기외박 주기를 주기별로
 `remainingByKey` `useMemo` 다음에 넣는다(앱과 같은 내용):
 
 ```ts
-  const regularConfig = balances.data?.regularOvernight ?? null;
-  const cycleBased = isRegularOvernightCycleBased(regularConfig);
-  const dischargeAt = me.data?.dischargeAt ?? "";
+const regularConfig = balances.data?.regularOvernight ?? null;
+const cycleBased = isRegularOvernightCycleBased(regularConfig);
+const dischargeAt = me.data?.dischargeAt ?? "";
 
-  // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
-  const savedRegular = useMemo<SegmentLike[]>(
-    () =>
-      (myLeaves.data?.leaves ?? [])
-        .filter((leave) => leave.id !== editing?.id)
-        .flatMap((leave) => leave.segments),
-    [myLeaves.data, editing],
-  );
+// 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+const savedRegular = useMemo<SegmentLike[]>(
+  () =>
+    (myLeaves.data?.leaves ?? [])
+      .filter((leave) => leave.id !== editing?.id)
+      .flatMap((leave) => leave.segments),
+  [myLeaves.data, editing],
+);
 
-  // 폼이 이번에 정기외박으로 잡아둔 구간.
-  const draftRegular = useMemo<SegmentLike[]>(
-    () =>
-      resolved
-        .filter((draft) => draft.key === "regular_overnight")
-        .map((draft) => ({
-          ...balanceKeyToCategory(draft.key),
-          startDate: draft.startDate,
-          endDate: draft.endDate,
-        })),
-    [resolved],
-  );
+// 폼이 이번에 정기외박으로 잡아둔 구간.
+const draftRegular = useMemo<SegmentLike[]>(
+  () =>
+    resolved
+      .filter((draft) => draft.key === "regular_overnight")
+      .map((draft) => ({
+        ...balanceKeyToCategory(draft.key),
+        startDate: draft.startDate,
+        endDate: draft.endDate,
+      })),
+  [resolved],
+);
 
-  // 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
-  const regularBlock = useMemo(() => {
-    if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
-    return checkRegularOvernight({
-      config: regularConfig,
-      existing: savedRegular,
-      requested: draftRegular,
-      dischargeAt,
-    });
-  }, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
+// 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
+const regularBlock = useMemo(() => {
+  if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
+  return checkRegularOvernight({
+    config: regularConfig,
+    existing: savedRegular,
+    requested: draftRegular,
+    dischargeAt,
+  });
+}, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
 ```
 
 - [ ] **Step 3: 블로커와 잔여 표를 갈아끼운다**
@@ -1028,64 +1046,64 @@ git commit -m "fix: 앱 휴가 폼이 미래 정기외박 주기를 주기별로
 기존:
 
 ```ts
-  const availableByKey = useMemo(() => {
-    const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
-    const result = new Map(remainingByKey);
-    for (const [key, days] of used) {
-      result.set(key, (result.get(key) ?? 0) - days);
-    }
-    return result;
-  }, [remainingByKey, validRange, startDate, drafts]);
+const availableByKey = useMemo(() => {
+  const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
+  const result = new Map(remainingByKey);
+  for (const [key, days] of used) {
+    result.set(key, (result.get(key) ?? 0) - days);
+  }
+  return result;
+}, [remainingByKey, validRange, startDate, drafts]);
 
-  const overused = [...availableByKey.entries()].filter(
-    ([, remaining]) => remaining < 0,
-  );
-  const canSubmit =
-    validRange &&
-    drafts.length > 0 &&
-    !overused.length &&
-    title.trim().length > 0;
+const overused = [...availableByKey.entries()].filter(
+  ([, remaining]) => remaining < 0,
+);
+const canSubmit =
+  validRange &&
+  drafts.length > 0 &&
+  !overused.length &&
+  title.trim().length > 0;
 ```
 
 를 이렇게 바꾼다:
 
 ```ts
-  const availableByKey = useMemo(() => {
-    const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
-    const result = new Map(remainingByKey);
-    for (const [key, days] of used) {
-      result.set(key, (result.get(key) ?? 0) - days);
-    }
-    // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
-    // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
-    if (cycleBased) result.delete("regular_overnight");
-    return result;
-  }, [remainingByKey, validRange, startDate, drafts, cycleBased]);
+const availableByKey = useMemo(() => {
+  const used = validRange ? draftDaysByKey(startDate, drafts) : new Map();
+  const result = new Map(remainingByKey);
+  for (const [key, days] of used) {
+    result.set(key, (result.get(key) ?? 0) - days);
+  }
+  // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
+  // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
+  if (cycleBased) result.delete("regular_overnight");
+  return result;
+}, [remainingByKey, validRange, startDate, drafts, cycleBased]);
 
-  /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
-  const rowAvailable = (from: string, to: string) => {
-    if (!cycleBased) return availableByKey;
-    return new Map(availableByKey).set(
-      "regular_overnight",
-      regularOvernightAvailableIn({
-        config: regularConfig,
-        used: [...savedRegular, ...draftRegular],
-        dischargeAt,
-        from,
-        to,
-      }),
-    );
-  };
-
-  const overused = [...availableByKey.entries()].filter(
-    ([, remaining]) => remaining < 0,
+/** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
+const rowAvailable = (from: string, to: string) => {
+  if (!cycleBased) return availableByKey;
+  return new Map(availableByKey).set(
+    "regular_overnight",
+    regularOvernightAvailableIn({
+      config: regularConfig,
+      used: [...savedRegular, ...draftRegular],
+      dischargeAt,
+      from,
+      to,
+    }),
   );
-  const canSubmit =
-    validRange &&
-    drafts.length > 0 &&
-    !overused.length &&
-    !regularBlock &&
-    title.trim().length > 0;
+};
+
+const overused = [...availableByKey.entries()].filter(
+  ([, remaining]) => remaining < 0,
+);
+const canSubmit =
+  validRange &&
+  drafts.length > 0 &&
+  !overused.length &&
+  !regularBlock &&
+  title.trim().length > 0;
 ```
 
 - [ ] **Step 4: 재원 `<select>`와 오류 표시를 연결한다**
@@ -1093,40 +1111,42 @@ git commit -m "fix: 앱 휴가 폼이 미래 정기외박 주기를 주기별로
 `resolved.map((draft, index) => {` 블록 안, `const maxEnd = …` 다음 줄에 추가한다:
 
 ```ts
-                const available = rowAvailable(draft.startDate, draft.endDate);
+const available = rowAvailable(draft.startDate, draft.endDate);
 ```
 
 `<option>`의 잔여 표시를 `availableByKey` 대신 `available`로 바꾼다:
 
 ```tsx
-                      {BALANCE_KEYS.map((key) => (
-                        <option key={key} value={key}>
-                          {BALANCE_LABELS[key]} (잔여 {available.get(key) ?? 0}
-                          일)
-                        </option>
-                      ))}
+{
+  BALANCE_KEYS.map((key) => (
+    <option key={key} value={key}>
+      {BALANCE_LABELS[key]} (잔여 {available.get(key) ?? 0}
+      일)
+    </option>
+  ));
+}
 ```
 
 오류 표시 블록(`{overused.length > 0 && (…)}`)을 다음으로 바꾼다:
 
 ```tsx
-          {(overused.length > 0 || regularBlock) && (
-            <p
-              className="field-error"
-              role="alert"
-              style={{ marginTop: "var(--sp-sm)" }}
-            >
-              {[
-                ...overused.map(
-                  ([key, remaining]) =>
-                    `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
-                ),
-                ...(regularBlock
-                  ? [regularOvernightBlockMessage(regularBlock)]
-                  : []),
-              ].join(", ")}
-            </p>
-          )}
+{
+  (overused.length > 0 || regularBlock) && (
+    <p
+      className="field-error"
+      role="alert"
+      style={{ marginTop: "var(--sp-sm)" }}
+    >
+      {[
+        ...overused.map(
+          ([key, remaining]) =>
+            `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
+        ),
+        ...(regularBlock ? [regularOvernightBlockMessage(regularBlock)] : []),
+      ].join(", ")}
+    </p>
+  );
+}
 ```
 
 - [ ] **Step 5: 타입 검사와 전체 테스트**

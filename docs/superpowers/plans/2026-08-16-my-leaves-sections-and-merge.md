@@ -33,6 +33,7 @@
 서버가 병합 후 자동 제목을 다시 지어야 하는데, 지금 규칙은 `@leave/client`에 있다. 두 함수 모두 `BALANCE_LABELS`와 `SegmentDraft`(둘 다 이미 shared)에만 의존하는 순수 함수라 옮기는 데 걸림돌이 없다. 구간에서 바로 제목을 짓는 `titleFromSegments`를 함께 만든다.
 
 **Files:**
+
 - Create: `packages/shared/src/leave-title.ts`
 - Create: `packages/shared/test/leave-title.test.ts` (아래 Delete한 파일 내용을 옮겨 씀)
 - Delete: `packages/client/test/leave-title.test.ts`
@@ -41,6 +42,7 @@
 - Modify: `apps/native/src/components/leave-form-modal.tsx:19-30` (import 출처 변경)
 
 **Interfaces:**
+
 - Consumes: `BALANCE_KEYS`, `BALANCE_LABELS`, `segmentBalanceKey`, `LeaveSegment` (`./leave`), `SegmentDraft` (`./leave-draft`)
 - Produces:
   - `titleFromDrafts(drafts: readonly SegmentDraft[]): string`
@@ -268,11 +270,13 @@ EOF
 DB를 모르는 순수 함수가 "누구를 흡수할지 · 어떻게 이어 붙일지 · 제목과 사유는 무엇인지 · 어느 행이 살아남을지"를 전부 결정한다.
 
 **Files:**
+
 - Create: `packages/shared/src/leave-merge.ts`
 - Create: `packages/shared/test/leave-merge.test.ts`
 - Modify: `packages/shared/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `addDays`, `rangesOverlap`, `ISODate` (`./dates`); `inclusiveDays`, `segmentBalanceKey`, `segmentsRange`, `sortSegments`, `LeaveSegment`, `LeaveStatus` (`./leave`); `isDerivedTitle`, `titleFromSegments` (`./leave-title`, Task 1)
 - Produces:
   - `type MergeCandidate = { id: string; title: string; reason: string | null; status: LeaveStatus; createdAt: string; segments: LeaveSegment[] }`
@@ -308,7 +312,8 @@ function seg(
   overnightKind?: LeaveSegment["overnightKind"],
 ): LeaveSegment {
   const days =
-    (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) /
+    (Date.parse(`${endDate}T00:00:00Z`) -
+      Date.parse(`${startDate}T00:00:00Z`)) /
       86_400_000 +
     1;
   return { category, overnightKind, startDate, endDate, days };
@@ -332,7 +337,10 @@ function leave(
 
 describe("planLeaveMerge — 붙음/겹침/상태", () => {
   it("이웃이 없으면 alone이다", () => {
-    const plan = planLeaveMerge(leave("a", [seg("annual", "2026-02-03", "2026-02-05")]), []);
+    const plan = planLeaveMerge(
+      leave("a", [seg("annual", "2026-02-03", "2026-02-05")]),
+      [],
+    );
     expect(plan.kind).toBe("alone");
   });
 
@@ -366,7 +374,9 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
     const touching = leave("a", [seg("annual", "2026-02-01", "2026-02-02")]);
     const overlapping = leave("c", [seg("annual", "2026-02-04", "2026-02-06")]);
     const incoming = leave("b", [seg("annual", "2026-02-03", "2026-02-05")]);
-    expect(planLeaveMerge(incoming, [touching, overlapping]).kind).toBe("conflict");
+    expect(planLeaveMerge(incoming, [touching, overlapping]).kind).toBe(
+      "conflict",
+    );
   });
 
   it("상태가 다르면 붙어 있어도 손대지 않는다", () => {
@@ -395,7 +405,13 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
     expect(plan.hostId).toBe("a");
     expect(plan.absorbedIds.sort()).toEqual(["b", "c"]);
     expect(plan.segments).toEqual([
-      { category: "annual", overnightKind: undefined, startDate: "2026-02-01", endDate: "2026-02-12", days: 12 },
+      {
+        category: "annual",
+        overnightKind: undefined,
+        startDate: "2026-02-01",
+        endDate: "2026-02-12",
+        days: 12,
+      },
     ]);
   });
 
@@ -415,13 +431,27 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
 describe("planLeaveMerge — 구간과 일수 보존", () => {
   it("재원이 다르면 구간을 따로 남기고 일수를 유지한다", () => {
     const before = leave("a", [seg("annual", "2026-02-03", "2026-02-05")]);
-    const incoming = leave("b", [seg("overnight", "2026-02-06", "2026-02-09", "regular")]);
+    const incoming = leave("b", [
+      seg("overnight", "2026-02-06", "2026-02-09", "regular"),
+    ]);
     const plan = planLeaveMerge(incoming, [before]);
     expect(plan.kind).toBe("merged");
     if (plan.kind !== "merged") return;
     expect(plan.segments).toEqual([
-      { category: "annual", overnightKind: undefined, startDate: "2026-02-03", endDate: "2026-02-05", days: 3 },
-      { category: "overnight", overnightKind: "regular", startDate: "2026-02-06", endDate: "2026-02-09", days: 4 },
+      {
+        category: "annual",
+        overnightKind: undefined,
+        startDate: "2026-02-03",
+        endDate: "2026-02-05",
+        days: 3,
+      },
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-02-06",
+        endDate: "2026-02-09",
+        days: 4,
+      },
     ]);
   });
 
@@ -436,8 +466,12 @@ describe("planLeaveMerge — 구간과 일수 보존", () => {
   });
 
   it("외박은 종류가 다르면 따로 남는다", () => {
-    const before = leave("a", [seg("overnight", "2026-02-03", "2026-02-04", "regular")]);
-    const incoming = leave("b", [seg("overnight", "2026-02-05", "2026-02-06", "other")]);
+    const before = leave("a", [
+      seg("overnight", "2026-02-03", "2026-02-04", "regular"),
+    ]);
+    const incoming = leave("b", [
+      seg("overnight", "2026-02-05", "2026-02-06", "other"),
+    ]);
     const plan = planLeaveMerge(incoming, [before]);
     expect(plan.kind).toBe("merged");
     if (plan.kind !== "merged") return;
@@ -484,9 +518,13 @@ describe("planLeaveMerge — 제목·사유·살아남는 행", () => {
   });
 
   it("전부 자동 제목이면 합친 첫 구간으로 다시 짓는다", () => {
-    const before = leave("a", [seg("overnight", "2026-02-03", "2026-02-05", "regular")], {
-      title: "정기외박 계획",
-    });
+    const before = leave(
+      "a",
+      [seg("overnight", "2026-02-03", "2026-02-05", "regular")],
+      {
+        title: "정기외박 계획",
+      },
+    );
     const incoming = leave("b", [seg("annual", "2026-02-06", "2026-02-09")], {
       title: "연가 계획",
     });
@@ -507,7 +545,9 @@ describe("planLeaveMerge — 제목·사유·살아남는 행", () => {
     expect(plan.reason).toBe("본가 방문\n가족 행사");
 
     const same = planLeaveMerge(
-      leave("b", [seg("annual", "2026-02-06", "2026-02-09")], { reason: "본가 방문" }),
+      leave("b", [seg("annual", "2026-02-06", "2026-02-09")], {
+        reason: "본가 방문",
+      }),
       [before],
     );
     if (same.kind !== "merged") throw new Error("merged가 아니다");
@@ -686,7 +726,9 @@ export function planLeaveMerge(
   others: readonly MergeCandidate[],
 ): LeaveMergePlan {
   const pool = others
-    .filter((other) => other.id !== incoming.id && other.status === incoming.status)
+    .filter(
+      (other) => other.id !== incoming.id && other.status === incoming.status,
+    )
     .sort(byStart);
 
   // 겹침이 먼저다. 합칠 이웃이 있더라도 겹치는 게 있으면 그걸 알리는 쪽이 먼저다.
@@ -723,7 +765,10 @@ export function planLeaveMerge(
     grew = false;
     for (let i = 0; i < rest.length; i += 1) {
       const other = rest[i]!;
-      const merged = rangeOf({ ...incoming, segments: parts.flatMap((p) => p.segments) });
+      const merged = rangeOf({
+        ...incoming,
+        segments: parts.flatMap((p) => p.segments),
+      });
       const range = rangeOf(other);
       const touches =
         addDays(merged.endDate, 1) === range.startDate ||
@@ -803,10 +848,12 @@ EOF
 병합에서는 흡수될 이웃들의 구간이 **이미 DB에 있다.** 지금은 제외할 휴가를 하나만 받아서, 그대로 두면 같은 날을 두 번 세고 "잔여가 부족합니다"로 잘못 막는다.
 
 **Files:**
+
 - Modify: `apps/api/src/lib/leave-balances.ts` (`assertSegmentsAvailable`, `assertRegularOvernightAvailable`, `userSegmentsExcluding`, `regularOvernightSegments`, import 줄)
 - Modify: `apps/api/src/routes/leaves.ts` (호출부 2곳)
 
 **Interfaces:**
+
 - Produces: `assertSegmentsAvailable(db, user, segments: LeaveSegment[], replacingLeaveIds?: readonly string[]): Promise<void>` — 네 번째 인자가 `string`에서 `readonly string[]`으로 바뀐다. 빈 배열/`undefined`면 아무것도 제외하지 않는다.
 
 - [ ] **Step 1: `regularOvernightSegments`를 여러 제외로 바꾼다**
@@ -922,15 +969,15 @@ export async function assertSegmentsAvailable(
 함수 끝의 호출부도 바꾼다:
 
 ```ts
-  if (cycleBased && requested.has("regular_overnight")) {
-    await assertRegularOvernightAvailable(
-      db,
-      user,
-      config,
-      segments,
-      replacingLeaveIds,
-    );
-  }
+if (cycleBased && requested.has("regular_overnight")) {
+  await assertRegularOvernightAvailable(
+    db,
+    user,
+    config,
+    segments,
+    replacingLeaveIds,
+  );
+}
 ```
 
 `assertSegmentsAvailable`의 doc 주석에서 "수정일 때 기존 구간을 빼고 배분하므로"를 "수정이거나 이웃을 흡수할 때 사라질 구간을 빼고 배분하므로"로 고친다.
@@ -938,6 +985,7 @@ export async function assertSegmentsAvailable(
 - [ ] **Step 5: 라우트의 호출부 2곳을 배열로 바꾼다**
 
 `apps/api/src/routes/leaves.ts`:
+
 - POST(`createLeaveRoute`) 안의 `await assertSegmentsAvailable(db, user, segments);` — 그대로 둔다(기본값 `[]`).
 - PATCH(`updateLeaveRoute`) 안의 `await assertSegmentsAvailable(db, user, segments, id);` → `await assertSegmentsAvailable(db, user, segments, [id]);`
 
@@ -971,11 +1019,13 @@ EOF
 `planLeaveMerge`를 DB에 붙인다. POST·PATCH가 같은 헬퍼 하나를 부르게 해서 규칙이 두 벌로 갈라지지 않게 한다.
 
 **Files:**
+
 - Create: `apps/api/src/lib/leave-merge.ts`
 - Modify: `apps/api/src/routes/leaves.ts` (POST·PATCH 핸들러 본문)
 - Modify: `apps/api/test/leaves.test.mjs` (테스트 추가)
 
 **Interfaces:**
+
 - Consumes: `planLeaveMerge`, `MergeCandidate`, `LeaveMergePlan`, `fmtDateShort`, `segmentsRange` (`@leave/shared`); `assertSegmentsAvailable`, `segmentRowsFor`, `segmentsForLeaves` (`./leave-balances`); `LeaveRow`, `leaves`, `leaveSegments` (`../db/schema`)
 - Produces:
   - `saveLeaveWithMerge(db, user, incoming: MergeCandidate, options: { existingId?: string }): Promise<SaveLeaveResult>`
@@ -1482,6 +1532,7 @@ Run: `grep -n "export async function segmentsForLeaves" apps/api/src/lib/leave-b
 - [ ] **Step 6: import를 정리한다**
 
 `apps/api/src/routes/leaves.ts` 상단에서:
+
 - `saveLeaveWithMerge`를 `./lib/leave-merge`가 아니라 `../lib/leave-merge`에서 가져온다(이 파일은 `src/routes/` 아래다).
 - 더 이상 쓰지 않는 심볼(`assertSegmentsAvailable`, `insertLeaveSegments`, `segmentRowsFor`, `segmentsRange`, `leaveSegments`)을 grep으로 확인하고 지운다. `segmentsForLeaves`는 `mineRoute`가 계속 쓴다.
 
@@ -1515,11 +1566,13 @@ EOF
 웹과 네이티브가 같은 규칙을 봐야 한다. `my-leave-days.ts`·`leave-holdings.ts`와 같은 자리에 순수 함수 하나를 둔다.
 
 **Files:**
+
 - Create: `packages/client/src/my-leaves-sections.ts`
 - Create: `packages/client/test/my-leaves-sections.test.ts`
 - Modify: `packages/client/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `todayInSeoul`, `ISODate` (`@leave/shared`); `MyLeave` (`./types`)
 - Produces:
   - `type MyLeaveSections = { upcoming: MyLeave[]; past: MyLeave[] }`
@@ -1552,9 +1605,7 @@ function leave(id: string, startDate: string, endDate: string): MyLeave {
     endDate,
     reason: null,
     status: "shared",
-    segments: [
-      { category: "annual", startDate, endDate, days: 1 },
-    ],
+    segments: [{ category: "annual", startDate, endDate, days: 1 }],
     createdAt: "2026-01-01T00:00:00.000Z",
   } as unknown as MyLeave;
 }
@@ -1568,20 +1619,29 @@ describe("partitionMyLeaves", () => {
   });
 
   it("종료일이 어제까지면 지난 휴가다", () => {
-    const sections = partitionMyLeaves([leave("a", "2026-08-14", "2026-08-15")], TODAY);
+    const sections = partitionMyLeaves(
+      [leave("a", "2026-08-14", "2026-08-15")],
+      TODAY,
+    );
     expect(sections.past.map((l) => l.id)).toEqual(["a"]);
     expect(sections.upcoming).toEqual([]);
   });
 
   it("오늘 끝나는 휴가는 아직 지나지 않았다", () => {
-    const sections = partitionMyLeaves([leave("a", "2026-08-14", TODAY)], TODAY);
+    const sections = partitionMyLeaves(
+      [leave("a", "2026-08-14", TODAY)],
+      TODAY,
+    );
     expect(sections.upcoming.map((l) => l.id)).toEqual(["a"]);
     expect(sections.past).toEqual([]);
   });
 
   it("오늘 진행 중인 휴가는 다가오는 쪽이고 맨 위에 온다", () => {
     const sections = partitionMyLeaves(
-      [leave("later", "2026-08-20", "2026-08-22"), leave("now", "2026-08-15", "2026-08-18")],
+      [
+        leave("later", "2026-08-20", "2026-08-22"),
+        leave("now", "2026-08-15", "2026-08-18"),
+      ],
       TODAY,
     );
     expect(sections.upcoming.map((l) => l.id)).toEqual(["now", "later"]);
@@ -1634,7 +1694,10 @@ describe("partitionMyLeaves", () => {
   });
 
   it("원본 배열을 건드리지 않는다", () => {
-    const input = [leave("b", "2026-09-01", "2026-09-02"), leave("a", "2026-08-20", "2026-08-22")];
+    const input = [
+      leave("b", "2026-09-01", "2026-09-02"),
+      leave("a", "2026-08-20", "2026-08-22"),
+    ];
     partitionMyLeaves(input, TODAY);
     expect(input.map((l) => l.id)).toEqual(["b", "a"]);
   });
@@ -1725,12 +1788,14 @@ EOF
 ### Task 6: 웹 내 휴가 화면을 두 섹션으로 나눈다
 
 **Files:**
+
 - Modify: `apps/web/src/pages/LeavesPage.tsx` (목록 렌더 부분, 182-263줄 근처)
 - Modify: `apps/web/src/components/LeaveFormModal.tsx:55,66` (`onSaved` 시그니처)
 - Modify: `apps/web/src/pages/CalendarPage.tsx:86` (`onSaved` 호출부)
 - Modify: `apps/web/src/pages/LeaveDetailPage.tsx:346` (흡수 시 새 id로 이동)
 
 **Interfaces:**
+
 - Consumes: `partitionMyLeaves` (Task 5), `LeaveResult` (`@leave/client`)
 - Produces: 없음(화면 코드)
 
@@ -1854,12 +1919,12 @@ function LeaveSection(props: {
 `LeavesPage` 안에서 `partitionMyLeaves`를 부르고, 기존 `<ul>...</ul>` 블록을 두 섹션으로 바꾼다.
 
 ```tsx
-  const sections = partitionMyLeaves(leaves.data?.leaves);
-  const onDelete = (leave: MyLeave) => {
-    if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
-      void del.mutateAsync(leave.id);
-    }
-  };
+const sections = partitionMyLeaves(leaves.data?.leaves);
+const onDelete = (leave: MyLeave) => {
+  if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
+    void del.mutateAsync(leave.id);
+  }
+};
 ```
 
 렌더 부분:
@@ -1902,12 +1967,12 @@ export function LeaveFormModal(props: {
 ```
 
 ```tsx
-  const save = async () => {
-    const result = await form.submit();
-    if (!result) return;
-    props.onSaved(result);
-    props.onClose();
-  };
+const save = async () => {
+  const result = await form.submit();
+  if (!result) return;
+  props.onSaved(result);
+  props.onClose();
+};
 ```
 
 `LeaveResult` 타입을 `@leave/client`에서 가져온다.
@@ -1919,16 +1984,16 @@ export function LeaveFormModal(props: {
 - `apps/web/src/pages/LeaveDetailPage.tsx:346` — 흡수되면 사라진 URL에 남지 않도록 새 id로 갈아탄다:
 
 ```tsx
-        <LeaveFormModal
-          editing={leave}
-          onClose={() => setEditing(false)}
-          onSaved={(result) => {
-            // 앞 휴가에 흡수되면 이 화면이 가리키던 휴가가 사라진다. 합쳐진 쪽으로 옮긴다.
-            if (result.leave.id !== leaveId) {
-              navigate(`/leaves/${result.leave.id}`, { replace: true });
-            }
-          }}
-        />
+<LeaveFormModal
+  editing={leave}
+  onClose={() => setEditing(false)}
+  onSaved={(result) => {
+    // 앞 휴가에 흡수되면 이 화면이 가리키던 휴가가 사라진다. 합쳐진 쪽으로 옮긴다.
+    if (result.leave.id !== leaveId) {
+      navigate(`/leaves/${result.leave.id}`, { replace: true });
+    }
+  }}
+/>
 ```
 
 - [ ] **Step 6: 타입 검사와 빌드**
@@ -1954,11 +2019,13 @@ EOF
 ### Task 7: 네이티브 내 휴가 화면을 두 섹션으로 나눈다
 
 **Files:**
+
 - Modify: `apps/native/src/screens/leaves.tsx` (`leaveList` 부분, 185-257줄 근처)
 - Modify: `apps/native/src/components/leave-form-modal.tsx` (`onSaved` 콜백 추가)
 - Modify: `apps/native/src/screens/leave-detail.tsx:136` (흡수 시 새 id로 이동)
 
 **Interfaces:**
+
 - Consumes: `partitionMyLeaves` (Task 5), `LeaveResult` (`@leave/client`)
 - Produces: 없음(화면 코드)
 
@@ -1967,56 +2034,56 @@ EOF
 `apps/native/src/screens/leaves.tsx`의 `myLeaves.map((l, index) => ...)` 안쪽 `<View>` 전체를 `renderLeaveRow(l, index)` 형태의 지역 함수로 뽑는다. 컴포넌트 밖으로 빼면 `styles`·`isExpanded`·`selectedLeave`·`openLeave`·`setEditing`·`confirmDelete`·`del`을 전부 넘겨야 하므로, `LeavesScreen` 안의 지역 함수로 둔다.
 
 ```tsx
-  const renderLeaveRow = (l: MyLeave, index: number) => {
-    const selected = isExpanded && l.id === selectedLeave?.id;
-    return (
-      <View
-        key={l.id}
-        style={[
-          styles.leaveRow,
-          index > 0 && styles.rowDivider,
-          // 색만으로 선택을 알리지 않도록 왼쪽에 굵은 표시선을 함께 둔다.
-          selected && styles.leaveRowSelected,
-        ]}
+const renderLeaveRow = (l: MyLeave, index: number) => {
+  const selected = isExpanded && l.id === selectedLeave?.id;
+  return (
+    <View
+      key={l.id}
+      style={[
+        styles.leaveRow,
+        index > 0 && styles.rowDivider,
+        // 색만으로 선택을 알리지 않도록 왼쪽에 굵은 표시선을 함께 둔다.
+        selected && styles.leaveRowSelected,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={isExpanded ? { selected } : undefined}
+        accessibilityLabel={`${l.title} 자세히 보기`}
+        onPress={() => openLeave(l)}
+        style={{ flex: 1, minWidth: 0 }}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={isExpanded ? { selected } : undefined}
-          accessibilityLabel={`${l.title} 자세히 보기`}
-          onPress={() => openLeave(l)}
-          style={{ flex: 1, minWidth: 0 }}
-        >
-          <Text style={styles.leaveTitle}>{l.title}</Text>
-          <Text style={styles.leaveDates}>
-            {fmtRange(l.startDate, l.endDate)}
-          </Text>
-          {l.reason ? <Text style={styles.leaveReason}>{l.reason}</Text> : null}
-          <SegmentBadges segments={l.segments} />
-        </Pressable>
-        <ActionMenu
-          label={`${l.title} 작업`}
-          buttonLabel="휴가 관리"
-          testID={`leave-actions-${l.id}`}
-          actions={[
-            {
-              id: "edit",
-              title: "수정",
-              systemImage: "pencil",
-              onPress: () => setEditing(l),
-            },
-            {
-              id: "delete",
-              title: "삭제",
-              systemImage: "trash",
-              destructive: true,
-              disabled: del.isPending,
-              onPress: () => void confirmDelete(l),
-            },
-          ]}
-        />
-      </View>
-    );
-  };
+        <Text style={styles.leaveTitle}>{l.title}</Text>
+        <Text style={styles.leaveDates}>
+          {fmtRange(l.startDate, l.endDate)}
+        </Text>
+        {l.reason ? <Text style={styles.leaveReason}>{l.reason}</Text> : null}
+        <SegmentBadges segments={l.segments} />
+      </Pressable>
+      <ActionMenu
+        label={`${l.title} 작업`}
+        buttonLabel="휴가 관리"
+        testID={`leave-actions-${l.id}`}
+        actions={[
+          {
+            id: "edit",
+            title: "수정",
+            systemImage: "pencil",
+            onPress: () => setEditing(l),
+          },
+          {
+            id: "delete",
+            title: "삭제",
+            systemImage: "trash",
+            destructive: true,
+            disabled: del.isPending,
+            onPress: () => void confirmDelete(l),
+          },
+        ]}
+      />
+    </View>
+  );
+};
 ```
 
 - [ ] **Step 2: `leaveList`를 두 패널로 바꾼다**
@@ -2024,41 +2091,41 @@ EOF
 `const sections = partitionMyLeaves(leaves.data?.leaves);`를 `const myLeaves = ...` 아래에 더하고, `leaveList`를 다음으로 바꾼다.
 
 ```tsx
-  const leaveList = (
-    <View style={styles.stack}>
-      {leaves.isPending ? (
-        <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
-          <ActivityIndicator color={colors.ink} />
-        </View>
-      ) : myLeaves.length === 0 ? (
-        <ContentPanel style={styles.empty}>
-          <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
-          <Text style={styles.emptyCaption}>
-            휴가를 등록하면 부대 달력에 함께 표시돼요.
-          </Text>
-        </ContentPanel>
-      ) : (
-        <>
-          {sections.upcoming.length > 0 ? (
-            <ContentPanel style={styles.leaveList}>
-              <Text style={styles.sectionTitle} selectable>
-                다가오는 휴가 {sections.upcoming.length}건
-              </Text>
-              {sections.upcoming.map(renderLeaveRow)}
-            </ContentPanel>
-          ) : null}
-          {sections.past.length > 0 ? (
-            <ContentPanel style={styles.leaveList}>
-              <Text style={styles.sectionTitle} selectable>
-                지난 휴가 {sections.past.length}건
-              </Text>
-              {sections.past.map(renderLeaveRow)}
-            </ContentPanel>
-          ) : null}
-        </>
-      )}
-    </View>
-  );
+const leaveList = (
+  <View style={styles.stack}>
+    {leaves.isPending ? (
+      <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
+        <ActivityIndicator color={colors.ink} />
+      </View>
+    ) : myLeaves.length === 0 ? (
+      <ContentPanel style={styles.empty}>
+        <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>
+        <Text style={styles.emptyCaption}>
+          휴가를 등록하면 부대 달력에 함께 표시돼요.
+        </Text>
+      </ContentPanel>
+    ) : (
+      <>
+        {sections.upcoming.length > 0 ? (
+          <ContentPanel style={styles.leaveList}>
+            <Text style={styles.sectionTitle} selectable>
+              다가오는 휴가 {sections.upcoming.length}건
+            </Text>
+            {sections.upcoming.map(renderLeaveRow)}
+          </ContentPanel>
+        ) : null}
+        {sections.past.length > 0 ? (
+          <ContentPanel style={styles.leaveList}>
+            <Text style={styles.sectionTitle} selectable>
+              지난 휴가 {sections.past.length}건
+            </Text>
+            {sections.past.map(renderLeaveRow)}
+          </ContentPanel>
+        ) : null}
+      </>
+    )}
+  </View>
+);
 ```
 
 첫 줄에 `index > 0 && styles.rowDivider`가 걸려 있어 각 패널의 첫 줄에는 구분선이 붙지 않는다 — 섹션 제목 바로 아래라 의도한 모습이다.
@@ -2100,20 +2167,20 @@ export function LeaveFormModal(props: {
 `apps/native/src/screens/leave-detail.tsx`의 `<LeaveFormModal>`에 `onSaved`를 더한다.
 
 ```tsx
-        <LeaveFormModal
-          visible
-          editing={leave}
-          onClose={() => setEditing(false)}
-          onSaved={(result) => {
-            // 앞 휴가에 흡수되면 이 화면이 가리키던 휴가가 사라진다. 합쳐진 쪽으로 옮긴다.
-            if (result.leave.id !== leaveId) {
-              router.replace({
-                pathname: "/leave/[leaveId]",
-                params: { leaveId: result.leave.id },
-              });
-            }
-          }}
-        />
+<LeaveFormModal
+  visible
+  editing={leave}
+  onClose={() => setEditing(false)}
+  onSaved={(result) => {
+    // 앞 휴가에 흡수되면 이 화면이 가리키던 휴가가 사라진다. 합쳐진 쪽으로 옮긴다.
+    if (result.leave.id !== leaveId) {
+      router.replace({
+        pathname: "/leave/[leaveId]",
+        params: { leaveId: result.leave.id },
+      });
+    }
+  }}
+/>
 ```
 
 - [ ] **Step 5: 타입 검사와 린트**
@@ -2140,6 +2207,7 @@ EOF
 단위·통합 테스트는 규칙과 API를 덮지만, 실제 화면에서 섹션이 나뉘고 병합이 눈에 보이는지는 확인하지 않았다.
 
 **Files:**
+
 - Modify: 없음(문제를 찾으면 해당 Task로 돌아간다)
 
 - [ ] **Step 1: 스킬 지침을 읽는다**
@@ -2197,7 +2265,8 @@ pnpm exec agent-browser snapshot -i
 ```
 
 확인할 것:
-1. 2/3~2/5 연가와 2/6~2/9 정기외박을 각각 등록 → 목록에 **1건**, 배지가 **연가·정기외박 2개**, 기간이 2/3~2/9
+
+1. 2/3~~2/5 연가와 2/6~~2/9 정기외박을 각각 등록 → 목록에 **1건**, 배지가 **연가·정기외박 2개**, 기간이 2/3~2/9
 2. 과거 날짜 휴가를 하나 등록 → **지난 휴가** 섹션이 아래에 생기고 다가오는 휴가가 위에 있다
 3. 다가오는 휴가가 여러 건이면 가까운 순, 지난 휴가가 여러 건이면 최근 순
 4. 이미 있는 휴가와 겹치는 기간으로 등록 → 날짜가 담긴 오류 문구로 막힌다

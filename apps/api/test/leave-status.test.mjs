@@ -89,11 +89,9 @@ test("초안을 공유로 바꾸면 그때부터 집계에 잡힌다", async () 
   });
   assert.equal(shared.data.leave.status, "shared");
 
-  const calendar = await req(
-    "GET",
-    `/units/${unitId}/calendar?month=2026-09`,
-    { token: owner.token },
-  );
+  const calendar = await req("GET", `/units/${unitId}/calendar?month=2026-09`, {
+    token: owner.token,
+  });
   const day = calendar.data.days.find((d) => d.date === "2026-09-15");
   assert.equal(day.count, 1);
 });
@@ -157,11 +155,9 @@ test("당일 외출은 복귀일 설정과 무관하게 하루로 센다", async
   });
   assert.equal(outing.status, 201, JSON.stringify(outing.data));
 
-  const calendar = await req(
-    "GET",
-    `/units/${unitId}/calendar?month=2026-08`,
-    { token: owner.token },
-  );
+  const calendar = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
+    token: owner.token,
+  });
   const day = calendar.data.days.find((d) => d.date === "2026-08-28");
   assert.equal(day.count, 1);
 });
@@ -202,11 +198,9 @@ test("블랙아웃은 관리자만 등록하고 달력에 blocked로 표시된�
   assert.equal(createdBlackout.status, 201);
   const blackoutId = createdBlackout.data.blackout.id;
 
-  const calendar = await req(
-    "GET",
-    `/units/${unitId}/calendar?month=2026-09`,
-    { token: member.token },
-  );
+  const calendar = await req("GET", `/units/${unitId}/calendar?month=2026-09`, {
+    token: member.token,
+  });
   const blocked = (date) =>
     calendar.data.days.find((d) => d.date === date).blocked;
   assert.equal(blocked("2026-09-01"), true);
@@ -239,7 +233,10 @@ test("블랙아웃은 관리자만 등록하고 달력에 blocked로 표시된�
   const after = await req("GET", `/units/${unitId}/calendar?month=2026-09`, {
     token: owner.token,
   });
-  assert.equal(after.data.days.find((d) => d.date === "2026-09-01").blocked, false);
+  assert.equal(
+    after.data.days.find((d) => d.date === "2026-09-01").blocked,
+    false,
+  );
 });
 
 test("그룹을 나간 사람의 기존 일정은 집계에서 빠진다", async () => {
@@ -266,10 +263,7 @@ test("그룹을 나간 사람의 기존 일정은 집계에서 빠진다", async
   const before = await req("GET", `/units/${unitId}/calendar?month=2026-09`, {
     token: owner.token,
   });
-  assert.equal(
-    before.data.days.find((d) => d.date === "2026-09-20").count,
-    1,
-  );
+  assert.equal(before.data.days.find((d) => d.date === "2026-09-20").count, 1);
 
   const left = await req("POST", "/units/leave", { token: leaver.token });
   assert.equal(left.status, 200);

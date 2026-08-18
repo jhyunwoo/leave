@@ -56,9 +56,9 @@ createdAt  text NOT NULL
 ### `src/holidays.ts` (신규)
 
 ```ts
-export const HOLIDAYS: Record<ISODate, string>  // 2024-01-01 ~ 2030-12-31
-export function getHoliday(date: ISODate): string | null
-export function isHoliday(date: ISODate): boolean
+export const HOLIDAYS: Record<ISODate, string>; // 2024-01-01 ~ 2030-12-31
+export function getHoliday(date: ISODate): string | null;
+export function isHoliday(date: ISODate): boolean;
 ```
 
 - 양력 고정: 신정, 삼일절, 어린이날, 현충일, 광복절, 개천절, 한글날, 성탄절
@@ -78,7 +78,10 @@ export function isHoliday(date: ISODate): boolean
 허용 인원 = `floor((headcount ?? 앱가입자수) × 비율)`. shared에 헬퍼 추가:
 
 ```ts
-export function effectiveMemberCount(headcount: number | null, appMemberCount: number): number
+export function effectiveMemberCount(
+  headcount: number | null,
+  appMemberCount: number,
+): number;
 ```
 
 ## 3. API (`apps/api`)
@@ -169,14 +172,17 @@ export function effectiveMemberCount(headcount: number | null, appMemberCount: n
 라우팅(저위험): 로그아웃 상태의 `/`를 랜딩으로, 로그인 상태의 `/`는 기존 달력 유지.
 
 `App.tsx`:
+
 ```
 비인증: <Route path="/" element={<LandingPage/>} />, "*" → "/"
         (기존 /login, /signup 유지)
 인증:   기존 AuthedApp 그대로
 ```
+
 `LandingPage`는 `AppLayout`(me 필요)을 쓰지 않는 독립 공개 페이지. 자체 헤더(로고 + 로그인/시작하기)와 푸터.
 
 구성 섹션:
+
 1. 상단 내비(로고 `리브` + `로그인`·`무료로 시작하기`)
 2. 히어로 — 핵심 카피("부대 출타율, 미리 보고 계획하세요") + 서브카피 + CTA + **달력 목업 비주얼**(출타율 초과일 빨간 표시가 보이는 정적 미니 달력, 순수 CSS/SVG)
 3. 핵심 기능 3~4개 카드: 부대 달력 함께 보기 · 출타율 초과 알림(인앱+푸시) · 계급 자동 진급 · 부대 관리(승인·인원)

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError, unwrap } from "../src";
 
 function fakeRes(ok: boolean, status: number, body: unknown) {
-  return { ok, status, json: async () => body };
+  return { ok, status, json: () => Promise.resolve(body) };
 }
 
 describe("unwrap", () => {

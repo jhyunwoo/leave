@@ -163,7 +163,7 @@ export function OverviewPage() {
                 defaultValue=""
                 onChange={(event) => {
                   if (event.target.value) {
-                    navigate(
+                    void navigate(
                       `/access-logs?platform=${encodeURIComponent(event.target.value)}`,
                     );
                   }
@@ -177,7 +177,7 @@ export function OverviewPage() {
               <button
                 className="button compact secondary"
                 type="button"
-                onClick={() => navigate("/access-logs")}
+                onClick={() => void navigate("/access-logs")}
               >
                 전체 로그 보기
               </button>
@@ -186,24 +186,30 @@ export function OverviewPage() {
           <DataTable
             columns={columns}
             items={recentAccessLogs}
-            onRowClick={() => navigate("/access-logs")}
+            onRowClick={() => void navigate("/access-logs")}
           />
         </section>
 
         <aside className="utility-rail">
           <section className="utility-panel">
             <h2>빠른 작업</h2>
-            <button type="button" onClick={() => navigate("/users?create=1")}>
+            <button
+              type="button"
+              onClick={() => void navigate("/users?create=1")}
+            >
               <UserPlus size={23} />
               사용자 추가
             </button>
-            <button type="button" onClick={() => navigate("/units?create=1")}>
+            <button
+              type="button"
+              onClick={() => void navigate("/units?create=1")}
+            >
               <Building2 size={23} />
               부대 추가
             </button>
             <button
               type="button"
-              onClick={() => navigate("/notifications?create=1")}
+              onClick={() => void navigate("/notifications?create=1")}
             >
               <Send size={23} />
               알림 발송
@@ -246,7 +252,7 @@ export function OverviewPage() {
       <button
         className="mobile-quick-action"
         type="button"
-        onClick={() => navigate("/notifications?create=1")}
+        onClick={() => void navigate("/notifications?create=1")}
       >
         <UserPlus size={24} />
         <span>빠른 작업</span>

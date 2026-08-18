@@ -10,7 +10,11 @@
  * 존재하지도 않는 그룹의 정원을 먼저 정하게 돼 오히려 헷갈린다.
  */
 
-import { unitCreateSchema, unitJoinSchema } from "@leave/shared";
+import {
+  fmtDateTimeFull,
+  unitCreateSchema,
+  unitJoinSchema,
+} from "@leave/shared";
 import {
   useCreateUnit,
   useJoinUnit,
@@ -99,11 +103,14 @@ export function GroupStep(props: {
           {invite.code}
         </div>
         <p className="ob-fineprint">
-          {new Date(invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
-          {invite.maxUses}회 · 서버에는 해시값만 저장됩니다.
+          {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회 ·
+          서버에는 해시값만 저장됩니다.
         </p>
         <StepNext label="안전하게 공유" onClick={() => void share()} />
-        <StepSkip label="코드 복사" onClick={() => void navigator.clipboard.writeText(invite.code)} />
+        <StepSkip
+          label="코드 복사"
+          onClick={() => void navigator.clipboard.writeText(invite.code)}
+        />
         <StepSkip
           label="완료하고 시작하기"
           onClick={() => props.onDone(true)}

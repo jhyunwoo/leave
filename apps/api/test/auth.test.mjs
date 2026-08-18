@@ -75,7 +75,10 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
   assert.equal(me.data.user.branch, "air_force");
 
   // 완료 API는 재호출해도 연가를 중복 생성하지 않는다.
-  assert.equal((await req("POST", "/auth/onboarding/complete", { token })).status, 200);
+  assert.equal(
+    (await req("POST", "/auth/onboarding/complete", { token })).status,
+    200,
+  );
   const grants = await req("GET", "/leaves/grants", { token });
   const annual = grants.data.funds.find((fund) => fund.key === "annual");
   assert.equal(annual.grants.length, 1);
@@ -176,4 +179,60 @@ test("계정 삭제: 계정·휴가·부대 소속이 모두 사라진다", asyn
   // 같은 이메일로 재가입이 가능해야 함 (완전히 삭제되었으므로)
   const again = await signup({ email });
   assert.equal(again.status, 201);
+});
+
+test("계정 삭제: 혼자 남은 관리자가 지우면 그룹과 초대코드가 함께 사라진다", async () => {
+  // 탈퇴 조율(관리자 이관 → 없으면 그룹 삭제)의 다른 쪽 분기.
+  // 이관 분기는 units.test.mjs가 지킨다.
+  const admin = await signup();
+  const created = await createUnit(admin.token);
+  assert.equal(created.status, 201);
+  const code = created.data.invite.code;
+
+  const del = await req("DELETE", "/auth/account", { token: admin.token });
+  assert.equal(del.status, 200);
+
+  // 남은 초대코드로는 아무도 들어올 수 없다. 그룹이 사라졌기 때문이다.
+  const outsider = await signup();
+  const join = await req("POST", "/units/join", {
+    token: outsider.token,
+    body: { code },
+  });
+  assert.equal(join.status, 400);
+  assert.match(join.data.error, /초대코드/);
+});
+
+test("계정 삭제: 나를 차단한 사람의 목록이 깨지지 않는다", async () => {
+  // 차단은 양방향으로 지운다. 남으면 없는 id를 계속 숨기려 든다.
+  const admin = await signup();
+  const created = await createUnit(admin.token);
+  const unitId = created.data.unit.id;
+  const code = created.data.invite.code;
+
+  const member = await signup();
+  assert.equal(
+    (await req("POST", "/units/join", { token: member.token, body: { code } }))
+      .status,
+    200,
+  );
+
+  const blocked = await req("POST", "/moderation/blocks", {
+    token: admin.token,
+    body: { userId: member.data.user.id },
+  });
+  assert.equal(blocked.status, 200);
+
+  assert.equal(
+    (await req("DELETE", "/auth/account", { token: member.token })).status,
+    200,
+  );
+
+  const members = await req("GET", `/units/${unitId}/members`, {
+    token: admin.token,
+  });
+  assert.equal(members.status, 200);
+  assert.deepEqual(
+    members.data.members.map((m) => m.id),
+    [admin.data.user.id],
+  );
 });

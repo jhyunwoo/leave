@@ -10,6 +10,7 @@
  */
 
 import {
+  fmtDateTimeFull,
   unitCreateSchema,
   unitJoinSchema,
   type UnitCreateInput,
@@ -46,7 +47,7 @@ async function shareInvite(invite: IssuedUnitInvite) {
     message: [
       "리브 앱에서 아래 초대코드를 입력하세요.",
       invite.code,
-      `만료: ${new Date(invite.expiresAt).toLocaleString("ko-KR")}`,
+      `만료: ${fmtDateTimeFull(invite.expiresAt)}`,
       "실제 부대명·부대번호·주소·병력 현황은 입력하지 마세요.",
     ].join("\n\n"),
   });
@@ -235,7 +236,7 @@ function InvitePanel(props: { invite: IssuedUnitInvite; onShare: () => void }) {
         {props.invite.code}
       </Text>
       <Text style={styles.myUnitMeta}>
-        {new Date(props.invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
+        {fmtDateTimeFull(props.invite.expiresAt)}까지 · 최대{" "}
         {props.invite.maxUses}회
       </Text>
       <Button title="안전하게 공유" onPress={props.onShare} />

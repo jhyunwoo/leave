@@ -2,24 +2,32 @@
   "name": "leave",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
     "browser:close": "agent-browser close --all",
     "browser:doctor": "agent-browser doctor --offline --quick",
     "browser:install": "node scripts/setup-agent-browser.mjs",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
     "dev": "turbo run dev",
     "dev:admin": "turbo run dev --filter=@leave/admin",
     "dev:web": "turbo run dev --filter=@leave/api --filter=@leave/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types",
+    "quality": "pnpm format:check && pnpm lint && pnpm types:check && pnpm check-types && pnpm test",
     "test": "turbo run test",
-    "test:e2e": "turbo run test:e2e"
+    "test:e2e": "turbo run test:e2e",
+    "types:check": "turbo run types:check"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "agent-browser": "0.33.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
     "prettier": "^3.9.6",
     "turbo": "^2.10.8",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "typescript-eslint": "^8.67.0"
   },
   "packageManager": "pnpm@11.13.1",
   "engines": {

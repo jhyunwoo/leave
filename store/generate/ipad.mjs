@@ -42,7 +42,11 @@ for (const shot of Object.values(WEB_SHOTS)) {
  * 그냥 사각형으로 붙이면 "앱 화면"인지 "웹 화면"인지 읽히지 않는다. 크롬 바를
  * 씌워야 아이패드 사용자가 "브라우저에서도 쓴다"로 이해한다.
  */
-export function browserWindow(shotKey, targetW, { shadow = true, radiusScale = 0.016 } = {}) {
+export function browserWindow(
+  shotKey,
+  targetW,
+  { shadow = true, radiusScale = 0.016 } = {},
+) {
   const shot = WEB_SHOTS[shotKey];
   const visibleH = shot.cropBottom ?? shot.h;
   const k = targetW / shot.w;
@@ -55,13 +59,17 @@ export function browserWindow(shotKey, targetW, { shadow = true, radiusScale = 0
       (c) =>
         `<span style="width:${dot}px;height:${dot}px;border-radius:999px;background:${c};display:inline-block"></span>`,
     )
-    .join(`<span style="width:${Math.round(dot * 0.7)}px;display:inline-block"></span>`);
+    .join(
+      `<span style="width:${Math.round(dot * 0.7)}px;display:inline-block"></span>`,
+    );
 
   return {
     w: Math.round(targetW),
     h: bodyH + barH,
     html: `<div style="width:${Math.round(targetW)}px;border-radius:${radius}px;overflow:hidden;background:#e9ece7;${
-      shadow ? `box-shadow:0 ${Math.round(targetW * 0.035)}px ${Math.round(targetW * 0.085)}px rgba(22,51,0,.30)` : ""
+      shadow
+        ? `box-shadow:0 ${Math.round(targetW * 0.035)}px ${Math.round(targetW * 0.085)}px rgba(22,51,0,.30)`
+        : ""
     }">
       <div style="height:${barH}px;display:flex;align-items:center;padding:0 ${Math.round(barH * 0.55)}px;background:#dfe4db;border-bottom:1px solid rgba(14,15,12,.07)">
         ${dots}
@@ -192,7 +200,11 @@ export function tabletSlideHTML({ W, H, slide, head, iconUri }) {
     // 창 하나 + 그 위에 겹친 요약 카드. 창을 두 개 겹치면 뒤쪽이 여백만 보이므로,
     // 뒤쪽 화면에서 할 말이 있는 카드만 오려 앞으로 띄운다.
     const dev = browserWindow(slide.shot, Math.round(W * 0.8));
-    const card = shotCard(slide.shotCard, GRANTS_SUMMARY_BOX, Math.round(W * 0.66));
+    const card = shotCard(
+      slide.shotCard,
+      GRANTS_SUMMARY_BOX,
+      Math.round(W * 0.66),
+    );
     return shell(
       bg,
       `${orbs(W)}

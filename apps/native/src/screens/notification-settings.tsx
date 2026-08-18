@@ -59,63 +59,62 @@ export function NotificationSettingsScreen() {
       {process.env.EXPO_OS === "web" && (
         <Text style={styles.webTitle}>알림 설정</Text>
       )}
-      <ResponsiveGrid
-        sizeClass={sizeClass}
-        columns={{ compact: 1, medium: 2 }}
-      >
-      <ContentPanel style={styles.preferenceCard}>
-        <Text selectable style={styles.preferenceTitle}>
-          기기 알림은 원할 때만
-        </Text>
-        <Text selectable style={styles.preferenceBody}>
-          앱에서 일정 상태가 왜 중요한지 확인한 뒤 직접 켤 수 있어요. 권한을
-          허용하지 않아도 캘린더와 계획 기능은 그대로 사용할 수 있습니다.
-        </Text>
-        <Button
-          title={registerPush.isPending ? "설정 중…" : "기기 알림 켜기"}
-          variant="secondary"
-          loading={registerPush.isPending}
-          onPress={() => void enableDeviceNotifications()}
-        />
-        {permissionResult ? (
-          <Text selectable style={styles.permissionResult}>
-            {permissionResult}
+      <ResponsiveGrid sizeClass={sizeClass} columns={{ compact: 1, medium: 2 }}>
+        <ContentPanel style={styles.preferenceCard}>
+          <Text selectable style={styles.preferenceTitle}>
+            기기 알림은 원할 때만
           </Text>
-        ) : null}
-      </ContentPanel>
+          <Text selectable style={styles.preferenceBody}>
+            앱에서 일정 상태가 왜 중요한지 확인한 뒤 직접 켤 수 있어요. 권한을
+            허용하지 않아도 캘린더와 계획 기능은 그대로 사용할 수 있습니다.
+          </Text>
+          <Button
+            title={registerPush.isPending ? "설정 중…" : "기기 알림 켜기"}
+            variant="secondary"
+            loading={registerPush.isPending}
+            onPress={() => void enableDeviceNotifications()}
+          />
+          {permissionResult ? (
+            <Text selectable style={styles.permissionResult}>
+              {permissionResult}
+            </Text>
+          ) : null}
+        </ContentPanel>
 
-      {/* 종류별 on/off — 전부 꺼도 앱은 그대로 쓸 수 있다. */}
-      <ContentPanel style={styles.preferenceCard}>
-        <Text selectable style={styles.preferenceTitle}>
-          받을 알림 고르기
-        </Text>
-        <Text selectable style={styles.preferenceBody}>
-          종류별로 따로 끌 수 있어요. 모두 꺼도 캘린더와 계획 기능은 그대로
-          사용할 수 있습니다.
-        </Text>
-        <NativeCheckbox
-          value={prefs.data?.preferences.overage ?? true}
-          onValueChange={(overage) => void updatePrefs.mutateAsync({ overage })}
-          label="내 계획 날짜가 참고 기준을 넘겼을 때"
-          testID="notification-pref-overage"
-        />
-        <NativeCheckbox
-          value={prefs.data?.preferences.blackout ?? true}
-          onValueChange={(blackout) =>
-            void updatePrefs.mutateAsync({ blackout })
-          }
-          label="내 계획 기간에 제한 기간(검열·훈련)이 등록됐을 때"
-          testID="notification-pref-blackout"
-        />
-        <NativeCheckbox
-          value={prefs.data?.preferences.unitNotice ?? true}
-          onValueChange={(unitNotice) =>
-            void updatePrefs.mutateAsync({ unitNotice })
-          }
-          label="그룹 설정·관리자 변경 안내"
-          testID="notification-pref-unit-notice"
-        />
-      </ContentPanel>
+        {/* 종류별 on/off — 전부 꺼도 앱은 그대로 쓸 수 있다. */}
+        <ContentPanel style={styles.preferenceCard}>
+          <Text selectable style={styles.preferenceTitle}>
+            받을 알림 고르기
+          </Text>
+          <Text selectable style={styles.preferenceBody}>
+            종류별로 따로 끌 수 있어요. 모두 꺼도 캘린더와 계획 기능은 그대로
+            사용할 수 있습니다.
+          </Text>
+          <NativeCheckbox
+            value={prefs.data?.preferences.overage ?? true}
+            onValueChange={(overage) =>
+              void updatePrefs.mutateAsync({ overage })
+            }
+            label="내 계획 날짜가 참고 기준을 넘겼을 때"
+            testID="notification-pref-overage"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.blackout ?? true}
+            onValueChange={(blackout) =>
+              void updatePrefs.mutateAsync({ blackout })
+            }
+            label="내 계획 기간에 제한 기간(검열·훈련)이 등록됐을 때"
+            testID="notification-pref-blackout"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.unitNotice ?? true}
+            onValueChange={(unitNotice) =>
+              void updatePrefs.mutateAsync({ unitNotice })
+            }
+            label="그룹 설정·관리자 변경 안내"
+            testID="notification-pref-unit-notice"
+          />
+        </ContentPanel>
       </ResponsiveGrid>
     </ScrollView>
   );

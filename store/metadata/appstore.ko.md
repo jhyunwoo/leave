@@ -67,16 +67,16 @@
 
 ## App Store Connect 필드
 
-| 항목 | 값 |
-|---|---|
-| Primary Category | Productivity |
-| Secondary Category | Utilities |
-| Support URL | https://leave.moveto.kr/support |
-| Marketing URL | 비워 둠 |
+| 항목               | 값                              |
+| ------------------ | ------------------------------- |
+| Primary Category   | Productivity                    |
+| Secondary Category | Utilities                       |
+| Support URL        | https://leave.moveto.kr/support |
+| Marketing URL      | 비워 둠                         |
 | Privacy Policy URL | https://leave.moveto.kr/privacy |
-| Copyright | 2026 Hyunwoo Jeon |
-| Tracking | 사용하지 않음 |
-| Sign-in required | 예 |
+| Copyright          | 2026 Hyunwoo Jeon               |
+| Tracking           | 사용하지 않음                   |
+| Sign-in required   | 예                              |
 
 연령 등급은 그룹 구성원 간 일정 공유를 사용자 간 상호작용으로 사실대로 답하고 콘솔이 산출한 결과를 사용합니다. 출시 전에 인앱 신고·차단 흐름과 운영 절차가 준비되지 않았다면 심사 제출하지 않습니다.
 

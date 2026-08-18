@@ -5,6 +5,7 @@
  */
 
 import {
+  fmtDateTimeFull,
   blackoutCreateSchema,
   fmtRangeTiny,
   REPORT_REASON_LABELS,
@@ -58,7 +59,7 @@ export function UnitManagePage(props: { me: Me }) {
         <button
           type="button"
           className="btn btn-tertiary btn-sm"
-          onClick={() => navigate("/units")}
+          onClick={() => void navigate("/units")}
           style={{ marginBottom: "var(--sp-sm)" }}
         >
           ← 공유 그룹
@@ -126,8 +127,7 @@ function ParticipationSection({ unit }: { unit: Unit }) {
       </p>
       {unit.lastTotalUpdatedAt && (
         <p className="caption text-mute">
-          기준 인원 마지막 갱신:{" "}
-          {new Date(unit.lastTotalUpdatedAt).toLocaleString("ko-KR")}
+          기준 인원 마지막 갱신: {fmtDateTimeFull(unit.lastTotalUpdatedAt)}
         </p>
       )}
     </section>
@@ -278,8 +278,7 @@ function InviteSection({ unit }: { unit: Unit }) {
             {invite.code}
           </code>
           <p className="caption text-mute">
-            {new Date(invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
-            {invite.maxUses}회
+            {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회
           </p>
         </>
       )}

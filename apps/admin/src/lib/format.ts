@@ -29,9 +29,28 @@ export function formatDateTime(value: unknown): string {
   return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
 }
 
-/** 빈 값을 표 안에서 눈에 띄는 대시로 바꾼다. */
+/**
+ * 빈 값을 표 안에서 눈에 띄는 대시로 바꾼다.
+ *
+ * 관리자 표는 서버가 준 행을 스키마 없이 그대로 그린다. 값이 무엇이든 한 칸에
+ * 찍어야 하므로 `unknown`을 String()에 넘기는 것이 이 함수의 목적이다.
+ * 이 저장소에서 unknown을 문자열로 바꾸는 곳은 여기 하나로 모은다.
+ */
 export function text(value: unknown): string {
-  return value === null || value === undefined || value === ""
-    ? "—"
-    : String(value);
+  if (value === null || value === undefined || value === "") return "—";
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 위 주석: 의도적인 표시 경계
+  return String(value);
+}
+
+/**
+ * 상세 서랍에서 한 필드를 보여줄 문자열.
+ *
+ * `text()`와 달리 객체는 접힌 JSON으로 펼친다 — 상세 화면은 원본을 확인하는
+ * 곳이라 `[object Object]`로 뭉개면 쓸모가 없다.
+ */
+export function detailText(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 서버 원본 값을 그대로 보여주는 의도적 경계
+  return String(value);
 }

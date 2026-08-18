@@ -37,16 +37,16 @@ IMPORTANT
 Leave is an independently developed service and is not affiliated with or endorsed by the Republic of Korea Ministry of National Defense, any armed service, or any military unit. Capacity results are estimates based on user-entered data and a group setting. They are not official records, reservations, or approvals. Actual leave requires commander approval and is subject to applicable unit rules. Do not make a leave decision based only on this app.
 ```
 
-| Field | Value |
-|---|---|
-| Category | Productivity |
-| Contact email | `jhyunwoo0228@gmail.com` |
-| Website | `https://leave.moveto.kr/support` |
-| Privacy policy | `https://leave.moveto.kr/privacy` |
+| Field            | Value                                    |
+| ---------------- | ---------------------------------------- |
+| Category         | Productivity                             |
+| Contact email    | `jhyunwoo0228@gmail.com`                 |
+| Website          | `https://leave.moveto.kr/support`        |
+| Privacy policy   | `https://leave.moveto.kr/privacy`        |
 | Account deletion | `https://leave.moveto.kr/delete-account` |
-| Contains ads | No |
-| In-app purchases | None |
-| Target audience | 18 and older; not directed to children |
+| Contains ads     | No                                       |
+| In-app purchases | None                                     |
+| Target audience  | 18 and older; not directed to children   |
 
 Disclose user interaction and UGC because members share schedule titles and notes. Do not submit until in-app reporting and blocking requirements are satisfied.
 

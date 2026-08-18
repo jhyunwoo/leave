@@ -49,17 +49,17 @@
 
 ## Play Console 필드
 
-| 항목 | 값 |
-|---|---|
-| Category | Productivity |
-| Tags | Calendar, Schedule management, Productivity |
-| Contact email | jhyunwoo0228@gmail.com |
-| Website | https://leave.moveto.kr/support |
-| Privacy Policy URL | https://leave.moveto.kr/privacy |
-| Account deletion URL | https://leave.moveto.kr/delete-account |
-| Contains ads | 아니요 |
-| In-app purchases | 없음 |
-| Target audience | 만 18세 이상, 아동 대상 아님 |
+| 항목                 | 값                                          |
+| -------------------- | ------------------------------------------- |
+| Category             | Productivity                                |
+| Tags                 | Calendar, Schedule management, Productivity |
+| Contact email        | jhyunwoo0228@gmail.com                      |
+| Website              | https://leave.moveto.kr/support             |
+| Privacy Policy URL   | https://leave.moveto.kr/privacy             |
+| Account deletion URL | https://leave.moveto.kr/delete-account      |
+| Contains ads         | 아니요                                      |
+| In-app purchases     | 없음                                        |
+| Target audience      | 만 18세 이상, 아동 대상 아님                |
 
 콘텐츠 등급 설문에서는 그룹 구성원 간 일정 공유를 사용자 간 상호작용으로 사실대로 답합니다. 인앱 신고·차단 요건과 운영 절차가 준비되지 않았다면 제출하지 않습니다.
 

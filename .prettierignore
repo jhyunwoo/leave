@@ -1,0 +1,25 @@
+# 생성물·산출물은 서식 검사 대상이 아니다.
+dist
+build
+coverage
+.turbo
+.wrangler
+.expo
+node_modules
+pnpm-lock.yaml
+
+# Wrangler가 생성한다. 손으로 고치지 않는다.
+apps/*/worker-configuration.d.ts
+apps/*/worker-env.d.ts
+
+# Expo가 생성한다.
+apps/native/expo-env.d.ts
+
+# 법적 고지·지원 페이지는 손으로 관리하는 단독 HTML이다. Prettier의 HTML 재배치는
+# 인라인 요소 사이 공백을 바꿔 렌더 결과를 건드릴 수 있어 대상에서 뺀다.
+*.html
+
+# 도구가 생성하고 도구가 다시 쓰는 파일. 서식을 맞춰 두면 다음 생성 때 되돌아가
+# 매번 뜻 없는 diff가 남는다.
+apps/api/migrations
+apps/native/assets/expo.icon

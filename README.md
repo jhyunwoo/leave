@@ -12,14 +12,20 @@
 
 ## 구조 (Turborepo + pnpm)
 
-| 경로 | 내용 | 스택 |
-|---|---|---|
-| `apps/api` | 백엔드 API | Hono + Cloudflare Workers, D1(Drizzle), **KV 캐시**, 접속/푸시 로깅, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
-| `apps/web` | 웹 앱 | Vite + React SPA, Jotai, TanStack Query, Cloudflare Workers 정적 에셋 배포, Playwright e2e |
-| `apps/native` | iOS/Android 앱 | Expo SDK 57, expo-router(NativeTabs — iOS 26 Liquid Glass), expo-notifications, iPad 대응, Maestro e2e |
-| `packages/shared` | 공유 도메인 로직 | 계급 자동진급 계산, 출타 인원 계산, zod 스키마, 날짜/달력 유틸, 공용 HTTP 유틸(`unwrap`/`ApiError`) + vitest 테스트 |
+| 경로              | 내용                   | 스택                                                                                                                              |
+| ----------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`        | 백엔드 API             | Hono + Cloudflare Workers, D1(Drizzle), **KV 캐시**, 접속/푸시 로깅, `@hono/zod-openapi` (문서 자동 생성 `/docs`), Hono Stack RPC |
+| `apps/web`        | 웹 앱                  | Vite + React SPA, Jotai, TanStack Query, Cloudflare Workers 정적 에셋 배포, Playwright e2e                                        |
+| `apps/native`     | iOS/Android 앱         | Expo SDK 57, expo-router(NativeTabs — iOS 26 Liquid Glass), expo-notifications, iPad 대응, Maestro e2e                            |
+| `packages/shared` | 공유 도메인 로직       | 계급 자동진급 계산, 출타 인원 계산, zod 스키마, 날짜/달력 유틸, 공용 HTTP 유틸(`unwrap`/`ApiError`) + vitest 테스트               |
+| `packages/client` | 웹·앱 공용 데이터 계층 | Hono RPC 클라이언트 타입, TanStack Query 훅, 캐시 키·무효화, 플랫폼 독립 폼 상태(`useLeaveForm`) + vitest 테스트                  |
+| `apps/admin`      | 운영자 콘솔            | Vite + React SPA, 전용 Cloudflare Worker(쿠키 세션·CSRF·감사 로그), Playwright e2e                                                |
 
 타입 안정성: `apps/api`가 `AppType`을 export → 웹/앱이 `hc<AppType>()`로 타입 안전 RPC 클라이언트 사용. 디자인은 `DESIGN.md`(Wise 스타일) 토큰을 웹·앱이 공유합니다.
+
+- 무엇이 어디에 사는가·의존 방향: [docs/architecture.md](docs/architecture.md)
+- 무엇을 고치면 무엇을 테스트하는가: [docs/testing.md](docs/testing.md)
+- 유지보수 규칙: [docs/code-style.md](docs/code-style.md)
 
 ## 로컬 개발
 
@@ -74,10 +80,13 @@ pnpm browser:close
 ### 테스트
 
 ```bash
-pnpm test                        # 전체 테스트 (Turborepo 캐시)
-pnpm test --filter @leave/shared # 도메인·유틸 단위 테스트 (vitest, 44개)
-pnpm test --filter @leave/api    # API 통합 테스트 (TDD, 19개)
+pnpm quality                     # 서식 → lint → 바인딩 타입 → 타입 검사 → 테스트
+pnpm test                        # 테스트만 (Turborepo 캐시)
+pnpm test --filter @leave/shared # 도메인·유틸 단위 테스트 (vitest)
+pnpm test --filter @leave/api    # API 통합 테스트 (격리 D1 + wrangler dev)
 ```
+
+무엇을 고쳤을 때 무엇을 돌리고 무엇을 더 써야 하는지는 [docs/testing.md](docs/testing.md).
 
 - **API 통합 테스트**(`apps/api/test/*.test.mjs`): 격리된 로컬 D1로 `wrangler dev`를 자동 기동해
   인증·부대·휴가·출타 인원·**접속 로그**·**푸시 이벤트**·**달력 캐시 무효화**를 Node 내장 러너로 검증(추가 의존성 없음).
@@ -94,11 +103,11 @@ pnpm test --filter @leave/api    # API 통합 테스트 (TDD, 19개)
 `routes`(`custom_domain: true`)에 선언돼 있어, 배포할 때 wrangler가 DNS 레코드와
 인증서를 자동으로 만듭니다. `moveto.kr` 존이 배포 계정에 있어야 합니다.
 
-| 워커 | 도메인 |
-| --- | --- |
-| `leave-web` (사용자 웹) | `https://leave.moveto.kr` |
-| `leave-admin` (관리자) | `https://admin.leave.moveto.kr` |
-| `leave-api` (API·문서) | `https://api.leave.moveto.kr` |
+| 워커                    | 도메인                          |
+| ----------------------- | ------------------------------- |
+| `leave-web` (사용자 웹) | `https://leave.moveto.kr`       |
+| `leave-admin` (관리자)  | `https://admin.leave.moveto.kr` |
+| `leave-api` (API·문서)  | `https://api.leave.moveto.kr`   |
 
 ```bash
 # 1. 리소스 생성

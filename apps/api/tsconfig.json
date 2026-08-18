@@ -1,15 +1,14 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "lib": ["ES2022"],
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "noEmit": true,
+    // Workers 런타임 전역(D1Database·KVNamespace 등).
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src", "drizzle.config.ts"]
+  "include": [
+    "src",
+    "drizzle.config.ts",
+    "worker-env.d.ts",
+    "bindings-drift.ts"
+  ]
 }

@@ -1,8 +1,14 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  // 이 파일들이 바뀌면 모든 태스크의 캐시를 버린다(의존성 해석·컴파일러 설정이 달라지므로).
-  "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.json"],
+  // 이 파일들이 바뀌면 모든 태스크의 캐시를 버린다
+  // (의존성 해석·컴파일러 설정·검사 규칙이 한꺼번에 달라지므로).
+  "globalDependencies": [
+    "pnpm-workspace.yaml",
+    "tsconfig.base.json",
+    "eslint.config.mjs",
+    "prettier.config.mjs"
+  ],
   "tasks": {
     // ── 빌드·검증 ────────────────────────────────────────────────
     // 의존 패키지를 먼저 빌드해야 한다(^build). @leave/shared·@leave/client는
@@ -20,6 +26,15 @@
     "lint": {
       "dependsOn": ["^lint"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md"]
+    },
+    // wrangler.jsonc의 바인딩과 생성된 타입이 어긋나지 않는지 확인한다.
+    // 설정 파일 하나만 보면 되므로 입력을 좁혀 둔다.
+    "types:check": {
+      "inputs": [
+        "wrangler.jsonc",
+        "worker-configuration.d.ts",
+        "worker-env.d.ts"
+      ]
     },
     // API 테스트는 migrations/를 적용해 실제 D1에 붙으므로 입력에 포함한다.
     "test": {

@@ -4,7 +4,7 @@
  * 값 배열과 라벨 표를 분리해, 화면은 내부 값 그대로 다루고 표기만 바꿀 수 있다.
  */
 
-import SegmentedControl from "@expo/ui/community/segmented-control";
+import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { StyleSheet, View } from "react-native";
 
 export function NativeSegmentedControl<T extends string>(props: {

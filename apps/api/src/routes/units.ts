@@ -2,26 +2,27 @@
  * 그룹(부대) 라우트 핸들러.
  *
  * 마운트 위치: `/units` (apps/api/src/index.ts).
- * 명세는 ./units.routes.ts, 공용 규칙은 아래 lib에 있다.
- *  - 권한 판정      → lib/unit-access.ts
- *  - 초대코드 발급  → lib/invites.ts
- *  - 달력 조립      → lib/calendar.ts
+ * 명세는 ./units.contract.ts, 공용 규칙은 아래 lib에 있다.
+ *  - 권한 판정        → lib/unit-access.ts
+ *  - 초대코드 발급    → lib/invites.ts
+ *  - 가입·탈퇴 조율   → lib/unit-membership.ts
+ *  - 달력 조립        → lib/calendar.ts
  *
  * 여기 남긴 것은 "요청을 받아 권한을 확인하고 DB를 바꾸고 응답을 고르는" 흐름뿐이다.
  */
-import { and, asc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { unitBlackouts, unitInvites, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
 import { buildCalendarPayload, listVisibleMembers } from "../lib/calendar";
-import { sha256Hex } from "../lib/crypto";
 import {
   createInvite,
   DEFAULT_INVITE_MAX_USES,
   resolveInviteExpiry,
 } from "../lib/invites";
 import { serializeUnit } from "../lib/serialize";
+import { joinUnitByInviteCode, leaveUnit } from "../lib/unit-membership";
 import { checkUnitAdmin, serializeUnitById } from "../lib/unit-access";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
@@ -41,7 +42,7 @@ import {
   rotateInviteRoute,
   transferRoute,
   updateUnitRoute,
-} from "./units.routes";
+} from "./units.contract";
 
 /**
  * 달력을 조회할 수 있는 범위(현재 월 기준).
@@ -62,6 +63,7 @@ app.use("*", async (c, next) => {
   const path = new URL(c.req.url).pathname;
   if (c.req.method === "POST" && (path === "/units" || path === "/units/join"))
     return next();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Hono 미들웨어 합성 타이핑 한계 (apps/api/src/index.ts 주석 참고)
   return onboardingMiddleware(c, next);
 });
 // 초대코드를 무차별 대입으로 찾아내지 못하게 막는 마지막 방어선.
@@ -196,64 +198,21 @@ export const unitRoutes = app
     const { code } = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    if (user.unitId) {
-      return c.json(
-        {
-          error: "이미 그룹에 소속되어 있습니다. 먼저 현재 그룹에서 나가주세요",
-        },
-        409,
-      );
+
+    const joined = await joinUnitByInviteCode(db, user, code);
+    if (!joined.ok) {
+      return joined.reason === "already-in-unit"
+        ? c.json(
+            {
+              error:
+                "이미 그룹에 소속되어 있습니다. 먼저 현재 그룹에서 나가주세요",
+            },
+            409,
+          )
+        : c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
 
-    const now = new Date().toISOString();
-    const codeHash = await sha256Hex(code);
-    const invite = await db
-      .select()
-      .from(unitInvites)
-      .where(eq(unitInvites.codeHash, codeHash))
-      .get();
-    if (
-      !invite ||
-      invite.revokedAt !== null ||
-      invite.expiresAt <= now ||
-      invite.usedCount >= invite.maxUses
-    ) {
-      return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
-    }
-
-    // 사용 횟수 증가를 조건부 UPDATE로 처리해, 동시 요청이 상한을 넘겨 쓰지 못하게 한다.
-    const consumed = await db
-      .update(unitInvites)
-      .set({ usedCount: sql`${unitInvites.usedCount} + 1` })
-      .where(
-        and(
-          eq(unitInvites.id, invite.id),
-          isNull(unitInvites.revokedAt),
-          gt(unitInvites.expiresAt, now),
-          lt(unitInvites.usedCount, unitInvites.maxUses),
-        ),
-      )
-      .run();
-    if (consumed.meta.changes !== 1) {
-      return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
-    }
-
-    const joined = await db
-      .update(users)
-      .set({ unitId: invite.unitId })
-      .where(and(eq(users.id, user.id), isNull(users.unitId)))
-      .run();
-    if (joined.meta.changes !== 1) {
-      // 같은 사용자의 동시 요청이 코드를 불필요하게 소진하지 않도록 보상한다.
-      await db
-        .update(unitInvites)
-        .set({ usedCount: sql`${unitInvites.usedCount} - 1` })
-        .where(and(eq(unitInvites.id, invite.id), gt(unitInvites.usedCount, 0)))
-        .run();
-      return c.json({ error: "이미 그룹에 소속되어 있습니다" }, 409);
-    }
-
-    const unit = await serializeUnitById(db, invite.unitId);
+    const unit = await serializeUnitById(db, joined.unitId);
     if (!unit) {
       return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
@@ -352,41 +311,13 @@ export const unitRoutes = app
   })
 
   .openapi(leaveUnitRoute, async (c) => {
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-    const unitId = user.unitId;
-    // 애초에 소속이 없으면 탈퇴는 이미 이뤄진 상태다.
-    if (!unitId) return c.json({ ok: true as const }, 200);
-
-    const unit = await db
-      .select()
-      .from(units)
-      .where(eq(units.id, unitId))
-      .get();
-
-    if (unit && unit.adminId === user.id) {
-      const otherCount = await db.$count(
-        users,
-        and(eq(users.unitId, unitId), ne(users.id, user.id)),
+    const left = await leaveUnit(drizzle(c.env.DB), c.env.CACHE, c.get("user"));
+    if (!left.ok) {
+      return c.json(
+        { error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다" },
+        409,
       );
-      if (otherCount > 0) {
-        return c.json(
-          {
-            error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다",
-          },
-          409,
-        );
-      }
-      // 혼자 남은 관리자가 나가면 빈 그룹과 초대코드를 정리한다.
-      await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
-      await db.delete(unitInvites).where(eq(unitInvites.unitId, unitId));
-      await db.delete(units).where(eq(units.id, unitId));
-      await bumpUnitVersion(c.env.CACHE, unitId);
-      return c.json({ ok: true as const }, 200);
     }
-
-    await db.update(users).set({ unitId: null }).where(eq(users.id, user.id));
-    await bumpUnitVersion(c.env.CACHE, unitId);
     return c.json({ ok: true as const }, 200);
   })
 

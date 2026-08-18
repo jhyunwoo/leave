@@ -1,302 +1,109 @@
 /**
- * 인증·프로필 라우트.
+ * 인증·프로필 라우트 핸들러.
  *
  * 마운트 위치: `/auth` (apps/api/src/index.ts).
- * 다루는 것: 회원가입, 로그인, 내 정보, 프로필 수정·이미지, 로그아웃, 회원 탈퇴.
+ * 명세는 ./auth.contract.ts, 여러 표를 함께 건드리는 작업은 아래 lib에 있다.
+ *  - 세션 발급   → lib/sessions.ts
+ *  - 온보딩      → lib/onboarding.ts
+ *  - 회원 탈퇴   → lib/delete-account.ts
  *
- * 회원가입은 계정만 만드는 게 아니라 군 종류별 기본 연가 적립분까지 함께 넣는다.
- * 탈퇴는 관련 데이터를 모두 지우고, 남은 부대원이 있으면 관리자를 이관한다.
+ * 여기 남긴 것은 "요청을 받아 권한을 확인하고 위 작업을 부르고 응답을 고르는" 흐름뿐이다.
  */
 
-import { createRoute, z } from "@hono/zod-openapi";
-import {
-  DEFAULT_ANNUAL_DAYS,
-  loginSchema,
-  onboardingProfileSchema,
-  passwordChangeSchema,
-  profileUpdateSchema,
-  regularOvernightConfigSchema,
-  signupSchema,
+import type {
+  LoginInput,
+  ProfileUpdateInput,
+  SignupInput,
 } from "@leave/shared";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
-import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import { desc, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
 import {
   accessLogs,
-  leaveGrants,
-  leaves,
-  contentReports,
-  notifications,
   pushLogs,
-  regularOvernightConfigs,
   sessions,
-  unitInvites,
   units,
-  userBlocks,
-  userNotificationPrefs,
   users,
   type UserRow,
 } from "../db/schema";
 import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
+import { hashPassword, sha256Hex, verifyPassword } from "../lib/crypto";
+import { deleteAccount } from "../lib/delete-account";
+import { leaveRuleMessage } from "../lib/errors";
 import { saveRegularOvernightConfig } from "../lib/leave-balances";
 import {
-  generateSessionToken,
-  hashPassword,
-  sha256Hex,
-  verifyPassword,
-} from "../lib/crypto";
-import {
-  activitySchema,
-  authResponseSchema,
-  errorResponse,
-  jsonContent,
-  myJoinRequestSchema,
-  okSchema,
-  unitSchema,
-  userSchema,
-} from "../lib/responses";
+  completeOnboarding,
+  ensureDefaultAnnualGrant,
+  PLACEHOLDER_PROFILE,
+  readOnboardingStatus,
+  saveOnboardingProfile,
+} from "../lib/onboarding";
 import { serializeUnit, serializeUser } from "../lib/serialize";
+import { createSession } from "../lib/sessions";
 import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
+import {
+  activityRoute,
+  changePasswordRoute,
+  deleteAccountRoute,
+  loginRoute,
+  logoutRoute,
+  meRoute,
+  onboardingCompleteRoute,
+  onboardingProfileRoute,
+  onboardingRegularRoute,
+  onboardingStatusRoute,
+  signupRoute,
+  updateProfileRoute,
+} from "./auth.contract";
 
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** 내 기록 열람에서 한 번에 돌려주는 최대 건수(종류별). */
+const ACTIVITY_LOG_LIMIT = 50;
 
-async function createSession(
-  db: DrizzleD1Database,
-  userId: string,
-): Promise<string> {
-  const token = generateSessionToken();
-  await db.insert(sessions).values({
+/**
+ * 가입 입력으로 사용자 행을 만든다.
+ *
+ * 가입 화면에서 복무 정보를 함께 받는 경로와 계정만 먼저 만드는 경로가 있어,
+ * 이름이 없으면 자리표시 값을 넣고 온보딩 미완료 상태로 둔다.
+ */
+function newUserRow(input: SignupInput): UserRow {
+  const now = new Date().toISOString();
+  const hasProfile = input.name !== undefined;
+  return {
     id: crypto.randomUUID(),
-    userId,
-    tokenHash: await sha256Hex(token),
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
-    createdAt: new Date().toISOString(),
-  });
-  return token;
+    email: input.email,
+    passwordHash: "",
+    passwordSalt: "",
+    name: input.name ?? PLACEHOLDER_PROFILE.name,
+    branch: input.branch ?? "army",
+    enlistedAt: input.enlistedAt ?? PLACEHOLDER_PROFILE.enlistedAt,
+    dischargeAt: input.dischargeAt ?? PLACEHOLDER_PROFILE.dischargeAt,
+    signupRank: input.rank ?? "private",
+    unitId: null,
+    expoPushToken: null,
+    // 가입 시 개인정보 수집·이용에 동의했음을 기록 (동의는 스키마에서 필수)
+    consentedAt: input.dataConsent ? now : null,
+    onboardingCompletedAt: hasProfile ? now : null,
+    createdAt: now,
+  };
 }
 
-const signupRoute = createRoute({
-  method: "post",
-  path: "/signup",
-  tags: ["인증"],
-  summary: "회원가입",
-  request: {
-    body: {
-      content: { "application/json": { schema: signupSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    201: jsonContent(authResponseSchema, "가입 성공 (세션 토큰 포함)"),
-    400: errorResponse("입력값 오류"),
-    409: errorResponse("이미 가입된 이메일"),
-  },
-});
-
-const loginRoute = createRoute({
-  method: "post",
-  path: "/login",
-  tags: ["인증"],
-  summary: "로그인",
-  request: {
-    body: {
-      content: { "application/json": { schema: loginSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(authResponseSchema, "로그인 성공"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("이메일 또는 비밀번호 불일치"),
-  },
-});
-
-const onboardingStatusSchema = z.object({
-  completed: z.boolean(),
-  profile: z
-    .object({
-      name: z.string(),
-      branch: z.enum(["army", "navy", "air_force"]),
-      enlistedAt: z.string(),
-      dischargeAt: z.string(),
-      rank: z.enum(["private", "private_first", "corporal", "sergeant"]),
-    })
-    .nullable(),
-  regularOvernight: z
-    .object({
-      enabled: z.boolean(),
-      startDate: z.string().nullable(),
-      intervalDays: z.number().nullable(),
-      daysPerGrant: z.number().nullable(),
-    })
-    .nullable(),
-  unitId: z.string().nullable(),
-});
-
-const onboardingStatusRoute = createRoute({
-  method: "get",
-  path: "/onboarding",
-  tags: ["인증"],
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(onboardingStatusSchema, "온보딩 상태"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const onboardingProfileRoute = createRoute({
-  method: "put",
-  path: "/onboarding/profile",
-  tags: ["인증"],
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: onboardingProfileSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(okSchema, "복무정보 저장"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const onboardingRegularRoute = createRoute({
-  method: "put",
-  path: "/onboarding/regular-overnight",
-  tags: ["인증"],
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: regularOvernightConfigSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(okSchema, "정기외박 설정 저장"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const onboardingCompleteRoute = createRoute({
-  method: "post",
-  path: "/onboarding/complete",
-  tags: ["인증"],
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(okSchema, "온보딩 완료"),
-    400: errorResponse("복무정보 미완료"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const logoutRoute = createRoute({
-  method: "post",
-  path: "/logout",
-  tags: ["인증"],
-  summary: "로그아웃",
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(okSchema, "로그아웃 완료"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const meRoute = createRoute({
-  method: "get",
-  path: "/me",
-  tags: ["인증"],
-  summary: "내 정보 (계산된 현재 계급, 소속 부대 포함)",
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(
-      z.object({
-        user: userSchema,
-        unit: unitSchema.nullable(),
-        joinRequest: myJoinRequestSchema.nullable(),
-      }),
-      "내 정보",
-    ),
-    401: errorResponse("인증 실패"),
-    428: errorResponse("온보딩 미완료"),
-  },
-});
-
-const activityRoute = createRoute({
-  method: "get",
-  path: "/activity",
-  tags: ["인증"],
-  summary: "내 접속·푸시 기록 열람 (개인정보 열람권)",
-  description:
-    "동의 하에 수집된 내 접속 기록과 푸시 발송·수신 로그를 최근 순으로 최대 50건씩 돌려줍니다.",
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(activitySchema, "내 기록"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const updateProfileRoute = createRoute({
-  method: "patch",
-  path: "/me",
-  tags: ["인증"],
-  summary: "내 정보 수정 (별칭·군 종류·입대일·전역예정일·계급)",
-  description:
-    "보낸 항목만 바꿉니다. 표시 계급은 입대일에서 다시 계산되므로, 입대일을 바꾸면 계급 표시도 함께 바뀝니다.",
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: profileUpdateSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(z.object({ user: userSchema }), "수정된 내 정보"),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패"),
-  },
-});
-
-const changePasswordRoute = createRoute({
-  method: "post",
-  path: "/me/password",
-  tags: ["인증"],
-  summary: "비밀번호 변경",
-  description:
-    "현재 비밀번호를 확인한 뒤 바꿉니다. 성공하면 기존 세션이 모두 끊기고 새 토큰을 돌려줍니다.",
-  security: [{ Bearer: [] }],
-  request: {
-    body: {
-      content: { "application/json": { schema: passwordChangeSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    200: jsonContent(
-      z.object({ token: z.string() }),
-      "변경 완료. 이 기기에서 계속 쓸 새 토큰",
-    ),
-    400: errorResponse("입력값 오류"),
-    401: errorResponse("인증 실패 또는 현재 비밀번호 불일치"),
-  },
-});
-
-const deleteAccountRoute = createRoute({
-  method: "delete",
-  path: "/account",
-  tags: ["인증"],
-  summary: "계정 삭제 (관련 데이터 전체 삭제)",
-  description:
-    "내 계정과 등록한 휴가·알림·세션·접속/푸시 기록·프로필 이미지를 모두 삭제합니다. 되돌릴 수 없습니다.",
-  security: [{ Bearer: [] }],
-  responses: {
-    200: jsonContent(okSchema, "삭제 완료"),
-    401: errorResponse("인증 실패"),
-  },
-});
+/**
+ * 부분 수정 입력을 현재 값 위에 얹는다.
+ * 날짜 선후 검사는 합친 뒤에야 할 수 있어 여기서 한 번에 만든다.
+ */
+function mergeProfile(user: UserRow, input: ProfileUpdateInput): UserRow {
+  return {
+    ...user,
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.branch !== undefined ? { branch: input.branch } : {}),
+    ...(input.enlistedAt !== undefined ? { enlistedAt: input.enlistedAt } : {}),
+    ...(input.dischargeAt !== undefined
+      ? { dischargeAt: input.dischargeAt }
+      : {}),
+    ...(input.rank !== undefined ? { signupRank: input.rank } : {}),
+  };
+}
 
 const app = createApp();
 // 비밀번호 무차별 대입과 이메일 열거를 막는다. 계정 생성도 같은 이유로 제한한다.
@@ -315,7 +122,7 @@ app.use("/account", authMiddleware);
 
 export const authRoutes = app
   .openapi(signupRoute, async (c) => {
-    const input = c.req.valid("json");
+    const input: SignupInput = c.req.valid("json");
     const db = drizzle(c.env.DB);
 
     const existing = await db
@@ -328,51 +135,29 @@ export const authRoutes = app
     }
 
     const { hash, salt } = await hashPassword(input.password);
-    const hasProfile = input.name !== undefined;
-    const user: UserRow = {
-      id: crypto.randomUUID(),
-      email: input.email,
+    const user = {
+      ...newUserRow(input),
       passwordHash: hash,
       passwordSalt: salt,
-      name: input.name ?? "",
-      branch: input.branch ?? "army",
-      enlistedAt: input.enlistedAt ?? "2000-01-01",
-      dischargeAt: input.dischargeAt ?? "2000-01-02",
-      signupRank: input.rank ?? "private",
-      unitId: null,
-      expoPushToken: null,
-      // 가입 시 개인정보 수집·이용에 동의했음을 기록 (동의는 스키마에서 필수)
-      consentedAt: input.dataConsent ? new Date().toISOString() : null,
-      onboardingCompletedAt: hasProfile ? new Date().toISOString() : null,
-      createdAt: new Date().toISOString(),
     };
     await db.insert(users).values(user);
-    // 군별 기본 연가를 만기 없는 적립분 한 건으로 심는다. 사용자가 보유 휴가 화면에서
-    // 자유롭게 고칠 수 있는 제안값이다.
-    if (hasProfile)
-      await db.insert(leaveGrants).values({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        balanceKey: "annual",
-        days: DEFAULT_ANNUAL_DAYS[user.branch],
-        grantedOn: null,
-        expiresOn: null,
-        note: null,
-        createdAt: user.createdAt,
-        updatedAt: user.createdAt,
-      });
+
+    // 복무 정보를 함께 받은 경우에만 심는다. 나머지는 온보딩 완료 시점에 들어간다.
+    if (user.onboardingCompletedAt) await ensureDefaultAnnualGrant(db, user);
+
     const token = await createSession(db, user.id);
+    const onboardingCompleted = Boolean(user.onboardingCompletedAt);
     return c.json(
       {
         token,
-        user: hasProfile ? serializeUser(user) : null,
-        onboardingCompleted: hasProfile,
+        user: onboardingCompleted ? serializeUser(user) : null,
+        onboardingCompleted,
       },
       201,
     );
   })
   .openapi(loginRoute, async (c) => {
-    const input = c.req.valid("json");
+    const input: LoginInput = c.req.valid("json");
     const db = drizzle(c.env.DB);
 
     const user = await db
@@ -434,81 +219,23 @@ export const authRoutes = app
     return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
   })
   .openapi(onboardingStatusRoute, async (c) => {
-    const user = c.get("user");
     const db = drizzle(c.env.DB);
-    const config = await db
-      .select()
-      .from(regularOvernightConfigs)
-      .where(eq(regularOvernightConfigs.userId, user.id))
-      .get();
-    const placeholder = !user.name || user.enlistedAt === "2000-01-01";
-    return c.json(
-      {
-        completed: Boolean(user.onboardingCompletedAt),
-        profile: placeholder
-          ? null
-          : {
-              name: user.name,
-              branch: user.branch,
-              enlistedAt: user.enlistedAt,
-              dischargeAt: user.dischargeAt,
-              rank: user.signupRank,
-            },
-        regularOvernight: config
-          ? {
-              enabled: config.enabled,
-              startDate: config.startDate,
-              intervalDays: config.intervalDays,
-              daysPerGrant: config.daysPerGrant,
-            }
-          : null,
-        unitId: user.unitId,
-      },
-      200,
-    );
+    return c.json(await readOnboardingStatus(db, c.get("user")), 200);
   })
   .openapi(onboardingProfileRoute, async (c) => {
-    const input = c.req.valid("json");
-    const user = c.get("user");
     const db = drizzle(c.env.DB);
-    await db
-      .update(users)
-      .set({
-        name: input.name,
-        branch: input.branch,
-        enlistedAt: input.enlistedAt,
-        dischargeAt: input.dischargeAt,
-        signupRank: input.rank,
-      })
-      .where(eq(users.id, user.id));
-    if (input.branch === "army") {
-      await db
-        .insert(regularOvernightConfigs)
-        .values({
-          userId: user.id,
-          enabled: false,
-          startDate: null,
-          intervalDays: null,
-          daysPerGrant: null,
-          updatedAt: new Date().toISOString(),
-        })
-        .onConflictDoUpdate({
-          target: regularOvernightConfigs.userId,
-          set: {
-            enabled: false,
-            startDate: null,
-            intervalDays: null,
-            daysPerGrant: null,
-            updatedAt: new Date().toISOString(),
-          },
-        });
-    }
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
+    await saveOnboardingProfile(
+      db,
+      c.env.CACHE,
+      c.get("user"),
+      c.req.valid("json"),
+    );
     return c.json({ ok: true as const }, 200);
   })
   .openapi(onboardingRegularRoute, async (c) => {
-    const input = c.req.valid("json");
-    const user = await drizzle(c.env.DB)
+    const db = drizzle(c.env.DB);
+    // 주기 계산이 복무 정보에 기대므로 저장된 최신 값을 다시 읽는다.
+    const user = await db
       .select()
       .from(users)
       .where(eq(users.id, c.get("user").id))
@@ -516,79 +243,27 @@ export const authRoutes = app
     if (!user || !user.name)
       return c.json({ error: "복무정보를 먼저 저장해주세요" }, 400);
     try {
-      await saveRegularOvernightConfig(drizzle(c.env.DB), user, input);
+      await saveRegularOvernightConfig(db, user, c.req.valid("json"));
       return c.json({ ok: true as const }, 200);
     } catch (error) {
-      return c.json(
-        {
-          error: error instanceof Error ? error.message : "설정하지 못했습니다",
-        },
-        400,
-      );
+      const message = leaveRuleMessage(error);
+      if (message === null) throw error;
+      return c.json({ error: message }, 400);
     }
   })
   .openapi(onboardingCompleteRoute, async (c) => {
-    const db = drizzle(c.env.DB);
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, c.get("user").id))
-      .get();
-    if (
-      !user ||
-      !user.name ||
-      user.enlistedAt === "2000-01-01" ||
-      user.enlistedAt >= user.dischargeAt
-    ) {
-      return c.json({ error: "복무정보를 먼저 완료해주세요" }, 400);
-    }
-    const existingAnnual = await db
-      .select({ id: leaveGrants.id })
-      .from(leaveGrants)
-      .where(
-        and(
-          eq(leaveGrants.userId, user.id),
-          eq(leaveGrants.balanceKey, "annual"),
-        ),
-      )
-      .get();
-    const now = new Date().toISOString();
-    if (!existingAnnual)
-      await db.insert(leaveGrants).values({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        balanceKey: "annual",
-        days: DEFAULT_ANNUAL_DAYS[user.branch],
-        grantedOn: null,
-        expiresOn: null,
-        note: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-    await db
-      .update(users)
-      .set({ onboardingCompletedAt: now })
-      .where(eq(users.id, user.id));
+    const result = await completeOnboarding(
+      drizzle(c.env.DB),
+      c.get("user").id,
+    );
+    if (!result.ok) return c.json({ error: result.error }, 400);
     return c.json({ ok: true as const }, 200);
   })
   .openapi(updateProfileRoute, async (c) => {
-    const input = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
 
-    // 부분 수정이라 날짜 선후 검사는 기존 값과 합친 뒤에야 할 수 있다.
-    const next: UserRow = {
-      ...user,
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.branch !== undefined ? { branch: input.branch } : {}),
-      ...(input.enlistedAt !== undefined
-        ? { enlistedAt: input.enlistedAt }
-        : {}),
-      ...(input.dischargeAt !== undefined
-        ? { dischargeAt: input.dischargeAt }
-        : {}),
-      ...(input.rank !== undefined ? { signupRank: input.rank } : {}),
-    };
+    const next = mergeProfile(user, c.req.valid("json"));
     if (next.enlistedAt >= next.dischargeAt) {
       return c.json({ error: "전역 예정일은 입대일보다 뒤여야 합니다" }, 400);
     }
@@ -651,14 +326,14 @@ export const authRoutes = app
         .from(accessLogs)
         .where(eq(accessLogs.userId, user.id))
         .orderBy(desc(accessLogs.createdAt))
-        .limit(50)
+        .limit(ACTIVITY_LOG_LIMIT)
         .all(),
       db
         .select()
         .from(pushLogs)
         .where(eq(pushLogs.userId, user.id))
         .orderBy(desc(pushLogs.createdAt))
-        .limit(50)
+        .limit(ACTIVITY_LOG_LIMIT)
         .all(),
     ]);
     return c.json(
@@ -685,60 +360,6 @@ export const authRoutes = app
     );
   })
   .openapi(deleteAccountRoute, async (c) => {
-    const user = c.get("user");
-    const db = drizzle(c.env.DB);
-
-    // 탈퇴자가 관리자면 부대가 관리자 없이 남지 않도록 먼저 정리한다.
-    // (남은 부대원이 있으면 이관, 혼자였다면 빈 부대를 삭제)
-    if (user.unitId) {
-      const unit = await db
-        .select()
-        .from(units)
-        .where(eq(units.id, user.unitId))
-        .get();
-      if (unit && unit.adminId === user.id) {
-        const heir = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(and(eq(users.unitId, user.unitId), ne(users.id, user.id)))
-          .orderBy(asc(users.createdAt))
-          .get();
-        if (heir) {
-          await db
-            .update(units)
-            .set({ adminId: heir.id })
-            .where(eq(units.id, user.unitId));
-        } else {
-          await db
-            .delete(unitInvites)
-            .where(eq(unitInvites.unitId, user.unitId));
-          await db.delete(units).where(eq(units.id, user.unitId));
-        }
-      }
-    }
-
-    // 관련 데이터를 명시적으로 모두 삭제한다.
-    // (Cloudflare D1은 외래키 ON DELETE CASCADE 적용을 보장하지 않으므로 직접 지운다.)
-    await db.delete(leaves).where(eq(leaves.userId, user.id));
-    await db.delete(notifications).where(eq(notifications.userId, user.id));
-    await db.delete(sessions).where(eq(sessions.userId, user.id));
-    await db.delete(accessLogs).where(eq(accessLogs.userId, user.id));
-    await db.delete(pushLogs).where(eq(pushLogs.userId, user.id));
-    await db
-      .delete(userNotificationPrefs)
-      .where(eq(userNotificationPrefs.userId, user.id));
-    // 내가 건 차단과 남이 나를 건 차단 모두 지운다. 남으면 없는 id를 계속 숨긴다.
-    await db.delete(userBlocks).where(eq(userBlocks.userId, user.id));
-    await db.delete(userBlocks).where(eq(userBlocks.blockedUserId, user.id));
-    // 접수된 신고 자체는 운영 증적으로 남기되 신고자 식별자는 끊는다.
-    await db
-      .update(contentReports)
-      .set({ reporterId: null })
-      .where(eq(contentReports.reporterId, user.id));
-    await db.delete(users).where(eq(users.id, user.id));
-
-    // 부대원 수 변동 → 해당 부대 달력 통계 캐시 무효화
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
-
+    await deleteAccount(drizzle(c.env.DB), c.env.CACHE, c.get("user"));
     return c.json({ ok: true as const }, 200);
   });

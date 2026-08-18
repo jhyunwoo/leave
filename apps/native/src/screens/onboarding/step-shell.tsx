@@ -13,7 +13,11 @@
 import { ONBOARDING_COPY, type OnboardingStepId } from "@leave/shared";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInRight } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInRight,
+} from "react-native-reanimated";
 import { Button } from "@/components/button";
 import { makeStyles, spacing } from "@/theme";
 

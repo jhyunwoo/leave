@@ -129,6 +129,10 @@ export function CalendarScreen() {
       )
       .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
     return candidates[0]?.state.data ?? null;
+    // isRestoring은 값으로 읽지 않지만 반드시 있어야 하는 의존성이다. 디스크
+    // 캐시 복원이 끝나는 순간 queryClient 안의 내용이 바뀌는데, 그 변화는
+    // 참조 동일성으로 드러나지 않아 이 신호로만 다시 읽을 수 있다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRestoring, queryClient]);
   const offlineCachedUnit =
     netInfo.isConnected === false || netInfo.isInternetReachable === false

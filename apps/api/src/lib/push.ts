@@ -92,9 +92,9 @@ export async function sendExpoPushMessages(
         continue;
       }
       // Expo는 입력 순서대로 티켓 배열을 돌려준다.
-      const json = (await res.json()) as {
+      const json: {
         data?: { status: string; id?: string; message?: string }[];
-      };
+      } = await res.json();
       const tickets = json.data ?? [];
       chunk.forEach((entry, idx) => {
         const ticket = tickets[idx];

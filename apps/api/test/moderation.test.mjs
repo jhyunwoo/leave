@@ -185,7 +185,10 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
   });
 
   const other = await signup();
-  await req("POST", "/units/join", { token: other.token, body: { code: invite } });
+  await req("POST", "/units/join", {
+    token: other.token,
+    body: { code: invite },
+  });
   const conflicting = await req("POST", "/leaves", {
     token: other.token,
     body: {

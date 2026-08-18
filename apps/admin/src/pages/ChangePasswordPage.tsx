@@ -41,7 +41,7 @@ export function ChangePasswordPage({
       );
       onChanged(result.admin);
       toast.success("비밀번호를 변경했습니다");
-      navigate("/");
+      void navigate("/");
     } catch (caught) {
       setError(
         caught instanceof ApiError
@@ -65,7 +65,10 @@ export function ChangePasswordPage({
           종료됩니다.
         </p>
       </div>
-      <form onSubmit={submit} className="form-grid single">
+      <form
+        onSubmit={(event) => void submit(event)}
+        className="form-grid single"
+      >
         <label className="field">
           <span>현재 비밀번호</span>
           <input
@@ -108,7 +111,7 @@ export function ChangePasswordPage({
             <button
               className="button secondary"
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => void navigate(-1)}
             >
               취소
             </button>

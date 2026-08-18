@@ -54,7 +54,7 @@ export function LoginPage({
           <h1>관리자 로그인</h1>
           <p>운영 데이터에 접근하려면 관리자 계정으로 로그인하세요.</p>
         </div>
-        <form onSubmit={submit} className="auth-form">
+        <form onSubmit={(event) => void submit(event)} className="auth-form">
           <label className="field">
             <span>이메일</span>
             <input

@@ -96,73 +96,65 @@ export function LeaveGrantsScreen() {
 
   const summary = (
     <ContentPanel tone="accent" style={styles.dashboard}>
-          <Text style={styles.eyebrow} selectable>
-            보유 휴가
-          </Text>
-          <Text style={styles.headline} selectable>
-            남은 휴가 {totals.remainingAsOfTodayDays}일
-          </Text>
-          {/* 남은 일수는 오늘까지 다녀온 몫만 뺀다. 계획은 아직 통장에서 빠지지 않는다. */}
-          <Text style={styles.subline} selectable>
-            사용 {totals.usedToDateDays}일
-            {totals.plannedDays > 0 ? ` · 계획 ${totals.plannedDays}일` : ""} ·
-            총 {totals.totalDays}일
-          </Text>
+      <Text style={styles.eyebrow} selectable>
+        보유 휴가
+      </Text>
+      <Text style={styles.headline} selectable>
+        남은 휴가 {totals.remainingAsOfTodayDays}일
+      </Text>
+      {/* 남은 일수는 오늘까지 다녀온 몫만 뺀다. 계획은 아직 통장에서 빠지지 않는다. */}
+      <Text style={styles.subline} selectable>
+        사용 {totals.usedToDateDays}일
+        {totals.plannedDays > 0 ? ` · 계획 ${totals.plannedDays}일` : ""} · 총{" "}
+        {totals.totalDays}일
+      </Text>
 
-          <StackedBar
-            segments={[
-              { value: totals.usedToDateDays, color: colors.surfaceStrong },
-              // 계획분은 아직 남은 휴가 안에 있다 — 초록을 쪼개 "잡아둔 몫"으로 보여준다.
-              { value: plannedBar, color: colors.primaryNeutral },
-              { value: freeBar, color: colors.primary },
-              // negativeTint는 다크에서 막대 트랙(surfaceCard)과 명도가 거의
-              // 같아 소멸분이 사라진다. 채도 있는 negative로 올린다.
-              { value: totals.expiredDays, color: colors.negative },
-            ]}
-          />
+      <StackedBar
+        segments={[
+          { value: totals.usedToDateDays, color: colors.surfaceStrong },
+          // 계획분은 아직 남은 휴가 안에 있다 — 초록을 쪼개 "잡아둔 몫"으로 보여준다.
+          { value: plannedBar, color: colors.primaryNeutral },
+          { value: freeBar, color: colors.primary },
+          // negativeTint는 다크에서 막대 트랙(surfaceCard)과 명도가 거의
+          // 같아 소멸분이 사라진다. 채도 있는 negative로 올린다.
+          { value: totals.expiredDays, color: colors.negative },
+        ]}
+      />
 
-          <View style={styles.chipRow}>
-            {totals.expiredDays > 0 && (
-              <View
-                style={[
-                  styles.statChip,
-                  { backgroundColor: colors.negativeTint },
-                ]}
-              >
-                <Text
-                  style={[styles.statChipText, { color: colors.negativeDeep }]}
-                >
-                  소멸 {totals.expiredDays}일
-                </Text>
-              </View>
-            )}
-            {totals.upcomingDays > 0 && (
-              <View
-                style={[
-                  styles.statChip,
-                  { backgroundColor: colors.surfaceCard },
-                ]}
-              >
-                <Text style={[styles.statChipText, { color: colors.body }]}>
-                  예정 {totals.upcomingDays}일
-                </Text>
-              </View>
-            )}
+      <View style={styles.chipRow}>
+        {totals.expiredDays > 0 && (
+          <View
+            style={[styles.statChip, { backgroundColor: colors.negativeTint }]}
+          >
+            <Text style={[styles.statChipText, { color: colors.negativeDeep }]}>
+              소멸 {totals.expiredDays}일
+            </Text>
           </View>
-
-          {totals.unattributedDays > 0 && (
-            <Text style={styles.warning} selectable>
-              적립분으로 설명되지 않는 사용 {totals.unattributedDays}일이
-              있어요. 적립분을 확인해주세요.
+        )}
+        {totals.upcomingDays > 0 && (
+          <View
+            style={[styles.statChip, { backgroundColor: colors.surfaceCard }]}
+          >
+            <Text style={[styles.statChipText, { color: colors.body }]}>
+              예정 {totals.upcomingDays}일
             </Text>
-          )}
+          </View>
+        )}
+      </View>
 
-          {upcomingCycleDays > 0 && (
-            <Text style={styles.rule} selectable>
-              전역까지 받을 정기외박 {upcomingCycleDays}일이 남은 휴가에 들어
-              있어요.
-            </Text>
-          )}
+      {totals.unattributedDays > 0 && (
+        <Text style={styles.warning} selectable>
+          적립분으로 설명되지 않는 사용 {totals.unattributedDays}일이 있어요.
+          적립분을 확인해주세요.
+        </Text>
+      )}
+
+      {upcomingCycleDays > 0 && (
+        <Text style={styles.rule} selectable>
+          전역까지 받을 정기외박 {upcomingCycleDays}일이 남은 휴가에 들어
+          있어요.
+        </Text>
+      )}
 
       {/* 배분 규칙이 보이지 않으면 건별 사용 일수를 믿기 어렵다. */}
       <Text style={styles.rule} selectable>

@@ -72,7 +72,7 @@ export function AppShell({ admin, onLoggedOut }: Props) {
     event.preventDefault();
     const value = query.trim();
     if (!value) return;
-    navigate(`/users?q=${encodeURIComponent(value)}`);
+    void navigate(`/users?q=${encodeURIComponent(value)}`);
   };
 
   const logout = async () => {
@@ -189,7 +189,7 @@ export function AppShell({ admin, onLoggedOut }: Props) {
                   type="button"
                   onClick={() => {
                     setAccountOpen(false);
-                    navigate("/change-password");
+                    void navigate("/change-password");
                   }}
                 >
                   <KeyRound size={17} /> 비밀번호 변경

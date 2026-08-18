@@ -19,7 +19,7 @@ export function LoginPage() {
     setError(null);
     try {
       await login.mutateAsync({ email, password });
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인하지 못했습니다");
     }

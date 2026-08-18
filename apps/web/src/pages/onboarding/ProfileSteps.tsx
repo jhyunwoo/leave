@@ -122,9 +122,7 @@ export function DatesStep(props: {
       enlistedAt: value,
       // 전역일은 사용자가 따로 고치기 전까지 입대일을 따라간다. 자동 계산값을
       // 그대로 두면 군종을 바꿨을 때 옛 날짜가 남아 있게 된다.
-      dischargeAt: value
-        ? standardDischargeDate(value as ISODate, props.branch)
-        : "",
+      dischargeAt: value ? standardDischargeDate(value, props.branch) : "",
     });
   };
 
@@ -176,12 +174,16 @@ export function RankStep(props: {
   onNext: () => void;
 }) {
   const suggested = props.enlistedAt
-    ? scheduledRank(props.enlistedAt as ISODate, props.today)
+    ? scheduledRank(props.enlistedAt, props.today)
     : null;
 
   return (
     <StepShell step="rank">
-      <div className="ob-choices is-compact" role="radiogroup" aria-label="계급">
+      <div
+        className="ob-choices is-compact"
+        role="radiogroup"
+        aria-label="계급"
+      >
         {RANKS.map((rank) => (
           <button
             type="button"

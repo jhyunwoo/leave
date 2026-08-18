@@ -20,9 +20,7 @@ function leave(id: string, startDate: string, endDate: string): MyLeave {
     endDate,
     reason: null,
     status: "shared",
-    segments: [
-      { category: "annual", startDate, endDate, days: 1 },
-    ],
+    segments: [{ category: "annual", startDate, endDate, days: 1 }],
     createdAt: "2026-01-01T00:00:00.000Z",
   } as unknown as MyLeave;
 }
@@ -36,20 +34,29 @@ describe("partitionMyLeaves", () => {
   });
 
   it("종료일이 어제까지면 지난 휴가다", () => {
-    const sections = partitionMyLeaves([leave("a", "2026-08-14", "2026-08-15")], TODAY);
+    const sections = partitionMyLeaves(
+      [leave("a", "2026-08-14", "2026-08-15")],
+      TODAY,
+    );
     expect(sections.past.map((l) => l.id)).toEqual(["a"]);
     expect(sections.upcoming).toEqual([]);
   });
 
   it("오늘 끝나는 휴가는 아직 지나지 않았다", () => {
-    const sections = partitionMyLeaves([leave("a", "2026-08-14", TODAY)], TODAY);
+    const sections = partitionMyLeaves(
+      [leave("a", "2026-08-14", TODAY)],
+      TODAY,
+    );
     expect(sections.upcoming.map((l) => l.id)).toEqual(["a"]);
     expect(sections.past).toEqual([]);
   });
 
   it("오늘 진행 중인 휴가는 다가오는 쪽이고 맨 위에 온다", () => {
     const sections = partitionMyLeaves(
-      [leave("later", "2026-08-20", "2026-08-22"), leave("now", "2026-08-15", "2026-08-18")],
+      [
+        leave("later", "2026-08-20", "2026-08-22"),
+        leave("now", "2026-08-15", "2026-08-18"),
+      ],
       TODAY,
     );
     expect(sections.upcoming.map((l) => l.id)).toEqual(["now", "later"]);
@@ -102,7 +109,10 @@ describe("partitionMyLeaves", () => {
   });
 
   it("원본 배열을 건드리지 않는다", () => {
-    const input = [leave("b", "2026-09-01", "2026-09-02"), leave("a", "2026-08-20", "2026-08-22")];
+    const input = [
+      leave("b", "2026-09-01", "2026-09-02"),
+      leave("a", "2026-08-20", "2026-08-22"),
+    ];
     partitionMyLeaves(input, TODAY);
     expect(input.map((l) => l.id)).toEqual(["b", "a"]);
   });

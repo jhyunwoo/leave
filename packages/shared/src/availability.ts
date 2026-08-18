@@ -62,7 +62,7 @@ export type DateRangeRecommendation = {
 /** YYYY-MM-DD 전용 일수 덧셈. 로컬 타임존을 사용하지 않는다. */
 function addDateDays(date: string, amount: number): string {
   const [year, month, day] = date.split("-").map(Number);
-  const utc = new Date(Date.UTC(year!, month! - 1, day!));
+  const utc = new Date(Date.UTC(year!, month! - 1, day));
   utc.setUTCDate(utc.getUTCDate() + amount);
   return utc.toISOString().slice(0, 10);
 }

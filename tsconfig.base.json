@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // 워크스페이스 공용 컴파일러 기준.
+  //
+  // 여기에는 "어느 패키지에서든 같아야 하는 것"만 둔다. lib·types·jsx처럼
+  // 실행 환경(Workers / 브라우저 / Expo)마다 달라야 하는 값은 각 패키지의
+  // tsconfig.json에 남긴다.
+  //
+  // apps/native는 Expo가 주는 expo/tsconfig.base를 확장해야 하므로 예외다
+  // (React Native 전용 해석 규칙이 그쪽에 들어 있다).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    // ── 엄격성 ──────────────────────────────────────────────────
+    "strict": true,
+    // 배열·Record 접근 결과가 undefined일 수 있음을 드러낸다. 달력·구간처럼
+    // 인덱스로 훑는 코드가 많아 이 옵션이 실제로 버그를 잡아왔다.
+    "noUncheckedIndexedAccess": true,
+    // noImplicitReturns는 켜지 않는다. 이 저장소에서 걸리는 곳은 전부 Hono
+    // 미들웨어와 defaultHook이었다 — "Response를 만들면 끊고, 아니면 흘려보낸다"가
+    // 곧 그 프레임워크의 계약이라 값을 빠뜨린 실수가 아니다. 실제 버그는 한 건도
+    // 나오지 않았고, 켜면 미들웨어마다 뜻 없는 `return undefined`가 붙는다.
+    //
+    // switch에서 break를 빠뜨린 채 다음 case로 흘러가는 것을 막는다.
+    "noFallthroughCasesInSwitch": true,
+    // 상위 구현을 덮어쓸 때는 override를 명시한다.
+    "noImplicitOverride": true
+  }
+}

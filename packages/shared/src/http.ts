@@ -57,7 +57,7 @@ export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
   if (!res.ok) {
     const message =
       data && typeof data === "object" && "error" in data
-        ? String((data as { error: unknown }).error)
+        ? String(data.error)
         : "요청을 처리하지 못했습니다";
     throw new ApiError(message, res.status);
   }

@@ -14,7 +14,7 @@
  * 어느 쪽이든 "알림 → 내 휴가" 해석 규칙은 하나뿐이다(`resolveDate`).
  */
 
-import { fmtDateShort } from "@leave/shared";
+import { fmtDateTimeShort, fmtDateShort } from "@leave/shared";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -41,14 +41,6 @@ import { notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Notification = NotificationList["notifications"][number];
-
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${d
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
 
 export function NotificationsScreen() {
   const styles = useStyles();
@@ -257,7 +249,9 @@ export function NotificationsScreen() {
                 </Pressable>
                 {renderDates(latest)}
                 <View style={styles.latestFooter}>
-                  <Text style={styles.time}>{fmtTime(latest.createdAt)}</Text>
+                  <Text style={styles.time}>
+                    {fmtDateTimeShort(latest.createdAt)}
+                  </Text>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${latest.title} 휴가 상세 보기`}
@@ -326,67 +320,69 @@ export function NotificationsScreen() {
                 contentContainerStyle={styles.columnContent}
                 showsVerticalScrollIndicator={false}
               >
-              {selected ? (
-                <ContentPanel
-                  tone={selected.read ? "plain" : "danger"}
-                  style={styles.latestCard}
-                  testID="notification-detail"
-                >
-                  <View style={styles.latestHeader}>
-                    <Text style={styles.eyebrow}>
-                      {selected.read ? "알림" : "안 읽음"}
-                    </Text>
-                    {!selected.read && <View style={styles.unreadDot} />}
-                    <View style={styles.headerSpacer} />
-                    {renderMenu(selected)}
-                  </View>
-                  <Text style={styles.latestTitle} selectable>
-                    {selected.title}
-                  </Text>
-                  <Text style={styles.latestBody} selectable>
-                    {selected.body}
-                  </Text>
-                  <Text style={styles.time}>{fmtTime(selected.createdAt)}</Text>
-
-                  {selected.dates.length > 0 ? (
-                    <View style={styles.affected}>
-                      <Text style={styles.sectionTitle}>걸린 날짜</Text>
-                      {selected.dates.map((date) => {
-                        const mine = resolveDate(date);
-                        return (
-                          <Pressable
-                            key={date}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              mine
-                                ? `${fmtDateShort(date)}, ${mine.title} 상세 보기`
-                                : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
-                            }
-                            disabled={!mine}
-                            onPress={() => openDates([date])}
-                            style={styles.affectedRow}
-                          >
-                            <Text style={styles.affectedDate}>
-                              {fmtDateShort(date)}
-                            </Text>
-                            <Text
-                              style={styles.affectedLeave}
-                              numberOfLines={1}
-                            >
-                              {mine ? mine.title : "연결된 계획 없음"}
-                            </Text>
-                            {mine ? (
-                              <Text style={styles.detailLink}>열기</Text>
-                            ) : null}
-                          </Pressable>
-                        );
-                      })}
+                {selected ? (
+                  <ContentPanel
+                    tone={selected.read ? "plain" : "danger"}
+                    style={styles.latestCard}
+                    testID="notification-detail"
+                  >
+                    <View style={styles.latestHeader}>
+                      <Text style={styles.eyebrow}>
+                        {selected.read ? "알림" : "안 읽음"}
+                      </Text>
+                      {!selected.read && <View style={styles.unreadDot} />}
+                      <View style={styles.headerSpacer} />
+                      {renderMenu(selected)}
                     </View>
-                  ) : null}
-                </ContentPanel>
-              ) : (
-                emptyPanel
-              )}
+                    <Text style={styles.latestTitle} selectable>
+                      {selected.title}
+                    </Text>
+                    <Text style={styles.latestBody} selectable>
+                      {selected.body}
+                    </Text>
+                    <Text style={styles.time}>
+                      {fmtDateTimeShort(selected.createdAt)}
+                    </Text>
+
+                    {selected.dates.length > 0 ? (
+                      <View style={styles.affected}>
+                        <Text style={styles.sectionTitle}>걸린 날짜</Text>
+                        {selected.dates.map((date) => {
+                          const mine = resolveDate(date);
+                          return (
+                            <Pressable
+                              key={date}
+                              accessibilityRole="button"
+                              accessibilityLabel={
+                                mine
+                                  ? `${fmtDateShort(date)}, ${mine.title} 상세 보기`
+                                  : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
+                              }
+                              disabled={!mine}
+                              onPress={() => openDates([date])}
+                              style={styles.affectedRow}
+                            >
+                              <Text style={styles.affectedDate}>
+                                {fmtDateShort(date)}
+                              </Text>
+                              <Text
+                                style={styles.affectedLeave}
+                                numberOfLines={1}
+                              >
+                                {mine ? mine.title : "연결된 계획 없음"}
+                              </Text>
+                              {mine ? (
+                                <Text style={styles.detailLink}>열기</Text>
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </ContentPanel>
+                ) : (
+                  emptyPanel
+                )}
               </ScrollView>
             </View>
           </View>
@@ -481,7 +477,7 @@ function NotificationRow(props: {
             {n.body}
           </Text>
           {props.dates}
-          <Text style={styles.time}>{fmtTime(n.createdAt)}</Text>
+          <Text style={styles.time}>{fmtDateTimeShort(n.createdAt)}</Text>
         </View>
       </Pressable>
       {props.menu}

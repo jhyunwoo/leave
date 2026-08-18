@@ -6,6 +6,7 @@
  */
 
 import {
+  fmtDateTimeFull,
   unitCreateSchema,
   unitJoinSchema,
   type UnitCreateInput,
@@ -53,7 +54,7 @@ export function UnitsPage(props: { me: Me }) {
     try {
       await join.mutateAsync(parsed.data);
       setInviteCode("");
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "그룹에 참여하지 못했습니다",
@@ -141,7 +142,7 @@ export function UnitsPage(props: { me: Me }) {
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => navigate("/")}
+              onClick={() => void navigate("/")}
             >
               달력 보기
             </button>
@@ -149,7 +150,7 @@ export function UnitsPage(props: { me: Me }) {
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={() => navigate("/units/manage")}
+                onClick={() => void navigate("/units/manage")}
               >
                 그룹 관리·초대
               </button>
@@ -271,7 +272,7 @@ function InvitePanel(props: { invite: IssuedUnitInvite }) {
         {props.invite.code}
       </code>
       <p className="caption text-body">
-        {new Date(props.invite.expiresAt).toLocaleString("ko-KR")}까지 · 최대{" "}
+        {fmtDateTimeFull(props.invite.expiresAt)}까지 · 최대{" "}
         {props.invite.maxUses}회
       </p>
     </div>

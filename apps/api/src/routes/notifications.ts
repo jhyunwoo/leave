@@ -140,10 +140,7 @@ export const notificationRoutes = app
       .select()
       .from(notifications)
       .where(
-        and(
-          eq(notifications.userId, user.id),
-          isNull(notifications.deletedAt),
-        ),
+        and(eq(notifications.userId, user.id), isNull(notifications.deletedAt)),
       )
       .orderBy(desc(notifications.createdAt))
       .limit(50)

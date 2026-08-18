@@ -140,7 +140,8 @@ function CalendarPanel(props: {
             const isToday = cell.date === today;
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             // 달력 탭과 같은 규칙 — 주말과 공휴일을 한 가지 "빨간 날"로 묶는다.
-            const red = cell.inMonth && (isWeekend(cell.date) || holiday != null);
+            const red =
+              cell.inMonth && (isWeekend(cell.date) || holiday != null);
 
             return (
               <Pressable

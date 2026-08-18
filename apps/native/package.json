@@ -54,7 +54,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint",
+    "lint": "eslint . --max-warnings 0",
     "eas:build": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build",
     "eas:submit": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas submit",
     "eas:update:preview": "eas update --channel preview --environment preview",

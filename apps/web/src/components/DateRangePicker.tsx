@@ -79,7 +79,11 @@ function CalendarPanel(props: {
         </button>
       </div>
 
-      <div className="dp-grid" role="grid" aria-label={`${props.month} 날짜 선택`}>
+      <div
+        className="dp-grid"
+        role="grid"
+        aria-label={`${props.month} 날짜 선택`}
+      >
         <div className="dp-week" role="row">
           {WEEKDAYS.map((weekday, index) => (
             <div
@@ -101,9 +105,9 @@ function CalendarPanel(props: {
                 cell.date === props.rangeStart || cell.date === props.rangeEnd;
               const inRange = Boolean(
                 props.rangeStart &&
-                  props.rangeEnd &&
-                  props.rangeStart <= cell.date &&
-                  cell.date <= props.rangeEnd,
+                props.rangeEnd &&
+                props.rangeStart <= cell.date &&
+                cell.date <= props.rangeEnd,
               );
               const holiday = cell.inMonth ? getHoliday(cell.date) : null;
               // 달력 화면과 같은 규칙 — 주말과 공휴일을 한 가지 "빨간 날"로 묶는다.
@@ -224,7 +228,9 @@ export function DateRangePicker(props: {
             {props.startDate ? fmtDateShort(props.startDate) : "날짜 선택"}
           </span>
           {props.startDate && (
-            <span className="dp-input-year">{props.startDate.slice(0, 4)}년</span>
+            <span className="dp-input-year">
+              {props.startDate.slice(0, 4)}년
+            </span>
           )}
         </button>
 

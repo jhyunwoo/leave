@@ -6,6 +6,7 @@
  * 명세(경로·입력 스키마·응답 코드)와 구현(핸들러)을 한 파일에 두면, 한쪽을 읽는
  * 동안 다른 쪽을 계속 건너뛰게 된다. "이 API가 무엇을 약속하는가"만 모아 두면
  * 문서(/docs)와 클라이언트 타입의 출처를 한눈에 확인할 수 있다.
+ * (같은 이유로 auth.contract.ts, leaves.contract.ts도 같은 모양이다.)
  */
 import { createRoute, z } from "@hono/zod-openapi";
 import {

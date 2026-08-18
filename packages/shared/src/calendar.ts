@@ -54,6 +54,28 @@ export function fmtRangeTiny(start: ISODate, end: ISODate): string {
   return `${fmtDateTiny(start)}–${fmtDateTiny(end)}`;
 }
 
+/* ------------------------------------------------------------------ *
+ * 시각이 붙은 표기
+ *
+ * 위의 fmtDate*는 날짜 문자열(YYYY-MM-DD)을 다루므로 UTC 접근자를 쓴다 —
+ * 타임존 때문에 하루가 밀리지 않게 하려는 것이다. 아래 둘은 반대로 "언제 일어난
+ * 일인가"(알림 도착, 초대코드 만료)를 다루므로 기기의 로컬 시각으로 보여준다.
+ * 사용자가 화면에서 읽는 시각과 손목시계가 어긋나면 안 되기 때문이다.
+ * ------------------------------------------------------------------ */
+
+/** "8월 2일 14:05" — 목록에서 한 줄에 들어가야 하는 시각. */
+export function fmtDateTimeShort(timestamp: string): string {
+  const at = new Date(timestamp);
+  const hours = at.getHours().toString().padStart(2, "0");
+  const minutes = at.getMinutes().toString().padStart(2, "0");
+  return `${at.getMonth() + 1}월 ${at.getDate()}일 ${hours}:${minutes}`;
+}
+
+/** 초 단위까지 보이는 한국 로캘 전체 표기. 만료 시각처럼 정확도가 중요한 자리에. */
+export function fmtDateTimeFull(timestamp: string): string {
+  return new Date(timestamp).toLocaleString("ko-KR");
+}
+
 export function shiftMonth(month: string, delta: number): string {
   const { year, monthNum } = splitMonth(month);
   const total = year * 12 + (monthNum - 1) + delta;

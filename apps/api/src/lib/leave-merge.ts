@@ -20,6 +20,7 @@ import {
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { leaves, leaveSegments, type LeaveRow } from "../db/schema";
 import type { Db } from "./db";
+import { leaveRuleMessage } from "./errors";
 import {
   assertSegmentsAvailable,
   segmentRowsFor,
@@ -152,10 +153,11 @@ export async function saveLeaveWithMerge(
       ...(options.existingId ? [options.existingId] : []),
     ]);
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "잔여량이 부족합니다",
-    };
+    // 규칙 위반만 "이래서 못 넣는다"로 돌려준다. D1 장애 같은 것은 그대로 올려
+    // 보내야 500으로 잡히고 관측에도 남는다.
+    const message = leaveRuleMessage(error);
+    if (message === null) throw error;
+    return { ok: false, error: message };
   }
 
   // 살아남는 행이 이미 DB에 있는지. 등록인데 host가 자기 자신이면 그때만 insert다.

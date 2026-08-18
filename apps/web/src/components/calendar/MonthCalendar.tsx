@@ -94,7 +94,8 @@ export function MonthCalendar(props: {
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
-            const pastDischarge = dischargeAt != null && cell.date > dischargeAt;
+            const pastDischarge =
+              dischargeAt != null && cell.date > dischargeAt;
             const inCycle =
               cell.inMonth &&
               !pastDischarge &&
@@ -104,7 +105,9 @@ export function MonthCalendar(props: {
             // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
             const cycle =
               cell.inMonth && !pastDischarge
-                ? cycles?.find((c) => c.start <= cell.date && cell.date <= c.end)
+                ? cycles?.find(
+                    (c) => c.start <= cell.date && cell.date <= c.end,
+                  )
                 : undefined;
 
             return (

@@ -11,14 +11,9 @@ import {
   useNotifications,
   type NotificationList,
 } from "@leave/client";
-import { fmtDateShort } from "@leave/shared";
+import { fmtDateTimeShort, fmtDateShort } from "@leave/shared";
 
 type Notification = NotificationList["notifications"][number];
-
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
 
 export function NotificationsPage() {
   const list = useNotifications();
@@ -229,7 +224,7 @@ export function NotificationsPage() {
               }}
             >
               <span className="caption text-mute">
-                {fmtTime(latest.createdAt)}
+                {fmtDateTimeShort(latest.createdAt)}
               </span>
               <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
                 {renderDelete(latest)}
@@ -299,7 +294,7 @@ export function NotificationsPage() {
                         className="caption text-mute"
                         style={{ marginTop: "var(--sp-sm)" }}
                       >
-                        {fmtTime(n.createdAt)}
+                        {fmtDateTimeShort(n.createdAt)}
                       </p>
                     </div>
                     <div style={{ flexShrink: 0 }}>{renderDelete(n)}</div>

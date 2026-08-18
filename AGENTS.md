@@ -1,5 +1,24 @@
 # Agent instructions
 
+## Before you finish
+
+Run the repository quality gate and make it pass:
+
+```bash
+pnpm quality   # format:check → lint → types:check → check-types → test
+```
+
+Each step is also available on its own (`pnpm format:check`, `pnpm lint`, `pnpm types:check`,
+`pnpm check-types`, `pnpm test`), and every package can be filtered
+(`pnpm --filter @leave/api lint`). Browser and simulator e2e stay out of the gate —
+run `pnpm test:e2e` only for the flow you changed.
+
+If you edited `wrangler.jsonc`, regenerate the binding types first
+(`pnpm --filter @leave/api types`, `pnpm --filter @leave/admin types`); `types:check` fails on drift.
+
+Where things live and which tests to add: [docs/architecture.md](docs/architecture.md),
+[docs/testing.md](docs/testing.md), [docs/code-style.md](docs/code-style.md).
+
 ## Browser verification
 
 Use the project-local `agent-browser` whenever a web UI is changed or the user asks to inspect the rendered result. The matching skill is installed in `.agents/skills/agent-browser`; load its current instructions with `pnpm exec agent-browser skills get core` before the first browser command in a task.

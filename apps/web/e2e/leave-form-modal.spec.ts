@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 /**
  * 화면 기준으로 떠야 하는 UI(모달·토스트)의 배치 e2e.
@@ -13,9 +13,7 @@ import { expect, test } from "@playwright/test";
  */
 
 /** 계정·부대·휴가 여러 건을 만들고 토큰을 돌려준다. 목록이 길어야 재현된다. */
-async function seedLongLeaveList(
-  request: import("@playwright/test").APIRequestContext,
-) {
+async function seedLongLeaveList(request: APIRequestContext) {
   const email = `modal-e2e-${Date.now()}@test.com`;
   const signup = await request.post("http://localhost:8787/auth/signup", {
     data: {

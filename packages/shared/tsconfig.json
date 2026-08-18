@@ -1,14 +1,8 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "lib": ["ES2022"],
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "noEmit": true,
+    // 플랫폼 독립 커널이다. 어떤 환경의 전역 타입도 자동으로 끌어오지 않는다.
     "types": []
   },
   "include": ["src", "test"]

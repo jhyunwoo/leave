@@ -166,7 +166,7 @@ export function ProfilePage(props: { me: Me }) {
           type="button"
           className="btn btn-secondary"
           style={{ flex: 1 }}
-          onClick={() => navigate("/units")}
+          onClick={() => void navigate("/units")}
         >
           공유 그룹
         </button>

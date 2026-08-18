@@ -141,9 +141,9 @@ export function RegularOvernightSettings(props: {
           </small>
         ) : (
           <small className="caption text-mute">
-            주기 시작일에서 {interval}일이 지난 날 {perGrant}일이 처음 적립되면서
-            1주기가 시작돼요. 한 주기 몫은 다음 적립 전날까지 쓰고 남으면
-            사라져요.
+            주기 시작일에서 {interval}일이 지난 날 {perGrant}일이 처음
+            적립되면서 1주기가 시작돼요. 한 주기 몫은 다음 적립 전날까지 쓰고
+            남으면 사라져요.
           </small>
         ))}
 

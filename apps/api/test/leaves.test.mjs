@@ -599,8 +599,6 @@ test("최대 출타 인원 초과 시 초과일 계산 + 알림 + 푸시 발송 
     name: uniq("초과부대-"),
     maxLeaveCount: 2,
   });
-  const unitId = unit.data.unit.id;
-
   const u2 = await signup();
   const u3 = await signup();
   await req("POST", "/units/join", {

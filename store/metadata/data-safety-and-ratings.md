@@ -17,26 +17,26 @@
 
 ### 상위 답변
 
-| 질문 | 답변 |
-|---|---|
-| 데이터 수집 | 예 |
-| 제3자 공유 | 아니요 — Cloudflare, Expo, APNs, FCM은 서비스 제공을 위한 처리업체이며 판매·광고 공유 없음 |
-| 전송 중 암호화 | 예 — HTTPS/TLS |
-| 삭제 요청 | 예 — 앱 내 삭제 + 공개 웹 안내 |
-| 광고 | 없음 |
-| 독립 보안 검토 | 아니요 |
+| 질문           | 답변                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| 데이터 수집    | 예                                                                                         |
+| 제3자 공유     | 아니요 — Cloudflare, Expo, APNs, FCM은 서비스 제공을 위한 처리업체이며 판매·광고 공유 없음 |
+| 전송 중 암호화 | 예 — HTTPS/TLS                                                                             |
+| 삭제 요청      | 예 — 앱 내 삭제 + 공개 웹 안내                                                             |
+| 광고           | 없음                                                                                       |
+| 독립 보안 검토 | 아니요                                                                                     |
 
 ### 데이터 유형
 
-| Play 데이터 유형 | 수집 | 공유 | 필수/선택 | 목적 |
-|---|---:|---:|---|---|
-| 개인정보 > 이름 | 예 | 아니요 | 필수 입력이나 별칭 권장 | 앱 기능, 계정 관리 |
-| 개인정보 > 이메일 주소 | 예 | 아니요 | 필수 | 계정 관리, 보안 |
-| 개인정보 > 사용자 ID | 예 | 아니요 | 필수 | 계정·세션·그룹 기능 |
-| 앱 활동 > 앱 상호작용 | 예 | 아니요 | 자동 | 분석, 앱 기능, 보안 |
-| 앱 활동 > 기타 사용자 제작 콘텐츠 | 예 | 아니요 | 일정은 필수, 사유·메모는 선택 | 그룹 일정 공유, 휴가 관리 |
-| 앱 정보 및 성능 > 진단 | 예 | 아니요 | 자동 | 앱 기능, 분석, 안정성 |
-| 기기 또는 기타 ID | 예 | 아니요 | 알림 동의 시 선택 | 푸시 알림, 앱 기능 |
+| Play 데이터 유형                  | 수집 |   공유 | 필수/선택                     | 목적                      |
+| --------------------------------- | ---: | -----: | ----------------------------- | ------------------------- |
+| 개인정보 > 이름                   |   예 | 아니요 | 필수 입력이나 별칭 권장       | 앱 기능, 계정 관리        |
+| 개인정보 > 이메일 주소            |   예 | 아니요 | 필수                          | 계정 관리, 보안           |
+| 개인정보 > 사용자 ID              |   예 | 아니요 | 필수                          | 계정·세션·그룹 기능       |
+| 앱 활동 > 앱 상호작용             |   예 | 아니요 | 자동                          | 분석, 앱 기능, 보안       |
+| 앱 활동 > 기타 사용자 제작 콘텐츠 |   예 | 아니요 | 일정은 필수, 사유·메모는 선택 | 그룹 일정 공유, 휴가 관리 |
+| 앱 정보 및 성능 > 진단            |   예 | 아니요 | 자동                          | 앱 기능, 분석, 안정성     |
+| 기기 또는 기타 ID                 |   예 | 아니요 | 알림 동의 시 선택             | 푸시 알림, 앱 기능        |
 
 모든 항목은 계정 또는 그룹과 연결될 수 있습니다. 광고, 교차 앱 추적, 데이터 브로커 제공에는 사용하지 않습니다.
 
@@ -51,14 +51,14 @@
 
 `apps/native/app.json`의 Privacy Manifest와 App Store Connect 답변을 동일하게 유지합니다.
 
-| Apple 데이터 유형 | Linked to You | Tracking | 목적 |
-|---|---:|---:|---|
-| Contact Info — Email Address | 예 | 아니요 | App Functionality |
-| User Content — Other User Content | 예 | 아니요 | App Functionality |
-| Identifiers — User ID, Device ID | 예 | 아니요 | App Functionality |
-| Usage Data — Product Interaction | 예 | 아니요 | Analytics, App Functionality |
-| Diagnostics — Performance Data | 예 | 아니요 | Analytics, App Functionality |
-| Other Data — 그룹 기준값·휴가 잔여량 등 | 예 | 아니요 | App Functionality |
+| Apple 데이터 유형                       | Linked to You | Tracking | 목적                         |
+| --------------------------------------- | ------------: | -------: | ---------------------------- |
+| Contact Info — Email Address            |            예 |   아니요 | App Functionality            |
+| User Content — Other User Content       |            예 |   아니요 | App Functionality            |
+| Identifiers — User ID, Device ID        |            예 |   아니요 | App Functionality            |
+| Usage Data — Product Interaction        |            예 |   아니요 | Analytics, App Functionality |
+| Diagnostics — Performance Data          |            예 |   아니요 | Analytics, App Functionality |
+| Other Data — 그룹 기준값·휴가 잔여량 등 |            예 |   아니요 | App Functionality            |
 
 - Data Used to Track You: 없음
 - Tracking domains: 없음
@@ -82,11 +82,11 @@
 
 ## 처리업체 및 국외 이전 대조
 
-| 업체 | 역할 | 관련 데이터 |
-|---|---|---|
-| Cloudflare, Inc. | Workers, D1, KV, 운영 로그·보안 | 계정·그룹·일정·접속 메타데이터 |
+| 업체                        | 역할                            | 관련 데이터                        |
+| --------------------------- | ------------------------------- | ---------------------------------- |
+| Cloudflare, Inc.            | Workers, D1, KV, 운영 로그·보안 | 계정·그룹·일정·접속 메타데이터     |
 | Expo / 650 Industries, Inc. | EAS Update, Insights, Expo Push | 앱 버전·사용 이벤트·푸시 토큰/내용 |
-| Apple Inc. | APNs | Apple 기기의 푸시 토큰/내용 |
-| Google LLC | FCM | Android 기기의 푸시 토큰/내용 |
+| Apple Inc.                  | APNs                            | Apple 기기의 푸시 토큰/내용        |
+| Google LLC                  | FCM                             | Android 기기의 푸시 토큰/내용      |
 
 지역·보관 위치는 각 콘솔의 실제 프로젝트 설정 및 업체 최신 하위처리자 목록을 확인해 개인정보 처리방침과 일치시킵니다.

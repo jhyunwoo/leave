@@ -136,6 +136,48 @@ async function run() {
   assert.equal(listed.response.status, 200);
   assert.equal(listed.body.items.length, 1);
 
+  // 알림은 사용자를 지우기 전에 확인한다(대상 사용자가 있어야 발송된다).
+  // 목록 라우트 네 개는 각각 다른 모듈에 있다. 하나라도 마운트에서 빠지면
+  // 화면에서는 빈 표로만 보이고 조용히 넘어가므로 여기서 함께 짚는다.
+  const notificationCreated = await request("/notifications", {
+    method: "POST",
+    body: JSON.stringify({
+      userId,
+      title: "관리자 테스트 알림",
+      body: "통합 테스트에서 만든 알림입니다",
+      sendPush: false,
+    }),
+  });
+  assert.equal(notificationCreated.response.status, 201);
+  const notificationId = notificationCreated.body.item.id;
+
+  const notificationRemoved = await request(
+    `/notifications/${notificationId}`,
+    {
+      method: "DELETE",
+    },
+  );
+  assert.equal(notificationRemoved.response.status, 200);
+
+  for (const resource of [
+    "/leaves",
+    "/notifications",
+    "/unit-invites",
+    "/content-reports",
+  ]) {
+    const list = await request(resource);
+    assert.equal(
+      list.response.status,
+      200,
+      `${resource} 목록이 200이어야 한다`,
+    );
+    assert.ok(
+      Array.isArray(list.body.items),
+      `${resource} items가 배열이어야 한다`,
+    );
+    assert.equal(typeof list.body.meta.total, "number");
+  }
+
   const removed = await request(`/users/${userId}`, { method: "DELETE" });
   assert.equal(removed.response.status, 200);
 
@@ -150,7 +192,7 @@ async function run() {
   assert.equal(logout.response.status, 200);
 
   process.stdout.write(
-    "관리자 API 통합 테스트 통과: 인증, 비밀번호 변경, CRUD, 감사 로그, 로그아웃\n",
+    "관리자 API 통합 테스트 통과: 인증, 비밀번호 변경, CRUD, 알림, 목록 라우트, 감사 로그, 로그아웃\n",
   );
 }
 

@@ -101,9 +101,7 @@ export function LeavesScreen() {
    */
   const openLeave = (leave: MyLeave) => {
     if (isExpanded) {
-      setSelectedLeaveId((current) =>
-        current === leave.id ? null : leave.id,
-      );
+      setSelectedLeaveId((current) => (current === leave.id ? null : leave.id));
       return;
     }
     router.push({
@@ -162,10 +160,14 @@ export function LeavesScreen() {
                   </Text>
                   {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
                   <Text style={styles.balanceMeta} selectable>
-                    {item.cycleScoped ? "이번 주기 · " : ""}총 {item.totalDays}일
-                    · 사용 {item.usedToDateDays}일
-                    {item.plannedDays > 0 ? ` · 계획 ${item.plannedDays}일` : ""}
-                    {item.expiredDays > 0 ? ` · 만료 ${item.expiredDays}일` : ""}
+                    {item.cycleScoped ? "이번 주기 · " : ""}총 {item.totalDays}
+                    일 · 사용 {item.usedToDateDays}일
+                    {item.plannedDays > 0
+                      ? ` · 계획 ${item.plannedDays}일`
+                      : ""}
+                    {item.expiredDays > 0
+                      ? ` · 만료 ${item.expiredDays}일`
+                      : ""}
                   </Text>
                 </View>
                 <Text style={styles.balanceValue} selectable>
@@ -207,9 +209,7 @@ export function LeavesScreen() {
           <Text style={styles.leaveDates}>
             {fmtRange(l.startDate, l.endDate)}
           </Text>
-          {l.reason ? (
-            <Text style={styles.leaveReason}>{l.reason}</Text>
-          ) : null}
+          {l.reason ? <Text style={styles.leaveReason}>{l.reason}</Text> : null}
           <SegmentBadges segments={l.segments} />
         </Pressable>
         <ActionMenu

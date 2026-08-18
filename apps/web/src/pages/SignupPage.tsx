@@ -59,7 +59,7 @@ export function SignupPage() {
       // 알림 선택은 가입을 막지 않는다. 로그인 후 알림의 가치를 확인한
       // 설정 화면에서 다시 선택한다.
       void notificationOptIn;
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "가입하지 못했습니다");
     }

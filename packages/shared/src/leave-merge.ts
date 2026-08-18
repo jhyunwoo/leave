@@ -113,7 +113,9 @@ export function planLeaveMerge(
   others: readonly MergeCandidate[],
 ): LeaveMergePlan {
   const pool = others
-    .filter((other) => other.id !== incoming.id && other.status === incoming.status)
+    .filter(
+      (other) => other.id !== incoming.id && other.status === incoming.status,
+    )
     .sort(byStart);
 
   // 겹침이 먼저다. 합칠 이웃이 있더라도 겹치는 게 있으면 그걸 알리는 쪽이 먼저다.
@@ -150,7 +152,10 @@ export function planLeaveMerge(
     grew = false;
     for (let i = 0; i < rest.length; i += 1) {
       const other = rest[i]!;
-      const merged = rangeOf({ ...incoming, segments: parts.flatMap((p) => p.segments) });
+      const merged = rangeOf({
+        ...incoming,
+        segments: parts.flatMap((p) => p.segments),
+      });
       const range = rangeOf(other);
       const touches =
         addDays(merged.endDate, 1) === range.startDate ||

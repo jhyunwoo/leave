@@ -189,6 +189,11 @@ const useStyles = makeStyles(({ colors }) => ({
   row: { flexDirection: "row", gap: spacing.md },
   promises: { gap: spacing.md },
   promise: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
-  check: { fontSize: 15, fontWeight: "900", color: colors.brand, lineHeight: 22 },
+  check: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.brand,
+    lineHeight: 22,
+  },
   promiseText: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.body },
 }));
