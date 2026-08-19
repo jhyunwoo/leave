@@ -25,9 +25,16 @@
       "id": "a22fbf38ce4a41e291915286e120d51f",
     },
   ],
+  // 매일 03:10 UTC(= 한국 12:10). 보관 기간이 지난 접속 기록·푸시 로그와
+  // 만료된 세션을 지운다 (src/index.ts의 scheduled 핸들러).
+  "triggers": {
+    "crons": ["10 3 * * *"],
+  },
   "vars": {
     // 웹 오리진으로 제한 (네이티브 앱은 브라우저 CORS 대상이 아니므로 영향 없음)
     "CORS_ORIGIN": "https://leave.moveto.kr",
+    // 접속 기록·푸시 로그 보관 일수. 개인정보 처리방침과 같은 값이어야 한다.
+    "LOG_RETENTION_DAYS": "90",
   },
   "observability": {
     "enabled": true,

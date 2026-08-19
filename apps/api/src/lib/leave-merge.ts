@@ -18,13 +18,15 @@ import {
   type MergeCandidate,
 } from "@leave/shared";
 import { and, eq, inArray, ne } from "drizzle-orm";
-import { leaves, leaveSegments, type LeaveRow } from "../db/schema";
+import { leaves, type LeaveRow } from "../db/schema";
+import { chunkForParams, runBatch, type BatchItem } from "./d1";
 import type { Db } from "./db";
 import { leaveRuleMessage } from "./errors";
 import {
   assertSegmentsAvailable,
+  deleteSegmentsOfStatements,
   foldSegmentRows,
-  segmentRowsFor,
+  segmentInsertStatements,
   segmentsOfUserQuery,
 } from "./leave-balances";
 
@@ -168,14 +170,15 @@ export async function saveLeaveWithMerge(
   // 살아남는 행이 이미 DB에 있는지. 등록인데 host가 자기 자신이면 그때만 insert다.
   const inserting = !options.existingId && saved.id === incoming.id;
 
-  type BatchItem = Parameters<typeof db.batch>[0][number];
-  const statements: BatchItem[] = [
-    db.delete(leaveSegments).where(inArray(leaveSegments.leaveId, clearIds)),
-  ];
-  if (saved.absorbedIds.length) {
-    statements.push(
-      db.delete(leaves).where(inArray(leaves.id, saved.absorbedIds)),
-    );
+  // 아래 문장들은 모두 한 batch = 한 트랜잭션에 들어간다. 중간에 실패하면 전부 되돌아가야
+  // 한다 — 옛 구간만 지워지고 새 구간이 안 들어가면 휴가가 통째로 빈 껍데기가 된다.
+  // 문장을 여러 개로 쪼개는 것은 D1의 문장당 바인드 파라미터 상한(100개) 때문이고,
+  // 같은 batch 안에 있으므로 왕복도 원자성도 그대로다.
+  const statements: BatchItem[] = deleteSegmentsOfStatements(db, clearIds);
+  // 흡수되는 이웃 수에는 상한이 없다 — 같은 재원의 붙은 구간은 하나로 합쳐지므로
+  // 구간 30개 상한에 걸리지 않고도 수백 건이 한 번에 흡수될 수 있다.
+  for (const ids of chunkForParams(saved.absorbedIds, 1)) {
+    statements.push(db.delete(leaves).where(inArray(leaves.id, ids)));
   }
   statements.push(
     inserting
@@ -193,11 +196,9 @@ export async function saveLeaveWithMerge(
           // 하지만 그 전제가 나중에 깨지더라도 남의 행을 건드리지 않도록 userId도 같이 건다.
           .where(and(eq(leaves.id, row.id), eq(leaves.userId, user.id))),
   );
-  statements.push(
-    db.insert(leaveSegments).values(segmentRowsFor(row.id, saved.segments)),
-  );
+  statements.push(...segmentInsertStatements(db, row.id, saved.segments));
 
-  await db.batch(statements as [BatchItem, ...BatchItem[]]);
+  await runBatch(db, statements);
 
   return { ok: true, row, segments: saved.segments };
 }

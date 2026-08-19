@@ -25,6 +25,7 @@ import {
   users,
   type LeaveRow,
 } from "../db/schema";
+import { insertStatements, runBatch } from "./d1";
 import { buildNotificationPushMessage, sendExpoPushMessages } from "./push";
 
 function formatDateList(dates: ISODate[]): string {
@@ -136,17 +137,25 @@ export async function checkOverageAndNotify(params: {
     const notificationIdByUser = new Map(
       affectedIds.map((userId) => [userId, crypto.randomUUID()]),
     );
-    await db.insert(notifications).values(
-      affectedIds.map((userId) => ({
-        id: notificationIdByUser.get(userId)!,
-        userId,
-        title,
-        body,
-        leaveId: changedLeave.id,
-        datesJson: JSON.stringify(exceededDates),
-        read: false,
-        createdAt: now,
-      })),
+    // 대상이 12명을 넘으면 한 INSERT 문이 D1 바인드 파라미터 상한을 넘겨 휴가 등록
+    // 자체가 500이 됐다(알림 행은 컬럼이 9개다). 나눠 담되 한 batch로 묶어
+    // "일부에게만 알림이 간" 상태가 남지 않게 한다.
+    await runBatch(
+      db,
+      insertStatements(
+        db,
+        notifications,
+        affectedIds.map((userId) => ({
+          id: notificationIdByUser.get(userId)!,
+          userId,
+          title,
+          body,
+          leaveId: changedLeave.id,
+          datesJson: JSON.stringify(exceededDates),
+          read: false,
+          createdAt: now,
+        })),
+      ),
     );
 
     const affectedSet = new Set(affectedIds);
@@ -182,9 +191,9 @@ export async function checkOverageAndNotify(params: {
             createdAt: new Date().toISOString(),
           };
         });
-        if (logRows.length > 0) {
-          await db.insert(pushLogs).values(logRows);
-        }
+        // 발송 대상이 16명을 넘으면 한 문장이 상한을 넘는다 — 여기도 나눠 담는다.
+        // 이 실패는 waitUntil 안이라 사용자에게 보이지 않고 로그만 조용히 비었다.
+        await runBatch(db, insertStatements(db, pushLogs, logRows));
       })(),
     );
   }

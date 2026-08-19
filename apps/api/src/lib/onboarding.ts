@@ -20,7 +20,6 @@ import {
   users,
   type UserRow,
 } from "../db/schema";
-import { bumpUnitVersion } from "./cache";
 import type { Db } from "./db";
 
 /**
@@ -116,7 +115,6 @@ export async function readOnboardingStatus(db: Db, user: UserRow) {
  */
 export async function saveOnboardingProfile(
   db: Db,
-  cache: KVNamespace,
   user: UserRow,
   input: OnboardingProfileInput,
 ): Promise<void> {
@@ -147,9 +145,6 @@ export async function saveOnboardingProfile(
         set: cleared,
       });
   }
-
-  // 달력 캐시에는 별칭과 계급 라벨이 박혀 있다.
-  if (user.unitId) await bumpUnitVersion(cache, user.unitId);
 }
 
 /**

@@ -14,7 +14,6 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { unitBlackouts, unitInvites, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
-import { bumpUnitVersion } from "../lib/cache";
 import { buildCalendarPayload, listVisibleMembers } from "../lib/calendar";
 import {
   createInvite,
@@ -51,8 +50,8 @@ import {
  * 달력·추천·시뮬레이션만 비는 어긋난 상태가 된다. 복무 기간(약 18개월) 끝까지
  * 계획할 수 있도록 미래를 넉넉히 열어 둔다.
  *
- * 긁어가기는 아래 rate limit이 막는다. 여기서 범위를 두는 목적은 캐시 키
- * (`calendar2:...:{month}`)가 무한정 늘어나지 않게 하는 것뿐이다.
+ * 긁어가기는 아래 rate limit이 막는다. 여기서 범위를 두는 목적은 한 사용자가
+ * 임의로 먼 달을 무한히 조회해 D1을 긁게 두지 않는 것뿐이다.
  */
 const CALENDAR_PAST_MONTHS = 12;
 const CALENDAR_FUTURE_MONTHS = 24;
@@ -187,7 +186,6 @@ export const unitRoutes = app
       await db.update(units).set(patch).where(eq(units.id, id));
     }
     // 최대 출타 인원 변경은 달력 통계를 바꾸므로 캐시를 무효화한다.
-    await bumpUnitVersion(c.env.CACHE, id);
 
     const unit = await serializeUnitById(db, id);
     if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
@@ -216,7 +214,6 @@ export const unitRoutes = app
     if (!unit) {
       return c.json({ error: "유효하지 않은 초대코드입니다" }, 400);
     }
-    await bumpUnitVersion(c.env.CACHE, unit.id);
     return c.json({ joined: true as const, unit }, 200);
   })
 
@@ -278,7 +275,6 @@ export const unitRoutes = app
       return c.json({ error: "해당 부대원을 찾을 수 없습니다" }, 404);
     }
     await db.update(users).set({ unitId: null }).where(eq(users.id, userId));
-    await bumpUnitVersion(c.env.CACHE, id);
     return c.json({ ok: true as const }, 200);
   })
 
@@ -311,7 +307,7 @@ export const unitRoutes = app
   })
 
   .openapi(leaveUnitRoute, async (c) => {
-    const left = await leaveUnit(drizzle(c.env.DB), c.env.CACHE, c.get("user"));
+    const left = await leaveUnit(drizzle(c.env.DB), c.get("user"));
     if (!left.ok) {
       return c.json(
         { error: "관리자는 다른 부대원에게 관리자를 넘긴 뒤 나갈 수 있습니다" },
@@ -379,7 +375,6 @@ export const unitRoutes = app
     };
     await db.insert(unitBlackouts).values(row);
     // 달력의 blocked 표시가 바뀌므로 캐시를 무효화한다.
-    await bumpUnitVersion(c.env.CACHE, id);
     return c.json(
       {
         blackout: {
@@ -411,7 +406,6 @@ export const unitRoutes = app
     if (removed.meta.changes === 0) {
       return c.json({ error: "블랙아웃 기간을 찾을 수 없습니다" }, 404);
     }
-    await bumpUnitVersion(c.env.CACHE, id);
     return c.json({ ok: true as const }, 200);
   })
 

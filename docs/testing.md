@@ -58,7 +58,8 @@ pnpm quality   # 서식 → lint → 바인딩 타입 → 타입 검사 → 단�
 - 그룹 가입·탈퇴 (`lib/unit-membership.ts`) — 동시 요청이 초대코드 상한을 넘길 수 있다
 - 휴가 병합·잔여 (`lib/leave-merge.ts`, `lib/leave-balances.ts`)
 - 관리자 권한 판정 (`worker/auth.ts`)와 감사 로그
-- 캐시 무효화 (`bumpUnitVersion`, `hooks/invalidate.ts`)
+- 클라이언트 캐시 무효화 (`hooks/invalidate.ts`)
+- 보관 기간 정리 (`lib/retention.ts`) — 지우면 안 되는 것을 지우면 되돌릴 수 없다
 
 절차는 같다. ① 지금 동작을 그대로 적은 테스트를 쓴다 ② 그 테스트가 **고치기 전** 코드에서 통과하는지 본다
 ③ 고친다 ④ 같은 테스트가 여전히 통과하는지 본다.

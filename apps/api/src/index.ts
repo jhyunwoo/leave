@@ -4,9 +4,12 @@
  * 배포: Cloudflare Workers (wrangler.jsonc). 로컬은 `pnpm dev:web`이 8787로 띄운다.
  *
  * 미들웨어는 바깥에서 안쪽 순서로 쌓인다.
- *  1) 접속 기록  — 모든 요청을 남긴다. next() 뒤에 실행돼 인증된 사용자까지 안다.
+ *  1) 접속 기록  — 동의한 사용자의 요청을 남긴다. next() 뒤에 실행돼 인증된 사용자까지 안다.
  *  2) CORS       — 허용 오리진은 환경변수로 받는다.
  *  3) 최소 버전  — 출타 계산 규칙이 바뀐 뒤의 구버전 앱을 끊는다.
+ *
+ * fetch 말고 `scheduled`도 내보낸다 — 보관 기간이 지난 로그와 만료 세션을 지우는
+ * 정리 작업이다(wrangler.jsonc의 cron 트리거).
  *
  * 마지막에 체이닝된 `routes`의 타입이 그대로 `AppType`이 되고, 웹/앱이
  * `hc<AppType>()`으로 가져가 컴파일 타임에 경로·입력·응답을 맞춘다.
@@ -14,8 +17,10 @@
  */
 
 import { Scalar } from "@scalar/hono-api-reference";
+import { drizzle } from "drizzle-orm/d1";
 import { cors } from "hono/cors";
-import { createApp } from "./lib/app";
+import { createApp, type AppBindings } from "./lib/app";
+import { pruneExpiredData, resolveRetentionDays } from "./lib/retention";
 import { accessLogMiddleware } from "./middleware/access-log";
 import { minVersionMiddleware } from "./middleware/min-version";
 import { authRoutes } from "./routes/auth";
@@ -117,4 +122,24 @@ export type AppType = typeof routes;
 
 export default {
   fetch: app.fetch,
+
+  /**
+   * 정기 정리 — 보관 기간이 지난 접속 기록·푸시 로그와 만료된 세션을 지운다.
+   *
+   * 실패해도 다음 실행이 이어서 하면 되므로 던지지 않고 기록만 남긴다.
+   * 던지면 Cloudflare가 실패로 재시도하는데, 여기서 재시도가 도움이 되는 상황이 없다.
+   */
+  async scheduled(
+    _event: ScheduledController,
+    env: AppBindings,
+  ): Promise<void> {
+    try {
+      const summary = await pruneExpiredData(drizzle(env.DB), {
+        retentionDays: resolveRetentionDays(env.LOG_RETENTION_DAYS),
+      });
+      console.log("retention", JSON.stringify(summary));
+    } catch (err) {
+      console.error("보관 기간 정리 실패", err);
+    }
+  },
 };

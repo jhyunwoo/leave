@@ -31,17 +31,7 @@ import {
   type RegularOvernightConfigInput,
   type SegmentLike,
 } from "@leave/shared";
-import {
-  and,
-  asc,
-  eq,
-  gte,
-  inArray,
-  lte,
-  ne,
-  notInArray,
-  or,
-} from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
 import {
   leaveGrants,
   leaves,
@@ -52,6 +42,12 @@ import {
   type LeaveSegmentRow,
   type RegularOvernightConfigRow,
 } from "../db/schema";
+import {
+  chunkForParams,
+  insertStatements,
+  runBatch,
+  type BatchItem,
+} from "./d1";
 import type { Db } from "./db";
 import { LeaveRuleError } from "./errors";
 import {
@@ -95,36 +91,14 @@ export type LeaveBalanceItem = {
   expiringSoonDays: number;
 };
 
-/**
- * 정기외박 잔여량 계산에 필요한, 날짜가 살아 있는 내 정기외박 구간들.
- * excludeLeaveIds를 주면 그 휴가들의 구간은 뺀다(수정 중인 휴가, 그리고 이번 저장으로 흡수될 이웃들).
- */
-async function regularOvernightSegments(
-  db: Db,
-  userId: string,
-  excludeLeaveIds: readonly string[] = [],
-) {
-  return db
-    .select({
-      category: leaveSegments.category,
-      overnightKind: leaveSegments.overnightKind,
-      startDate: leaveSegments.startDate,
-      endDate: leaveSegments.endDate,
-    })
-    .from(leaveSegments)
-    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-    .where(
-      and(
-        eq(leaves.userId, userId),
-        eq(leaveSegments.category, "overnight"),
-        eq(leaveSegments.overnightKind, "regular"),
-        // 빈 배열로 notInArray를 부르면 드라이버마다 결과가 갈린다. 아예 조건을 뺀다.
-        ...(excludeLeaveIds.length
-          ? [notInArray(leaveSegments.leaveId, [...excludeLeaveIds])]
-          : []),
-      ),
-    )
-    .all();
+/** 이미 읽어 둔 구간 중 정기외박(자동 적립 대상)만 고른다. */
+function onlyRegularOvernight<
+  T extends { category: string; overnightKind: string | null },
+>(segments: readonly T[]): T[] {
+  return segments.filter(
+    (segment) =>
+      segment.category === "overnight" && segment.overnightKind === "regular",
+  );
 }
 
 export async function getLeaveBalanceSummary(
@@ -138,10 +112,7 @@ export async function getLeaveBalanceSummary(
 
   // 정기외박 구간은 위에서 이미 읽은 전체 구간의 부분집합이다. 같은 조인을
   // 조건만 좁혀 한 번 더 던지면 왕복만 하나 늘고 결과는 같다 — 여기서 걸러 쓴다.
-  const regularSegments = segments.filter(
-    (segment) =>
-      segment.category === "overnight" && segment.overnightKind === "regular",
-  );
+  const regularSegments = onlyRegularOvernight(segments);
 
   const today = todayInSeoul();
   const allocations = allocateAllGrants(
@@ -276,43 +247,54 @@ export async function updateLeaveBalanceTotals(
     return { key, plan };
   });
 
+  // 한 요청이 여러 재원을 한꺼번에 보내므로 변경도 여러 건이 된다. 문장마다 await 하면
+  // 왕복이 그만큼 늘고, 무엇보다 중간에 실패하면 일부 재원만 바뀐 상태로 남는다.
+  // batch는 한 왕복이자 한 트랜잭션이라 둘 다 해결된다.
   const now = new Date().toISOString();
+  const statements: BatchItem[] = [];
   for (const { key, plan } of plans) {
     for (const mutation of plan.mutations) {
       if (mutation.kind === "create") {
-        await db.insert(leaveGrants).values({
-          id: crypto.randomUUID(),
-          userId: user.id,
-          balanceKey: key,
-          days: mutation.days,
-          grantedOn: null,
-          expiresOn: null,
-          note: null,
-          createdAt: now,
-          updatedAt: now,
-        });
+        statements.push(
+          db.insert(leaveGrants).values({
+            id: crypto.randomUUID(),
+            userId: user.id,
+            balanceKey: key,
+            days: mutation.days,
+            grantedOn: null,
+            expiresOn: null,
+            note: null,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
       } else if (mutation.kind === "update") {
-        await db
-          .update(leaveGrants)
-          .set({ days: mutation.days, updatedAt: now })
-          .where(
-            and(
-              eq(leaveGrants.id, mutation.id),
-              eq(leaveGrants.userId, user.id),
+        statements.push(
+          db
+            .update(leaveGrants)
+            .set({ days: mutation.days, updatedAt: now })
+            .where(
+              and(
+                eq(leaveGrants.id, mutation.id),
+                eq(leaveGrants.userId, user.id),
+              ),
             ),
-          );
+        );
       } else {
-        await db
-          .delete(leaveGrants)
-          .where(
-            and(
-              eq(leaveGrants.id, mutation.id),
-              eq(leaveGrants.userId, user.id),
+        statements.push(
+          db
+            .delete(leaveGrants)
+            .where(
+              and(
+                eq(leaveGrants.id, mutation.id),
+                eq(leaveGrants.userId, user.id),
+              ),
             ),
-          );
+        );
       }
     }
   }
+  await runBatch(db, statements);
   return getLeaveBalanceSummary(db, user);
 }
 
@@ -359,19 +341,13 @@ export async function saveRegularOvernightConfig(
  *
  * 판정 규칙은 폼과 공유하려고 @leave/shared에 있다 — 여기서는 재료만 모은다.
  */
-async function assertRegularOvernightAvailable(
-  db: Db,
+function assertRegularOvernightAvailable(
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   config: RegularOvernightConfigRow | undefined,
   requested: SegmentLike[],
-  replacingLeaveIds: readonly string[],
+  /** 이번 저장으로 사라질 휴가의 구간은 이미 빠져 있어야 한다 — 자기 자신과 부딪히면 안 된다. */
+  existing: readonly SegmentLike[],
 ) {
-  // 이번 저장으로 사라질 휴가들의 구간은 빼야 자기 자신과 부딪히지 않는다.
-  const existing = await regularOvernightSegments(
-    db,
-    user.id,
-    replacingLeaveIds,
-  );
   const block = checkRegularOvernight({
     config,
     existing,
@@ -399,15 +375,17 @@ export async function assertSegmentsAvailable(
 ) {
   const {
     grantRows,
-    segments: allSegments,
+    segments: storedSegments,
     config,
-  } = await loadAllocationInputs(
-    db,
-    user.id,
-    replacingLeaveIds.length
-      ? userSegmentsExcludingQuery(db, user.id, replacingLeaveIds)
-      : undefined,
-  );
+  } = await loadAllocationInputs(db, user.id);
+
+  // 이번 저장으로 사라지거나 교체될 휴가의 구간을 뺀다. 예전에는 이 제외를
+  // `NOT IN (...)`으로 SQL에 넣었는데, 흡수 대상이 100건을 넘으면 바인드 파라미터
+  // 상한에 걸려 저장이 통째로 죽었다. 한 사용자의 구간은 메모리에서 걸러도 싸다.
+  const replacing = new Set(replacingLeaveIds);
+  const allSegments = replacing.size
+    ? storedSegments.filter((segment) => !replacing.has(segment.leaveId))
+    : storedSegments;
 
   const today = todayInSeoul();
   const grants = grantRows.map(toLeaveGrant);
@@ -438,40 +416,16 @@ export async function assertSegmentsAvailable(
   }
 
   if (cycleBased && requested.has("regular_overnight")) {
-    await assertRegularOvernightAvailable(
-      db,
+    assertRegularOvernightAvailable(
       user,
       config,
       segments,
-      replacingLeaveIds,
+      onlyRegularOvernight(allSegments),
     );
   }
 }
 
-/** 이번 저장으로 사라지거나 교체될 휴가의 구간을 뺀, 이 사용자의 나머지 구간들. */
-function userSegmentsExcludingQuery(
-  db: Db,
-  userId: string,
-  excludeLeaveIds: readonly string[],
-) {
-  return db
-    .select({
-      category: leaveSegments.category,
-      overnightKind: leaveSegments.overnightKind,
-      startDate: leaveSegments.startDate,
-      endDate: leaveSegments.endDate,
-    })
-    .from(leaveSegments)
-    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-    .where(
-      and(
-        eq(leaves.userId, userId),
-        notInArray(leaveSegments.leaveId, [...excludeLeaveIds]),
-      ),
-    );
-}
-
-export function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
+function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
   return segments.map((segment) => ({
     id: crypto.randomUUID(),
     leaveId,
@@ -483,22 +437,31 @@ export function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
   }));
 }
 
-export async function insertLeaveSegments(
+/**
+ * 구간을 저장하는 INSERT 문들. 한 문장에 몰아넣지 않는 이유가 있다.
+ *
+ * 휴가 한 건은 구간을 30개까지 가질 수 있는데(스키마 상한), 한 행이 컬럼 7개를
+ * 바인드하므로 15개부터 D1의 100개 상한을 넘겨 저장이 500으로 죽었다. 문장 단위
+ * 상한이라 나눠 담으면 된다 — 호출자가 같은 batch에 넣으면 왕복도 하나고
+ * 원자성도 그대로다.
+ */
+export function segmentInsertStatements(
   db: Db,
   leaveId: string,
   segments: LeaveSegment[],
-) {
-  await db.insert(leaveSegments).values(segmentRowsFor(leaveId, segments));
+): BatchItem[] {
+  return insertStatements(db, leaveSegments, segmentRowsFor(leaveId, segments));
 }
 
-/**
- * D1은 한 문장에 바인드 파라미터를 100개까지만 받는다. id 목록을 그대로 IN에 넣는
- * 조회는 목록이 그 수를 넘는 순간 SQLITE_ERROR로 요청 전체가 죽는다(휴가 101건이면
- * GET /leaves/mine이 500이 된다). 목록으로 조회할 수밖에 없는 호출자를 위해 여기서
- * 나눠 보낸다 — 다만 라우트가 쓰는 뜨거운 경로는 아래 조인 버전을 써서 애초에
- * 목록을 만들지 않는다.
- */
-const D1_MAX_BOUND_PARAMS = 100;
+/** 주어진 휴가들의 구간을 지우는 DELETE 문들(id 목록도 상한을 넘을 수 있다). */
+export function deleteSegmentsOfStatements(
+  db: Db,
+  leaveIds: readonly string[],
+): BatchItem[] {
+  return chunkForParams(leaveIds, 1).map((ids) =>
+    db.delete(leaveSegments).where(inArray(leaveSegments.leaveId, ids)),
+  );
+}
 
 /** 구간 조회가 돌려주는 행 — 응답 조립에 필요한 컬럼만. */
 type SegmentPick = {
@@ -540,8 +503,7 @@ const segmentColumns = {
 export async function segmentsForLeaves(db: Db, leaveIds: string[]) {
   if (!leaveIds.length) return new Map<string, LeaveSegment[]>();
   const rows: SegmentPick[] = [];
-  for (let i = 0; i < leaveIds.length; i += D1_MAX_BOUND_PARAMS) {
-    const chunk = leaveIds.slice(i, i + D1_MAX_BOUND_PARAMS);
+  for (const chunk of chunkForParams(leaveIds, 1)) {
     rows.push(
       ...(await db
         .select(segmentColumns)

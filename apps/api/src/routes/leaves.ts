@@ -8,7 +8,7 @@
  * 휴가를 저장하기 전에 반드시 두 가지를 확인한다.
  *  1) 구간들이 겹치지 않고 빈틈없이 이어지는가(스키마)
  *  2) 각 구간의 재원이 실제로 남아 있는가(assertSegmentsAvailable)
- * 저장 뒤에는 그룹 달력 캐시를 무효화하고 초과 알림을 보낸다.
+ * 저장 뒤에는 그룹의 하루 출타 상한을 넘겼는지 확인해 초과 알림을 보낸다.
  */
 
 import {
@@ -21,7 +21,6 @@ import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { leaves, type LeaveRow } from "../db/schema";
 import { createApp } from "../lib/app";
-import { bumpUnitVersion } from "../lib/cache";
 import { leaveRuleMessage } from "../lib/errors";
 import {
   foldSegmentRows,
@@ -198,9 +197,6 @@ export const leaveRoutes = app
     });
     if (!saved.ok) return c.json({ error: saved.error }, 400);
 
-    // 휴가가 추가되면 부대 달력이 바뀌므로 캐시를 무효화한다.
-    await bumpUnitVersion(c.env.CACHE, user.unitId);
-
     const exceededDates = await checkOverageAndNotify({
       db,
       unitId: user.unitId,
@@ -249,8 +245,6 @@ export const leaveRoutes = app
     );
     if (!saved.ok) return c.json({ error: saved.error }, 400);
 
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
-
     const exceededDates = user.unitId
       ? await checkOverageAndNotify({
           db,
@@ -285,6 +279,5 @@ export const leaveRoutes = app
     if (removed.meta.changes === 0) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   });

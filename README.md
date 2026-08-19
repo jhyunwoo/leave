@@ -89,12 +89,11 @@ pnpm test --filter @leave/api    # API 통합 테스트 (격리 D1 + wrangler de
 무엇을 고쳤을 때 무엇을 돌리고 무엇을 더 써야 하는지는 [docs/testing.md](docs/testing.md).
 
 - **API 통합 테스트**(`apps/api/test/*.test.mjs`): 격리된 로컬 D1로 `wrangler dev`를 자동 기동해
-  인증·부대·휴가·출타 인원·**접속 로그**·**푸시 이벤트**·**달력 캐시 무효화**를 Node 내장 러너로 검증(추가 의존성 없음).
+  인증·부대·휴가·출타 인원·**접속 로그**·**푸시 이벤트**·**보관 기간 정리**를 Node 내장 러너로 검증(추가 의존성 없음).
 - **웹 e2e**(Playwright): `pnpm --filter @leave/web test:e2e`
   (사전 1회: `pnpm add -D @playwright/test && npx playwright install chromium`). 설정은 `apps/web/playwright.config.ts`.
 - **앱 e2e**(Maestro): `apps/native/.maestro/README.md` 참고.
 - API 문서: http://localhost:8787/docs (OpenAPI 자동 생성)
-- 레거시 통합 스크립트: API 기동 후 `bash apps/api/scripts/integration.sh`
 - 전체 타입체크/빌드: `pnpm check-types` / `pnpm build`
 
 ## 배포 (Cloudflare)

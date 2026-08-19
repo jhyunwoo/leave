@@ -27,7 +27,6 @@ import {
   primaryKey,
   sqliteTable,
   text,
-  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
@@ -186,30 +185,6 @@ export const leaveSegments = sqliteTable(
   (t) => [
     index("leave_segments_leave_start_idx").on(t.leaveId, t.startDate),
     index("leave_segments_dates_idx").on(t.startDate, t.endDate),
-  ],
-);
-
-/**
- * 사용자가 직접 수정하는 휴가 총량 조정값.
- * 정기외박 자동 적립분과 합산한 값이 화면에 보이는 총 보유일수다.
- */
-export const userLeaveBalances = sqliteTable(
-  "user_leave_balances",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    balanceKey: text("balance_key", { enum: BALANCE_KEYS }).notNull(),
-    adjustmentDays: integer("adjustment_days").notNull().default(0),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (t) => [
-    // (userId)만 거는 인덱스는 이 유니크 인덱스의 접두사라 중복이다(0020).
-    uniqueIndex("user_leave_balances_user_key_unique").on(
-      t.userId,
-      t.balanceKey,
-    ),
   ],
 );
 
@@ -456,7 +431,6 @@ export type ContentReportRow = typeof contentReports.$inferSelect;
 export type UserBlockRow = typeof userBlocks.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
-export type UserLeaveBalanceRow = typeof userLeaveBalances.$inferSelect;
 export type LeaveGrantRow = typeof leaveGrants.$inferSelect;
 export type RegularOvernightConfigRow =
   typeof regularOvernightConfigs.$inferSelect;

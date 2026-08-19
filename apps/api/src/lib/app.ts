@@ -27,6 +27,8 @@ export type AppBindings = {
   LATEST_APP_VERSION?: string;
   /** 카운터별 rate limit 상한 덮어쓰기 JSON (예: `{"signup":10000}`). */
   RATE_LIMITS?: string;
+  /** 접속 기록·푸시 로그 보관 일수. 비우면 lib/retention.ts의 기본값을 쓴다. */
+  LOG_RETENTION_DAYS?: string;
 };
 
 export type AppEnv = {

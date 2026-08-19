@@ -14,8 +14,8 @@
  *  3) 마지막에 사용자 행을 지운다.
  *
  * D1은 ON DELETE CASCADE를 실제로 적용하므로, users를 참조하는 표
- * (leaves→leave_segments, leave_grants, user_leave_balances,
- *  regular_overnight_configs, sessions, notifications, user_notification_prefs)는
+ * (leaves→leave_segments, leave_grants, regular_overnight_configs,
+ *  sessions, notifications, user_notification_prefs)는
  * 마지막 한 줄로 함께 사라진다. 그래도 명시적으로 지우는 것들이 있는데,
  * 이유가 둘로 갈린다.
  *  - 외래키가 **없어서** 반드시 직접 지워야 하는 것: access_logs, push_logs,
@@ -38,7 +38,7 @@ import {
   userNotificationPrefs,
   users,
 } from "../db/schema";
-import { bumpUnitVersion } from "./cache";
+import { runBatch, type BatchItem } from "./d1";
 import type { Db } from "./db";
 
 type DeletableUser = { id: string; unitId: string | null };
@@ -77,41 +77,44 @@ async function handOverOrCloseUnit(db: Db, user: DeletableUser): Promise<void> {
   await db.delete(units).where(eq(units.id, user.unitId));
 }
 
-/** 사용자를 가리키는 흔적을 모두 지운다. 마지막이 사용자 행이다. */
+/**
+ * 사용자를 가리키는 흔적을 모두 지운다. 마지막이 사용자 행이다.
+ *
+ * 한 문장씩 await 하면 중간에 실패했을 때 "휴가는 지워졌는데 계정은 살아 있는" 상태가
+ * 남는다. 되돌릴 수 없는 삭제에서 그런 중간 상태는 개인정보 약속을 깨뜨린다 —
+ * batch는 한 트랜잭션이라 전부 지워지거나 아무것도 안 지워지거나 둘 중 하나다.
+ */
 async function purgeUserData(db: Db, userId: string): Promise<void> {
-  await db.delete(leaves).where(eq(leaves.userId, userId));
-  await db.delete(notifications).where(eq(notifications.userId, userId));
-  await db.delete(sessions).where(eq(sessions.userId, userId));
-  await db.delete(accessLogs).where(eq(accessLogs.userId, userId));
-  await db.delete(pushLogs).where(eq(pushLogs.userId, userId));
-  await db
-    .delete(userNotificationPrefs)
-    .where(eq(userNotificationPrefs.userId, userId));
+  const statements: BatchItem[] = [
+    db.delete(leaves).where(eq(leaves.userId, userId)),
+    db.delete(notifications).where(eq(notifications.userId, userId)),
+    db.delete(sessions).where(eq(sessions.userId, userId)),
+    db.delete(accessLogs).where(eq(accessLogs.userId, userId)),
+    db.delete(pushLogs).where(eq(pushLogs.userId, userId)),
+    db
+      .delete(userNotificationPrefs)
+      .where(eq(userNotificationPrefs.userId, userId)),
 
-  // 내가 건 차단과 남이 나를 건 차단 모두 지운다. 남으면 없는 id를 계속 숨긴다.
-  await db.delete(userBlocks).where(eq(userBlocks.userId, userId));
-  await db.delete(userBlocks).where(eq(userBlocks.blockedUserId, userId));
+    // 내가 건 차단과 남이 나를 건 차단 모두 지운다. 남으면 없는 id를 계속 숨긴다.
+    db.delete(userBlocks).where(eq(userBlocks.userId, userId)),
+    db.delete(userBlocks).where(eq(userBlocks.blockedUserId, userId)),
 
-  // 접수된 신고 자체는 운영 증적으로 남기되 신고자 식별자는 끊는다.
-  await db
-    .update(contentReports)
-    .set({ reporterId: null })
-    .where(eq(contentReports.reporterId, userId));
+    // 접수된 신고 자체는 운영 증적으로 남기되 신고자 식별자는 끊는다.
+    db
+      .update(contentReports)
+      .set({ reporterId: null })
+      .where(eq(contentReports.reporterId, userId)),
 
-  await db.delete(users).where(eq(users.id, userId));
+    db.delete(users).where(eq(users.id, userId)),
+  ];
+  await runBatch(db, statements);
 }
 
-/**
- * 계정과 관련 데이터를 모두 삭제한다. 되돌릴 수 없다.
- *
- * @param cache 부대원 수가 바뀌므로 그 그룹의 달력 통계 캐시를 무효화한다.
- */
+/** 계정과 관련 데이터를 모두 삭제한다. 되돌릴 수 없다. */
 export async function deleteAccount(
   db: Db,
-  cache: KVNamespace,
   user: DeletableUser,
 ): Promise<void> {
   await handOverOrCloseUnit(db, user);
   await purgeUserData(db, user.id);
-  if (user.unitId) await bumpUnitVersion(cache, user.unitId);
 }

@@ -88,10 +88,18 @@ export function grantsQuery(db: Db, userId: string) {
   return db.select().from(leaveGrants).where(eq(leaveGrants.userId, userId));
 }
 
-/** 배분에 쓰는, 이 사용자의 모든 휴가 구간. */
+/**
+ * 배분에 쓰는, 이 사용자의 모든 휴가 구간.
+ *
+ * `leaveId`까지 읽는 이유는 호출자가 특정 휴가의 구간을 빼고 계산해야 할 때가 있어서다
+ * (수정 중인 휴가, 이번 저장으로 흡수될 이웃). 예전에는 그 제외를 `NOT IN (...)`으로
+ * SQL에 넣었는데, 목록이 길어지면 D1 바인드 파라미터 상한에 걸려 저장이 죽었다.
+ * 한 사용자의 구간은 메모리에서 걸러도 충분히 싸다.
+ */
 export function userSegmentsQuery(db: Db, userId: string) {
   return db
     .select({
+      leaveId: leaveSegments.leaveId,
       category: leaveSegments.category,
       overnightKind: leaveSegments.overnightKind,
       startDate: leaveSegments.startDate,

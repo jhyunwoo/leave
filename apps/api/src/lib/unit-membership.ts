@@ -11,7 +11,6 @@
 
 import { and, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
 import { unitInvites, units, users } from "../db/schema";
-import { bumpUnitVersion } from "./cache";
 import { sha256Hex } from "./crypto";
 import type { Db } from "./db";
 
@@ -96,7 +95,6 @@ export type LeaveUnitResult =
  */
 export async function leaveUnit(
   db: Db,
-  cache: KVNamespace,
   user: { id: string; unitId: string | null },
 ): Promise<LeaveUnitResult> {
   const unitId = user.unitId;
@@ -119,6 +117,5 @@ export async function leaveUnit(
     await db.delete(unitInvites).where(eq(unitInvites.unitId, unitId));
     await db.delete(units).where(eq(units.id, unitId));
   }
-  await bumpUnitVersion(cache, unitId);
   return { ok: true };
 }

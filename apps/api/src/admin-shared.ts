@@ -3,7 +3,6 @@
  * 브라우저 번들에서는 import하지 않는다.
  */
 export * from "./db/schema";
-export { bumpUnitVersion } from "./lib/cache";
 export {
   generateSessionToken,
   hashPassword,
@@ -13,8 +12,7 @@ export {
 export { checkOverageAndNotify } from "./lib/overage";
 export {
   assertSegmentsAvailable,
-  insertLeaveSegments,
-  segmentRowsFor,
+  segmentInsertStatements,
   segmentsForLeaves,
 } from "./lib/leave-balances";
 export { buildNotificationPushMessage, sendExpoPush } from "./lib/push";

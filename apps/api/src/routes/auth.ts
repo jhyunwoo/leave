@@ -25,7 +25,6 @@ import {
   type UserRow,
 } from "../db/schema";
 import { createApp } from "../lib/app";
-import { bumpUnitVersion } from "../lib/cache";
 import { hashPassword, sha256Hex, verifyPassword } from "../lib/crypto";
 import { deleteAccount } from "../lib/delete-account";
 import { leaveRuleMessage } from "../lib/errors";
@@ -215,12 +214,7 @@ export const authRoutes = app
   })
   .openapi(onboardingProfileRoute, async (c) => {
     const db = drizzle(c.env.DB);
-    await saveOnboardingProfile(
-      db,
-      c.env.CACHE,
-      c.get("user"),
-      c.req.valid("json"),
-    );
+    await saveOnboardingProfile(db, c.get("user"), c.req.valid("json"));
     return c.json({ ok: true as const }, 200);
   })
   .openapi(onboardingRegularRoute, async (c) => {
@@ -269,16 +263,6 @@ export const authRoutes = app
         signupRank: next.signupRank,
       })
       .where(eq(users.id, user.id));
-
-    // 부대 달력 캐시에는 별칭과 계급 라벨이 박혀 있다. 표시 계급은 입대일에서
-    // 파생하므로 이름·계급·입대일 중 하나만 바뀌어도 캐시를 새로 발급해야 한다.
-    const affectsCalendar =
-      next.name !== user.name ||
-      next.signupRank !== user.signupRank ||
-      next.enlistedAt !== user.enlistedAt;
-    if (user.unitId && affectsCalendar) {
-      await bumpUnitVersion(c.env.CACHE, user.unitId);
-    }
 
     return c.json({ user: serializeUser(next) }, 200);
   })
@@ -365,6 +349,6 @@ export const authRoutes = app
     );
   })
   .openapi(deleteAccountRoute, async (c) => {
-    await deleteAccount(drizzle(c.env.DB), c.env.CACHE, c.get("user"));
+    await deleteAccount(drizzle(c.env.DB), c.get("user"));
     return c.json({ ok: true as const }, 200);
   });

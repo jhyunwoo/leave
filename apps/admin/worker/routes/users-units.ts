@@ -3,13 +3,9 @@
  *
  * 마운트 위치: `/api` (worker/index.ts).
  * 다루는 것: 목록·검색·생성·수정·삭제, 초대코드 조회/폐기, 사용자 세션 만료.
- *
- * 사용자나 그룹을 바꾸면 그 그룹의 달력 집계가 달라지므로
- * `bumpUnitVersion`으로 캐시를 무효화해야 한다.
  */
 
 import {
-  bumpUnitVersion,
   hashPassword,
   leaves,
   notifications,
@@ -206,7 +202,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       createdAt: now,
     };
     await db.insert(users).values(user);
-    if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     const after = userDto(user as typeof users.$inferSelect);
     await writeAudit(c, {
       action: "create",
@@ -273,12 +268,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     if (Object.keys(patch).length) {
       await db.update(users).set(patch).where(eq(users.id, id));
     }
-    if (input.data.unitId !== undefined) {
-      if (before.unitId) await bumpUnitVersion(c.env.CACHE, before.unitId);
-      if (input.data.unitId) {
-        await bumpUnitVersion(c.env.CACHE, input.data.unitId);
-      }
-    }
     if (input.data.password) {
       await db.delete(sessions).where(eq(sessions.userId, id));
     }
@@ -317,7 +306,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     await db.delete(sessions).where(eq(sessions.userId, id));
     // 접속·푸시 로그는 운영 감사 기록이므로 보존한다.
     await db.delete(users).where(eq(users.id, id));
-    if (before.unitId) await bumpUnitVersion(c.env.CACHE, before.unitId);
     await writeAudit(c, {
       action: "delete",
       entityType: "user",
@@ -387,7 +375,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       .update(users)
       .set({ unitId: unit.id })
       .where(eq(users.id, admin.id));
-    await bumpUnitVersion(c.env.CACHE, unit.id);
     await writeAudit(c, {
       action: "create",
       entityType: "unit",
@@ -420,7 +407,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
         .set({ unitId: id })
         .where(eq(users.id, input.data.adminId));
     }
-    await bumpUnitVersion(c.env.CACHE, id);
     const after = (await db
       .select()
       .from(units)
@@ -444,7 +430,6 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     await db.delete(unitInvites).where(eq(unitInvites.unitId, id));
     await db.update(users).set({ unitId: null }).where(eq(users.unitId, id));
     await db.delete(units).where(eq(units.id, id));
-    await bumpUnitVersion(c.env.CACHE, id);
     await writeAudit(c, {
       action: "delete",
       entityType: "unit",

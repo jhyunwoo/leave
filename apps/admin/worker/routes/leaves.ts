@@ -10,12 +10,10 @@
 
 import {
   assertSegmentsAvailable,
-  bumpUnitVersion,
   checkOverageAndNotify,
-  insertLeaveSegments,
   leaves,
   leaveSegments,
-  segmentRowsFor,
+  segmentInsertStatements,
   segmentsForLeaves,
   units,
   users,
@@ -185,21 +183,22 @@ export const adminLeaveRoutes = new Hono<AdminAppEnv>()
       reason: input.data.reason ?? null,
       createdAt: nowIso(),
     };
-    await db.insert(leaves).values(leave);
-    await insertLeaveSegments(db, leave.id, segments);
-    if (user.unitId) {
-      await bumpUnitVersion(c.env.CACHE, user.unitId);
-      if (input.data.sendNotifications) {
-        safeWaitUntil(
-          c,
-          checkOverageAndNotify({
-            db,
-            unitId: user.unitId,
-            changedLeave: leave as typeof leaves.$inferSelect,
-            waitUntil: (promise) => safeWaitUntil(c, promise),
-          }),
-        );
-      }
+    // 행과 구간을 나눠 쓰면 사이에서 실패했을 때 구간 없는 휴가가 남는다. 앱의 병합
+    // 경로가 그런 행을 방어적으로 걸러내야 했던 원인이 여기였다. 한 batch로 묶는다.
+    await db.batch([
+      db.insert(leaves).values(leave),
+      ...segmentInsertStatements(db, leave.id, segments),
+    ]);
+    if (user.unitId && input.data.sendNotifications) {
+      safeWaitUntil(
+        c,
+        checkOverageAndNotify({
+          db,
+          unitId: user.unitId,
+          changedLeave: leave as typeof leaves.$inferSelect,
+          waitUntil: (promise) => safeWaitUntil(c, promise),
+        }),
+      );
     }
     await writeAudit(c, {
       action: "create",
@@ -225,10 +224,7 @@ export const adminLeaveRoutes = new Hono<AdminAppEnv>()
       .where(eq(leaves.id, id))
       .get();
     if (!before) return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
-    const [oldUser, newUser] = await Promise.all([
-      getUser(db, before.userId),
-      getUser(db, input.data.userId),
-    ]);
+    const newUser = await getUser(db, input.data.userId);
     if (!newUser) return c.json({ error: "사용자를 찾을 수 없습니다" }, 400);
     const segments = toSegments(input.data.segments);
     const range = segmentsRange(segments)!;
@@ -257,22 +253,19 @@ export const adminLeaveRoutes = new Hono<AdminAppEnv>()
     await db.batch([
       db.update(leaves).set(patch).where(eq(leaves.id, id)),
       db.delete(leaveSegments).where(eq(leaveSegments.leaveId, id)),
-      db.insert(leaveSegments).values(segmentRowsFor(id, segments)),
+      // 구간 15개부터는 한 INSERT 문이 D1 바인드 파라미터 상한을 넘는다 — 나눠 담는다.
+      ...segmentInsertStatements(db, id, segments),
     ]);
-    if (oldUser?.unitId) await bumpUnitVersion(c.env.CACHE, oldUser.unitId);
-    if (newUser.unitId) {
-      await bumpUnitVersion(c.env.CACHE, newUser.unitId);
-      if (input.data.sendNotifications) {
-        safeWaitUntil(
-          c,
-          checkOverageAndNotify({
-            db,
-            unitId: newUser.unitId,
-            changedLeave: { ...before, ...patch },
-            waitUntil: (promise) => safeWaitUntil(c, promise),
-          }),
-        );
-      }
+    if (newUser.unitId && input.data.sendNotifications) {
+      safeWaitUntil(
+        c,
+        checkOverageAndNotify({
+          db,
+          unitId: newUser.unitId,
+          changedLeave: { ...before, ...patch },
+          waitUntil: (promise) => safeWaitUntil(c, promise),
+        }),
+      );
     }
     const after = { ...before, ...patch, segments };
     await writeAudit(c, {
@@ -293,9 +286,7 @@ export const adminLeaveRoutes = new Hono<AdminAppEnv>()
       .where(eq(leaves.id, id))
       .get();
     if (!before) return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
-    const user = await getUser(db, before.userId);
     await db.delete(leaves).where(eq(leaves.id, id));
-    if (user?.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     await writeAudit(c, {
       action: "delete",
       entityType: "leave",
