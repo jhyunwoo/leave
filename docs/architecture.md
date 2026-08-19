@@ -75,6 +75,27 @@ middleware/*.ts             인증·온보딩·rate limit·접속 기록·최소
 
 **캐시**: 부대 달력은 KV에 캐싱하고 "부대별 버전 토큰"으로 무효화한다(`lib/cache.ts`).
 부대원·휴가·설정이 바뀌는 모든 경로에서 `bumpUnitVersion`을 부른다.
+⚠ 지금 캐시를 **읽는 쪽이 없다** — `getCachedCalendar`/`putCachedCalendar`는 어디서도
+호출되지 않고, 남은 것은 변경 경로마다 도는 KV 쓰기뿐이다. 달력을 실제로 캐싱하거나
+버전 갱신을 걷어내거나, 둘 중 하나로 정리해야 한다(정리 방향은 아래 "D1 사용 규칙" 다음 문단).
+
+### D1 사용 규칙
+
+**한 문장의 바인드 파라미터는 100개까지다.** 이 상한을 넘기면 `SQLITE_ERROR`로 요청 전체가
+죽는다 — 느려지는 것이 아니라 500이 된다. id 목록을 모아 `inArray(...)`에 넣는 조회는
+목록이 자라는 순간 이 벽에 부딪히므로, **부대·사용자로 좁히는 조인**으로 쓴다.
+`lib/leave-balances.ts`의 `segmentsOfUser`·`segmentsOfUnitDuring`이 그 형태다.
+목록으로 조회할 수밖에 없는 자리(`segmentsForLeaves`)는 100개씩 나눠 보낸다.
+
+**인덱스는 "좁히는 컬럼 + 정렬 컬럼" 순서로 만든다.** 사용자별 목록을 최신순으로 주는
+엔드포인트(`/auth/activity`, `/notifications`, `/leaves/mine`)는 정렬 컬럼이 인덱스에 없으면
+`USE TEMP B-TREE FOR ORDER BY`가 붙어, LIMIT 50을 돌려주려고 그 사용자의 행을 전부 읽는다.
+인덱스를 더하기 전에 `EXPLAIN QUERY PLAN`으로 확인하고, 접두사가 겹치는 인덱스는 만들지 않는다
+(`(user_id)`는 `(user_id, created_at)`의 접두사라 중복이다).
+
+**여러 조회를 한 왕복으로 묶을 때는 `db.batch()`를 쓴다.** `Promise.all`은 D1 왕복을
+그대로 여러 번 낸다. 서로의 결과에 기대지 않는 조회만 묶는다 — 순서에 뜻이 있는 쓰기를
+묶으면 그 뜻이 사라진다.
 
 **바인딩**: `wrangler.jsonc`가 실제로 주는 바인딩과 코드가 믿는 `AppBindings`가 어긋나면
 `bindings-drift.ts`에서 타입 검사가 깨진다. 생성물은 `pnpm --filter @leave/api types`로 갱신한다.

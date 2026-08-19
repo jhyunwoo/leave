@@ -23,8 +23,9 @@ import type { Db } from "./db";
 import { leaveRuleMessage } from "./errors";
 import {
   assertSegmentsAvailable,
+  foldSegmentRows,
   segmentRowsFor,
-  segmentsForLeaves,
+  segmentsOfUserQuery,
 } from "./leave-balances";
 
 export type SaveLeaveResult =
@@ -43,22 +44,26 @@ async function loadMergeCandidates(
   userId: string,
   input: { status: LeaveStatus; excludeLeaveId?: string },
 ): Promise<MergeCandidate[]> {
-  const rows = await db
-    .select()
-    .from(leaves)
-    .where(
-      and(
-        eq(leaves.userId, userId),
-        eq(leaves.status, input.status),
-        ...(input.excludeLeaveId ? [ne(leaves.id, input.excludeLeaveId)] : []),
+  // 후보 행과 그 구간을 한 번의 왕복으로 함께 읽는다. 예전에는 행을 먼저 읽고
+  // id 목록을 IN(...)에 넣어 구간을 읽었는데, 같은 상태의 휴가가 100건을 넘으면
+  // D1 바인드 파라미터 상한에 걸려 등록·수정이 통째로 실패했다.
+  const [rows, segments] = await db.batch([
+    db
+      .select()
+      .from(leaves)
+      .where(
+        and(
+          eq(leaves.userId, userId),
+          eq(leaves.status, input.status),
+          ...(input.excludeLeaveId
+            ? [ne(leaves.id, input.excludeLeaveId)]
+            : []),
+        ),
       ),
-    )
-    .all();
+    segmentsOfUserQuery(db, userId, input),
+  ]);
   if (!rows.length) return [];
-  const segments = await segmentsForLeaves(
-    db,
-    rows.map((row) => row.id),
-  );
+  const segmentMap = foldSegmentRows(segments);
   // 구간이 하나도 없는 행은 정상 경로로는 생길 수 없지만(스키마가 min(1)),
   // 등록과 구간 삽입을 나눠 하는 관리자 경로가 중간에 실패하면 남을 수 있다.
   // 그런 행을 후보로 넘기면 뒤의 rangeOf가 non-null 단정에서 그대로 죽으므로,
@@ -70,7 +75,7 @@ async function loadMergeCandidates(
       reason: row.reason,
       status: row.status,
       createdAt: row.createdAt,
-      segments: segments.get(row.id) ?? [],
+      segments: segmentMap.get(row.id) ?? [],
     }))
     .filter((candidate) => candidate.segments.length > 0);
 }

@@ -12,7 +12,7 @@
  * 여기서 한 번에 판정하고, "무엇이 어긋났는지"만 돌려준다. 어떤 상태 코드로
  * 답할지는 라우트마다 OpenAPI 응답 정의가 다르므로 호출한 쪽이 정한다.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { units, users, type UnitRow, type UserRow } from "../db/schema";
 import type { Db } from "./db";
 import { serializeUnit } from "./serialize";
@@ -41,17 +41,34 @@ export async function checkUnitAdmin(
 }
 
 /**
- * 그룹 응답에는 항상 현재 인원수가 붙는다. 조회 → 직렬화를 한 번에 처리한다.
- * 인원수는 users.unitId를 세는 값이라 그룹 행만으로는 알 수 없다.
+ * 그룹 응답에는 항상 현재 인원수가 붙는다.
+ *
+ * 인원수는 users.unitId를 세는 값이라 그룹 행만으로는 알 수 없는데, 따로 세면
+ * 왕복이 하나 더 든다. 두 조회를 batch로 묶어 왕복 하나로 끝낸다 — 세는 쪽은
+ * `users_unit_name_idx`만 읽는 COVERING INDEX 조회라 그대로 싸다.
  */
 export async function serializeUnitWithCount(db: Db, unit: UnitRow) {
   const memberCount = await db.$count(users, eq(users.unitId, unit.id));
   return serializeUnit(unit, memberCount);
 }
 
+/** 그룹 행 + 현재 인원수를 한 번의 왕복으로 읽는다. */
+export async function unitWithMemberCount(db: Db, unitId: string) {
+  const [unitRows, countRows] = await db.batch([
+    db.select().from(units).where(eq(units.id, unitId)),
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(users)
+      .where(eq(users.unitId, unitId)),
+  ]);
+  const unit = unitRows[0];
+  if (!unit) return null;
+  return { unit, memberCount: countRows[0]?.count ?? 0 };
+}
+
 /** id로 그룹을 다시 읽어 인원수까지 붙여 직렬화한다(수정 직후 응답용). */
 export async function serializeUnitById(db: Db, unitId: string) {
-  const unit = await db.select().from(units).where(eq(units.id, unitId)).get();
-  if (!unit) return null;
-  return serializeUnitWithCount(db, unit);
+  const row = await unitWithMemberCount(db, unitId);
+  if (!row) return null;
+  return serializeUnit(row.unit, row.memberCount);
 }

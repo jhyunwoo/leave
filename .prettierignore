@@ -23,3 +23,7 @@ apps/native/expo-env.d.ts
 # 매번 뜻 없는 diff가 남는다.
 apps/api/migrations
 apps/native/assets/expo.icon
+
+# 다른 세션이 만든 중첩 워크트리. 같은 규칙이 그 워크트리 자신의 루트에서 이미 적용되므로
+# 바깥에서 다시 검사하면 생성물(마이그레이션 스냅샷·worker-env.d.ts)만 걸린다.
+.claude/worktrees

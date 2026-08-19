@@ -24,9 +24,10 @@ import { createApp } from "../lib/app";
 import { bumpUnitVersion } from "../lib/cache";
 import { leaveRuleMessage } from "../lib/errors";
 import {
+  foldSegmentRows,
   getLeaveBalanceSummary,
   saveRegularOvernightConfig,
-  segmentsForLeaves,
+  segmentsOfUserQuery,
   updateLeaveBalanceTotals,
 } from "../lib/leave-balances";
 import {
@@ -161,16 +162,17 @@ export const leaveRoutes = app
   .openapi(mineRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    const rows = await db
-      .select()
-      .from(leaves)
-      .where(eq(leaves.userId, user.id))
-      .orderBy(desc(leaves.startDate))
-      .all();
-    const segments = await segmentsForLeaves(
-      db,
-      rows.map((row) => row.id),
-    );
+    // 휴가 id를 뽑아 IN(...)으로 구간을 읽던 두 번째 왕복을 없앤다. 그 방식은
+    // 휴가가 100건을 넘으면 D1 바인드 파라미터 상한에 걸려 이 목록이 통째로 500이 됐다.
+    const [rows, segmentRows] = await db.batch([
+      db
+        .select()
+        .from(leaves)
+        .where(eq(leaves.userId, user.id))
+        .orderBy(desc(leaves.startDate)),
+      segmentsOfUserQuery(db, user.id),
+    ]);
+    const segments = foldSegmentRows(segmentRows);
     return c.json(
       { leaves: rows.map((row) => serializeLeave(row, segments)) },
       200,
@@ -273,15 +275,16 @@ export const leaveRoutes = app
     const user = c.get("user");
     const db = drizzle(c.env.DB);
 
-    const existing = await db
-      .select({ id: leaves.id })
-      .from(leaves)
+    // 존재 확인과 삭제를 한 문장으로 합친다 — 소유자 조건을 DELETE에 그대로 걸면
+    // 남의 휴가를 지울 수 없다는 보장은 같고, 왕복은 하나 줄어든다.
+    // (deleteBlackoutRoute가 쓰는 것과 같은 방식이다.)
+    const removed = await db
+      .delete(leaves)
       .where(and(eq(leaves.id, id), eq(leaves.userId, user.id)))
-      .get();
-    if (!existing) {
+      .run();
+    if (removed.meta.changes === 0) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
-    await db.delete(leaves).where(eq(leaves.id, id));
     if (user.unitId) await bumpUnitVersion(c.env.CACHE, user.unitId);
     return c.json({ ok: true as const }, 200);
   });

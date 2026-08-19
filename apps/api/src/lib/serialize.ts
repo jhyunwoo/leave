@@ -50,8 +50,19 @@ export function serializeUser(
   };
 }
 
+/**
+ * 구성원 직렬화에 실제로 필요한 컬럼.
+ *
+ * `UserRow` 전체를 요구하면 호출하는 쿼리가 `select *`를 쓸 수밖에 없다 —
+ * 부대원 수만큼 비밀번호 해시·소금·이메일을 읽게 된다. 필요한 것만 받는다.
+ */
+export type MemberFields = Pick<
+  UserRow,
+  "id" | "name" | "branch" | "enlistedAt" | "dischargeAt" | "signupRank"
+>;
+
 export function serializeMember(
-  user: UserRow,
+  user: MemberFields,
   on: string = todayInSeoul(),
 ): z.infer<typeof memberSchema> {
   const dischargeAt = normalizeLegacyDischargeDate(

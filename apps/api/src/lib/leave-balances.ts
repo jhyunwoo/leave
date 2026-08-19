@@ -14,6 +14,7 @@ import {
   BALANCE_LABELS,
   checkRegularOvernight,
   clipSegmentsTo,
+  COUNTED_LEAVE_STATUSES,
   cycleFor,
   cycleUsedDays,
   fmtDateShort,
@@ -30,22 +31,34 @@ import {
   type RegularOvernightConfigInput,
   type SegmentLike,
 } from "@leave/shared";
-import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  ne,
+  notInArray,
+  or,
+} from "drizzle-orm";
 import {
   leaveGrants,
   leaves,
   leaveSegments,
   regularOvernightConfigs,
+  users,
+  type LeaveRow,
+  type LeaveSegmentRow,
   type RegularOvernightConfigRow,
 } from "../db/schema";
 import type { Db } from "./db";
 import { LeaveRuleError } from "./errors";
 import {
   cycleDischargeDate,
-  listGrants,
+  loadAllocationInputs,
   regularOvernightSummary,
   toLeaveGrant,
-  userSegments,
 } from "./leave-grants";
 
 export type LeaveBalanceItem = {
@@ -118,16 +131,17 @@ export async function getLeaveBalanceSummary(
   db: Db,
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
 ) {
-  const [grantRows, segments, config, regularSegments] = await Promise.all([
-    listGrants(db, user.id),
-    userSegments(db, user.id),
-    db
-      .select()
-      .from(regularOvernightConfigs)
-      .where(eq(regularOvernightConfigs.userId, user.id))
-      .get(),
-    regularOvernightSegments(db, user.id),
-  ]);
+  const { grantRows, segments, config } = await loadAllocationInputs(
+    db,
+    user.id,
+  );
+
+  // 정기외박 구간은 위에서 이미 읽은 전체 구간의 부분집합이다. 같은 조인을
+  // 조건만 좁혀 한 번 더 던지면 왕복만 하나 늘고 결과는 같다 — 여기서 걸러 쓴다.
+  const regularSegments = segments.filter(
+    (segment) =>
+      segment.category === "overnight" && segment.overnightKind === "regular",
+  );
 
   const today = todayInSeoul();
   const allocations = allocateAllGrants(
@@ -235,15 +249,10 @@ export async function updateLeaveBalanceTotals(
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   totals: Partial<Record<BalanceKey, number>>,
 ) {
-  const [grantRows, segments, config] = await Promise.all([
-    listGrants(db, user.id),
-    userSegments(db, user.id),
-    db
-      .select()
-      .from(regularOvernightConfigs)
-      .where(eq(regularOvernightConfigs.userId, user.id))
-      .get(),
-  ]);
+  const { grantRows, segments, config } = await loadAllocationInputs(
+    db,
+    user.id,
+  );
   const allocations = allocateAllGrants(
     grantRows.map(toLeaveGrant),
     segments,
@@ -388,17 +397,17 @@ export async function assertSegmentsAvailable(
   segments: LeaveSegment[],
   replacingLeaveIds: readonly string[] = [],
 ) {
-  const [grantRows, allSegments, config] = await Promise.all([
-    listGrants(db, user.id),
+  const {
+    grantRows,
+    segments: allSegments,
+    config,
+  } = await loadAllocationInputs(
+    db,
+    user.id,
     replacingLeaveIds.length
-      ? userSegmentsExcluding(db, user.id, replacingLeaveIds)
-      : userSegments(db, user.id),
-    db
-      .select()
-      .from(regularOvernightConfigs)
-      .where(eq(regularOvernightConfigs.userId, user.id))
-      .get(),
-  ]);
+      ? userSegmentsExcludingQuery(db, user.id, replacingLeaveIds)
+      : undefined,
+  );
 
   const today = todayInSeoul();
   const grants = grantRows.map(toLeaveGrant);
@@ -440,7 +449,7 @@ export async function assertSegmentsAvailable(
 }
 
 /** 이번 저장으로 사라지거나 교체될 휴가의 구간을 뺀, 이 사용자의 나머지 구간들. */
-async function userSegmentsExcluding(
+function userSegmentsExcludingQuery(
   db: Db,
   userId: string,
   excludeLeaveIds: readonly string[],
@@ -459,8 +468,7 @@ async function userSegmentsExcluding(
         eq(leaves.userId, userId),
         notInArray(leaveSegments.leaveId, [...excludeLeaveIds]),
       ),
-    )
-    .all();
+    );
 }
 
 export function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
@@ -483,14 +491,27 @@ export async function insertLeaveSegments(
   await db.insert(leaveSegments).values(segmentRowsFor(leaveId, segments));
 }
 
-export async function segmentsForLeaves(db: Db, leaveIds: string[]) {
-  if (!leaveIds.length) return new Map<string, LeaveSegment[]>();
-  const rows = await db
-    .select()
-    .from(leaveSegments)
-    .where(inArray(leaveSegments.leaveId, leaveIds))
-    .orderBy(asc(leaveSegments.startDate))
-    .all();
+/**
+ * D1은 한 문장에 바인드 파라미터를 100개까지만 받는다. id 목록을 그대로 IN에 넣는
+ * 조회는 목록이 그 수를 넘는 순간 SQLITE_ERROR로 요청 전체가 죽는다(휴가 101건이면
+ * GET /leaves/mine이 500이 된다). 목록으로 조회할 수밖에 없는 호출자를 위해 여기서
+ * 나눠 보낸다 — 다만 라우트가 쓰는 뜨거운 경로는 아래 조인 버전을 써서 애초에
+ * 목록을 만들지 않는다.
+ */
+const D1_MAX_BOUND_PARAMS = 100;
+
+/** 구간 조회가 돌려주는 행 — 응답 조립에 필요한 컬럼만. */
+type SegmentPick = {
+  leaveId: string;
+  category: LeaveSegment["category"];
+  overnightKind: LeaveSegmentRow["overnightKind"];
+  startDate: string;
+  endDate: string;
+  days: number;
+};
+
+/** 구간 행들을 leaveId별 Map으로 접는다. */
+export function foldSegmentRows(rows: readonly SegmentPick[]) {
   const result = new Map<string, LeaveSegment[]>();
   for (const row of rows) {
     const values = result.get(row.leaveId) ?? [];
@@ -504,4 +525,96 @@ export async function segmentsForLeaves(db: Db, leaveIds: string[]) {
     result.set(row.leaveId, values);
   }
   return result;
+}
+
+/** 구간 조회에서 쓰는 공통 투영 — 응답에 필요한 컬럼만 읽는다. */
+const segmentColumns = {
+  leaveId: leaveSegments.leaveId,
+  category: leaveSegments.category,
+  overnightKind: leaveSegments.overnightKind,
+  startDate: leaveSegments.startDate,
+  endDate: leaveSegments.endDate,
+  days: leaveSegments.days,
+} as const;
+
+export async function segmentsForLeaves(db: Db, leaveIds: string[]) {
+  if (!leaveIds.length) return new Map<string, LeaveSegment[]>();
+  const rows: SegmentPick[] = [];
+  for (let i = 0; i < leaveIds.length; i += D1_MAX_BOUND_PARAMS) {
+    const chunk = leaveIds.slice(i, i + D1_MAX_BOUND_PARAMS);
+    rows.push(
+      ...(await db
+        .select(segmentColumns)
+        .from(leaveSegments)
+        .where(inArray(leaveSegments.leaveId, chunk))
+        .orderBy(asc(leaveSegments.startDate))
+        .all()),
+    );
+  }
+  return foldSegmentRows(rows);
+}
+
+/**
+ * 한 사용자의 휴가 구간 전부를 휴가 조인으로 한 번에 읽는다.
+ *
+ * 예전에는 휴가 id 목록을 먼저 뽑아 IN(...)에 넣었다. 왕복이 한 번 더 들고,
+ * 휴가가 100건을 넘으면 바인드 파라미터 상한에 걸려 요청이 죽었다.
+ */
+export function segmentsOfUserQuery(
+  db: Db,
+  userId: string,
+  options: { status?: LeaveRow["status"]; excludeLeaveId?: string } = {},
+) {
+  return db
+    .select(segmentColumns)
+    .from(leaveSegments)
+    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+    .where(
+      and(
+        eq(leaves.userId, userId),
+        ...(options.status ? [eq(leaves.status, options.status)] : []),
+        ...(options.excludeLeaveId
+          ? [ne(leaves.id, options.excludeLeaveId)]
+          : []),
+      ),
+    )
+    .orderBy(asc(leaveSegments.startDate));
+}
+
+/** 위 조회를 바로 실행해 leaveId별 Map으로 돌려준다. */
+export async function segmentsOfUser(
+  db: Db,
+  userId: string,
+  options: { status?: LeaveRow["status"]; excludeLeaveId?: string } = {},
+) {
+  return foldSegmentRows(await segmentsOfUserQuery(db, userId, options).all());
+}
+
+/**
+ * 한 부대의 특정 기간에 걸친 휴가 구간을 조인으로 읽는다(달력용).
+ * 집계에 들어가는 상태이거나 조회자 본인 것만 — 남의 초안 구간은 읽지 않는다.
+ */
+export async function segmentsOfUnitDuring(
+  db: Db,
+  input: { unitId: string; start: string; end: string; viewerId: string },
+) {
+  const rows = await db
+    .select(segmentColumns)
+    .from(leaveSegments)
+    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+    .innerJoin(users, eq(leaves.userId, users.id))
+    .where(
+      and(
+        eq(users.unitId, input.unitId),
+        lte(leaves.startDate, input.end),
+        gte(leaves.endDate, input.start),
+        or(
+          inArray(leaves.status, [...COUNTED_LEAVE_STATUSES]),
+          eq(leaves.userId, input.viewerId),
+        ),
+      ),
+    )
+    .orderBy(asc(leaveSegments.startDate))
+    .all();
+  return foldSegmentRows(rows);
 }

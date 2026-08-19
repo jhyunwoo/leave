@@ -11,7 +11,7 @@
 
 import { createRoute, z } from "@hono/zod-openapi";
 import { notificationPrefsSchema } from "@leave/shared";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
   notifications,
@@ -116,7 +116,7 @@ const updatePrefsRoute = createRoute({
 /** 행이 없으면 전부 켜진 것으로 본다 — 기존 사용자의 동작을 바꾸지 않는다. */
 const DEFAULT_PREFS = { overage: true, blackout: true, unitNotice: true };
 
-function parseDates(row: NotificationRow): string[] {
+function parseDates(row: Pick<NotificationRow, "datesJson">): string[] {
   if (!row.datesJson) return [];
   try {
     const parsed: unknown = JSON.parse(row.datesJson);
@@ -136,23 +136,39 @@ export const notificationRoutes = app
   .openapi(listRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    const rows = await db
-      .select()
-      .from(notifications)
-      .where(
-        and(eq(notifications.userId, user.id), isNull(notifications.deletedAt)),
-      )
-      .orderBy(desc(notifications.createdAt))
-      .limit(50)
-      .all();
-    const unreadCount = await db.$count(
-      notifications,
-      and(
-        eq(notifications.userId, user.id),
-        eq(notifications.read, false),
-        isNull(notifications.deletedAt),
-      ),
-    );
+    // 목록과 안 읽음 수는 서로를 기다릴 이유가 없다 — 한 번의 왕복으로 묶는다.
+    const [rows, unread] = await db.batch([
+      db
+        .select({
+          id: notifications.id,
+          title: notifications.title,
+          body: notifications.body,
+          leaveId: notifications.leaveId,
+          datesJson: notifications.datesJson,
+          read: notifications.read,
+          createdAt: notifications.createdAt,
+        })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, user.id),
+            isNull(notifications.deletedAt),
+          ),
+        )
+        .orderBy(desc(notifications.createdAt))
+        .limit(50),
+      db
+        .select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, user.id),
+            eq(notifications.read, false),
+            isNull(notifications.deletedAt),
+          ),
+        ),
+    ]);
+    const unreadCount = unread[0]?.count ?? 0;
     return c.json(
       {
         notifications: rows.map((row) => ({

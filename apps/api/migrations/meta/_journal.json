@@ -141,6 +141,13 @@
       "when": 1787184000000,
       "tag": "0019_notification_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1787788800000,
+      "tag": "0020_index_access_patterns",
+      "breakpoints": true
     }
   ]
 }

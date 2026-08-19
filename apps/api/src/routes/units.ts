@@ -436,15 +436,13 @@ export const unitRoutes = app
       );
     }
 
-    const db = drizzle(c.env.DB);
-    const unit = await db.select().from(units).where(eq(units.id, id)).get();
-    if (!unit) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
-
+    // 부대 행 조회도 달력 조립의 batch 안으로 들어간다 — 여기서 따로 읽으면 왕복이 하나 더 든다.
     const payload = await buildCalendarPayload({
-      db,
-      unit,
+      db: drizzle(c.env.DB),
+      unitId: id,
       viewerId: user.id,
       month,
     });
+    if (!payload) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     return c.json(payload, 200);
   });

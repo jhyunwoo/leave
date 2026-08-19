@@ -76,16 +76,20 @@ export function toLeaveGrant(row: LeaveGrantRow): LeaveGrant {
   };
 }
 
-export async function listGrants(db: Db, userId: string) {
-  return db
-    .select()
-    .from(leaveGrants)
-    .where(eq(leaveGrants.userId, userId))
-    .all();
+/*
+ * 아래 셋은 실행하지 않은 쿼리(빌더)를 돌려준다.
+ *
+ * 잔여 계산은 늘 "적립분 + 구간 + 주기 설정" 셋을 함께 본다. `Promise.all`로 묶으면
+ * 동시에 나가기는 해도 D1 왕복은 그대로 셋이다. 빌더로 넘겨 호출하는 쪽이
+ * `db.batch()`로 묶으면 왕복이 하나가 된다. 셋 다 서로의 결과에 기대지 않으므로
+ * 한 배치에 담아도 뜻이 바뀌지 않는다.
+ */
+export function grantsQuery(db: Db, userId: string) {
+  return db.select().from(leaveGrants).where(eq(leaveGrants.userId, userId));
 }
 
 /** 배분에 쓰는, 이 사용자의 모든 휴가 구간. */
-export async function userSegments(db: Db, userId: string) {
+export function userSegmentsQuery(db: Db, userId: string) {
   return db
     .select({
       category: leaveSegments.category,
@@ -95,16 +99,40 @@ export async function userSegments(db: Db, userId: string) {
     })
     .from(leaveSegments)
     .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-    .where(eq(leaves.userId, userId))
-    .all();
+    .where(eq(leaves.userId, userId));
 }
 
-export async function regularOvernightConfigOf(db: Db, userId: string) {
+export function regularOvernightConfigQuery(db: Db, userId: string) {
   return db
     .select()
     .from(regularOvernightConfigs)
-    .where(eq(regularOvernightConfigs.userId, userId))
-    .get();
+    .where(eq(regularOvernightConfigs.userId, userId));
+}
+
+/** 위 셋을 한 번의 D1 왕복으로 읽는다. */
+export async function loadAllocationInputs(
+  db: Db,
+  userId: string,
+  segmentsQuery = userSegmentsQuery(db, userId),
+) {
+  const [grantRows, segments, configRows] = await db.batch([
+    grantsQuery(db, userId),
+    segmentsQuery,
+    regularOvernightConfigQuery(db, userId),
+  ]);
+  return { grantRows, segments, config: configRows[0] };
+}
+
+export async function listGrants(db: Db, userId: string) {
+  return grantsQuery(db, userId).all();
+}
+
+export async function userSegments(db: Db, userId: string) {
+  return userSegmentsQuery(db, userId).all();
+}
+
+export async function regularOvernightConfigOf(db: Db, userId: string) {
+  return regularOvernightConfigQuery(db, userId).get();
 }
 
 /**
@@ -193,11 +221,10 @@ export async function deleteGrant(db: Db, user: User, id: string) {
  * 지났거나 첫 적립일보다 이르더라도 1·2주기는 보이도록 하한을 둔다.
  */
 export async function buildGrantsPage(db: Db, user: User) {
-  const [grantRows, segments, config] = await Promise.all([
-    listGrants(db, user.id),
-    userSegments(db, user.id),
-    regularOvernightConfigOf(db, user.id),
-  ]);
+  const { grantRows, segments, config } = await loadAllocationInputs(
+    db,
+    user.id,
+  );
 
   const today = todayInSeoul();
   const grants = grantRows.map(toLeaveGrant);

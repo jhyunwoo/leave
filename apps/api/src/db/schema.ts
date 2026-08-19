@@ -50,7 +50,9 @@ export const users = sqliteTable(
     onboardingCompletedAt: text("onboarding_completed_at"),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [index("users_unit_idx").on(t.unitId)],
+  // 부대원 목록은 항상 이름순이다 — 정렬 컬럼을 뒤에 붙여 TEMP B-TREE를 없앤다.
+  // 인원수 세기(count)는 이 인덱스만 읽는 COVERING INDEX로 그대로 처리된다.
+  (t) => [index("users_unit_name_idx").on(t.unitId, t.name)],
 );
 
 export const sessions = sqliteTable(
@@ -132,9 +134,11 @@ export const leaves = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (t) => [
-    index("leaves_user_idx").on(t.userId),
+    // 내 휴가 목록의 정렬과 달력의 기간 조건이 모두 이 인덱스 하나로 끝난다.
+    // status 단독 인덱스는 두지 않는다 — 값이 7종뿐이라 계획에서 선택되지 않고,
+    // 휴가를 쓸 때마다 갱신 비용만 든다(0020).
+    index("leaves_user_start_idx").on(t.userId, t.startDate),
     index("leaves_dates_idx").on(t.startDate, t.endDate),
-    index("leaves_status_idx").on(t.status),
   ],
 );
 
@@ -180,7 +184,7 @@ export const leaveSegments = sqliteTable(
     days: integer("days").notNull(),
   },
   (t) => [
-    index("leave_segments_leave_idx").on(t.leaveId),
+    index("leave_segments_leave_start_idx").on(t.leaveId, t.startDate),
     index("leave_segments_dates_idx").on(t.startDate, t.endDate),
   ],
 );
@@ -201,11 +205,11 @@ export const userLeaveBalances = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
+    // (userId)만 거는 인덱스는 이 유니크 인덱스의 접두사라 중복이다(0020).
     uniqueIndex("user_leave_balances_user_key_unique").on(
       t.userId,
       t.balanceKey,
     ),
-    index("user_leave_balances_user_idx").on(t.userId),
   ],
 );
 
@@ -235,10 +239,8 @@ export const leaveGrants = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [
-    index("leave_grants_user_idx").on(t.userId),
-    index("leave_grants_user_key_idx").on(t.userId, t.balanceKey),
-  ],
+  // (userId)만 거는 인덱스는 아래 인덱스의 접두사라 중복이다(0020).
+  (t) => [index("leave_grants_user_key_idx").on(t.userId, t.balanceKey)],
 );
 
 export const regularOvernightConfigs = sqliteTable(
@@ -273,7 +275,8 @@ export const notifications = sqliteTable(
     // 행은 남겨 둔다 — 관리자 화면의 발송 이력이 사용자 조작으로 사라지면 안 된다.
     deletedAt: text("deleted_at"),
   },
-  (t) => [index("notifications_user_idx").on(t.userId)],
+  // 알림함은 항상 최신순이다 — 정렬을 인덱스로 끝낸다(0020).
+  (t) => [index("notifications_user_created_idx").on(t.userId, t.createdAt)],
 );
 
 /**
@@ -297,7 +300,10 @@ export const accessLogs = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (t) => [
-    index("access_logs_user_idx").on(t.userId),
+    // 요청당 1행이 쌓이는 표라 사용자별 목록이 가장 빨리 나빠진다.
+    // 정렬 컬럼을 뒤에 붙여 "그 사용자의 로그 전부를 읽고 정렬"을 없앤다(0020).
+    index("access_logs_user_created_idx").on(t.userId, t.createdAt),
+    // 관리자 화면의 기간 조회·최신순 목록이 쓴다.
     index("access_logs_created_idx").on(t.createdAt),
   ],
 );
@@ -321,7 +327,7 @@ export const pushLogs = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (t) => [
-    index("push_logs_user_idx").on(t.userId),
+    index("push_logs_user_created_idx").on(t.userId, t.createdAt),
     index("push_logs_created_idx").on(t.createdAt),
   ],
 );
@@ -435,10 +441,9 @@ export const userBlocks = sqliteTable(
     blockedUserId: text("blocked_user_id").notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [
-    primaryKey({ columns: [t.userId, t.blockedUserId] }),
-    index("user_blocks_user_idx").on(t.userId),
-  ],
+  // (userId)만 거는 인덱스는 기본키의 접두사라 중복이다 — 조회 계획도 기본키
+  // 인덱스를 COVERING INDEX로 쓴다(0020).
+  (t) => [primaryKey({ columns: [t.userId, t.blockedUserId] })],
 );
 
 export type UserRow = typeof users.$inferSelect;

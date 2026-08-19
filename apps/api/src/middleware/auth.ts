@@ -24,17 +24,20 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 
   const db = drizzle(c.env.DB);
   const tokenHash = await sha256Hex(token);
+  // 세션 행에서 실제로 쓰는 값은 만료 시각 하나다. 나머지 컬럼(토큰 해시·생성 시각)은
+  // 모든 인증 요청마다 읽을 이유가 없다. 사용자 행은 c.var.user로 그대로 쓰이므로 전부 읽는다.
   const row = await db
-    .select()
+    .select({ expiresAt: sessions.expiresAt, user: users })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(eq(sessions.tokenHash, tokenHash))
     .get();
 
-  if (!row || row.sessions.expiresAt <= new Date().toISOString()) {
+  // 만료 판정을 SQL로 내리지 않는 이유: 없는 세션과 만료된 세션에 다른 안내를 줘야 한다.
+  if (!row || row.expiresAt <= new Date().toISOString()) {
     return c.json({ error: "세션이 만료되었습니다. 다시 로그인해주세요" }, 401);
   }
 
-  c.set("user", row.users);
+  c.set("user", row.user);
   await next();
 });

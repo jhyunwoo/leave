@@ -21,7 +21,6 @@ import {
   accessLogs,
   pushLogs,
   sessions,
-  units,
   users,
   type UserRow,
 } from "../db/schema";
@@ -38,7 +37,8 @@ import {
   readOnboardingStatus,
   saveOnboardingProfile,
 } from "../lib/onboarding";
-import { serializeUnit, serializeUser } from "../lib/serialize";
+import { serializeUser } from "../lib/serialize";
+import { serializeUnitById } from "../lib/unit-access";
 import { createSession } from "../lib/sessions";
 import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
@@ -115,7 +115,8 @@ app.use(
 app.use("/logout", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/me/password", authMiddleware);
-app.use("/onboarding", authMiddleware);
+// `/onboarding/*`만으로 `/onboarding` 자신까지 매치된다. 두 줄을 다 두면
+// 인증 미들웨어가 한 요청에서 두 번 돌아 세션 조회(D1 왕복 + SHA-256)가 그대로 두 배가 된다.
 app.use("/onboarding/*", authMiddleware);
 app.use("/activity", authMiddleware);
 app.use("/account", authMiddleware);
@@ -201,18 +202,8 @@ export const authRoutes = app
       return c.json({ error: "온보딩을 먼저 완료해주세요" }, 428);
     const db = drizzle(c.env.DB);
 
-    let unit = null;
-    if (user.unitId) {
-      const row = await db
-        .select()
-        .from(units)
-        .where(eq(units.id, user.unitId))
-        .get();
-      if (row) {
-        const memberCount = await db.$count(users, eq(users.unitId, row.id));
-        unit = serializeUnit(row, memberCount);
-      }
-    }
+    // 그룹 행과 인원수를 한 문장으로 읽는다(예전에는 조회 + count로 왕복이 둘이었다).
+    const unit = user.unitId ? await serializeUnitById(db, user.unitId) : null;
 
     // 초대코드 가입은 즉시 완료되므로 대기 상태는 더 이상 만들지 않는다.
     const joinRequest = null;
@@ -320,21 +311,35 @@ export const authRoutes = app
   .openapi(activityRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    const [access, push] = await Promise.all([
+    // 두 목록은 서로를 기다릴 이유가 없다 — 한 번의 왕복으로 묶는다.
+    const [access, push] = await db.batch([
       db
-        .select()
+        .select({
+          id: accessLogs.id,
+          method: accessLogs.method,
+          path: accessLogs.path,
+          status: accessLogs.status,
+          platform: accessLogs.platform,
+          appVersion: accessLogs.appVersion,
+          durationMs: accessLogs.durationMs,
+          createdAt: accessLogs.createdAt,
+        })
         .from(accessLogs)
         .where(eq(accessLogs.userId, user.id))
         .orderBy(desc(accessLogs.createdAt))
-        .limit(ACTIVITY_LOG_LIMIT)
-        .all(),
+        .limit(ACTIVITY_LOG_LIMIT),
       db
-        .select()
+        .select({
+          id: pushLogs.id,
+          notificationId: pushLogs.notificationId,
+          direction: pushLogs.direction,
+          status: pushLogs.status,
+          createdAt: pushLogs.createdAt,
+        })
         .from(pushLogs)
         .where(eq(pushLogs.userId, user.id))
         .orderBy(desc(pushLogs.createdAt))
-        .limit(ACTIVITY_LOG_LIMIT)
-        .all(),
+        .limit(ACTIVITY_LOG_LIMIT),
     ]);
     return c.json(
       {
