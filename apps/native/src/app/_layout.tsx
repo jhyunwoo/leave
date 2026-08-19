@@ -30,7 +30,7 @@ import {
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { tokenAtom } from "@/state/auth";
-import { useOnboardingStatus } from "@leave/client";
+import { useOnboardingStatus } from "@leave/client/hooks/auth";
 import { useColors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();

@@ -5,13 +5,15 @@
  * 되므로, 셀마다 전체 휴가 목록을 훑는 O(날짜 × 휴가) 계산이 사라진다.
  * 맵에 없는 날짜는 내 휴가가 없는 날이고, 그룹 출타율만 보여준다.
  */
+// 도메인 하위 경로에서 직접 가져온다. 배럴(`@leave/shared`)은 zod 스키마까지
+// 함께 평가시키는데, 달력 첫 화면에는 검증이 한 줄도 필요 없다. 자세한 배경은
+// packages/shared/src/index.ts 주석 참고.
+import { eachDate, type ISODate } from "@leave/shared/dates";
 import {
-  eachDate,
   isConfirmedLeaveStatus,
   segmentBalanceKey,
   type BalanceKey,
-  type ISODate,
-} from "@leave/shared";
+} from "@leave/shared/leave";
 import type { MyLeave } from "./types";
 
 /** 달력 셀 하나가 알아야 하는 "그날 내 휴가"의 전부. */

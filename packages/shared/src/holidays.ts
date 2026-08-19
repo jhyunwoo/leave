@@ -189,15 +189,29 @@ function build(): Record<ISODate, string> {
   return map;
 }
 
-/** 2024–2030 한국 공휴일 (YYYY-MM-DD → 이름). 대체공휴일 포함. */
-export const HOLIDAYS: Readonly<Record<ISODate, string>> = build();
+/**
+ * 표는 처음 쓰일 때 만든다.
+ *
+ * `build()`는 7년치를 돌며 연휴를 펼치고 대체공휴일을 계산한다 — 모듈을 읽는
+ * 것만으로 도는 일치고는 무겁다(Node/V8 기준 중앙값 2.2ms, 저사양 기기의
+ * Hermes는 이보다 몇 배). 그런데 이 모듈은 `@leave/shared` 배럴에 실려 있어서,
+ * 공휴일을 한 번도 묻지 않는 화면(로그인·회원가입·온보딩·서버 라우트)까지
+ * 시작할 때 그 비용을 낸다.
+ *
+ * 지연시키면 실제로 달력 칸을 그리는 순간에만, 그것도 한 번만 든다.
+ */
+let holidayMap: Readonly<Record<ISODate, string>> | null = null;
+
+function holidays(): Readonly<Record<ISODate, string>> {
+  return (holidayMap ??= build());
+}
 
 /** 공휴일이면 이름, 아니면 null. */
 export function getHoliday(date: ISODate): string | null {
-  return HOLIDAYS[date] ?? null;
+  return holidays()[date] ?? null;
 }
 
 /** 공휴일 여부. */
 export function isHoliday(date: ISODate): boolean {
-  return date in HOLIDAYS;
+  return date in holidays();
 }

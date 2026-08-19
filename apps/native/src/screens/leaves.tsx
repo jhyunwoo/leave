@@ -16,7 +16,7 @@
  * 자리를 옮긴다.
  */
 
-import { fmtRange } from "@leave/shared";
+import { fmtRange } from "@leave/shared/calendar";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -39,7 +39,7 @@ import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
-import { LeaveFormModal } from "@/components/leave-form-modal";
+import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
@@ -370,7 +370,7 @@ export function LeavesScreen() {
       </Stack.Toolbar>
 
       {(creating || editing) && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           visible
           editing={editing}
           onClose={() => {

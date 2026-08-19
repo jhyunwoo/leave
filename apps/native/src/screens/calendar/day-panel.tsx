@@ -3,14 +3,11 @@
  * 출타율·공휴일·제한 기간을 알리고 그날의 출타 명단(day-roster.tsx)을 보여준다.
  */
 
-import {
-  availabilitySignal,
-  fmtDateK,
-  fmtRangeTiny,
-  getHoliday,
-  type ISODate,
-  type RegularOvernightCycle,
-} from "@leave/shared";
+import { availabilitySignal } from "@leave/shared/availability";
+import { fmtDateK, fmtRangeTiny } from "@leave/shared/calendar";
+import { type ISODate } from "@leave/shared/dates";
+import { getHoliday } from "@leave/shared/holidays";
+import { type RegularOvernightCycle } from "@leave/shared/regular-overnight";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Badge } from "@/components/badge";

@@ -26,14 +26,13 @@
  * 뜨려다 UIKit이 표시를 거부하고, 그 상태가 굳어 화면 전체가 먹통이 된다.
  */
 
+import { WEEKDAYS } from "@leave/shared/calendar";
+import { todayInSeoul, type ISODate } from "@leave/shared/dates";
 import {
   cycleForDisplay,
   cycleUsedDays,
   firstGrantDate,
-  todayInSeoul,
-  WEEKDAYS,
-  type ISODate,
-} from "@leave/shared";
+} from "@leave/shared/regular-overnight";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
@@ -46,15 +45,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  buildMyLeaveDayMap,
-  summarizeHoldings,
-  useCalendar,
-  useLeaveBalances,
-  useMe,
-  useMyLeaves,
-  type Calendar,
-} from "@leave/client";
+import type { Calendar } from "@leave/client";
+import { useMe } from "@leave/client/hooks/auth";
+import { useCalendar } from "@leave/client/hooks/calendar";
+import { useLeaveBalances, useMyLeaves } from "@leave/client/hooks/leaves";
+import { summarizeHoldings } from "@leave/client/leave-holdings";
+import { buildMyLeaveDayMap } from "@leave/client/my-leave-days";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -63,7 +59,7 @@ import {
   CalendarScroll,
   type CalendarScrollHandle,
 } from "@/components/calendar-scroll";
-import { LeaveFormModal } from "@/components/leave-form-modal";
+import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import { SheetScaffold } from "@/components/sheet-scaffold";
 import { makeStyles, spacing, useColors } from "@/theme";
@@ -510,7 +506,7 @@ export function CalendarScreen() {
       </NativeBottomSheet>
 
       {formDate && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           visible
           initialDate={formDate}
           onClose={() => setFormDate(null)}

@@ -14,7 +14,7 @@
  * 어느 쪽이든 "알림 → 내 휴가" 해석 규칙은 하나뿐이다(`resolveDate`).
  */
 
-import { fmtDateTimeShort, fmtDateShort } from "@leave/shared";
+import { fmtDateTimeShort, fmtDateShort } from "@leave/shared/calendar";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {

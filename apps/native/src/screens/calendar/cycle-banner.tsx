@@ -3,14 +3,9 @@
  * 사용처: 달력 화면 상단. 이번 주기에 며칠 남았고 언제 끝나는지 알려준다.
  */
 
-import {
-  diffDays,
-  fmtDateTiny,
-  fmtRangeTiny,
-  todayInSeoul,
-  type ISODate,
-  type RegularOvernightCycle,
-} from "@leave/shared";
+import { fmtDateTiny, fmtRangeTiny } from "@leave/shared/calendar";
+import { diffDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { type RegularOvernightCycle } from "@leave/shared/regular-overnight";
 import type { ReactNode } from "react";
 import { Text, View, type ColorValue } from "react-native";
 import {

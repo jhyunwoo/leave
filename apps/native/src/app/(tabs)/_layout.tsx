@@ -4,7 +4,7 @@
  */
 
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { useNotifications } from "@leave/client";
+import { useNotifications } from "@leave/client/hooks/notifications";
 import { useColors } from "@/theme";
 
 /**

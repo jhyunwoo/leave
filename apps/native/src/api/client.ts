@@ -15,14 +15,14 @@ import {
   resolveApiUrl,
   unwrap as unwrapResponse,
   type UnwrappableResponse,
-} from "@leave/shared";
+} from "@leave/shared/http";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { hc } from "hono/client";
 import { Platform } from "react-native";
 
 // 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
-export { ApiError } from "@leave/shared";
+export { ApiError } from "@leave/shared/http";
 
 const TOKEN_KEY = "leave.token";
 
