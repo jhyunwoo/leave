@@ -16,7 +16,7 @@ import type {
 } from "@leave/shared";
 import { ApiError } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLeaveApi } from "../context";
+import { queryRequestOptions, useLeaveApi } from "../context";
 import { useInvalidateKeys } from "./invalidate";
 import { queryKeys } from "../query-keys";
 import type { AuthResponse, Me, OnboardingStatus } from "../types";
@@ -29,22 +29,33 @@ function retryUnlessUnauthorized(failureCount: number, error: Error): boolean {
 
 /** 로그인한 사용자와 소속 그룹. 앱 전역에서 "나"의 단일 출처. */
 export function useMe() {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.me,
     retry: retryUnlessUnauthorized,
-    queryFn: async () => unwrap<Me>(await client.auth.me.$get()),
+    queryFn: async (context) =>
+      unwrap<Me>(
+        await client.auth.me.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
   });
 }
 
 export function useOnboardingStatus(enabled = true) {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.onboarding,
     enabled,
     retry: retryUnlessUnauthorized,
-    queryFn: async () =>
-      unwrap<OnboardingStatus>(await client.auth.onboarding.$get()),
+    queryFn: async (context) =>
+      unwrap<OnboardingStatus>(
+        await client.auth.onboarding.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
   });
 }
 

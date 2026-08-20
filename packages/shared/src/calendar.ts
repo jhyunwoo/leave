@@ -12,6 +12,14 @@ import { addDays, parseISODate, toISODate, type ISODate } from "./dates";
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 /**
+ * Calendar-query bounds relative to the current Seoul month. The API enforces
+ * these limits and scrolling clients use the same contract to avoid requests
+ * that can only fail.
+ */
+export const CALENDAR_QUERY_PAST_MONTHS = 12;
+export const CALENDAR_QUERY_FUTURE_MONTHS = 24;
+
+/**
  * 토·일 여부. 달력에서 "빨간 날"의 절반을 이룬다(나머지 절반은 `getHoliday`).
  *
  * 호출부가 `new Date(date).getUTCDay()`를 직접 쓰지 않게 하려고 둔다 — 이 파일의

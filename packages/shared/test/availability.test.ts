@@ -76,6 +76,126 @@ describe("recommendDateRanges", () => {
       },
     ]);
   });
+
+  it("겹치는 구간을 한 번만 훑어도 기존 순위 규칙과 같은 결과를 낸다", () => {
+    const addDays = (date: string, amount: number) => {
+      const value = new Date(`${date}T00:00:00.000Z`);
+      value.setUTCDate(value.getUTCDate() + amount);
+      return value.toISOString().slice(0, 10);
+    };
+    const naive = (input: {
+      days: readonly AvailabilityDay[];
+      selectedStart: string;
+      durationDays: number;
+      radiusDays?: number;
+      limit?: number;
+    }) => {
+      const duration = Math.trunc(input.durationDays);
+      if (duration <= 0) return [];
+      const byDate = new Map(input.days.map((day) => [day.date, day]));
+      const radius = Math.max(duration, input.radiusDays ?? 14);
+      const selectedEnd = addDays(input.selectedStart, duration - 1);
+      const candidates: Array<{
+        startDate: string;
+        endDate: string;
+        peakPercent: number;
+        distance: number;
+      }> = [];
+
+      for (let offset = -radius; offset <= radius; offset += 1) {
+        const startDate = addDays(input.selectedStart, offset);
+        const endDate = addDays(startDate, duration - 1);
+        if (startDate === input.selectedStart && endDate === selectedEnd) {
+          continue;
+        }
+        const range: AvailabilityDay[] = [];
+        let valid = true;
+        for (let index = 0; index < duration; index += 1) {
+          const day = byDate.get(addDays(startDate, index));
+          if (
+            !day ||
+            day.blocked ||
+            day.allowed <= 0 ||
+            day.count > day.allowed
+          ) {
+            valid = false;
+            break;
+          }
+          range.push(day);
+        }
+        if (!valid) continue;
+        candidates.push({
+          startDate,
+          endDate,
+          peakPercent: Math.max(
+            ...range.map((day) =>
+              Math.round((Math.max(0, day.count) / day.allowed) * 100),
+            ),
+          ),
+          distance: Math.abs(offset),
+        });
+      }
+
+      return candidates
+        .sort(
+          (a, b) =>
+            a.peakPercent - b.peakPercent ||
+            a.distance - b.distance ||
+            a.startDate.localeCompare(b.startDate),
+        )
+        .slice(0, input.limit ?? 3)
+        .map(({ distance: _distance, ...range }) => range);
+    };
+
+    const selectedStart = "2028-02-20";
+    const generatedDays: AvailabilityDay[] = Array.from(
+      { length: 181 },
+      (_, index) => {
+        const offset = index - 90;
+        const allowed = offset % 29 === 0 ? 0 : 5;
+        return {
+          date: addDays(selectedStart, offset),
+          count: offset % 17 === 0 ? 6 : Math.abs(offset * 7) % 6,
+          allowed,
+          blocked: offset % 31 === 0,
+        };
+      },
+    );
+
+    for (const durationDays of [1, 2, 7, 14, 30]) {
+      for (const limit of [1, 3, 7]) {
+        const input = { generatedDays, durationDays, limit };
+        const args = {
+          days: input.generatedDays,
+          selectedStart,
+          durationDays: input.durationDays,
+          radiusDays: 45,
+          limit: input.limit,
+        };
+        expect(recommendDateRanges(args)).toEqual(naive(args));
+      }
+    }
+
+    for (const radiusDays of [2.25, 3.75]) {
+      const args = {
+        days: generatedDays,
+        selectedStart,
+        durationDays: 2,
+        radiusDays,
+        limit: 7,
+      };
+      expect(recommendDateRanges(args)).toEqual(naive(args));
+    }
+
+    expect(
+      recommendDateRanges({
+        days: generatedDays,
+        selectedStart,
+        durationDays: 2,
+        radiusDays: Number.NaN,
+      }),
+    ).toEqual([]);
+  });
 });
 
 describe("월 경계 데이터 공급", () => {

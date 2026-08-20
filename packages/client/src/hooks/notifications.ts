@@ -4,22 +4,31 @@
  * 사용처: 알림 탭/페이지, 알림 설정 화면, 앱 시작 시 푸시 토큰 등록.
  */
 import type { NotificationPrefsInput } from "@leave/shared";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLeaveApi } from "../context";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
 import type { NotificationList, NotificationPrefs } from "../types";
-import { useInvalidateKeys } from "./invalidate";
+import { setAuthoritativeQueryData, useInvalidateKeys } from "./invalidate";
 
 /** 30초마다 새로 받는다. 초과 알림은 늦게 알수록 쓸모가 줄어든다. */
 const NOTIFICATION_POLL_MS = 30_000;
+/** 부분 설정 PATCH가 서로의 전체 응답을 덮지 않도록 제출 순서를 보존한다. */
+const NOTIFICATION_PREFS_MUTATION_SCOPE = {
+  id: "notification-preferences",
+} as const;
 
 export function useNotifications() {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.notifications,
     refetchInterval: NOTIFICATION_POLL_MS,
-    queryFn: async () =>
-      unwrap<NotificationList>(await client.notifications.$get()),
+    queryFn: async (context) =>
+      unwrap<NotificationList>(
+        await client.notifications.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
   });
 }
 
@@ -45,25 +54,35 @@ export function useDeleteNotification() {
 }
 
 export function useNotificationPrefs() {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.notificationPrefs,
-    queryFn: async () =>
+    queryFn: async (context) =>
       unwrap<{ preferences: NotificationPrefs }>(
-        await client.notifications.preferences.$get(),
+        await client.notifications.preferences.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
       ),
   });
 }
 
 export function useUpdateNotificationPrefs() {
   const { client, unwrap } = useLeaveApi();
-  const invalidate = useInvalidateKeys([queryKeys.notificationPrefs]);
+  const queryClient = useQueryClient();
   return useMutation({
+    scope: NOTIFICATION_PREFS_MUTATION_SCOPE,
     mutationFn: async (input: NotificationPrefsInput) =>
       unwrap<{ preferences: NotificationPrefs }>(
         await client.notifications.preferences.$patch({ json: input }),
       ),
-    onSuccess: invalidate,
+    onSuccess: async (data) => {
+      await setAuthoritativeQueryData(
+        queryClient,
+        queryKeys.notificationPrefs,
+        data,
+      );
+    },
   });
 }
 

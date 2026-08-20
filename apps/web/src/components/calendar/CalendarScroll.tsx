@@ -15,6 +15,8 @@
 
 import {
   buildMonthGrid,
+  CALENDAR_QUERY_FUTURE_MONTHS,
+  CALENDAR_QUERY_PAST_MONTHS,
   cyclesInRange,
   monthBounds,
   shiftMonth,
@@ -26,6 +28,7 @@ import {
 } from "@leave/shared";
 import {
   forwardRef,
+  memo,
   type CSSProperties,
   useCallback,
   useEffect,
@@ -42,7 +45,8 @@ import { MonthCalendar } from "./MonthCalendar";
 import "./calendar.css";
 
 const INITIAL_SPAN = 2;
-const PAGE_SIZE = 6;
+export const CALENDAR_PAGE_SIZE = 3;
+export const CALENDAR_MAX_MONTHS = 9;
 
 /**
  * 좁은 화면에서는 페이지가 달력의 스크롤포트가 된다. 기준은 CalendarPage가
@@ -71,6 +75,45 @@ function monthRange(center: string, span: number): string[] {
   return out;
 }
 
+export type CalendarWindowDirection = "older" | "newer";
+export interface CalendarWindowBounds {
+  earliestMonth: string;
+  latestMonth: string;
+}
+
+/**
+ * Move the mounted month window in one direction while retaining the edge
+ * nearest the viewport. The transition is pure so its contiguous-month and
+ * maximum-size invariants can be tested independently of IntersectionObserver.
+ * A final partial batch stops at the API bounds; at the absolute edge the
+ * original array is returned so React and the observer do no extra work.
+ */
+export function transitionCalendarWindow(
+  months: string[],
+  direction: CalendarWindowDirection,
+  bounds: CalendarWindowBounds,
+): string[] {
+  if (months.length === 0) return [];
+
+  if (direction === "older") {
+    const first = months[0];
+    if (!first) return [];
+    const older = Array.from({ length: CALENDAR_PAGE_SIZE }, (_, index) =>
+      shiftMonth(first, index - CALENDAR_PAGE_SIZE),
+    ).filter((month) => month >= bounds.earliestMonth);
+    if (older.length === 0) return months;
+    return [...older, ...months].slice(0, CALENDAR_MAX_MONTHS);
+  }
+
+  const last = months[months.length - 1];
+  if (!last) return [];
+  const newer = Array.from({ length: CALENDAR_PAGE_SIZE }, (_, index) =>
+    shiftMonth(last, index + 1),
+  ).filter((month) => month <= bounds.latestMonth);
+  if (newer.length === 0) return months;
+  return [...months, ...newer].slice(-CALENDAR_MAX_MONTHS);
+}
+
 function monthLabel(month: string): string {
   const { year, monthNum } = splitMonth(month);
   return `${year}년 ${monthNum}월`;
@@ -84,7 +127,7 @@ export interface CalendarScrollHandle {
  * iOS 기본 캘린더식 세로 무한 스크롤. 여러 달을 세로로 쌓아 자유롭게 스크롤하며,
  * 위·아래 끝에 가까워지면 이전/다음 달을 이어 붙인다. 요일 헤더는 상단에 고정.
  */
-export const CalendarScroll = forwardRef<
+const CalendarScrollImpl = forwardRef<
   CalendarScrollHandle,
   {
     unitId: string;
@@ -109,6 +152,8 @@ export const CalendarScroll = forwardRef<
   ref,
 ) {
   const currentMonth = todayInSeoul().slice(0, 7);
+  const earliestMonth = shiftMonth(currentMonth, -CALENDAR_QUERY_PAST_MONTHS);
+  const latestMonth = shiftMonth(currentMonth, CALENDAR_QUERY_FUTURE_MONTHS);
   const [months, setMonths] = useState(() =>
     monthRange(currentMonth, INITIAL_SPAN),
   );
@@ -119,6 +164,18 @@ export const CalendarScroll = forwardRef<
   const monthEls = useRef(new Map<string, HTMLElement>());
   const topSentinel = useRef<HTMLDivElement>(null);
   const bottomSentinel = useRef<HTMLDivElement>(null);
+  const monthsRef = useRef(months);
+  const transitionPending = useRef(false);
+  const edgeIntersecting = useRef({ older: false, newer: false });
+  const pendingScroll = useRef<{
+    month: string;
+    behavior: ScrollBehavior;
+  } | null>(null);
+  const pendingFocusHandoff = useRef<{
+    month: string;
+    dayIndex: number;
+  } | null>(null);
+  const onSelectDateRef = useRef(onSelectDate);
   /**
    * prepend 시 스크롤 점프를 막기 위한 기준점 — 위에 달이 끼어들기 직전의
    * "이 요소가 화면 어디에 있었는가".
@@ -128,8 +185,16 @@ export const CalendarScroll = forwardRef<
    * 붙은 6개월까지 위에 낀 것으로 세어 3326px을 밀어 버렸다. 실제 요소를
    * 기준으로 재면 아래에서 무슨 일이 나든 영향을 받지 않는다.
    */
-  const prependAnchor = useRef<{ el: HTMLElement; top: number } | null>(null);
+  const scrollAnchor = useRef<{ el: HTMLElement; top: number } | null>(null);
   const didInitialScroll = useRef(false);
+
+  useLayoutEffect(() => {
+    onSelectDateRef.current = onSelectDate;
+  }, [onSelectDate]);
+
+  const handleSelectDate = useCallback((date: string) => {
+    onSelectDateRef.current(date);
+  }, []);
 
   /**
    * 페이지 모드에서 달을 세울 높이. 요일 줄이 붙는 위치(= 상단 내비 높이)에
@@ -173,7 +238,7 @@ export const CalendarScroll = forwardRef<
       // 걸려 prepend가 예약된다. 그 기준점은 이 이동 전에 잰 값이라, 그대로
       // 두면 보정이 방금 한 이동까지 되돌려 버린다(실측 1129px 어긋남).
       // 끼어든 달만큼만 보정하도록 기준을 갱신한다.
-      const anchor = prependAnchor.current;
+      const anchor = scrollAnchor.current;
       if (anchor) anchor.top = anchor.el.getBoundingClientRect().top;
     },
     [pageScroll, stickyOffset],
@@ -188,56 +253,187 @@ export const CalendarScroll = forwardRef<
     }
   });
 
-  // prepend 후 스크롤 위치 보정. 안 하면 새 달이 삽입된 만큼 화면이 아래로
-  // 튀어, 보고 있던 날짜가 사라진 것처럼 보인다.
+  // Restore an explicitly requested month after a reset, or preserve a retained
+  // edge month's visual position after the bounded window moves.
   useLayoutEffect(() => {
-    const anchor = prependAnchor.current;
-    if (anchor == null) return;
-    prependAnchor.current = null;
-    // 기준 요소가 화면에서 밀려난 만큼만 되민다.
-    const delta = anchor.el.getBoundingClientRect().top - anchor.top;
-    if (delta === 0) return;
-    if (pageScroll) {
-      window.scrollBy(0, delta);
+    monthsRef.current = months;
+
+    const requestedScroll = pendingScroll.current;
+    if (requestedScroll && monthEls.current.has(requestedScroll.month)) {
+      pendingScroll.current = null;
+      scrollAnchor.current = null;
+      pendingFocusHandoff.current = null;
+      scrollToMonth(requestedScroll.month, requestedScroll.behavior);
+      transitionPending.current = false;
       return;
     }
-    const scroller = scrollRef.current;
-    if (scroller) scroller.scrollTop += delta;
-  }, [months, pageScroll]);
+
+    const anchor = scrollAnchor.current;
+    scrollAnchor.current = null;
+    if (anchor) {
+      // Move by exactly the amount the retained DOM node moved. This handles
+      // both prepending/pruning the end and appending/pruning the start.
+      const delta = anchor.el.getBoundingClientRect().top - anchor.top;
+      if (Math.abs(delta) >= 1) {
+        if (pageScroll) {
+          window.scrollBy(0, delta);
+        } else {
+          const scroller = scrollRef.current;
+          if (scroller) scroller.scrollTop += delta;
+        }
+      }
+    }
+
+    const focusHandoff = pendingFocusHandoff.current;
+    pendingFocusHandoff.current = null;
+    if (focusHandoff) {
+      const targetMonth = monthEls.current.get(focusHandoff.month);
+      const dateCells = targetMonth?.querySelectorAll<HTMLButtonElement>(
+        ".cal-cell:not(:disabled)",
+      );
+      const targetCell =
+        dateCells?.[
+          Math.min(focusHandoff.dayIndex, Math.max(dateCells.length - 1, 0))
+        ];
+
+      if (targetCell) {
+        targetCell.focus({ preventScroll: true });
+      } else if (targetMonth) {
+        // A retained month can still be loading on a slow connection. Its
+        // section is a meaningful temporary target until normal Tab navigation
+        // reaches loaded date cells; -1 keeps it out of the tab sequence.
+        targetMonth.tabIndex = -1;
+        targetMonth.focus({ preventScroll: true });
+        targetMonth.addEventListener(
+          "blur",
+          () => targetMonth.removeAttribute("tabindex"),
+          { once: true },
+        );
+      }
+    }
+
+    transitionPending.current = false;
+  }, [months, pageScroll, scrollToMonth]);
+
+  const requestWindowTransition = useCallback(
+    (direction: CalendarWindowDirection) => {
+      if (transitionPending.current) return;
+
+      const previousMonths = monthsRef.current;
+      const nextMonths = transitionCalendarWindow(previousMonths, direction, {
+        earliestMonth,
+        latestMonth,
+      });
+      if (nextMonths.length === 0 || nextMonths === previousMonths) return;
+
+      const activeElement = document.activeElement;
+      const focusedMonth =
+        activeElement instanceof HTMLElement
+          ? previousMonths.find((month) =>
+              monthEls.current.get(month)?.contains(activeElement),
+            )
+          : undefined;
+      if (
+        activeElement instanceof HTMLElement &&
+        focusedMonth &&
+        !nextMonths.includes(focusedMonth)
+      ) {
+        const focusedMonthEl = monthEls.current.get(focusedMonth);
+        const focusedDateCells = focusedMonthEl?.querySelectorAll(
+          ".cal-cell:not(:disabled)",
+        );
+        const dayIndex = focusedDateCells
+          ? Array.from(focusedDateCells).indexOf(activeElement)
+          : -1;
+        const targetMonth =
+          direction === "older"
+            ? nextMonths[nextMonths.length - 1]
+            : nextMonths[0];
+        if (targetMonth) {
+          // A previous handoff may currently be on a still-loading section.
+          // Carry that focus forward too, defaulting to the first available day.
+          pendingFocusHandoff.current = {
+            month: targetMonth,
+            dayIndex: Math.max(dayIndex, 0),
+          };
+        }
+      }
+
+      // The old first month survives an older transition; the old last month
+      // survives a newer transition. At the corresponding boundary that is the
+      // visible retained node whose screen position must not move.
+      const anchorMonth =
+        direction === "older"
+          ? previousMonths[0]
+          : previousMonths[previousMonths.length - 1];
+      const anchorEl = anchorMonth
+        ? monthEls.current.get(anchorMonth)
+        : undefined;
+      scrollAnchor.current = anchorEl
+        ? { el: anchorEl, top: anchorEl.getBoundingClientRect().top }
+        : null;
+
+      transitionPending.current = true;
+      setMonths(nextMonths);
+    },
+    [earliestMonth, latestMonth],
+  );
 
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
     const io = new IntersectionObserver(
       (entries) => {
+        let requestOlder = false;
+        let requestNewer = false;
+
         for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          if (e.target === topSentinel.current && didInitialScroll.current) {
-            // 첫 달 블록은 prepend 뒤에도 같은 DOM 노드로 남는다(key가 달 문자열).
-            const firstBlock =
-              scroller.querySelector<HTMLElement>(".cal-month-block");
-            if (firstBlock)
-              prependAnchor.current = {
-                el: firstBlock,
-                top: firstBlock.getBoundingClientRect().top,
-              };
-            setMonths((ms) => {
-              const first = ms[0]!;
-              const older: string[] = [];
-              for (let i = PAGE_SIZE; i >= 1; i--)
-                older.push(shiftMonth(first, -i));
-              return [...older, ...ms];
-            });
+          if (e.target === topSentinel.current) {
+            if (!e.isIntersecting) {
+              edgeIntersecting.current.older = false;
+            } else if (
+              didInitialScroll.current &&
+              !edgeIntersecting.current.older
+            ) {
+              edgeIntersecting.current.older = true;
+              requestOlder = true;
+            }
           } else if (e.target === bottomSentinel.current) {
-            setMonths((ms) => {
-              const last = ms[ms.length - 1]!;
-              const newer: string[] = [];
-              for (let i = 1; i <= PAGE_SIZE; i++)
-                newer.push(shiftMonth(last, i));
-              return [...ms, ...newer];
-            });
+            if (!e.isIntersecting) {
+              edgeIntersecting.current.newer = false;
+            } else if (!edgeIntersecting.current.newer) {
+              edgeIntersecting.current.newer = true;
+              requestNewer = true;
+            }
           }
         }
+
+        if (transitionPending.current || (!requestOlder && !requestNewer)) {
+          return;
+        }
+
+        let direction: CalendarWindowDirection;
+        if (requestOlder && requestNewer) {
+          // Very tall viewports can expose both sentinels in one delivery. Pick
+          // only the edge closest to its viewport boundary so callbacks cannot
+          // enqueue conflicting window mutations.
+          const viewport = pageScroll
+            ? { top: 0, bottom: window.innerHeight }
+            : scroller.getBoundingClientRect();
+          const topDistance = Math.abs(
+            (topSentinel.current?.getBoundingClientRect().bottom ?? 0) -
+              viewport.top,
+          );
+          const bottomDistance = Math.abs(
+            (bottomSentinel.current?.getBoundingClientRect().top ?? 0) -
+              viewport.bottom,
+          );
+          direction = topDistance <= bottomDistance ? "older" : "newer";
+        } else {
+          direction = requestOlder ? "older" : "newer";
+        }
+
+        requestWindowTransition(direction);
       },
       // 스크롤포트가 바뀌면 관찰 기준도 함께 바뀌어야 한다(페이지는 null).
       { root: pageScroll ? null : scroller, rootMargin: "600px" },
@@ -245,12 +441,31 @@ export const CalendarScroll = forwardRef<
     if (topSentinel.current) io.observe(topSentinel.current);
     if (bottomSentinel.current) io.observe(bottomSentinel.current);
     return () => io.disconnect();
-  }, [pageScroll]);
+  }, [pageScroll, requestWindowTransition]);
 
   useImperativeHandle(
     ref,
     () => ({
-      scrollToToday: () => scrollToMonth(currentMonth, "smooth"),
+      scrollToToday: () => {
+        if (monthEls.current.has(currentMonth)) {
+          scrollToMonth(currentMonth, "smooth");
+          return;
+        }
+
+        // The bounded window may have pruned today. Restore the original
+        // five-month window, then scroll after those month refs have committed.
+        pendingScroll.current = {
+          month: currentMonth,
+          // Resetting replaces most mounted DOM. An immediate jump avoids an
+          // in-progress animation exposing a boundary and extending the fresh
+          // window before it reaches today.
+          behavior: "auto",
+        };
+        scrollAnchor.current = null;
+        transitionPending.current = true;
+        edgeIntersecting.current = { older: false, newer: false };
+        setMonths(monthRange(currentMonth, INITIAL_SPAN));
+      },
     }),
     [currentMonth, scrollToMonth],
   );
@@ -287,8 +502,10 @@ export const CalendarScroll = forwardRef<
             <MonthBlock
               unitId={unitId}
               month={m}
-              selectedDate={selectedDate}
-              onSelectDate={onSelectDate}
+              selectedDate={
+                selectedDate?.slice(0, 7) === m ? selectedDate : null
+              }
+              onSelectDate={handleSelectDate}
               myLeaveDays={myLeaveDays}
               regularOvernight={regularOvernight}
               currentCycle={currentCycle}
@@ -302,7 +519,9 @@ export const CalendarScroll = forwardRef<
   );
 });
 
-function MonthBlock(props: {
+export const CalendarScroll = memo(CalendarScrollImpl);
+
+const MonthBlock = memo(function MonthBlock(props: {
   unitId: string;
   month: string;
   selectedDate: string | null;
@@ -349,4 +568,4 @@ function MonthBlock(props: {
       dischargeAt={props.dischargeAt}
     />
   );
-}
+});

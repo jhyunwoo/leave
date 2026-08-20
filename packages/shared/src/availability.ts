@@ -84,34 +84,99 @@ export function recommendDateRanges(input: {
   const byDate = new Map(input.days.map((day) => [day.date, day]));
   const radius = Math.max(duration, input.radiusDays ?? 14);
   const selectedEnd = addDateDays(input.selectedStart, duration - 1);
+  if (Number.isNaN(radius)) return [];
   const candidates: (DateRangeRecommendation & { distance: number })[] = [];
 
-  for (let offset = -radius; offset <= radius; offset += 1) {
-    const startDate = addDateDays(input.selectedStart, offset);
-    const endDate = addDateDays(startDate, duration - 1);
-    if (startDate === input.selectedStart && endDate === selectedEnd) continue;
-
-    const range: AvailabilityDay[] = [];
-    let valid = true;
-    for (let index = 0; index < duration; index += 1) {
-      const day = byDate.get(addDateDays(startDate, index));
-      if (!day || day.blocked || day.allowed <= 0 || day.count > day.allowed) {
-        valid = false;
-        break;
-      }
-      range.push(day);
+  // Candidate ranges overlap almost completely. Normalize each relevant date
+  // once, then slide a duration-sized window across it. A monotonic queue keeps
+  // the peak percentage in O(1) amortized time, making the whole search O(n)
+  // instead of rescanning up to `duration` days for every candidate.
+  // `radiusDays` is typed as a number rather than an integer. Preserve the
+  // previous loop's fractional-radius behavior: offsets still advance by one,
+  // so there are `floor(radius * 2) + 1` candidate starts.
+  const searchDayCount = Math.floor(radius * 2) + duration;
+  const dates = new Array<string>(searchDayCount);
+  const valid = new Uint8Array(searchDayCount);
+  const percents = new Float64Array(searchDayCount);
+  for (let index = 0; index < searchDayCount; index += 1) {
+    const date = addDateDays(input.selectedStart, index - radius);
+    const day = byDate.get(date);
+    dates[index] = date;
+    if (!day || day.blocked || day.allowed <= 0 || day.count > day.allowed) {
+      continue;
     }
-    if (!valid) continue;
+    valid[index] = 1;
+    percents[index] = Math.round((Math.max(0, day.count) / day.allowed) * 100);
+  }
 
-    const peakPercent = Math.max(
-      ...range.map((day) =>
-        Math.round((Math.max(0, day.count) / day.allowed) * 100),
-      ),
-    );
+  const peakIndexes: number[] = [];
+  let peakHead = 0;
+  let invalidCount = 0;
+  let notANumberCount = 0;
+
+  const addToWindow = (index: number) => {
+    if (!valid[index]) {
+      invalidCount += 1;
+      return;
+    }
+    const percent = percents[index]!;
+    if (Number.isNaN(percent)) {
+      notANumberCount += 1;
+      return;
+    }
+    while (
+      peakIndexes.length > peakHead &&
+      percents[peakIndexes[peakIndexes.length - 1]!]! <= percent
+    ) {
+      peakIndexes.pop();
+    }
+    peakIndexes.push(index);
+  };
+
+  const removeFromWindow = (index: number) => {
+    if (!valid[index]) {
+      invalidCount -= 1;
+    } else if (Number.isNaN(percents[index]!)) {
+      notANumberCount -= 1;
+    } else if (peakIndexes[peakHead] === index) {
+      peakHead += 1;
+    }
+
+    // Avoid retaining a long discarded prefix when callers provide a very
+    // large explicit radius.
+    if (peakHead > 1_024 && peakHead * 2 > peakIndexes.length) {
+      peakIndexes.splice(0, peakHead);
+      peakHead = 0;
+    }
+  };
+
+  for (let index = 0; index < duration; index += 1) addToWindow(index);
+
+  for (
+    let candidateIndex = 0;
+    candidateIndex <= radius * 2;
+    candidateIndex += 1
+  ) {
+    if (candidateIndex > 0) {
+      removeFromWindow(candidateIndex - 1);
+      addToWindow(candidateIndex + duration - 1);
+    }
+
+    const offset = candidateIndex - radius;
+    const startDate = dates[candidateIndex]!;
+    const endDate = dates[candidateIndex + duration - 1]!;
+    if (
+      (startDate === input.selectedStart && endDate === selectedEnd) ||
+      invalidCount > 0
+    ) {
+      continue;
+    }
+
     candidates.push({
       startDate,
       endDate,
-      peakPercent,
+      peakPercent:
+        notANumberCount > 0 ? Number.NaN : percents[peakIndexes[peakHead]!]!,
       distance: Math.abs(offset),
     });
   }

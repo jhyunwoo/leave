@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMonthGrid,
+  CALENDAR_QUERY_FUTURE_MONTHS,
+  CALENDAR_QUERY_PAST_MONTHS,
   fmtDateTimeFull,
   fmtDateTimeShort,
   fmtRange,
@@ -8,6 +10,13 @@ import {
   shiftMonth,
   splitMonth,
 } from "../src";
+
+describe("calendar query bounds", () => {
+  it("keeps clients and the API on the same relative-month contract", () => {
+    expect(CALENDAR_QUERY_PAST_MONTHS).toBe(12);
+    expect(CALENDAR_QUERY_FUTURE_MONTHS).toBe(24);
+  });
+});
 
 describe("shiftMonth", () => {
   it("연도 경계를 넘어 이동", () => {

@@ -16,7 +16,10 @@ import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 /** 연가 5일만 남은 사용자. 그룹은 없어 달력 조회가 일어나지 않는다. */
 function setup(
   createLeave = vi.fn((_args: { json: unknown }) =>
-    Promise.resolve({ leave: {}, exceededDates: [] }),
+    Promise.resolve({
+      leave: { startDate: "2026-09-01", endDate: "2026-09-03" },
+      exceededDates: [],
+    }),
   ),
 ) {
   const client = {

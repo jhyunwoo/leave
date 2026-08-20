@@ -3,8 +3,13 @@
  * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약을 함께 보여준다.
  */
 
-import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
-import { useState } from "react";
+import {
+  BALANCE_LABELS,
+  fmtRangeTiny,
+  segmentBalanceKey,
+  todayInSeoul,
+} from "@leave/shared";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import type { MyLeave } from "@leave/client";
 import {
@@ -13,15 +18,19 @@ import {
   useLeaveBalances,
   useMyLeaves,
 } from "@leave/client";
-import { LeaveFormModal } from "../components/LeaveFormModal";
+import {
+  LazyLeaveFormModal,
+  preloadLeaveFormModal,
+} from "../components/LazyLeaveFormModal";
 import { fmtRange } from "@leave/shared";
 
 export function LeavesPage() {
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
-  const del = useDeleteLeave();
+  const { mutateAsync: deleteLeave, isPending: deleting } = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
+  const today = todayInSeoul();
 
   // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫까지 더한다.
   // 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
@@ -54,12 +63,18 @@ export function LeavesPage() {
       item.expiredDays > 0,
   );
 
-  const sections = partitionMyLeaves(leaves.data?.leaves);
-  const onDelete = (leave: MyLeave) => {
-    if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
-      void del.mutateAsync(leave.id);
-    }
-  };
+  const sections = useMemo(
+    () => partitionMyLeaves(leaves.data?.leaves, today),
+    [leaves.data?.leaves, today],
+  );
+  const onDelete = useCallback(
+    (leave: MyLeave) => {
+      if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
+        void deleteLeave(leave.id);
+      }
+    },
+    [deleteLeave],
+  );
 
   return (
     <div
@@ -93,6 +108,8 @@ export function LeavesPage() {
         <button
           type="button"
           className="btn btn-primary"
+          onMouseEnter={preloadLeaveFormModal}
+          onFocus={preloadLeaveFormModal}
           onClick={() => setCreating(true)}
         >
           휴가 등록
@@ -201,14 +218,14 @@ export function LeavesPage() {
           <LeaveSection
             title="다가오는 휴가"
             leaves={sections.upcoming}
-            deleting={del.isPending}
+            deleting={deleting}
             onEdit={setEditing}
             onDelete={onDelete}
           />
           <LeaveSection
             title="지난 휴가"
             leaves={sections.past}
-            deleting={del.isPending}
+            deleting={deleting}
             onEdit={setEditing}
             onDelete={onDelete}
           />
@@ -216,7 +233,7 @@ export function LeavesPage() {
       )}
 
       {(creating || editing) && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           editing={editing}
           onClose={() => {
             setCreating(false);
@@ -282,6 +299,8 @@ function LeaveRow(props: {
         <button
           type="button"
           className="btn btn-secondary btn-sm"
+          onMouseEnter={preloadLeaveFormModal}
+          onFocus={preloadLeaveFormModal}
           onClick={() => props.onEdit(l)}
         >
           수정
@@ -300,7 +319,7 @@ function LeaveRow(props: {
 }
 
 /** 섹션 하나. 비어 있으면 아무것도 그리지 않는다. */
-function LeaveSection(props: {
+const LeaveSection = memo(function LeaveSection(props: {
   title: string;
   leaves: MyLeave[];
   deleting: boolean;
@@ -330,4 +349,4 @@ function LeaveSection(props: {
       </ul>
     </section>
   );
-}
+});

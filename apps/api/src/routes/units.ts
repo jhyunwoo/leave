@@ -26,7 +26,12 @@ import { checkUnitAdmin, serializeUnitById } from "../lib/unit-access";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
 import { rateLimit } from "../middleware/rate-limit";
-import { shiftMonth, todayInSeoul } from "@leave/shared";
+import {
+  CALENDAR_QUERY_FUTURE_MONTHS,
+  CALENDAR_QUERY_PAST_MONTHS,
+  shiftMonth,
+  todayInSeoul,
+} from "@leave/shared";
 import {
   blackoutsRoute,
   calendarRoute,
@@ -42,19 +47,6 @@ import {
   transferRoute,
   updateUnitRoute,
 } from "./units.contract";
-
-/**
- * 달력을 조회할 수 있는 범위(현재 월 기준).
- *
- * 휴가 등록 자체에는 날짜 상한이 없으므로, 이 범위가 좁으면 등록은 되는데 그 달의
- * 달력·추천·시뮬레이션만 비는 어긋난 상태가 된다. 복무 기간(약 18개월) 끝까지
- * 계획할 수 있도록 미래를 넉넉히 열어 둔다.
- *
- * 긁어가기는 아래 rate limit이 막는다. 여기서 범위를 두는 목적은 한 사용자가
- * 임의로 먼 달을 무한히 조회해 D1을 긁게 두지 않는 것뿐이다.
- */
-const CALENDAR_PAST_MONTHS = 12;
-const CALENDAR_FUTURE_MONTHS = 24;
 
 const app = createApp();
 app.use("*", authMiddleware);
@@ -419,12 +411,12 @@ export const unitRoutes = app
 
     const currentMonth = todayInSeoul().slice(0, 7);
     if (
-      month < shiftMonth(currentMonth, -CALENDAR_PAST_MONTHS) ||
-      month > shiftMonth(currentMonth, CALENDAR_FUTURE_MONTHS)
+      month < shiftMonth(currentMonth, -CALENDAR_QUERY_PAST_MONTHS) ||
+      month > shiftMonth(currentMonth, CALENDAR_QUERY_FUTURE_MONTHS)
     ) {
       return c.json(
         {
-          error: `달력은 현재 월 기준 과거 ${CALENDAR_PAST_MONTHS}개월 ~ 미래 ${CALENDAR_FUTURE_MONTHS}개월만 조회할 수 있습니다`,
+          error: `달력은 현재 월 기준 과거 ${CALENDAR_QUERY_PAST_MONTHS}개월 ~ 미래 ${CALENDAR_QUERY_FUTURE_MONTHS}개월만 조회할 수 있습니다`,
         },
         400,
       );

@@ -18,6 +18,7 @@ export function DayPanel(props: {
   calendar: Calendar;
   date: string;
   onAddLeave: () => void;
+  onPreloadAddLeave?: () => void;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
@@ -131,6 +132,8 @@ export function DayPanel(props: {
       <button
         type="button"
         className="btn btn-primary"
+        onMouseEnter={props.onPreloadAddLeave}
+        onFocus={props.onPreloadAddLeave}
         onClick={props.onAddLeave}
       >
         이 날부터 휴가 등록

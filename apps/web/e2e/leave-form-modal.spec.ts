@@ -93,6 +93,108 @@ test("목록이 길어도 휴가 수정 모달의 저장 버튼이 화면 안에
   await expect(submit).toBeEnabled();
 });
 
+test("휴가 폼을 받는 동안 포커스가 모달 안에 머물고 닫으면 버튼으로 돌아간다", async ({
+  page,
+  request,
+}) => {
+  const token = await seedLongLeaveList(request);
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+
+  const formChunk = "**/src/components/LeaveFormModal.tsx*";
+  let releaseChunk: () => void = () => undefined;
+  const chunkGate = new Promise<void>((resolve) => {
+    releaseChunk = resolve;
+  });
+  await page.route(formChunk, async (route) => {
+    await chunkGate;
+    await route.continue();
+  });
+
+  try {
+    await page.goto("/leaves");
+    const trigger = page.getByRole("button", { name: "수정" }).first();
+    await trigger.click();
+
+    const dialog = page.getByRole("dialog", { name: "휴가 수정" });
+    const loading = dialog.getByRole("status");
+    await expect(loading).toHaveText("휴가 양식을 불러오는 중…");
+    await expect
+      .poll(() =>
+        dialog.evaluate((element) => element.contains(document.activeElement)),
+      )
+      .toBe(true);
+    expect(
+      await page
+        .locator("#root")
+        .evaluate((element) => (element as HTMLElement).inert),
+    ).toBe(true);
+
+    // 로딩 상태에서 Tab을 눌러도 inert 처리된 배경 버튼으로 빠지지 않는다.
+    await page.keyboard.press("Tab");
+    expect(
+      await dialog.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+    ).toBe(true);
+
+    releaseChunk();
+    await expect(dialog.getByPlaceholder("예: 제주도 가족여행")).toBeFocused();
+    await dialog.getByRole("button", { name: "닫기" }).click();
+    await expect(trigger).toBeFocused();
+    expect(
+      await page
+        .locator("#root")
+        .evaluate((element) => (element as HTMLElement).inert),
+    ).toBe(false);
+  } finally {
+    releaseChunk();
+  }
+});
+
+test("휴가 폼 청크 다운로드가 실패해도 닫거나 다시 시도할 수 있다", async ({
+  page,
+  request,
+}) => {
+  const token = await seedLongLeaveList(request);
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+
+  const formChunk = "**/src/components/LeaveFormModal.tsx*";
+  await page.route(formChunk, (route) => route.abort("failed"));
+  await page.goto("/leaves");
+  await page.getByRole("button", { name: "수정" }).first().click();
+
+  const dialog = page.getByRole("dialog", { name: "휴가 수정" });
+  await expect(dialog.getByRole("alert")).toContainText(
+    "휴가 양식을 불러오지 못했어요.",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "닫기", exact: true }).last(),
+  ).toBeVisible();
+
+  // 브라우저 모듈 맵은 실패한 동적 import도 기억한다. 요청 차단을 푼 뒤 새 문서로
+  // 다시 시작하고, 같은 수정 버튼에서 폼을 정상적으로 받을 수 있어야 한다.
+  await page.unroute(formChunk);
+  const navigation = page.waitForRequest(
+    (request) =>
+      request.isNavigationRequest() &&
+      new URL(request.url()).pathname === "/leaves",
+  );
+  await dialog.getByRole("button", { name: "페이지 새로고침" }).click();
+  await navigation;
+  await page.waitForLoadState("networkidle");
+
+  await page.getByRole("button", { name: "수정" }).first().click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "휴가 수정" })
+      .getByPlaceholder("예: 제주도 가족여행"),
+  ).toBeVisible();
+});
+
 test("모달 안에서 시작한 드래그를 배경에서 놓아도 모달이 닫히지 않는다", async ({
   page,
   request,

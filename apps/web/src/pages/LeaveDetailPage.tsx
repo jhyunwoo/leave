@@ -24,7 +24,10 @@ import {
   type Me,
 } from "@leave/client";
 import { DayRoster } from "../components/calendar/DayRoster";
-import { LeaveFormModal } from "../components/LeaveFormModal";
+import {
+  LazyLeaveFormModal,
+  preloadLeaveFormModal,
+} from "../components/LazyLeaveFormModal";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { fmtDateK, fmtDateShort, fmtRange } from "@leave/shared";
 
@@ -189,6 +192,8 @@ export function LeaveDetailPage(props: { me: Me }) {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
+            onMouseEnter={preloadLeaveFormModal}
+            onFocus={preloadLeaveFormModal}
             onClick={() => setEditing(true)}
           >
             수정
@@ -340,7 +345,7 @@ export function LeaveDetailPage(props: { me: Me }) {
       </section>
 
       {editing && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           editing={leave}
           onClose={() => setEditing(false)}
           onSaved={(result) => {

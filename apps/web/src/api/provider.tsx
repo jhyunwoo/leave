@@ -30,6 +30,8 @@ export function ApiProvider(props: { children: ReactNode }) {
       unwrap,
       // 웹은 localStorage 한 곳만 쓰므로 tokenAtom 쓰기가 곧 영속화다.
       setSessionToken: (token) => setToken(token),
+      // 브라우저 fetch는 AbortSignal을 지원하므로 화면을 떠난 GET은 내려받지 않는다.
+      useRequestAbortSignal: true,
     }),
     [setToken],
   );

@@ -49,13 +49,15 @@ function statusHint(status: LeaveStatus): string {
   return "희망 일정이에요. 달력 출타 명단에 이름과 함께 같은 그룹 구성원에게 보여요.";
 }
 
-export function LeaveFormModal(props: {
+export type LeaveFormModalProps = {
   initialDate?: string;
   editing?: MyLeave | null;
   onClose: () => void;
   // 붙어 있는 휴가에 흡수되면 저장된 휴가의 id가 요청한 id와 다를 수 있다.
   onSaved: (result: LeaveResult) => void;
-}) {
+};
+
+export function LeaveFormModal(props: LeaveFormModalProps) {
   const form = useLeaveForm({
     initialDate: props.initialDate,
     editing: props.editing,

@@ -4,22 +4,25 @@
  * 사용처: 웹 CalendarPage, 네이티브 캘린더 탭, 휴가 등록 폼(혼잡도 시뮬레이션).
  */
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useLeaveApi } from "../context";
+import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
 import type { Calendar, CalendarDay } from "../types";
 
 /** 한 달치 달력(일별 출타 통계 + 그 달에 걸친 휴가들). */
 export function useCalendar(unitId: string | null, month: string) {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.calendar(unitId, month),
     enabled: unitId !== null,
-    queryFn: async () =>
+    queryFn: async (context) =>
       unwrap<Calendar>(
-        await client.units[":id"].calendar.$get({
-          param: { id: unitId! },
-          query: { month },
-        }),
+        await client.units[":id"].calendar.$get(
+          {
+            param: { id: unitId! },
+            query: { month },
+          },
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
       ),
   });
 }
@@ -34,17 +37,20 @@ export function useCalendar(unitId: string | null, month: string) {
  * 다시 요청하지 않는다.
  */
 export function useCalendarDays(unitId: string | null, months: string[]) {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQueries({
     queries: months.map((month) => ({
       queryKey: queryKeys.calendar(unitId, month),
       enabled: unitId !== null,
-      queryFn: async () =>
+      queryFn: async (context) =>
         unwrap<Calendar>(
-          await client.units[":id"].calendar.$get({
-            param: { id: unitId! },
-            query: { month },
-          }),
+          await client.units[":id"].calendar.$get(
+            {
+              param: { id: unitId! },
+              query: { month },
+            },
+            queryRequestOptions(useRequestAbortSignal, context),
+          ),
         ),
     })),
     // combine은 결과가 실제로 바뀔 때만 다시 도는 React Query 내장 메모이제이션이다.

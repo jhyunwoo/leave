@@ -14,7 +14,7 @@ import type {
   UnitUpdateInput,
 } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLeaveApi } from "../context";
+import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
 import type { IssuedUnitInvite, Member, Unit } from "../types";
 
@@ -58,7 +58,6 @@ export function useJoinUnit() {
  */
 export function useRotateUnitInvite(unitId: string) {
   const { client, unwrap } = useLeaveApi();
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: UnitInviteCreateInput = {}) =>
       unwrap<{ invite: IssuedUnitInvite }>(
@@ -67,7 +66,6 @@ export function useRotateUnitInvite(unitId: string) {
           json: input,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.me }),
   });
 }
 
@@ -83,13 +81,16 @@ export function useLeaveUnit() {
 
 /** 그룹 구성원 목록. unitId가 없으면(그룹 미소속) 요청하지 않는다. */
 export function useUnitMembers(unitId: string | null, enabled = true) {
-  const { client, unwrap } = useLeaveApi();
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.unitMembers(unitId),
     enabled: enabled && unitId !== null,
-    queryFn: async () =>
+    queryFn: async (context) =>
       unwrap<{ members: Member[] }>(
-        await client.units[":id"].members.$get({ param: { id: unitId! } }),
+        await client.units[":id"].members.$get(
+          { param: { id: unitId! } },
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
       ),
   });
 }

@@ -14,7 +14,7 @@ import {
   maxAllowedOut,
   todayInSeoul,
 } from "@leave/shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Navigate, useNavigate } from "react-router";
 import type { LeaveResult, Me } from "@leave/client";
@@ -22,7 +22,10 @@ import { useCalendar, useLeaveBalances, useMyLeaves } from "@leave/client";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
-import { LeaveFormModal } from "../components/LeaveFormModal";
+import {
+  LazyLeaveFormModal,
+  preloadLeaveFormModal,
+} from "../components/LazyLeaveFormModal";
 import { fmtDateShort } from "@leave/shared";
 import { buildMyLeaveDayMap } from "@leave/client";
 
@@ -37,6 +40,9 @@ export function CalendarPage(props: { me: Me }) {
   const scrollRef = useRef<CalendarScrollHandle>(null);
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
+  const handleSelectDate = useCallback((date: string) => {
+    setSelectedDate((current) => (current === date ? null : date));
+  }, []);
 
   const myLeaveDays = useMemo(
     () => buildMyLeaveDayMap(myLeaves.data?.leaves),
@@ -126,6 +132,8 @@ export function CalendarPage(props: { me: Me }) {
           <button
             type="button"
             className="btn btn-primary"
+            onMouseEnter={preloadLeaveFormModal}
+            onFocus={preloadLeaveFormModal}
             onClick={() => setFormOpen(true)}
           >
             휴가 등록
@@ -167,9 +175,7 @@ export function CalendarPage(props: { me: Me }) {
             regularOvernight={regularOvernight}
             currentCycle={currentCycle}
             dischargeAt={dischargeAt}
-            onSelectDate={(d) =>
-              setSelectedDate((cur) => (cur === d ? null : d))
-            }
+            onSelectDate={handleSelectDate}
           />
           <div
             style={{
@@ -201,13 +207,14 @@ export function CalendarPage(props: { me: Me }) {
             cycle={cycleForDisplay(regularOvernight, selectedDate, dischargeAt)}
             dischargeAt={dischargeAt}
             onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
+            onPreloadAddLeave={preloadLeaveFormModal}
             onAddLeave={() => setFormOpen(true)}
           />
         )}
       </div>
 
       {formOpen && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           initialDate={selectedDate ?? today}
           onClose={() => setFormOpen(false)}
           onSaved={onSaved}

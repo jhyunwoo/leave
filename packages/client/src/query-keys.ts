@@ -18,7 +18,7 @@ export const queryKeys = {
   /** 그룹 구성원 목록(그룹별). */
   unitMembers: (unitId: string | null) => ["unitMembers", unitId] as const,
 
-  /** 모든 달의 달력. 휴가가 바뀌면 통째로 무효화한다. */
+  /** 모든 달의 달력 접두사. 범위를 모를 때만 전체를 무효화한다. */
   calendars: ["calendar"] as const,
   /** 특정 그룹의 특정 달(YYYY-MM) 달력. */
   calendar: (unitId: string | null, month: string) =>

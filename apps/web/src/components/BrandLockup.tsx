@@ -26,7 +26,7 @@ export function BrandLockup({
     <span className={classes}>
       <img
         className="brand-lockup__mark"
-        src="/brand/leave-icon.png"
+        src="/icon-192.png"
         width={iconSize}
         height={iconSize}
         alt=""

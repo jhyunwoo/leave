@@ -32,6 +32,7 @@ export function testAdapter(
     client?: unknown;
     unwrap?: LeaveApiAdapter["unwrap"];
     setSessionToken?: LeaveApiAdapter["setSessionToken"];
+    useRequestAbortSignal?: boolean;
   } = {},
 ): LeaveApiAdapter {
   return {
@@ -40,6 +41,7 @@ export function testAdapter(
     unwrap:
       overrides.unwrap ?? (<T,>(res: unknown) => Promise.resolve(res as T)),
     setSessionToken: overrides.setSessionToken ?? vi.fn(),
+    useRequestAbortSignal: overrides.useRequestAbortSignal,
   };
 }
 

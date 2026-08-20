@@ -15,11 +15,13 @@
  * 닿을 방법이 없어진다. 조상의 스타일에 기대지 않도록 body로 꺼내 그린다.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /** 모달 최대 폭. 폼이 넓을수록 데스크톱에서 스크롤이 줄어든다. */
 const MAX_WIDTH = { regular: 480, wide: 760 } as const;
+const FOCUSABLE_SELECTOR =
+  "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
 
 export function Modal(props: {
   title: string;
@@ -30,6 +32,47 @@ export function Modal(props: {
 }) {
   // 배경을 누른 곳이 어디인지 기억해 둔다. 아래 onPointerUp 참고.
   const pressedOverlay = useRef(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // 포털이 커밋되기 전 렌더 단계에서 열었던 버튼을 기억해야 autoFocus보다 앞선다.
+  const returnFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
+
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    const dialog = dialogRef.current;
+    if (!overlay || !dialog) return;
+    const returnFocus = returnFocusRef.current;
+
+    // 포털 형제(앱 루트와 다른 화면 고정 UI)를 접근성 트리와 탭 순서에서 뺀다.
+    // 이전 inert 상태를 보존해 다른 대화상자의 상태를 덮어쓰지 않는다.
+    const background = Array.from(document.body.children)
+      .filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element !== overlay,
+      )
+      .map((element) => ({ element, wasInert: element.inert }));
+    for (const { element } of background) element.inert = true;
+
+    // 자식의 autoFocus가 없을 때도 키보드 포커스가 배경에 남지 않게 한다.
+    if (!dialog.contains(document.activeElement)) {
+      const firstFocusable = dialog.querySelector<HTMLElement>(
+        `[data-modal-initial-focus], [autofocus], ${FOCUSABLE_SELECTOR}`,
+      );
+      (firstFocusable ?? dialog).focus({ preventScroll: true });
+    }
+
+    return () => {
+      for (const { element, wasInert } of background) {
+        element.inert = wasInert;
+      }
+      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,6 +88,7 @@ export function Modal(props: {
 
   return createPortal(
     <div
+      ref={overlayRef}
       role="presentation"
       // 배경 클릭으로 닫되, **누른 곳과 뗀 곳이 모두 배경일 때만** 닫는다.
       //
@@ -74,9 +118,34 @@ export function Modal(props: {
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={props.title}
+        tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const focusable = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>(
+              FOCUSABLE_SELECTOR,
+            ),
+          ).filter((element) => element.getClientRects().length > 0);
+          const currentIndex = focusable.findIndex(
+            (element) => element === document.activeElement,
+          );
+          let target: HTMLElement | undefined;
+          if (event.shiftKey && currentIndex <= 0) {
+            target = focusable.at(-1);
+          } else if (
+            !event.shiftKey &&
+            (currentIndex === -1 || currentIndex === focusable.length - 1)
+          ) {
+            target = focusable[0];
+          }
+          if (!target) return;
+          event.preventDefault();
+          target.focus();
+        }}
         className="card"
         style={{
           width: "100%",

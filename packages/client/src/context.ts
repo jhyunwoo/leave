@@ -12,7 +12,7 @@
  */
 import type { AppType } from "@leave/api";
 import type { UnwrappableResponse } from "@leave/shared";
-import type { hc } from "hono/client";
+import type { ClientRequestOptions, hc } from "hono/client";
 import {
   createContext,
   createElement,
@@ -37,7 +37,24 @@ export type LeaveApiAdapter = {
    * null이면 로그아웃. 네이티브는 여기서 디스크 쿼리 캐시도 함께 비운다.
    */
   setSessionToken: (token: string | null) => void | Promise<void>;
+  /**
+   * TanStack Query가 마지막 관찰자를 잃으면 진행 중인 GET도 취소한다.
+   * 플랫폼 fetch의 AbortSignal 지원이 확인된 어댑터만 켠다.
+   */
+  useRequestAbortSignal?: boolean;
 };
+
+/** 플랫폼이 허용한 경우에만 Hono GET에 TanStack의 취소 신호를 전달한다. */
+export function queryRequestOptions(
+  useRequestAbortSignal: boolean | undefined,
+  context: { readonly signal: AbortSignal },
+): ClientRequestOptions | undefined {
+  // `context.signal` is a getter that tells TanStack the transport consumes the
+  // signal. Do not read it at all for adapters that did not opt in.
+  return useRequestAbortSignal
+    ? { init: { signal: context.signal } }
+    : undefined;
+}
 
 const LeaveApiContext = createContext<LeaveApiAdapter | null>(null);
 

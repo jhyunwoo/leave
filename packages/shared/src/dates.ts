@@ -81,6 +81,12 @@ export function monthBounds(month: string): { start: ISODate; end: ISODate } {
 }
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const SEOUL_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 
 /**
  * 달력 날짜(KST 자정)에 해당하는 실제 시각(epoch ms).
@@ -92,12 +98,7 @@ export function kstMidnight(date: ISODate): number {
 
 /** 한국 시간 기준 오늘 날짜. */
 export function todayInSeoul(now: Date = new Date()): ISODate {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  return SEOUL_DATE_FORMATTER.format(now);
 }
 
 /** [aStart, aEnd]와 [bStart, bEnd]가 하루라도 겹치는지. */

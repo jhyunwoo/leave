@@ -125,22 +125,32 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
     localStorage.setItem("leave.token", token);
   }, auth.token);
   await page.goto("/profile");
+  await page.getByRole("link", { name: "보유 휴가" }).click();
+  await expect(page).toHaveURL(/\/leaves\/grants$/);
   await expect(
-    page.getByRole("heading", { name: "보유 휴가 일수" }),
+    page.getByRole("heading", { name: "보유 휴가", exact: true }),
   ).toBeVisible();
 
-  await page
-    .locator("label")
-    .filter({ hasText: /^연가/ })
-    .locator("input")
-    .fill("32");
-  await page
-    .locator("label")
-    .filter({ hasText: /^포상휴가/ })
-    .locator("input")
-    .fill("5");
-  await page.getByRole("button", { name: "휴가 일수 저장" }).click();
-  await expect(page.getByText("휴가 총량을 저장했습니다.")).toBeVisible();
+  // 총량 입력 화면은 적립분 장부로 바뀌었다. 기본 연가 적립분을 수정하고
+  // 포상휴가 적립분을 하나 추가해 같은 32일/5일 상태를 만든다.
+  const annualFund = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "연가", exact: true }),
+  });
+  await annualFund.getByRole("button", { name: "수정" }).click();
+  const editGrant = page.getByRole("dialog", { name: "적립분 수정" });
+  await editGrant.getByLabel("일수").fill("32");
+  await editGrant.getByRole("button", { name: "수정" }).click();
+  await expect(editGrant).toBeHidden();
+  await expect(annualFund).toContainText("총 32일");
+
+  await page.getByRole("button", { name: "+ 포상휴가" }).click();
+  const addGrant = page.getByRole("dialog", { name: "적립분 추가" });
+  await addGrant.getByLabel("일수").fill("5");
+  await addGrant.getByRole("button", { name: "추가" }).click();
+  await expect(addGrant).toBeHidden();
+  await expect(
+    page.getByRole("heading", { name: "포상휴가", exact: true }),
+  ).toBeVisible();
 
   await page.goto("/leaves");
   await page.getByRole("button", { name: "휴가 등록" }).click();
@@ -158,11 +168,16 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   await page.getByTestId("leave-date-range-calendar-day-2026-09-01").click();
   // 시작일을 고르면 종료일 선택으로 넘어가고 달도 9월로 따라온다.
   await page.getByTestId("leave-date-range-calendar-day-2026-09-05").click();
-  await page.getByLabel("연가 사용 일수").fill("3");
-  await page.getByLabel("포상휴가 사용 일수").fill("2");
+  // 5일짜리 기본 연가 구간을 3일/2일로 나눈 뒤 둘째 재원을 포상휴가로 바꾼다.
+  await page.getByRole("button", { name: "구간 추가" }).click();
+  await page
+    .getByRole("combobox", { name: "2번째 구간 휴가 재원" })
+    .selectOption("award");
   await page.getByRole("button", { name: "휴가 등록" }).last().click();
 
-  await expect(page.getByText("복합 휴가")).toBeVisible();
-  await expect(page.getByText("연가 3일")).toBeVisible();
-  await expect(page.getByText("포상휴가 2일")).toBeVisible();
+  const savedLeave = page.getByRole("listitem").filter({
+    has: page.getByRole("link", { name: "복합 휴가" }),
+  });
+  await expect(savedLeave).toContainText("연가 9/1–9/3");
+  await expect(savedLeave).toContainText("포상휴가 9/4–9/5");
 });
