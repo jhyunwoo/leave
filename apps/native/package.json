@@ -1,7 +1,20 @@
 {
   "name": "@leave/native",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "1.0.0",  
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint . --max-warnings 0",
+    "eas:build": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build",
+    "eas:submit": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas submit",
+    "eas:update:preview": "eas update --channel preview --environment preview",
+    "eas:update:production": "eas update --channel production --environment production",
+    "check-types": "tsc --noEmit",
+    "test:e2e": "maestro test .maestro"
+  },
   "dependencies": {
     "@expo/ui": "^57.0.11",
     "@leave/api": "workspace:*",
@@ -48,19 +61,6 @@
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.1",
     "typescript": "^6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "eslint . --max-warnings 0",
-    "eas:build": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build",
-    "eas:submit": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas submit",
-    "eas:update:preview": "eas update --channel preview --environment preview",
-    "eas:update:production": "eas update --channel production --environment production",
-    "check-types": "tsc --noEmit",
-    "test:e2e": "maestro test .maestro"
   },
   "private": true
 }
