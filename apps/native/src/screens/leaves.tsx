@@ -522,7 +522,9 @@ const useStyles = makeStyles(({ colors }) => ({
   detailEmpty: { padding: spacing.xl, gap: spacing.sm },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   emptyCaption: { fontSize: 13, lineHeight: 20, color: colors.body },
-  leaveList: { paddingHorizontal: spacing.xl },
+  // 첫 줄이 카드 위 경계에 붙지 않도록 제목 위 여백을 둔다. 아래쪽은 마지막
+  // 행의 paddingVertical이 이미 받쳐 준다.
+  leaveList: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   leaveRow: {
     paddingVertical: spacing.xl,
     flexDirection: "row",
