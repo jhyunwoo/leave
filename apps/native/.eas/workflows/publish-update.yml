@@ -1,0 +1,21 @@
+# 로컬에서 OTA를 발행할 수 없어 EAS 서버에 발행을 맡기는 워크플로.
+#
+# hermes-compiler는 linux는 x86-64 바이너리(linux64-bin)만 담고 있어, aarch64
+# 개발 머신에서는 `eas update`의 export 단계가 hermesc 실행에 실패한다
+# ("ELF: not found"). 빌드는 EAS 서버가 직접 번들하므로 영향이 없지만 OTA는
+# 로컬 번들을 올리는 구조라 막힌다. 이 워크플로로 같은 일을 EAS에서 돌린다.
+#
+# 실행: cd apps/native && npx eas workflow:run publish-update.yml
+name: Publish production update
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  publish_update:
+    name: OTA 발행 (production 채널)
+    type: update
+    environment: production
+    params:
+      channel: production
+      platform: all
