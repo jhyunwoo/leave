@@ -32,6 +32,8 @@ export function ApiProvider(props: { children: ReactNode }) {
       setSessionToken: (token) => setToken(token),
       // 브라우저 fetch는 AbortSignal을 지원하므로 화면을 떠난 GET은 내려받지 않는다.
       useRequestAbortSignal: true,
+      // CalendarScroll의 5개 월별 쿼리 키는 유지하면서 전송만 한 요청으로 합친다.
+      batchCalendarRequests: true,
     }),
     [setToken],
   );

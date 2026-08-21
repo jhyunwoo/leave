@@ -24,6 +24,14 @@ import {
 } from "../components/LazyLeaveFormModal";
 import { fmtRange } from "@leave/shared";
 
+/**
+ * A large leave history is uncommon but can otherwise mount hundreds of
+ * interactive rows synchronously. Keep the first useful screen bounded and
+ * let the user opt into each small batch; manual expansion is predictable on
+ * slow CPUs and remains discoverable to keyboard and screen-reader users.
+ */
+const LEAVE_SECTION_PAGE_SIZE = 20;
+
 export function LeavesPage() {
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
@@ -216,6 +224,7 @@ export function LeavesPage() {
           }}
         >
           <LeaveSection
+            id="upcoming-leaves"
             title="다가오는 휴가"
             leaves={sections.upcoming}
             deleting={deleting}
@@ -223,6 +232,7 @@ export function LeavesPage() {
             onDelete={onDelete}
           />
           <LeaveSection
+            id="past-leaves"
             title="지난 휴가"
             leaves={sections.past}
             deleting={deleting}
@@ -320,13 +330,18 @@ function LeaveRow(props: {
 
 /** 섹션 하나. 비어 있으면 아무것도 그리지 않는다. */
 const LeaveSection = memo(function LeaveSection(props: {
+  id: string;
   title: string;
   leaves: MyLeave[];
   deleting: boolean;
   onEdit: (leave: MyLeave) => void;
   onDelete: (leave: MyLeave) => void;
 }) {
+  const [visibleCount, setVisibleCount] = useState(LEAVE_SECTION_PAGE_SIZE);
   if (props.leaves.length === 0) return null;
+  const visibleLeaves = props.leaves.slice(0, visibleCount);
+  const remaining = props.leaves.length - visibleLeaves.length;
+  const nextBatch = Math.min(LEAVE_SECTION_PAGE_SIZE, remaining);
   return (
     <section>
       <h2 className="body-lg strong" style={{ marginBottom: "var(--sp-sm)" }}>
@@ -334,10 +349,11 @@ const LeaveSection = memo(function LeaveSection(props: {
         <span className="caption text-mute">{props.leaves.length}건</span>
       </h2>
       <ul
+        id={props.id}
         className="content-panel"
         style={{ listStyle: "none", margin: 0, padding: 0 }}
       >
-        {props.leaves.map((leave) => (
+        {visibleLeaves.map((leave) => (
           <LeaveRow
             key={leave.id}
             leave={leave}
@@ -347,6 +363,20 @@ const LeaveSection = memo(function LeaveSection(props: {
           />
         ))}
       </ul>
+      {remaining > 0 && (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          aria-controls={props.id}
+          aria-label={`${props.title} ${nextBatch}건 더 보기 · ${remaining}건 남음`}
+          onClick={() =>
+            setVisibleCount((count) => count + LEAVE_SECTION_PAGE_SIZE)
+          }
+          style={{ width: "100%", marginTop: "var(--sp-sm)" }}
+        >
+          {nextBatch}건 더 보기 · {remaining}건 남음
+        </button>
+      )}
     </section>
   );
 });

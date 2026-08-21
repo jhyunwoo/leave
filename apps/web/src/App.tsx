@@ -20,7 +20,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
-import { useMe, useOnboardingStatus } from "@leave/client";
+import { useAuthBootstrap, useMe } from "@leave/client";
 import { LoginPage } from "./pages/LoginPage";
 import { isAuthedAtom } from "./state/auth";
 
@@ -136,7 +136,7 @@ function CompletedApp() {
 }
 
 function AuthedApp() {
-  const onboarding = useOnboardingStatus();
+  const onboarding = useAuthBootstrap();
   if (onboarding.isPending) return <FullPageSpinner />;
   if (!onboarding.data) return <Navigate to="/login" replace />;
   if (!onboarding.data.completed)

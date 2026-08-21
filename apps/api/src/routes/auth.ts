@@ -25,6 +25,7 @@ import {
   type UserRow,
 } from "../db/schema";
 import { createApp } from "../lib/app";
+import { buildAuthBootstrap } from "../lib/auth-bootstrap";
 import { hashPassword, sha256Hex, verifyPassword } from "../lib/crypto";
 import { deleteAccount } from "../lib/delete-account";
 import { leaveRuleMessage } from "../lib/errors";
@@ -43,6 +44,7 @@ import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 import {
   activityRoute,
+  authBootstrapRoute,
   changePasswordRoute,
   deleteAccountRoute,
   loginRoute,
@@ -112,6 +114,7 @@ app.use(
   rateLimit({ name: "signup", limit: 10, windowSeconds: 600 }),
 );
 app.use("/logout", authMiddleware);
+app.use("/bootstrap", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/me/password", authMiddleware);
 // `/onboarding/*`만으로 `/onboarding` 자신까지 매치된다. 두 줄을 다 두면
@@ -194,6 +197,12 @@ export const authRoutes = app
       .delete(sessions)
       .where(eq(sessions.tokenHash, await sha256Hex(token)));
     return c.json({ ok: true as const }, 200);
+  })
+  .openapi(authBootstrapRoute, async (c) => {
+    return c.json(
+      await buildAuthBootstrap(drizzle(c.env.DB), c.get("user")),
+      200,
+    );
   })
   .openapi(meRoute, async (c) => {
     const user = c.get("user");

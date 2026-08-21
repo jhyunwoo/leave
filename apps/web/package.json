@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "tsc --noEmit && vite build",
+    "fonts:generate": "node scripts/generate-font-subset.mjs",
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler deploy",
     "check-types": "tsc --noEmit",

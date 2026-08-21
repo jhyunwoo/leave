@@ -18,6 +18,7 @@ import {
   leaveGrants,
   regularOvernightConfigs,
   users,
+  type RegularOvernightConfigRow,
   type UserRow,
 } from "../db/schema";
 import type { Db } from "./db";
@@ -83,6 +84,17 @@ export async function readOnboardingStatus(db: Db, user: UserRow) {
     .where(eq(regularOvernightConfigs.userId, user.id))
     .get();
 
+  return serializeOnboardingStatus(user, config);
+}
+
+/**
+ * 저장 행을 온보딩 응답으로 바꾼다. 인증 부트스트랩은 부대 조회와 설정 조회를
+ * 한 D1 batch에 묶은 뒤 같은 직렬화를 재사용한다.
+ */
+export function serializeOnboardingStatus(
+  user: UserRow,
+  config: RegularOvernightConfigRow | undefined,
+) {
   return {
     completed: Boolean(user.onboardingCompletedAt),
     profile: hasPlaceholderProfile(user)

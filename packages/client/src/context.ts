@@ -42,6 +42,11 @@ export type LeaveApiAdapter = {
    * 플랫폼 fetch의 AbortSignal 지원이 확인된 어댑터만 켠다.
    */
   useRequestAbortSignal?: boolean;
+  /**
+   * 같은 렌더에서 시작한 월별 달력 GET을 배치 엔드포인트 한 번으로 합친다.
+   * 웹만 켠다. 네이티브는 기존 단일 월 전송 경로와 동작을 그대로 유지한다.
+   */
+  batchCalendarRequests?: boolean;
 };
 
 /** 플랫폼이 허용한 경우에만 Hono GET에 TanStack의 취소 신호를 전달한다. */

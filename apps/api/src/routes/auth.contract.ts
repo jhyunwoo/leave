@@ -87,6 +87,30 @@ const onboardingStatusSchema = z.object({
   unitId: z.string().nullable(),
 });
 
+const meResponseSchema = z.object({
+  user: userSchema,
+  unit: unitSchema.nullable(),
+  joinRequest: myJoinRequestSchema.nullable(),
+});
+
+export const authBootstrapRoute = createRoute({
+  method: "get",
+  path: "/bootstrap",
+  tags: ["인증"],
+  summary: "웹 앱 인증 부트스트랩 (온보딩 상태 + 내 정보)",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(
+      z.object({
+        onboarding: onboardingStatusSchema,
+        me: meResponseSchema.nullable(),
+      }),
+      "인증 부트스트랩",
+    ),
+    401: errorResponse("인증 실패"),
+  },
+});
+
 export const onboardingStatusRoute = createRoute({
   method: "get",
   path: "/onboarding",
@@ -165,14 +189,7 @@ export const meRoute = createRoute({
   summary: "내 정보 (계산된 현재 계급, 소속 부대 포함)",
   security: [{ Bearer: [] }],
   responses: {
-    200: jsonContent(
-      z.object({
-        user: userSchema,
-        unit: unitSchema.nullable(),
-        joinRequest: myJoinRequestSchema.nullable(),
-      }),
-      "내 정보",
-    ),
+    200: jsonContent(meResponseSchema, "내 정보"),
     401: errorResponse("인증 실패"),
     428: errorResponse("온보딩 미완료"),
   },

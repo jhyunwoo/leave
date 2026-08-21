@@ -4,9 +4,9 @@
  */
 
 import { Suspense } from "react";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useLocation } from "react-router";
 import type { Me } from "@leave/client";
-import { useNotifications } from "@leave/client";
+import { useNotifications, useNotificationSummary } from "@leave/client";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 
@@ -14,8 +14,14 @@ const navClassName = ({ isActive }: { isActive: boolean }) =>
   `app-nav-item${isActive ? " is-active" : ""}`;
 
 export function AppLayout(props: { me: Me }) {
-  const notifications = useNotifications();
-  const unread = notifications.data?.unreadCount ?? 0;
+  const { pathname } = useLocation();
+  const showingInbox = pathname === "/notifications";
+  // A disabled observer still receives the inbox page's cache updates without
+  // starting a second full-list request or polling timer.
+  const inbox = useNotifications({ enabled: false });
+  const summary = useNotificationSummary({ enabled: !showingInbox });
+  const unread =
+    (showingInbox ? inbox.data?.unreadCount : summary.data?.unreadCount) ?? 0;
 
   return (
     <div className="app-shell">

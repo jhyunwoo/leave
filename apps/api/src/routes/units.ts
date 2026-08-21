@@ -14,7 +14,11 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { unitBlackouts, unitInvites, units, users } from "../db/schema";
 import { createApp } from "../lib/app";
-import { buildCalendarPayload, listVisibleMembers } from "../lib/calendar";
+import {
+  buildCalendarPayload,
+  buildCalendarPayloads,
+  listVisibleMembers,
+} from "../lib/calendar";
 import {
   createInvite,
   DEFAULT_INVITE_MAX_USES,
@@ -35,6 +39,7 @@ import {
 import {
   blackoutsRoute,
   calendarRoute,
+  calendarsRoute,
   createBlackoutRoute,
   createUnitRoute,
   deleteBlackoutRoute,
@@ -68,6 +73,22 @@ app.use(
   "/:id/calendar",
   rateLimit({ name: "calendar", limit: 120, windowSeconds: 60 }),
 );
+app.use(
+  "/:id/calendars",
+  rateLimit({ name: "calendar", limit: 120, windowSeconds: 60 }),
+);
+
+function calendarMonthOutOfRange(month: string): boolean {
+  const currentMonth = todayInSeoul().slice(0, 7);
+  return (
+    month < shiftMonth(currentMonth, -CALENDAR_QUERY_PAST_MONTHS) ||
+    month > shiftMonth(currentMonth, CALENDAR_QUERY_FUTURE_MONTHS)
+  );
+}
+
+const calendarRangeError = {
+  error: `달력은 현재 월 기준 과거 ${CALENDAR_QUERY_PAST_MONTHS}개월 ~ 미래 ${CALENDAR_QUERY_FUTURE_MONTHS}개월만 조회할 수 있습니다`,
+};
 
 export const unitRoutes = app
   .openapi(createUnitRoute, async (c) => {
@@ -409,17 +430,8 @@ export const unitRoutes = app
       return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
     }
 
-    const currentMonth = todayInSeoul().slice(0, 7);
-    if (
-      month < shiftMonth(currentMonth, -CALENDAR_QUERY_PAST_MONTHS) ||
-      month > shiftMonth(currentMonth, CALENDAR_QUERY_FUTURE_MONTHS)
-    ) {
-      return c.json(
-        {
-          error: `달력은 현재 월 기준 과거 ${CALENDAR_QUERY_PAST_MONTHS}개월 ~ 미래 ${CALENDAR_QUERY_FUTURE_MONTHS}개월만 조회할 수 있습니다`,
-        },
-        400,
-      );
+    if (calendarMonthOutOfRange(month)) {
+      return c.json(calendarRangeError, 400);
     }
 
     // 부대 행 조회도 달력 조립의 batch 안으로 들어간다 — 여기서 따로 읽으면 왕복이 하나 더 든다.
@@ -431,4 +443,27 @@ export const unitRoutes = app
     });
     if (!payload) return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
     return c.json(payload, 200);
+  })
+
+  .openapi(calendarsRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const months = c.req.valid("query").months.split(",");
+    const user = c.get("user");
+    if (user.unitId !== id) {
+      return c.json({ error: "부대원만 조회할 수 있습니다" }, 403);
+    }
+    if (months.some(calendarMonthOutOfRange)) {
+      return c.json(calendarRangeError, 400);
+    }
+
+    const calendars = await buildCalendarPayloads({
+      db: drizzle(c.env.DB),
+      unitId: id,
+      viewerId: user.id,
+      months,
+    });
+    if (!calendars) {
+      return c.json({ error: "부대를 찾을 수 없습니다" }, 404);
+    }
+    return c.json({ calendars }, 200);
   });

@@ -200,9 +200,15 @@ test("상세·멤버·달력은 현재 멤버십을 서버에서 검증한다", 
   const calendar = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
     token: outsider.token,
   });
+  const calendars = await req(
+    "GET",
+    `/units/${unitId}/calendars?months=2026-08,2026-09`,
+    { token: outsider.token },
+  );
   assert.equal(detail.status, 403);
   assert.equal(members.status, 403);
   assert.equal(calendar.status, 403);
+  assert.equal(calendars.status, 403);
 });
 
 test("달력은 출타 명단을 이름과 함께 주되 자유 입력값은 감추고 먼 달은 막는다", async () => {
@@ -290,6 +296,26 @@ test("달력은 출타 명단을 이름과 함께 주되 자유 입력값은 감
     withDraft.data.leaves.some((l) => l.startDate === draftDate),
     true,
   );
+
+  const batch = await req(
+    "GET",
+    `/units/${unitId}/calendars?months=2026-08,2026-09`,
+    { token: member.token },
+  );
+  assert.equal(batch.status, 200);
+  assert.deepEqual(
+    batch.data.calendars.map((item) => item.month),
+    ["2026-08", "2026-09"],
+  );
+  // 단일 월 계약과 배치 안의 같은 월은 필드·개인정보 필터가 완전히 같다.
+  assert.deepEqual(batch.data.calendars[0], withDraft.data);
+
+  const duplicateBatch = await req(
+    "GET",
+    `/units/${unitId}/calendars?months=2026-08,2026-08`,
+    { token: member.token },
+  );
+  assert.equal(duplicateBatch.status, 400);
 
   const far = await req(
     "GET",

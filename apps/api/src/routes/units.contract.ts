@@ -231,6 +231,53 @@ export const calendarRoute = createRoute({
   },
 });
 
+const calendarMonthsSchema = z.string().refine(
+  (value) => {
+    const months = value.split(",");
+    if (
+      months.length === 0 ||
+      months.length > 9 ||
+      new Set(months).size !== months.length ||
+      months.some((month) => !monthSchema.safeParse(month).success)
+    ) {
+      return false;
+    }
+    const indexes = months.map((month) => {
+      const [year, monthNumber] = month.split("-").map(Number);
+      return year! * 12 + monthNumber! - 1;
+    });
+    return Math.max(...indexes) - Math.min(...indexes) <= 8;
+  },
+  {
+    message:
+      "months는 중복 없이 연속 9개월 범위 안의 YYYY-MM 목록이어야 합니다",
+  },
+);
+
+export const calendarsRoute = createRoute({
+  method: "get",
+  path: "/{id}/calendars",
+  tags: TAGS,
+  summary: "부대 월별 휴가 달력 묶음 (최대 9개월)",
+  description:
+    "여러 개의 월별 달력을 한 HTTP 요청과 한 묶음의 D1 조회로 반환합니다. 기존 단일 월 엔드포인트와 응답 의미는 같습니다.",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    query: z.object({ months: calendarMonthsSchema }),
+  },
+  responses: {
+    200: jsonContent(
+      z.object({ calendars: z.array(calendarSchema) }),
+      "달력 데이터 묶음",
+    ),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("부대원만 조회 가능"),
+    404: errorResponse("부대 없음"),
+  },
+});
+
 export const blackoutsRoute = createRoute({
   method: "get",
   path: "/{id}/blackouts",

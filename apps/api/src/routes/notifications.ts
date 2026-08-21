@@ -47,6 +47,23 @@ const listRoute = createRoute({
   },
 });
 
+const summaryRoute = createRoute({
+  method: "get",
+  path: "/summary",
+  tags: ["알림"],
+  summary: "읽지 않은 알림 수",
+  description:
+    "상단 배지처럼 목록 본문이 필요 없는 화면에서 사용하는 경량 폴링 응답입니다.",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(
+      z.object({ unreadCount: z.number() }),
+      "읽지 않은 알림 수",
+    ),
+    401: errorResponse("인증 실패"),
+  },
+});
+
 const readAllRoute = createRoute({
   method: "post",
   path: "/read",
@@ -184,6 +201,21 @@ export const notificationRoutes = app
       },
       200,
     );
+  })
+  .openapi(summaryRoute, async (c) => {
+    const user = c.get("user");
+    const row = await drizzle(c.env.DB)
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, user.id),
+          eq(notifications.read, false),
+          isNull(notifications.deletedAt),
+        ),
+      )
+      .get();
+    return c.json({ unreadCount: row?.count ?? 0 }, 200);
   })
   .openapi(readAllRoute, async (c) => {
     const user = c.get("user");

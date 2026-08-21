@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryObserver } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { useMe } from "../src/hooks/auth";
 import {
@@ -12,10 +13,12 @@ import {
 } from "../src/hooks/leaves";
 import {
   useNotificationPrefs,
+  useNotificationSummary,
   useNotifications,
   useUpdateNotificationPrefs,
 } from "../src/hooks/notifications";
 import { useRotateUnitInvite } from "../src/hooks/units";
+import { useBlockUser } from "../src/hooks/moderation";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
@@ -314,6 +317,109 @@ describe("authoritative mutation responses", () => {
   });
 });
 
+describe("block visibility cache update", () => {
+  it("removes the user from members and every cached attendee list without refetching", async () => {
+    const block = vi.fn(() => Promise.resolve({ ok: true }));
+    const { queryClient, wrapper } = setup({
+      moderation: { blocks: { $post: block } },
+    });
+    const memberKey = queryKeys.unitMembers("unit-1");
+    const calendarKeys = [
+      queryKeys.calendar("unit-1", "2026-09"),
+      queryKeys.calendar("unit-1", "2026-10"),
+    ];
+    const members = {
+      members: [{ id: "me" }, { id: "blocked" }, { id: "other" }],
+    };
+    const calendars = calendarKeys.map((key) => ({
+      key,
+      value: {
+        month: String(key[2]),
+        days: [{ date: "2026-09-01", count: 3 }],
+        attendees: [
+          { userId: "me", name: "나" },
+          { userId: "blocked", name: "차단 대상" },
+          { userId: "other", name: "다른 사람" },
+        ],
+      },
+    }));
+    queryClient.setQueryData(memberKey, members);
+    for (const calendar of calendars) {
+      queryClient.setQueryData(calendar.key, calendar.value);
+    }
+
+    // These stale observers model GETs that started before POST /blocks. Their
+    // late responses contain the now-hidden user and must never restore it.
+    const memberResponse = deferred<typeof members>();
+    const memberGet = vi.fn(() => memberResponse.promise);
+    const calendarResponses = calendars.map(() =>
+      deferred<(typeof calendars)[number]["value"]>(),
+    );
+    const calendarGets = calendarResponses.map((response) =>
+      vi.fn(() => response.promise),
+    );
+    const observers = [
+      new QueryObserver(queryClient, {
+        queryKey: memberKey,
+        queryFn: memberGet,
+        staleTime: 0,
+      }),
+      ...calendars.map(
+        (calendar, index) =>
+          new QueryObserver(queryClient, {
+            queryKey: calendar.key,
+            queryFn: calendarGets[index]!,
+            staleTime: 0,
+          }),
+      ),
+    ];
+    const unsubscribe = observers.map((observer) =>
+      observer.subscribe(() => undefined),
+    );
+    await waitFor(() => expect(memberGet).toHaveBeenCalledTimes(1));
+    for (const get of calendarGets) expect(get).toHaveBeenCalledTimes(1);
+
+    const view = renderHook(() => useBlockUser(), { wrapper });
+    await act(() => view.result.current.mutateAsync({ userId: "blocked" }));
+
+    expect(
+      queryClient
+        .getQueryData<typeof members>(memberKey)
+        ?.members.map((member) => member.id),
+    ).toEqual(["me", "other"]);
+    for (const calendar of calendars) {
+      expect(
+        queryClient
+          .getQueryData<typeof calendar.value>(calendar.key)
+          ?.attendees.map((attendee) => attendee.userId),
+      ).toEqual(["me", "other"]);
+      expect(
+        queryClient.getQueryData<typeof calendar.value>(calendar.key)?.days,
+      ).toEqual(calendar.value.days);
+    }
+
+    await act(async () => {
+      memberResponse.resolve(members);
+      calendarResponses.forEach((response, index) =>
+        response.resolve(calendars[index]!.value),
+      );
+      await Promise.all([
+        memberResponse.promise,
+        ...calendarResponses.map((response) => response.promise),
+      ]);
+      await Promise.resolve();
+    });
+    expect(
+      queryClient
+        .getQueryData<typeof members>(memberKey)
+        ?.members.some((member) => member.id === "blocked"),
+    ).toBe(false);
+    for (const get of calendarGets) expect(get).toHaveBeenCalledTimes(1);
+    expect(memberGet).toHaveBeenCalledTimes(1);
+    unsubscribe.forEach((stop) => stop());
+  });
+});
+
 describe("conditional notification invalidation", () => {
   it("adds no notification GET for an ordinary leave, but one when exceeded", async () => {
     const notificationsGet = vi.fn(() =>
@@ -345,5 +451,50 @@ describe("conditional notification invalidation", () => {
     exceededDates = ["2026-09-01"];
     await act(() => view.result.current.create.mutateAsync({} as never));
     await waitFor(() => expect(notificationsGet).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("notification summary polling", () => {
+  it("fetches only the unread count endpoint for a badge observer", async () => {
+    const fullGet = vi.fn(() =>
+      Promise.resolve({ notifications: [], unreadCount: 7 }),
+    );
+    const summaryGet = vi.fn(() => Promise.resolve({ unreadCount: 7 }));
+    const { wrapper } = setup({
+      notifications: {
+        $get: fullGet,
+        summary: { $get: summaryGet },
+      },
+    });
+    const view = renderHook(() => useNotificationSummary(), { wrapper });
+    await waitFor(() => expect(view.result.current.isSuccess).toBe(true));
+    expect(view.result.current.data).toEqual({ unreadCount: 7 });
+    expect(summaryGet).toHaveBeenCalledTimes(1);
+    expect(fullGet).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch while the full inbox page owns freshness", async () => {
+    const summaryGet = vi.fn(() => Promise.resolve({ unreadCount: 7 }));
+    const fullGet = vi.fn(() =>
+      Promise.resolve({ notifications: [], unreadCount: 7 }),
+    );
+    const { wrapper } = setup({
+      notifications: {
+        $get: fullGet,
+        summary: { $get: summaryGet },
+      },
+    });
+    const view = renderHook(
+      () => ({
+        summary: useNotificationSummary({ enabled: false }),
+        inboxCache: useNotifications({ enabled: false }),
+      }),
+      { wrapper },
+    );
+    await act(async () => Promise.resolve());
+    expect(view.result.current.summary.fetchStatus).toBe("idle");
+    expect(view.result.current.inboxCache.fetchStatus).toBe("idle");
+    expect(summaryGet).not.toHaveBeenCalled();
+    expect(fullGet).not.toHaveBeenCalled();
   });
 });

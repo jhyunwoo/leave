@@ -45,6 +45,10 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
   assert.equal(initial.status, 200);
   assert.equal(initial.data.completed, false);
   assert.equal(initial.data.profile, null);
+  const initialBootstrap = await req("GET", "/auth/bootstrap", { token });
+  assert.equal(initialBootstrap.status, 200);
+  assert.deepEqual(initialBootstrap.data.onboarding, initial.data);
+  assert.equal(initialBootstrap.data.me, null);
 
   const profile = await req("PUT", "/auth/onboarding/profile", {
     token,
@@ -73,6 +77,10 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
   const me = await req("GET", "/auth/me", { token });
   assert.equal(me.status, 200);
   assert.equal(me.data.user.branch, "air_force");
+  const completedBootstrap = await req("GET", "/auth/bootstrap", { token });
+  assert.equal(completedBootstrap.status, 200);
+  assert.equal(completedBootstrap.data.onboarding.completed, true);
+  assert.deepEqual(completedBootstrap.data.me, me.data);
 
   // 완료 API는 재호출해도 연가를 중복 생성하지 않는다.
   assert.equal(
@@ -107,6 +115,7 @@ test("로그인: 성공/실패", async () => {
 test("/auth/me 는 인증 필요", async () => {
   const noAuth = await req("GET", "/auth/me");
   assert.equal(noAuth.status, 401);
+  assert.equal((await req("GET", "/auth/bootstrap")).status, 401);
 
   const { token } = await signup();
   const me = await req("GET", "/auth/me", { token });

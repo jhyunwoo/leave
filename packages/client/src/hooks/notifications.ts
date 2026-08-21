@@ -7,7 +7,11 @@ import type { NotificationPrefsInput } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
-import type { NotificationList, NotificationPrefs } from "../types";
+import type {
+  NotificationList,
+  NotificationPrefs,
+  NotificationSummary,
+} from "../types";
 import { setAuthoritativeQueryData, useInvalidateKeys } from "./invalidate";
 
 /** 30초마다 새로 받는다. 초과 알림은 늦게 알수록 쓸모가 줄어든다. */
@@ -17,14 +21,35 @@ const NOTIFICATION_PREFS_MUTATION_SCOPE = {
   id: "notification-preferences",
 } as const;
 
-export function useNotifications() {
+export function useNotifications(options: { enabled?: boolean } = {}) {
   const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.notifications,
+    enabled: options.enabled,
     refetchInterval: NOTIFICATION_POLL_MS,
     queryFn: async (context) =>
       unwrap<NotificationList>(
         await client.notifications.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
+  });
+}
+
+/**
+ * 상단 배지는 알림 50건의 제목·본문·날짜가 아니라 안 읽음 수 하나만 필요하다.
+ * 알림함을 열었을 때는 전체 목록 쿼리가 같은 30초 신선도를 맡으므로 끌 수 있다.
+ */
+export function useNotificationSummary(options: { enabled?: boolean } = {}) {
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  return useQuery({
+    queryKey: queryKeys.notificationSummary,
+    enabled: options.enabled,
+    refetchInterval: NOTIFICATION_POLL_MS,
+    queryFn: async (context) =>
+      unwrap<NotificationSummary>(
+        await client.notifications.summary.$get(
           undefined,
           queryRequestOptions(useRequestAbortSignal, context),
         ),

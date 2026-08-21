@@ -4,10 +4,10 @@
  * 사용처: 구성원 목록의 액션 메뉴, 휴가 상세의 신고 버튼.
  */
 import type { BlockCreateInput, ReportCreateInput } from "@leave/shared";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
-import { useInvalidateKeys } from "./invalidate";
+import type { Calendar, Member } from "../types";
 
 /** 신고는 접수만 하면 되므로 캐시를 건드리지 않는다. */
 export function useCreateReport() {
@@ -24,10 +24,43 @@ export function useCreateReport() {
  */
 export function useBlockUser() {
   const { client, unwrap } = useLeaveApi();
-  const invalidate = useInvalidateKeys([queryKeys.allUnitMembers]);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: BlockCreateInput) =>
       unwrap(await client.moderation.blocks.$post({ json: input })),
-    onSuccess: invalidate,
+    onSuccess: async (_data, input) => {
+      // A GET that started before the block can otherwise restore the person
+      // immediately after this local filter. Stop both families first, then
+      // apply exactly the server-side visibility rule without refetching every
+      // mounted calendar month.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.allUnitMembers }),
+        queryClient.cancelQueries({ queryKey: queryKeys.calendars }),
+      ]);
+      queryClient.setQueriesData<{ members: Member[] }>(
+        { queryKey: queryKeys.allUnitMembers },
+        (current) => {
+          if (!current) return current;
+          const members = current.members.filter(
+            (member) => member.id !== input.userId,
+          );
+          return members.length === current.members.length
+            ? current
+            : { ...current, members };
+        },
+      );
+      queryClient.setQueriesData<Calendar>(
+        { queryKey: queryKeys.calendars },
+        (current) => {
+          if (!current) return current;
+          const attendees = current.attendees.filter(
+            (attendee) => attendee.userId !== input.userId,
+          );
+          return attendees.length === current.attendees.length
+            ? current
+            : { ...current, attendees };
+        },
+      );
+    },
   });
 }

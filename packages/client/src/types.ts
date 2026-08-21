@@ -45,6 +45,12 @@ export type NotificationList = InferResponseType<
   200
 >;
 
+/** 상단 배지 폴링용 경량 응답. */
+export type NotificationSummary = InferResponseType<
+  Client["notifications"]["summary"]["$get"],
+  200
+>;
+
 /** 그룹 구성원 한 명. */
 export type Member = InferResponseType<
   Client["units"][":id"]["members"]["$get"],
@@ -65,6 +71,18 @@ export type AuthResponse = InferResponseType<
 
 export type OnboardingStatus = InferResponseType<
   Client["auth"]["onboarding"]["$get"],
+  200
+>;
+
+/** 웹 인증 게이트가 한 왕복으로 받는 온보딩 상태 + 내 정보. */
+export type AuthBootstrap = InferResponseType<
+  Client["auth"]["bootstrap"]["$get"],
+  200
+>;
+
+/** 여러 월 달력의 배치 전송 응답. 각 월은 기존 Calendar와 같은 계약이다. */
+export type CalendarBatch = InferResponseType<
+  Client["units"][":id"]["calendars"]["$get"],
   200
 >;
 

@@ -59,6 +59,20 @@ test("알림을 지우면 목록과 안 읽음 수에서 함께 빠진다", asyn
   );
   // soft delete라 행은 남지만, 안 읽음 수에서는 빠져야 탭 배지가 줄어든다.
   assert.equal(after.data.unreadCount, before - 1);
+  const summary = await req("GET", "/notifications/summary", { token });
+  assert.deepEqual(summary.data, { unreadCount: before - 1 });
+});
+
+test("상단 배지용 요약은 알림 본문 없이 같은 안 읽음 수만 돌려준다", async () => {
+  const { token, list } = await userWithNotification();
+  const summary = await req("GET", "/notifications/summary", { token });
+  assert.equal(summary.status, 200);
+  assert.deepEqual(summary.data, { unreadCount: list.data.unreadCount });
+
+  const read = await req("POST", "/notifications/read", { token });
+  assert.equal(read.status, 200);
+  const afterRead = await req("GET", "/notifications/summary", { token });
+  assert.deepEqual(afterRead.data, { unreadCount: 0 });
 });
 
 test("이미 지운 알림을 다시 지우면 404", async () => {
@@ -96,5 +110,10 @@ test("남의 알림은 지울 수 없고, 존재 여부도 알려주지 않는�
 
 test("알림 삭제에는 인증이 필요하다", async () => {
   const res = await req("DELETE", `/notifications/${crypto.randomUUID()}`);
+  assert.equal(res.status, 401);
+});
+
+test("알림 요약에도 인증이 필요하다", async () => {
+  const res = await req("GET", "/notifications/summary");
   assert.equal(res.status, 401);
 });

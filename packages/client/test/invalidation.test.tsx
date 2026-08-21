@@ -33,6 +33,7 @@ const SEEDED = [
   queryKeys.leaveBalances,
   queryKeys.leaveGrants,
   queryKeys.notifications,
+  queryKeys.notificationSummary,
   queryKeys.calendar("unit-1", "2026-09"),
   queryKeys.calendar("unit-1", "2026-10"),
   queryKeys.calendar("unit-1", "2026-11"),
@@ -117,6 +118,9 @@ describe("휴가 등록", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(staleKeys(queryClient)).toContain(
       JSON.stringify(queryKeys.notifications),
+    );
+    expect(staleKeys(queryClient)).toContain(
+      JSON.stringify(queryKeys.notificationSummary),
     );
   });
 

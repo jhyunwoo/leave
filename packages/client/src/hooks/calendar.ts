@@ -4,26 +4,243 @@
  * 사용처: 웹 CalendarPage, 네이티브 캘린더 탭, 휴가 등록 폼(혼잡도 시뮬레이션).
  */
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { queryRequestOptions, useLeaveApi } from "../context";
+import {
+  queryRequestOptions,
+  useLeaveApi,
+  type LeaveApiAdapter,
+} from "../context";
 import { queryKeys } from "../query-keys";
-import type { Calendar, CalendarDay } from "../types";
+import type { Calendar, CalendarBatch, CalendarDay } from "../types";
+
+type PendingCalendar = {
+  month: string;
+  signal: AbortSignal | undefined;
+  aborted: boolean;
+  onAbort: (() => void) | undefined;
+  group: PendingCalendar[] | undefined;
+  controller: AbortController | undefined;
+  resolve: (calendar: Calendar) => void;
+  reject: (reason: unknown) => void;
+};
+
+type CalendarQueue = {
+  pending: PendingCalendar[];
+  scheduled: boolean;
+};
+
+/** 어댑터(=앱 인스턴스)·부대별로 같은 마이크로태스크의 월 요청만 합친다. */
+const calendarQueues = new WeakMap<
+  LeaveApiAdapter,
+  Map<string, CalendarQueue>
+>();
+
+/**
+ * 취소 사유를 reject에 실어 보낼 Error로 맞춘다.
+ *
+ * AbortSignal.reason은 보통 DOMException("AbortError")이라 그대로 통과한다.
+ * 비-Error 사유(문자열 등)를 그대로 reject하면 스택도 name도 없는 값이 오류
+ * 경로를 타므로, 사유를 cause에 남긴 Error로 감싼다.
+ */
+function abortReason(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason;
+  if (reason instanceof Error) return reason;
+  if (reason == null) return new Error("달력 요청이 취소되었습니다");
+  return new Error("달력 요청이 취소되었습니다", { cause: reason });
+}
+
+function calendarMonthIndex(month: string): number {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return year! * 12 + monthNumber! - 1;
+}
+
+/** API 계약(중복 없는 최대 9개월·9개월 범위)을 넘지 않게 전송 묶음을 나눈다. */
+function calendarRequestGroups(
+  pending: PendingCalendar[],
+): PendingCalendar[][] {
+  const sorted = [...pending].sort((left, right) =>
+    left.month.localeCompare(right.month),
+  );
+  const groups: PendingCalendar[][] = [];
+  let group: PendingCalendar[] = [];
+  let firstMonthIndex = 0;
+  let uniqueMonths = new Set<string>();
+
+  for (const request of sorted) {
+    const monthIndex = calendarMonthIndex(request.month);
+    const isNewMonth = !uniqueMonths.has(request.month);
+    if (
+      group.length > 0 &&
+      isNewMonth &&
+      (uniqueMonths.size === 9 || monthIndex - firstMonthIndex > 8)
+    ) {
+      groups.push(group);
+      group = [];
+      uniqueMonths = new Set();
+    }
+    if (group.length === 0) firstMonthIndex = monthIndex;
+    group.push(request);
+    uniqueMonths.add(request.month);
+  }
+  if (group.length > 0) groups.push(group);
+  return groups;
+}
+
+async function fetchCalendarGroup(
+  adapter: LeaveApiAdapter,
+  unitId: string,
+  pending: PendingCalendar[],
+): Promise<void> {
+  const controller = new AbortController();
+  for (const request of pending) {
+    request.group = pending;
+    request.controller = controller;
+  }
+  const requestOptions = adapter.useRequestAbortSignal
+    ? { init: { signal: controller.signal } }
+    : undefined;
+
+  try {
+    const months = [...new Set(pending.map((request) => request.month))];
+    if (months.length === 1) {
+      const month = months[0]!;
+      const calendar = await adapter.unwrap<Calendar>(
+        await adapter.client.units[":id"].calendar.$get(
+          {
+            param: { id: unitId },
+            query: { month },
+          },
+          requestOptions,
+        ),
+      );
+      for (const request of pending) {
+        if (!request.aborted) request.resolve(calendar);
+      }
+      return;
+    }
+
+    const batch = await adapter.unwrap<CalendarBatch>(
+      await adapter.client.units[":id"].calendars.$get(
+        {
+          param: { id: unitId },
+          query: { months: months.join(",") },
+        },
+        requestOptions,
+      ),
+    );
+    const byMonth = new Map(
+      batch.calendars.map((calendar) => [calendar.month, calendar] as const),
+    );
+    for (const request of pending) {
+      if (request.aborted) continue;
+      const calendar = byMonth.get(request.month);
+      if (calendar) {
+        request.resolve(calendar);
+      } else {
+        request.reject(
+          new Error(`달력 배치 응답에 ${request.month} 데이터가 없습니다`),
+        );
+      }
+    }
+  } catch (error) {
+    for (const request of pending) {
+      if (!request.aborted) request.reject(error);
+    }
+  } finally {
+    for (const request of pending) {
+      if (request.signal && request.onAbort) {
+        request.signal.removeEventListener("abort", request.onAbort);
+      }
+    }
+  }
+}
+
+async function flushCalendarQueue(
+  adapter: LeaveApiAdapter,
+  unitId: string,
+  queue: CalendarQueue,
+): Promise<void> {
+  calendarQueues.get(adapter)?.delete(unitId);
+  const pending = queue.pending.filter((request) => !request.aborted);
+  await Promise.all(
+    calendarRequestGroups(pending).map((group) =>
+      fetchCalendarGroup(adapter, unitId, group),
+    ),
+  );
+}
+
+function enqueueCalendar(
+  adapter: LeaveApiAdapter,
+  unitId: string,
+  month: string,
+  context: { readonly signal: AbortSignal },
+): Promise<Calendar> {
+  if (!adapter.batchCalendarRequests) {
+    return adapter.client.units[":id"].calendar
+      .$get(
+        { param: { id: unitId }, query: { month } },
+        queryRequestOptions(adapter.useRequestAbortSignal, context),
+      )
+      .then((response) => adapter.unwrap<Calendar>(response));
+  }
+
+  const signal = adapter.useRequestAbortSignal ? context.signal : undefined;
+  if (signal?.aborted) return Promise.reject(abortReason(signal));
+
+  let byUnit = calendarQueues.get(adapter);
+  if (!byUnit) {
+    byUnit = new Map();
+    calendarQueues.set(adapter, byUnit);
+  }
+  let queue = byUnit.get(unitId);
+  if (!queue) {
+    queue = { pending: [], scheduled: false };
+    byUnit.set(unitId, queue);
+  }
+  const activeQueue = queue;
+
+  const promise = new Promise<Calendar>((resolve, reject) => {
+    const request: PendingCalendar = {
+      month,
+      signal,
+      aborted: false,
+      onAbort: undefined,
+      group: undefined,
+      controller: undefined,
+      resolve,
+      reject,
+    };
+    if (signal) {
+      request.onAbort = () => {
+        request.aborted = true;
+        reject(abortReason(signal));
+        if (
+          request.controller &&
+          request.group?.every((pending) => pending.aborted)
+        ) {
+          request.controller.abort(abortReason(signal));
+        }
+      };
+      signal.addEventListener("abort", request.onAbort, { once: true });
+    }
+    activeQueue.pending.push(request);
+  });
+
+  if (!activeQueue.scheduled) {
+    activeQueue.scheduled = true;
+    queueMicrotask(() => {
+      void flushCalendarQueue(adapter, unitId, activeQueue);
+    });
+  }
+  return promise;
+}
 
 /** 한 달치 달력(일별 출타 통계 + 그 달에 걸친 휴가들). */
 export function useCalendar(unitId: string | null, month: string) {
-  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  const adapter = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.calendar(unitId, month),
     enabled: unitId !== null,
-    queryFn: async (context) =>
-      unwrap<Calendar>(
-        await client.units[":id"].calendar.$get(
-          {
-            param: { id: unitId! },
-            query: { month },
-          },
-          queryRequestOptions(useRequestAbortSignal, context),
-        ),
-      ),
+    queryFn: (context) => enqueueCalendar(adapter, unitId!, month, context),
   });
 }
 
@@ -37,21 +254,12 @@ export function useCalendar(unitId: string | null, month: string) {
  * 다시 요청하지 않는다.
  */
 export function useCalendarDays(unitId: string | null, months: string[]) {
-  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  const adapter = useLeaveApi();
   return useQueries({
     queries: months.map((month) => ({
       queryKey: queryKeys.calendar(unitId, month),
       enabled: unitId !== null,
-      queryFn: async (context) =>
-        unwrap<Calendar>(
-          await client.units[":id"].calendar.$get(
-            {
-              param: { id: unitId! },
-              query: { month },
-            },
-            queryRequestOptions(useRequestAbortSignal, context),
-          ),
-        ),
+      queryFn: (context) => enqueueCalendar(adapter, unitId!, month, context),
     })),
     // combine은 결과가 실제로 바뀔 때만 다시 도는 React Query 내장 메모이제이션이다.
     // 바깥에서 useMemo로 감싸면 매 렌더 새 배열이 들어와 메모가 무력화된다.

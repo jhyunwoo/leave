@@ -58,16 +58,28 @@ function blockedUserIdsQuery(db: Db, viewerId: string) {
     .where(eq(userBlocks.userId, viewerId));
 }
 
-export async function buildCalendarPayload(input: {
+export async function buildCalendarPayloads(input: {
   db: Db;
   unitId: string;
   /** 이 응답을 받아 볼 사람. 내 일정 노출과 차단 반영의 기준이 된다. */
   viewerId: string;
-  /** YYYY-MM */
-  month: string;
+  /** 중복 없는 YYYY-MM 목록. API에서 최대 9개월·연속 9개월 범위로 제한한다. */
+  months: string[];
 }) {
-  const { db, unitId, viewerId, month } = input;
-  const { start, end } = monthBounds(month);
+  const { db, unitId, viewerId, months } = input;
+  if (months.length === 0) return [];
+  const monthRanges = months.map((month) => ({
+    month,
+    ...monthBounds(month),
+  }));
+  const rangeStart = monthRanges.reduce(
+    (earliest, range) => (range.start < earliest ? range.start : earliest),
+    monthRanges[0]!.start,
+  );
+  const rangeEnd = monthRanges.reduce(
+    (latest, range) => (range.end > latest ? range.end : latest),
+    monthRanges[0]!.end,
+  );
 
   /*
    * 다섯 조회는 서로를 기다릴 이유가 없다(모두 unitId·viewerId·기간만 있으면 된다).
@@ -83,7 +95,8 @@ export async function buildCalendarPayload(input: {
       .from(users)
       .where(eq(users.unitId, unitId))
       .orderBy(asc(users.name)),
-    // 이 달에 하루라도 걸치는 휴가만 가져온다(시작<=말일 && 종료>=1일).
+    // 요청 달 범위에 하루라도 걸치는 휴가만 가져온다. 개별 달 응답은 아래에서
+    // 다시 좁힌다. 연속 9개월 제한 덕분에 멀리 떨어진 두 달 사이를 통째로 읽지 않는다.
     db
       .select(leaveColumns)
       .from(leaves)
@@ -91,8 +104,8 @@ export async function buildCalendarPayload(input: {
       .where(
         and(
           eq(users.unitId, unitId),
-          lte(leaves.startDate, end),
-          gte(leaves.endDate, start),
+          lte(leaves.startDate, rangeEnd),
+          gte(leaves.endDate, rangeStart),
         ),
       )
       .orderBy(asc(leaves.startDate)),
@@ -107,8 +120,8 @@ export async function buildCalendarPayload(input: {
       .where(
         and(
           eq(unitBlackouts.unitId, unitId),
-          lte(unitBlackouts.startDate, end),
-          gte(unitBlackouts.endDate, start),
+          lte(unitBlackouts.startDate, rangeEnd),
+          gte(unitBlackouts.endDate, rangeStart),
         ),
       )
       .orderBy(asc(unitBlackouts.startDate)),
@@ -118,83 +131,109 @@ export async function buildCalendarPayload(input: {
   const unit = unitRows[0];
   if (!unit) return null;
 
-  const isBlocked = (date: string) =>
-    blackouts.some((b) => b.startDate <= date && date <= b.endDate);
-
-  const days = computeDayStats({
-    // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
-    leaves: rows
-      .filter((l) => isCountedLeaveStatus(l.status))
-      .map((l) => ({
-        userId: l.userId,
-        startDate: l.startDate,
-        endDate: l.endDate,
-      })),
-    maxCount: unit.maxLeaveCount,
-    rangeStart: start,
-    rangeEnd: end,
-    returnDayCounts: unit.returnDayCounts,
-  }).map((day) => ({
-    date: day.date,
-    count: day.count,
-    allowed: day.allowed,
-    exceeded: day.exceeded,
-    blocked: isBlocked(day.date),
-  }));
-
-  // 집계에 들어가는 상태만 이름과 함께 공개한다. 초안은 본인 것이라도 명단에 넣지 않는다.
-  const sharedRows = rows.filter((row) => isCountedLeaveStatus(row.status));
-  const ownRows = rows.filter((row) => row.userId === viewerId);
   // 구간도 같은 조인으로 읽는다 — 휴가 id 목록을 IN(...)에 넣던 조회는 이 달의
   // 휴가가 100건을 넘는 순간(부대원 80명이면 흔하다) 파라미터 상한에 걸렸다.
   const segmentMap = await segmentsOfUnitDuring(db, {
     unitId,
-    start,
-    end,
+    start: rangeStart,
+    end: rangeEnd,
     viewerId,
   });
 
-  // 내 일정만 제목·사유·초안까지 담아 돌려준다.
-  const calendarLeaves = ownRows.map((l) => ({
-    id: l.id,
-    title: l.title,
-    startDate: l.startDate,
-    endDate: l.endDate,
-    reason: l.reason,
-    status: l.status,
-    segments: segmentMap.get(l.id) ?? [],
-  }));
-
-  // 차단은 이 명단에서만 숨긴다. days 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
   const blocked = new Set(blockedRows.map((row) => row.id));
   const memberById = new Map(
     members.map((m) => [m.id, serializeMember(m)] as const),
   );
-  const attendees = sharedRows.flatMap((l) => {
-    const member = memberById.get(l.userId);
-    if (!member || blocked.has(l.userId)) return [];
-    return [
-      {
-        leaveId: l.id,
-        userId: l.userId,
-        name: member.name,
-        rankLabel: member.rankLabel,
-        startDate: l.startDate,
-        endDate: l.endDate,
-        status: l.status,
-        segments: segmentMap.get(l.id) ?? [],
-      },
-    ];
-  });
+  const serializedUnit = serializeUnit(unit, members.length);
 
-  return {
-    month,
-    unit: serializeUnit(unit, members.length),
-    days,
-    leaves: calendarLeaves,
-    attendees,
-    blackouts,
-  };
+  return monthRanges.map(({ month, start, end }) => {
+    const monthRows = rows.filter(
+      (row) => row.startDate <= end && row.endDate >= start,
+    );
+    const monthBlackouts = blackouts.filter(
+      (blackout) => blackout.startDate <= end && blackout.endDate >= start,
+    );
+    const isBlocked = (date: string) =>
+      monthBlackouts.some(
+        (blackout) => blackout.startDate <= date && date <= blackout.endDate,
+      );
+    const sharedRows = monthRows.filter((row) =>
+      isCountedLeaveStatus(row.status),
+    );
+
+    const days = computeDayStats({
+      // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
+      leaves: sharedRows.map((leave) => ({
+        userId: leave.userId,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+      })),
+      maxCount: unit.maxLeaveCount,
+      rangeStart: start,
+      rangeEnd: end,
+      returnDayCounts: unit.returnDayCounts,
+    }).map((day) => ({
+      date: day.date,
+      count: day.count,
+      allowed: day.allowed,
+      exceeded: day.exceeded,
+      blocked: isBlocked(day.date),
+    }));
+
+    // 내 일정만 제목·사유·초안까지 담아 돌려준다.
+    const calendarLeaves = monthRows
+      .filter((row) => row.userId === viewerId)
+      .map((leave) => ({
+        id: leave.id,
+        title: leave.title,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        reason: leave.reason,
+        status: leave.status,
+        segments: segmentMap.get(leave.id) ?? [],
+      }));
+
+    // 차단은 이 명단에서만 숨긴다. days 집계에서 빼면 사람마다 다른 숫자를 보게 된다.
+    const attendees = sharedRows.flatMap((leave) => {
+      const member = memberById.get(leave.userId);
+      if (!member || blocked.has(leave.userId)) return [];
+      return [
+        {
+          leaveId: leave.id,
+          userId: leave.userId,
+          name: member.name,
+          rankLabel: member.rankLabel,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          status: leave.status,
+          segments: segmentMap.get(leave.id) ?? [],
+        },
+      ];
+    });
+
+    return {
+      month,
+      unit: serializedUnit,
+      days,
+      leaves: calendarLeaves,
+      attendees,
+      blackouts: monthBlackouts,
+    };
+  });
+}
+
+/** 기존 단일 월 계약. 배치 조립기와 같은 경로를 타서 응답 의미가 어긋나지 않는다. */
+export async function buildCalendarPayload(input: {
+  db: Db;
+  unitId: string;
+  viewerId: string;
+  month: string;
+}) {
+  const payloads = await buildCalendarPayloads({
+    ...input,
+    months: [input.month],
+  });
+  return payloads?.[0] ?? null;
 }
 
 /** 구성원 목록(차단한 사람 제외). 출타 집계에서는 빼지 않는다. */

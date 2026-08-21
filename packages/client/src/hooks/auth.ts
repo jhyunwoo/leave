@@ -19,7 +19,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
 import { useInvalidateKeys } from "./invalidate";
 import { queryKeys } from "../query-keys";
-import type { AuthResponse, Me, OnboardingStatus } from "../types";
+import type {
+  AuthBootstrap,
+  AuthResponse,
+  Me,
+  OnboardingStatus,
+} from "../types";
 
 /** 401 응답은 다시 물어봐도 답이 달라지지 않으므로 재시도하지 않는다. */
 function retryUnlessUnauthorized(failureCount: number, error: Error): boolean {
@@ -56,6 +61,31 @@ export function useOnboardingStatus(enabled = true) {
           queryRequestOptions(useRequestAbortSignal, context),
         ),
       ),
+  });
+}
+
+/**
+ * 웹 인증 게이트 전용. 온보딩과 내 정보를 한 GET으로 받아 기존 두 캐시 키에
+ * 나눠 심는다. 화면과 뮤테이션은 계속 기존 키를 보므로 무효화 범위가 달라지지 않는다.
+ */
+export function useAuthBootstrap(enabled = true) {
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: queryKeys.onboarding,
+    enabled,
+    retry: retryUnlessUnauthorized,
+    queryFn: async (context) => {
+      const bootstrap = unwrap<AuthBootstrap>(
+        await client.auth.bootstrap.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      );
+      const data = await bootstrap;
+      if (data.me) queryClient.setQueryData(queryKeys.me, data.me);
+      return data.onboarding;
+    },
   });
 }
 

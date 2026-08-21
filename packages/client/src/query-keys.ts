@@ -38,6 +38,8 @@ export const queryKeys = {
 
   /** 알림함. */
   notifications: ["notifications"] as const,
+  /** 상단 배지용 경량 안 읽음 수. 알림함 접두사 아래라 같은 변경에 함께 무효화된다. */
+  notificationSummary: ["notifications", "summary"] as const,
   /** 알림 수신 설정. */
   notificationPrefs: ["notificationPrefs"] as const,
 };
