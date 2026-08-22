@@ -19,10 +19,15 @@ export default function CalendarStackLayout() {
       <Stack.Screen name="index" options={{ title: "부대 달력" }} />
       <Stack.Screen name="friend-calendar" options={{ title: "친구 달력" }} />
       <Stack.Screen name="personal-events" options={{ title: "개인 일정" }} />
+      {/*
+        시트 안쪽은 `SheetScaffold`가 제목과 닫기 버튼을 직접 그린다. 여기서
+        네이티브 헤더까지 띄우면(스택 기본값 `headerShown` + `headerTransparent`)
+        투명 헤더가 그 위에 겹쳐, 시트 제목과 닫기 버튼을 가린다.
+      */}
       <Stack.Screen
         name="personal-event"
         options={{
-          title: "개인 일정 편집",
+          headerShown: false,
           presentation: "formSheet",
           sheetAllowedDetents: [0.75, 1],
           sheetGrabberVisible: true,

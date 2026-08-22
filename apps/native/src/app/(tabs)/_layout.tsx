@@ -24,9 +24,10 @@ export default function TabLayout() {
   return (
     <NativeTabs
       tintColor={colors.brand}
-      minimizeBehavior={
-        process.env.EXPO_OS === "ios" ? "onScrollDown" : undefined
-      }
+      // iOS 26의 탭바 축소를 끈다. 스크롤할 때 탭바가 왼쪽 알약으로 접히면
+      // 탭 이름이 사라져 지금 어디에 있는지, 어디로 갈 수 있는지가 함께 사라진다.
+      // 달력·목록처럼 계속 스크롤하는 화면이 대부분이라 접힌 상태가 기본이 된다.
+      minimizeBehavior={process.env.EXPO_OS === "ios" ? "never" : undefined}
       sidebarAdaptable={process.env.EXPO_OS === "ios" ? true : undefined}
     >
       <NativeTabs.Trigger name="(calendar)">
