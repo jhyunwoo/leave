@@ -11,6 +11,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useLeaveForm } from "../src/forms/use-leave-form";
+import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
 type BalanceFixture = {
@@ -18,6 +19,7 @@ type BalanceFixture = {
   totalDays: number;
   usedDays: number;
   remainingDays: number;
+  remainingAsOfTodayDays: number;
 };
 
 /** 연가 5일만 남은 사용자. 그룹은 없어 달력 조회가 일어나지 않는다. */
@@ -29,7 +31,13 @@ function setup(
     }),
   ),
   balanceItems: BalanceFixture[] = [
-    { key: "annual", totalDays: 5, usedDays: 0, remainingDays: 5 },
+    {
+      key: "annual",
+      totalDays: 5,
+      usedDays: 0,
+      remainingDays: 5,
+      remainingAsOfTodayDays: 5,
+    },
   ],
   getBalances = () =>
     Promise.resolve({ balances: balanceItems, regularOvernight: null }),
@@ -58,6 +66,7 @@ function setup(
   });
   return {
     createLeave,
+    queryClient,
     wrapper: wrapperFor(queryClient, adapter),
   };
 }
@@ -76,21 +85,81 @@ async function renderForm(wrapper: ReturnType<typeof setup>["wrapper"]) {
 }
 
 describe("기본 휴가 종류", () => {
-  it("등록할 때 실제 잔여가 가장 많은 종류를 선택한다", async () => {
+  it("등록할 때 아직 실제로 쓰지 않은 잔여가 가장 많은 종류를 선택한다", async () => {
     const { wrapper } = setup(undefined, [
-      // 총 보유량보다 지금 쓸 수 있는 잔여량을 기준으로 고른다.
-      { key: "annual", totalDays: 20, usedDays: 18, remainingDays: 2 },
-      { key: "award", totalDays: 10, usedDays: 3, remainingDays: 7 },
+      // 미래 계획은 아직 사용한 휴가가 아니므로 오늘까지 실제 사용한 양만 뺀다.
+      {
+        key: "annual",
+        totalDays: 20,
+        usedDays: 20,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 8,
+      },
+      {
+        key: "award",
+        totalDays: 10,
+        usedDays: 3,
+        remainingDays: 7,
+        remainingAsOfTodayDays: 7,
+      },
       {
         key: "consolation",
         totalDays: 6,
         usedDays: 1,
         remainingDays: 5,
+        remainingAsOfTodayDays: 5,
       },
     ]);
     const { result } = await renderForm(wrapper);
 
-    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("award"));
+    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("annual"));
+  });
+
+  it("취소 직후 최신 잔여가 도착하면 기본 종류를 다시 선택한다", async () => {
+    const { wrapper, queryClient } = setup(undefined, [
+      {
+        key: "annual",
+        totalDays: 8,
+        usedDays: 0,
+        remainingDays: 8,
+        remainingAsOfTodayDays: 8,
+      },
+      {
+        key: "regular_overnight",
+        totalDays: 4,
+        usedDays: 4,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 0,
+      },
+    ]);
+    const { result } = await renderForm(wrapper);
+    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("annual"));
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.leaveBalances, {
+        balances: [
+          {
+            key: "annual",
+            totalDays: 8,
+            usedDays: 8,
+            remainingDays: 0,
+            remainingAsOfTodayDays: 0,
+          },
+          {
+            key: "regular_overnight",
+            totalDays: 4,
+            usedDays: 0,
+            remainingDays: 4,
+            remainingAsOfTodayDays: 4,
+          },
+        ],
+        regularOvernight: null,
+      });
+    });
+
+    await waitFor(() =>
+      expect(result.current.drafts[0]?.key).toBe("regular_overnight"),
+    );
   });
 
   it("잔여를 불러오는 동안 사용자가 고른 종류는 덮어쓰지 않는다", async () => {
@@ -115,8 +184,20 @@ describe("기본 휴가 종류", () => {
     await act(async () => {
       resolveBalances({
         balances: [
-          { key: "annual", totalDays: 2, usedDays: 0, remainingDays: 2 },
-          { key: "award", totalDays: 8, usedDays: 0, remainingDays: 8 },
+          {
+            key: "annual",
+            totalDays: 2,
+            usedDays: 0,
+            remainingDays: 2,
+            remainingAsOfTodayDays: 2,
+          },
+          {
+            key: "award",
+            totalDays: 8,
+            usedDays: 0,
+            remainingDays: 8,
+            remainingAsOfTodayDays: 8,
+          },
         ],
         regularOvernight: null,
       });

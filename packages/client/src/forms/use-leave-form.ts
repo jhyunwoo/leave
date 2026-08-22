@@ -95,14 +95,15 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const create = useCreateLeave();
   const update = useUpdateLeave();
 
-  /** 등록할 때는 실제 잔여가 가장 많은 재원을 먼저 제안한다. 동률이면 API 순서를 따른다. */
+  /** 등록할 때는 오늘까지 실제로 쓰고 남은 재원을 먼저 제안한다. 동률이면 API 순서를 따른다. */
   const preferredBalanceKey = useMemo<BalanceKey | undefined>(
     () =>
       balances.data?.balances.reduce<
         (typeof balances.data.balances)[number] | undefined
       >(
         (preferred, item) =>
-          !preferred || item.remainingDays > preferred.remainingDays
+          !preferred ||
+          item.remainingAsOfTodayDays > preferred.remainingAsOfTodayDays
             ? item
             : preferred,
         undefined,
@@ -131,13 +132,12 @@ export function useLeaveForm(options: LeaveFormOptions) {
         ),
   );
   const [error, setError] = useState<string | null>(null);
-  // 잔여 조회는 폼보다 늦게 끝날 수 있다. 한 번 기본값을 적용했거나 사용자가 구간을
-  // 건드렸다면 백그라운드 재조회 결과로 현재 선택을 덮어쓰지 않는다.
-  const preferredBalanceHandled = useRef(Boolean(editing));
+  // 잔여 조회는 폼보다 늦게 끝날 수 있고, 취소 직후에는 이전 캐시가 먼저 보일 수도 있다.
+  // 사용자가 직접 종류를 고르기 전까지는 최신 잔여로 기본값을 계속 바로잡는다.
+  const balanceSelectionTouched = useRef(Boolean(editing));
 
   useEffect(() => {
-    if (preferredBalanceHandled.current || !preferredBalanceKey) return;
-    preferredBalanceHandled.current = true;
+    if (balanceSelectionTouched.current || !preferredBalanceKey) return;
     setDraftState((current) =>
       current.map((draft, index) =>
         index === 0 ? { ...draft, key: preferredBalanceKey } : draft,
@@ -147,7 +147,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
 
   /** 화면에서 구간을 직접 바꾸는 순간부터는 사용자의 선택을 우선한다. */
   const setDrafts = (next: SetStateAction<SegmentDraft[]>) => {
-    preferredBalanceHandled.current = true;
+    balanceSelectionTouched.current = true;
     setDraftState(next);
   };
 
