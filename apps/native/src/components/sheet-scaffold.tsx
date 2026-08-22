@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,21 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { layout, makeStyles, spacing } from "@/theme";
 import { Button } from "./button";
+
+const HEADER_MIN_HEIGHT = 58;
+
+/**
+ * 바텀시트 위쪽 드래그 인디케이터가 차지하는 높이.
+ *
+ * 이만큼을 헤더 '안쪽' 여백으로 잡아야 헤더 배경이 시트 맨 위 둥근 모서리까지
+ * 이어진다. 바깥 여백으로 잡으면 그 틈으로 시스템 시트 배경이 비쳐, 콘텐츠가
+ * 시트 위에 얹힌 직각 카드처럼 보인다(아이폰 기본 시트와 이질감이 나는 원인).
+ * `FormSheet`(RN `Modal` pageSheet)에는 인디케이터가 없으므로 넘기지 않는다.
+ *
+ * iOS에서만 0이 아니다. 안드로이드(Material `ModalBottomSheet`)와 웹 구현은
+ * 드래그 핸들 자리를 시트 쪽에서 이미 비워두므로 여기서 또 비우면 두 번 벌어진다.
+ */
+export const SHEET_GRABBER_INSET = Platform.OS === "ios" ? 16 : 0;
 
 /**
  * 네이티브 바텀시트 안의 RN 콘텐츠를 Apple 폼 시트 구조로 정렬한다.
@@ -34,14 +50,25 @@ export function SheetScaffold(props: {
   contentContainerStyle?: StyleProp<ViewStyle>;
   /** 본문 최대 폭. 기본은 폼 한 벌 기준. 두 열을 쓰는 폼만 넓힌다. */
   contentMaxWidth?: number;
+  /** 헤더 위에 더 둘 여백. 바텀시트에서 드래그 인디케이터 자리를 비울 때 쓴다. */
+  headerTopInset?: number;
 }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const maxWidth = props.contentMaxWidth ?? layout.formContent;
+  const headerTopInset = props.headerTopInset ?? 0;
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          headerTopInset > 0 && {
+            paddingTop: headerTopInset,
+            minHeight: HEADER_MIN_HEIGHT + headerTopInset,
+          },
+        ]}
+      >
         <Text style={styles.title} selectable>
           {props.title}
         </Text>
@@ -88,7 +115,7 @@ export function SheetScaffold(props: {
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.canvasSoft },
   header: {
-    minHeight: 58,
+    minHeight: HEADER_MIN_HEIGHT,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
     alignItems: "center",

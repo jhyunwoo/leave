@@ -15,7 +15,6 @@
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui";
 import {
   frame,
-  padding,
   presentationDetents,
   presentationDragIndicator,
   type ModifierConfig,
@@ -42,9 +41,13 @@ export function NativeBottomSheet(props: {
   children: ReactElement;
 }) {
   const snapPoints = props.snapPoints ?? [];
+  // 여백을 SwiftUI 쪽에 두지 않는다. Group에 padding을 걸면 RN 트리가 시트보다
+  // 작아지고, 시트가 깎아주는 둥근 모서리 대신 직각 사각형이 시트 안에 얹힌 꼴이
+  // 된다. 그 틈으로 시스템 시트 배경이 비쳐 콘텐츠와 시트가 따로 노는 것처럼 보인다.
+  // 대신 RN 콘텐츠가 시트를 가득 채우게 두고(시트가 모서리를 알아서 클리핑한다),
+  // 드래그 인디케이터 자리는 콘텐츠 '안쪽' 여백(SHEET_GRABBER_INSET)으로 잡는다.
   const modifiers: ModifierConfig[] = [
     frame({ maxWidth: Infinity, alignment: "topLeading" }),
-    padding({ top: 16, leading: 16, trailing: 16 }),
     presentationDragIndicator("visible"),
   ];
   if (snapPoints.length > 0) {
