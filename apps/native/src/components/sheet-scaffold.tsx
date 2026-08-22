@@ -3,21 +3,13 @@
  * 사용처: FormSheet를 쓰는 모든 시트.
  */
 
+import type { ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import {
-  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  type KeyboardEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -50,39 +42,6 @@ export const SHEET_GRABBER_INSET = Platform.OS === "ios" ? 16 : 0;
 export const SHEET_EXTENDS_UNDER_BOTTOM_INSET = Platform.OS === "ios";
 
 /**
- * 키보드가 푸터를 덮는 높이.
- *
- * `KeyboardAvoidingView`로는 시트에서 정확히 맞출 수 없다 — 그 컴포넌트는 자기
- * 레이아웃 좌표(부모 기준)와 키보드의 화면 좌표를 그대로 빼기 때문에, 화면 위쪽에서
- * 시작하는 시트에서는 시트 상단 오프셋만큼 덜 밀어 올린다. 그래서 푸터가 실제로
- * 화면 어디에 있는지를 재서 겹치는 만큼만 비운다. 이미 컨테이너가 줄어드는
- * 화면(KeyboardAvoidingView로 감싼 시트, 안드로이드 adjustResize)에서는 겹침이
- * 0으로 나와 아무 일도 하지 않는다.
- */
-function useKeyboardOverlap(footerBottom: number | null) {
-  const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
-
-  useEffect(() => {
-    const ios = Platform.OS === "ios";
-    const onChange = (event: KeyboardEvent) =>
-      setKeyboardTop(event.endCoordinates.screenY);
-    const subscriptions = [
-      Keyboard.addListener(
-        ios ? "keyboardWillChangeFrame" : "keyboardDidChangeFrame",
-        onChange,
-      ),
-      Keyboard.addListener(ios ? "keyboardWillHide" : "keyboardDidHide", () =>
-        setKeyboardTop(null),
-      ),
-    ];
-    return () => subscriptions.forEach((subscription) => subscription.remove());
-  }, []);
-
-  if (keyboardTop === null || footerBottom === null) return 0;
-  return Math.max(0, footerBottom - keyboardTop);
-}
-
-/**
  * 네이티브 바텀시트 안의 RN 콘텐츠를 Apple 폼 시트 구조로 정렬한다.
  * 헤더와 저장 버튼은 고정하고, 입력 영역만 스크롤되게 해 시트가 커져도
  * 주요 동작의 의미와 위치가 바뀌지 않는다.
@@ -92,13 +51,8 @@ function useKeyboardOverlap(footerBottom: number | null) {
  * 화면이 이 상한보다 좁아 아무 일도 일어나지 않는다.
  */
 export function SheetScaffold(props: {
-  /**
-   * 시트 안쪽에 직접 그릴 제목. 시트 크롬을 네이티브 내비게이션 바가 맡는
-   * 화면(expo-router `presentation: "formSheet"`)에서는 넘기지 않는다 — RN 헤더와
-   * 시스템 바가 같은 자리를 두고 다투면 입력칸이 제목·닫기를 덮는다.
-   */
-  title?: string;
-  onClose?: () => void;
+  title: string;
+  onClose: () => void;
   closeTestID?: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -119,53 +73,34 @@ export function SheetScaffold(props: {
 }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const footerRef = useRef<View>(null);
-  // 푸터 아래쪽 여백이 늘어도 푸터의 '바닥'은 시트 바닥에 붙어 그대로다.
-  // 그래서 이 값은 한 번 자리를 잡으면 키보드가 오르내려도 흔들리지 않는다.
-  const [footerBottom, setFooterBottom] = useState<number | null>(null);
-  const measureFooter = useCallback(() => {
-    footerRef.current?.measureInWindow((_x, y, _width, height) => {
-      const bottom = y + height;
-      setFooterBottom((previous) =>
-        previous !== null && Math.abs(previous - bottom) < 1
-          ? previous
-          : bottom,
-      );
-    });
-  }, []);
-  const keyboardOverlap = useKeyboardOverlap(footerBottom);
   const maxWidth = props.contentMaxWidth ?? layout.formContent;
   const headerTopInset = props.headerTopInset ?? 0;
   const contentBottomInset =
     props.extendsUnderBottomInset && !props.footer ? insets.bottom : 0;
 
-  const onClose = props.onClose;
-
   return (
     <View style={styles.root}>
-      {props.title !== undefined && onClose ? (
-        <View
-          style={[
-            styles.header,
-            headerTopInset > 0 && {
-              paddingTop: headerTopInset,
-              minHeight: HEADER_MIN_HEIGHT + headerTopInset,
-            },
-          ]}
-        >
-          <Text style={styles.title} selectable>
-            {props.title}
-          </Text>
-          <Button
-            title="닫기"
-            variant="ghost"
-            size="sm"
-            onPress={onClose}
-            style={styles.closeButton}
-            testID={props.closeTestID}
-          />
-        </View>
-      ) : null}
+      <View
+        style={[
+          styles.header,
+          headerTopInset > 0 && {
+            paddingTop: headerTopInset,
+            minHeight: HEADER_MIN_HEIGHT + headerTopInset,
+          },
+        ]}
+      >
+        <Text style={styles.title} selectable>
+          {props.title}
+        </Text>
+        <Button
+          title="닫기"
+          variant="ghost"
+          size="sm"
+          onPress={props.onClose}
+          style={styles.closeButton}
+          testID={props.closeTestID}
+        />
+      </View>
 
       <ScrollView
         style={styles.scroll}
@@ -186,17 +121,9 @@ export function SheetScaffold(props: {
 
       {props.footer ? (
         <View
-          ref={footerRef}
-          onLayout={measureFooter}
           style={[
             styles.footer,
-            {
-              // 키보드가 올라와 있으면 홈 인디케이터 자리는 이미 키보드가 덮는다.
-              paddingBottom:
-                keyboardOverlap > 0
-                  ? keyboardOverlap + spacing.md
-                  : Math.max(insets.bottom, spacing.md),
-            },
+            { paddingBottom: Math.max(insets.bottom, spacing.md) },
           ]}
         >
           <View style={[styles.footerInner, { maxWidth }]}>{props.footer}</View>
@@ -221,13 +148,7 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   title: { flex: 1, fontSize: 20, fontWeight: "700", color: colors.ink },
   closeButton: { alignSelf: "center" },
-  /**
-   * `overflow: hidden`은 장식이 아니다. iOS RN의 `ScrollView`는 콘텐츠를 자기
-   * 경계로 잘라내지 않아서, 스크롤 오프셋이 생기는 순간 본문이 위쪽 고정 헤더와
-   * 아래쪽 푸터 '위로' 그려진다. 시트가 열리는 도중 키보드가 뜨면 UIKit이
-   * 포커스된 입력을 보이려고 스크롤을 밀고, 그 오프셋이 그대로 남아 겹쳐 보였다.
-   */
-  scroll: { flex: 1, overflow: "hidden" },
+  scroll: { flex: 1 },
   content: {
     width: "100%",
     alignSelf: "center",
