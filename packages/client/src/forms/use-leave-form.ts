@@ -18,6 +18,7 @@ import {
   draftsToSegments,
   fitDrafts,
   inclusiveDays,
+  isCountedLeaveStatus,
   isRegularOvernightCycleBased,
   leaveCreateSchema,
   monthsSpanning,
@@ -95,22 +96,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const create = useCreateLeave();
   const update = useUpdateLeave();
 
-  /** 등록할 때는 오늘까지 실제로 쓰고 남은 재원을 먼저 제안한다. 동률이면 API 순서를 따른다. */
-  const preferredBalanceKey = useMemo<BalanceKey | undefined>(
-    () =>
-      balances.data?.balances.reduce<
-        (typeof balances.data.balances)[number] | undefined
-      >(
-        (preferred, item) =>
-          !preferred ||
-          item.remainingAsOfTodayDays > preferred.remainingAsOfTodayDays
-            ? item
-            : preferred,
-        undefined,
-      )?.key,
-    [balances.data?.balances],
-  );
-
   /* --- 폼 상태 -------------------------------------------------------- */
   const [title, setTitle] = useState(editing?.title ?? "");
   const [reason, setReason] = useState(editing?.reason ?? "");
@@ -135,15 +120,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
   // 잔여 조회는 폼보다 늦게 끝날 수 있고, 취소 직후에는 이전 캐시가 먼저 보일 수도 있다.
   // 사용자가 직접 종류를 고르기 전까지는 최신 잔여로 기본값을 계속 바로잡는다.
   const balanceSelectionTouched = useRef(Boolean(editing));
-
-  useEffect(() => {
-    if (balanceSelectionTouched.current || !preferredBalanceKey) return;
-    setDraftState((current) =>
-      current.map((draft, index) =>
-        index === 0 ? { ...draft, key: preferredBalanceKey } : draft,
-      ),
-    );
-  }, [preferredBalanceKey]);
 
   /** 화면에서 구간을 직접 바꾸는 순간부터는 사용자의 선택을 우선한다. */
   const setDrafts = (next: SetStateAction<SegmentDraft[]>) => {
@@ -227,15 +203,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
     [validRange, startDate, drafts],
   );
 
-  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
-  const applyRange = (nextStart: string, nextEnd: string) => {
-    setStartDate(nextStart);
-    setEndDate(nextEnd);
-    setDraftState((current) =>
-      fitDrafts(current, nextStart, nextEnd, preferredBalanceKey),
-    );
-  };
-
   /* --- 재원 잔여 계산 -------------------------------------------------- */
   // 수정 중이면 이 휴가가 이미 쓰고 있던 몫을 되돌려줘야 자기 자신과 부딪히지 않는다.
   const remainingByKey = useMemo(() => {
@@ -260,10 +227,67 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const savedRegular = useMemo<SegmentLike[]>(
     () =>
       (myLeaves.data?.leaves ?? [])
-        .filter((leave) => leave.id !== editing?.id)
+        .filter(
+          (leave) =>
+            leave.id !== editing?.id && isCountedLeaveStatus(leave.status),
+        )
         .flatMap((leave) => leave.segments),
     [myLeaves.data, editing],
   );
+
+  /**
+   * 등록 날짜에 실제로 가장 많이 남은 재원. 자동 정기외박은 현재 주기 요약 대신
+   * 선택 날짜가 속한 주기의 잔여를 비교한다. 동률이면 API 순서를 따른다.
+   */
+  const preferredBalanceKey = useMemo<BalanceKey | undefined>(() => {
+    let preferred: { key: BalanceKey; remaining: number } | undefined;
+    for (const item of balances.data?.balances ?? []) {
+      const remaining =
+        item.key === "regular_overnight" &&
+        cycleBased &&
+        validRange &&
+        dischargeAt
+          ? regularOvernightAvailableIn({
+              config: regularConfig,
+              used: savedRegular,
+              dischargeAt,
+              from: startDate,
+              to: endDate,
+            })
+          : item.remainingAsOfTodayDays;
+      if (!preferred || remaining > preferred.remaining) {
+        preferred = { key: item.key, remaining };
+      }
+    }
+    return preferred?.key;
+  }, [
+    balances.data?.balances,
+    cycleBased,
+    dischargeAt,
+    endDate,
+    regularConfig,
+    savedRegular,
+    startDate,
+    validRange,
+  ]);
+
+  useEffect(() => {
+    if (balanceSelectionTouched.current || !preferredBalanceKey) return;
+    setDraftState((current) =>
+      current.map((draft, index) =>
+        index === 0 ? { ...draft, key: preferredBalanceKey } : draft,
+      ),
+    );
+  }, [preferredBalanceKey]);
+
+  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
+  const applyRange = (nextStart: string, nextEnd: string) => {
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    setDraftState((current) =>
+      fitDrafts(current, nextStart, nextEnd, preferredBalanceKey),
+    );
+  };
 
   // 폼이 이번에 정기외박으로 잡아둔 구간.
   const draftRegular = useMemo<SegmentLike[]>(

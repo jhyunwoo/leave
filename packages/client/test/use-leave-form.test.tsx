@@ -22,6 +22,17 @@ type BalanceFixture = {
   remainingAsOfTodayDays: number;
 };
 
+type SetupContext = {
+  dischargeAt?: string;
+  leaves?: unknown[];
+  regularOvernight?: {
+    enabled: boolean;
+    startDate: string;
+    intervalDays: number;
+    daysPerGrant: number;
+  } | null;
+};
+
 /** 연가 5일만 남은 사용자. 그룹은 없어 달력 조회가 일어나지 않는다. */
 function setup(
   createLeave = vi.fn((_args: { json: unknown }) =>
@@ -39,23 +50,35 @@ function setup(
       remainingAsOfTodayDays: 5,
     },
   ],
-  getBalances = () =>
-    Promise.resolve({ balances: balanceItems, regularOvernight: null }),
+  getBalances?: () => Promise<{
+    balances: BalanceFixture[];
+    regularOvernight: SetupContext["regularOvernight"];
+  }>,
+  context: SetupContext = {},
 ) {
   const client = {
     auth: {
       me: {
         $get: () =>
           Promise.resolve({
-            user: { id: "u1", dischargeAt: "2027-12-31" },
+            user: {
+              id: "u1",
+              dischargeAt: context.dischargeAt ?? "2027-12-31",
+            },
             unit: null,
           }),
       },
     },
     leaves: {
-      mine: { $get: () => Promise.resolve({ leaves: [] }) },
+      mine: { $get: () => Promise.resolve({ leaves: context.leaves ?? [] }) },
       balances: {
-        $get: getBalances,
+        $get:
+          getBalances ??
+          (() =>
+            Promise.resolve({
+              balances: balanceItems,
+              regularOvernight: context.regularOvernight ?? null,
+            })),
       },
       $post: createLeave,
     },
@@ -72,10 +95,11 @@ function setup(
 }
 
 /** 잔여를 읽어와야 검사가 의미 있으므로 로딩이 끝날 때까지 기다린다. */
-async function renderForm(wrapper: ReturnType<typeof setup>["wrapper"]) {
-  const view = renderHook(() => useLeaveForm({ initialDate: "2026-09-01" }), {
-    wrapper,
-  });
+async function renderForm(
+  wrapper: ReturnType<typeof setup>["wrapper"],
+  initialDate = "2026-09-01",
+) {
+  const view = renderHook(() => useLeaveForm({ initialDate }), { wrapper });
   await waitFor(() =>
     expect(view.result.current.submitBlocker).not.toBe(
       "시작일과 종료일을 확인해주세요.",
@@ -156,6 +180,62 @@ describe("기본 휴가 종류", () => {
         regularOvernight: null,
       });
     });
+
+    await waitFor(() =>
+      expect(result.current.drafts[0]?.key).toBe("regular_overnight"),
+    );
+  });
+
+  it("미래 날짜에는 취소된 계획을 빼고 해당 정기외박 주기 잔여를 선택한다", async () => {
+    const { wrapper } = setup(
+      undefined,
+      [
+        {
+          key: "annual",
+          totalDays: 0,
+          usedDays: 0,
+          remainingDays: 0,
+          remainingAsOfTodayDays: 0,
+        },
+        // balances의 스칼라 값은 현재 주기 값이라 미래 주기에는 쓸 수 없다.
+        {
+          key: "regular_overnight",
+          totalDays: 0,
+          usedDays: 0,
+          remainingDays: 0,
+          remainingAsOfTodayDays: 0,
+        },
+      ],
+      undefined,
+      {
+        dischargeAt: "2027-12-31",
+        regularOvernight: {
+          enabled: true,
+          startDate: "2026-01-01",
+          intervalDays: 90,
+          daysPerGrant: 4,
+        },
+        leaves: [
+          {
+            id: "cancelled-regular",
+            title: "취소한 정기외박",
+            status: "cancelled",
+            startDate: "2027-08-01",
+            endDate: "2027-08-04",
+            segments: [
+              {
+                category: "overnight",
+                overnightKind: "regular",
+                startDate: "2027-08-01",
+                endDate: "2027-08-04",
+                days: 4,
+              },
+            ],
+          },
+        ],
+      },
+    );
+    const { result } = await renderForm(wrapper, "2027-08-01");
 
     await waitFor(() =>
       expect(result.current.drafts[0]?.key).toBe("regular_overnight"),
