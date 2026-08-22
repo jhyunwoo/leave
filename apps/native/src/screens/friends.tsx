@@ -1,19 +1,28 @@
+/**
+ * 친구 탭의 첫 화면 — 친구 목록.
+ *
+ * 사용처: 친구 탭(app/(tabs)/(friends)/index.tsx).
+ *
+ * 이 화면이 하는 일은 두 가지다. 이미 맺은 친구 중에서 달력을 함께 볼 사람을
+ * 고르는 것, 그리고 받은 요청에 답하는 것. 둘 다 "지금 여기 있는 사람"에 대한
+ * 일이다. 반대로 새 친구를 찾아 요청을 보내는 일은 이메일을 입력하고 결과를
+ * 기다리는 별개의 흐름이라 화면을 나눴다(friend-add.tsx). 목록이 늘어날수록
+ * 매번 입력칸을 지나쳐 스크롤해야 하는 값이 커지기 때문이다.
+ */
+
 import { MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
 import {
   useAcceptFriendRequest,
-  useCancelFriendRequest,
   useDeclineFriendRequest,
   useFriends,
   useIncomingFriendRequests,
   useOutgoingFriendRequests,
   useRemoveFriend,
-  useSendFriendRequest,
 } from "@leave/client";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -21,7 +30,8 @@ import {
 } from "react-native";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
-import { Field, Input } from "@/components/field";
+import { WebScreenActions } from "@/components/web-screen-actions";
+import { confirmAction } from "@/lib/dialog";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function FriendsScreen() {
@@ -31,20 +41,13 @@ export function FriendsScreen() {
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
   const outgoing = useOutgoingFriendRequests();
-  const send = useSendFriendRequest();
   const accept = useAcceptFriendRequest();
   const decline = useDeclineFriendRequest();
-  const cancel = useCancelFriendRequest();
   const remove = useRemoveFriend();
-  const [email, setEmail] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const pending =
-    send.isPending ||
-    accept.isPending ||
-    decline.isPending ||
-    cancel.isPending ||
-    remove.isPending;
+  const pending = accept.isPending || decline.isPending || remove.isPending;
+  const outgoingCount = outgoing.data?.requests.length ?? 0;
   const run = async (promise: Promise<unknown>) => {
     try {
       await promise;
@@ -55,47 +58,58 @@ export function FriendsScreen() {
       );
     }
   };
+  const openAdd = () => router.push("/(tabs)/(friends)/add");
   const compare = () =>
     router.push({
       pathname: "/(tabs)/(calendar)/friend-calendar",
       params: { friendIds: selected.join(",") },
     });
+  const removeFriend = async (userId: string, name: string) => {
+    const confirmed = await confirmAction({
+      title: "친구 삭제",
+      message: `${name}님을 친구에서 삭제할까요?`,
+      confirmLabel: "삭제",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    await run(remove.mutateAsync(userId));
+  };
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
-      automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="person.badge.plus"
+          variant="prominent"
+          tintColor={colors.brand}
+          onPress={openAdd}
+        >
+          친구 추가
+        </Stack.Toolbar.Button>
+      </Stack.Toolbar>
       {process.env.EXPO_OS === "web" ? (
         <Text style={styles.title}>친구</Text>
       ) : null}
-      <ContentPanel style={styles.card}>
-        <Text style={styles.heading}>친구 추가</Text>
-        <Field
-          label="정확한 가입 이메일"
-          hint="공개 사용자 검색 없이 정확히 일치하는 계정에만 요청해요."
-          error={error}
-        >
-          <Input
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="friend@example.com"
-          />
-        </Field>
-        <Button
-          title="요청 보내기"
-          loading={send.isPending}
-          disabled={!email.trim()}
-          onPress={() =>
-            void run(send.mutateAsync({ email }).then(() => setEmail("")))
-          }
-          testID="friends-send-request"
-        />
-      </ContentPanel>
+      <WebScreenActions
+        actions={[
+          {
+            id: "add-friend",
+            title: "친구 추가",
+            variant: "primary",
+            onPress: openAdd,
+            testID: "friends-open-add",
+          },
+        ]}
+      />
+      {error ? (
+        <ContentPanel tone="danger" style={styles.card}>
+          <Text style={styles.error}>{error}</Text>
+        </ContentPanel>
+      ) : null}
       {(incoming.data?.requests.length ?? 0) > 0 ? (
         <ContentPanel style={styles.card}>
           <Text style={styles.heading}>받은 요청</Text>
@@ -121,26 +135,6 @@ export function FriendsScreen() {
           ))}
         </ContentPanel>
       ) : null}
-      {(outgoing.data?.requests.length ?? 0) > 0 ? (
-        <ContentPanel style={styles.card}>
-          <Text style={styles.heading}>보낸 요청</Text>
-          {outgoing.data!.requests.map((request) => (
-            <View key={request.userId} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{request.name}</Text>
-                <Text style={styles.caption}>수락 대기</Text>
-              </View>
-              <Button
-                title="취소"
-                size="sm"
-                variant="secondary"
-                disabled={pending}
-                onPress={() => void run(cancel.mutateAsync(request.userId))}
-              />
-            </View>
-          ))}
-        </ContentPanel>
-      ) : null}
       <ContentPanel style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.heading}>내 친구</Text>
@@ -153,7 +147,8 @@ export function FriendsScreen() {
         ) : friends.data?.friends.length ? (
           friends.data.friends.map((friend) => {
             const checked = selected.includes(friend.userId);
-            const disabled = selected.length >= 10 && !checked;
+            const disabled =
+              selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
             return (
               <Pressable
                 key={friend.userId}
@@ -185,43 +180,53 @@ export function FriendsScreen() {
                   title="삭제"
                   size="sm"
                   variant="danger"
-                  onPress={() =>
-                    Alert.alert(
-                      "친구 삭제",
-                      `${friend.name}님을 친구에서 삭제할까요?`,
-                      [
-                        { text: "취소", style: "cancel" },
-                        {
-                          text: "삭제",
-                          style: "destructive",
-                          onPress: () =>
-                            void run(remove.mutateAsync(friend.userId)),
-                        },
-                      ],
-                    )
-                  }
+                  disabled={pending}
+                  onPress={() => void removeFriend(friend.userId, friend.name)}
                 />
               </Pressable>
             );
           })
         ) : (
-          <Text style={styles.body}>
-            아직 친구가 없어요. 요청이 수락되면 여기에서 달력을 함께 볼 수
-            있어요.
-          </Text>
+          <View style={styles.empty}>
+            <Text style={styles.body}>
+              아직 친구가 없어요. 가입 이메일로 요청을 보내고, 상대가 수락하면
+              여기에서 달력을 함께 볼 수 있어요.
+            </Text>
+            <Button
+              title="친구 추가"
+              onPress={openAdd}
+              testID="friends-empty-add"
+            />
+          </View>
         )}
-        {selected.length >= 10 ? (
+        {selected.length >= MAX_FRIEND_CALENDAR_SELECTION ? (
           <Text style={styles.caption}>
-            한 번에 최대 10명까지 비교할 수 있어요.
+            한 번에 최대 {MAX_FRIEND_CALENDAR_SELECTION}명까지 비교할 수 있어요.
           </Text>
         ) : null}
-        <Button
-          title="선택한 친구와 달력 보기"
-          disabled={selected.length === 0}
-          onPress={compare}
-          testID="friends-compare-calendar"
-        />
+        {friends.data?.friends.length ? (
+          <Button
+            title="선택한 친구와 달력 보기"
+            disabled={selected.length === 0}
+            onPress={compare}
+            testID="friends-compare-calendar"
+          />
+        ) : null}
       </ContentPanel>
+      {outgoingCount > 0 ? (
+        <ContentPanel style={styles.card}>
+          <Text style={styles.heading}>보낸 요청 {outgoingCount}건</Text>
+          <Text style={styles.caption}>
+            상대가 수락하면 내 친구 목록에 들어와요.
+          </Text>
+          <Button
+            title="보낸 요청 보기"
+            variant="secondary"
+            onPress={openAdd}
+            testID="friends-open-outgoing"
+          />
+        </ContentPanel>
+      ) : null}
     </ScrollView>
   );
 }
@@ -248,7 +253,9 @@ const useStyles = makeStyles(({ colors }) => ({
   name: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.ink },
   body: { color: colors.body, lineHeight: 21 },
   caption: { fontSize: 12, color: colors.mute },
+  error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   count: { fontSize: 13, fontWeight: "700", color: colors.brand },
+  empty: { gap: spacing.md },
   friend: {
     minHeight: 56,
     flexDirection: "row",

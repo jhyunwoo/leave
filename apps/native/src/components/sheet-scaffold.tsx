@@ -33,6 +33,15 @@ const HEADER_MIN_HEIGHT = 58;
 export const SHEET_GRABBER_INSET = Platform.OS === "ios" ? 16 : 0;
 
 /**
+ * 바텀시트 표면이 아래 안전 영역까지 내려앉는가.
+ *
+ * iOS 시트만 그렇다 — `native-bottom-sheet.ios.tsx`가 시트 안쪽 안전 영역을
+ * 무시해 RN 표면을 시트 바닥까지 내린다. 안드로이드(Material `ModalBottomSheet`)와
+ * 웹 구현은 시트 쪽에서 이미 그 자리를 비워두므로 여기서 또 비우면 두 번 벌어진다.
+ */
+export const SHEET_EXTENDS_UNDER_BOTTOM_INSET = Platform.OS === "ios";
+
+/**
  * 네이티브 바텀시트 안의 RN 콘텐츠를 Apple 폼 시트 구조로 정렬한다.
  * 헤더와 저장 버튼은 고정하고, 입력 영역만 스크롤되게 해 시트가 커져도
  * 주요 동작의 의미와 위치가 바뀌지 않는다.
@@ -52,11 +61,22 @@ export function SheetScaffold(props: {
   contentMaxWidth?: number;
   /** 헤더 위에 더 둘 여백. 바텀시트에서 드래그 인디케이터 자리를 비울 때 쓴다. */
   headerTopInset?: number;
+  /**
+   * 시트 표면이 아래 안전 영역까지 내려앉는가(`SHEET_EXTENDS_UNDER_BOTTOM_INSET`).
+   *
+   * 그런 시트에서는 표면과 시트 바닥 사이에 틈이 없는 대신, 홈 인디케이터를
+   * 피하는 일이 콘텐츠 몫으로 넘어온다. 본문 맨 아래 항목이 인디케이터에 닿지
+   * 않게 스크롤 콘텐츠 아래 여백을 그만큼 잡는다. 푸터가 있으면 푸터가 이미
+   * 같은 여백을 잡으므로 본문에는 더하지 않는다.
+   */
+  extendsUnderBottomInset?: boolean;
 }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const maxWidth = props.contentMaxWidth ?? layout.formContent;
   const headerTopInset = props.headerTopInset ?? 0;
+  const contentBottomInset =
+    props.extendsUnderBottomInset && !props.footer ? insets.bottom : 0;
 
   return (
     <View style={styles.root}>
@@ -88,6 +108,7 @@ export function SheetScaffold(props: {
           styles.content,
           { maxWidth },
           props.contentContainerStyle,
+          contentBottomInset > 0 && { paddingBottom: contentBottomInset },
         ]}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustKeyboardInsets

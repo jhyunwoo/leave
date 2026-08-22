@@ -15,6 +15,7 @@ export default function FriendsStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "친구" }} />
+      <Stack.Screen name="add" options={{ title: "친구 추가" }} />
     </Stack>
   );
 }

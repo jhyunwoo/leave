@@ -15,6 +15,7 @@
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui";
 import {
   frame,
+  ignoreSafeArea,
   presentationDetents,
   presentationDragIndicator,
   type ModifierConfig,
@@ -46,11 +47,25 @@ export function NativeBottomSheet(props: {
   // 된다. 그 틈으로 시스템 시트 배경이 비쳐 콘텐츠와 시트가 따로 노는 것처럼 보인다.
   // 대신 RN 콘텐츠가 시트를 가득 채우게 두고(시트가 모서리를 알아서 클리핑한다),
   // 드래그 인디케이터 자리는 콘텐츠 '안쪽' 여백(SHEET_GRABBER_INSET)으로 잡는다.
+  const fitToContents = snapPoints.length === 0;
   const modifiers: ModifierConfig[] = [
-    frame({ maxWidth: Infinity, alignment: "topLeading" }),
+    frame({
+      maxWidth: Infinity,
+      // 디텐트를 준 시트는 높이가 이미 정해져 있다. 늘려서 채우지 않으면 RN 트리가
+      // 콘텐츠 높이에서 멈춰 시트 아래쪽이 빈 채로 남는다. 콘텐츠 높이에 맞추는
+      // 시트(fitToContents)에는 걸면 안 된다 — 시트가 화면 전체로 커진다.
+      ...(fitToContents ? null : { maxHeight: Infinity }),
+      alignment: "topLeading",
+    }),
     presentationDragIndicator("visible"),
   ];
-  if (snapPoints.length > 0) {
+  if (!fitToContents) {
+    // 시트 안쪽에도 아래 안전 영역이 잡혀 있다. 그대로 두면 RN 콘텐츠가 시트
+    // 바닥에서 홈 인디케이터 높이만큼 떠, 위·옆은 시트에 딱 붙는데 아래만
+    // 벌어져 그 틈으로 시스템 시트 배경이 비친다. 표면은 시트 바닥까지 내리고,
+    // 안쪽 여백은 RN 쪽(SheetScaffold의 bottomSafeInset)에서 잡는다.
+    // 키보드 영역까지 무시하면 입력칸이 키보드에 가리므로 컨테이너만 무시한다.
+    modifiers.push(ignoreSafeArea({ regions: "container", edges: "bottom" }));
     modifiers.push(presentationDetents(snapPoints.map(toDetent)));
   }
 
@@ -63,7 +78,7 @@ export function NativeBottomSheet(props: {
         }}
         onDismiss={props.onClosed}
         // 디텐트를 직접 주면 콘텐츠 높이에 맞추지 않는다.
-        fitToContents={snapPoints.length === 0}
+        fitToContents={fitToContents}
         testID={props.testID}
       >
         <Group modifiers={modifiers}>

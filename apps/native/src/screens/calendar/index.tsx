@@ -66,6 +66,7 @@ import {
 import { LeaveFormModal } from "@/components/leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import {
+  SHEET_EXTENDS_UNDER_BOTTOM_INSET,
   SHEET_GRABBER_INSET,
   SheetScaffold,
 } from "@/components/sheet-scaffold";
@@ -515,6 +516,9 @@ export function CalendarScreen() {
           // 드래그 인디케이터 자리를 헤더 안쪽에 둔다. 헤더 배경이 시트 맨 위까지
           // 이어져야 콘텐츠가 시트에 얹힌 카드로 보이지 않는다.
           headerTopInset={SHEET_GRABBER_INSET}
+          // 표면이 시트 바닥까지 내려앉는 플랫폼에서는 홈 인디케이터를 피하는
+          // 여백을 본문 아래쪽에서 잡는다.
+          extendsUnderBottomInset={SHEET_EXTENDS_UNDER_BOTTOM_INSET}
         >
           {selectedDate &&
             (panelCalendar.data ? (
