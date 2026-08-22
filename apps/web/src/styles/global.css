@@ -698,9 +698,11 @@ textarea.input {
 
 .app-nav-links {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  /* 탭 개수는 셀 수로 세지 않는다 — 탭이 하나 늘어도 한 줄을 유지한다. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   justify-self: center;
-  width: min(100%, 470px);
+  width: min(100%, 560px);
   padding: 5px;
   background: var(--glass-control);
   border: 1px solid rgba(255, 255, 255, 0.68);
@@ -718,6 +720,7 @@ textarea.input {
   color: var(--body);
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   text-decoration: none;
   transition:
     color 160ms var(--ease-out),
@@ -816,14 +819,13 @@ textarea.input {
   }
 
   .app-nav-links {
-    grid-template-columns: repeat(3, 1fr);
     width: 100%;
     padding: 3px;
   }
 
   .app-nav-item {
     min-height: 34px;
-    padding: 0 8px;
+    padding: 0 6px;
     font-size: 12px;
   }
 
