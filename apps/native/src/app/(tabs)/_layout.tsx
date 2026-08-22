@@ -45,6 +45,14 @@ export default function TabLayout() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="(friends)">
+        <NativeTabs.Trigger.Label>친구</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "person.2", selected: "person.2.fill" }}
+          md="group"
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="notifications">
         <NativeTabs.Trigger.Label>알림</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

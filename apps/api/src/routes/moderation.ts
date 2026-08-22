@@ -10,8 +10,15 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { blockCreateSchema, reportCreateSchema } from "@leave/shared";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { contentReports, units, userBlocks, users } from "../db/schema";
+import {
+  contentReports,
+  friendships,
+  units,
+  userBlocks,
+  users,
+} from "../db/schema";
 import { createApp } from "../lib/app";
+import { runBatch } from "../lib/d1";
 import {
   blockedUserSchema,
   errorResponse,
@@ -195,14 +202,28 @@ export const moderationRoutes = app
       .get();
     if (!target) return c.json({ error: "사용자를 찾을 수 없습니다" }, 404);
 
-    await db
-      .insert(userBlocks)
-      .values({
-        userId: user.id,
-        blockedUserId: userId,
-        createdAt: new Date().toISOString(),
-      })
-      .onConflictDoNothing();
+    // 차단과 친구/요청 제거는 한 D1 batch 안에서 함께 끝난다. 중간 상태에서는
+    // 차단된 상대가 달력 권한을 계속 갖는 순간이 생겨서는 안 된다.
+    const [userAId, userBId] =
+      user.id < userId ? [user.id, userId] : [userId, user.id];
+    await runBatch(db, [
+      db
+        .insert(userBlocks)
+        .values({
+          userId: user.id,
+          blockedUserId: userId,
+          createdAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing(),
+      db
+        .delete(friendships)
+        .where(
+          and(
+            eq(friendships.userAId, userAId),
+            eq(friendships.userBId, userBId),
+          ),
+        ),
+    ]);
     return c.json({ ok: true as const }, 200);
   })
   .openapi(deleteBlockRoute, async (c) => {

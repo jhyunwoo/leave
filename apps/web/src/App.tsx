@@ -28,7 +28,17 @@ const AppLayout = lazy(() =>
   import("./layouts/AppLayout").then((m) => ({ default: m.AppLayout })),
 );
 const CalendarPage = lazy(() =>
-  import("./pages/CalendarPage").then((m) => ({ default: m.CalendarPage })),
+  import("./pages/CalendarExperiencePage").then((m) => ({
+    default: m.CalendarPage,
+  })),
+);
+const FriendsPage = lazy(() =>
+  import("./pages/FriendsPage").then((m) => ({ default: m.FriendsPage })),
+);
+const FriendDetailPage = lazy(() =>
+  import("./pages/FriendDetailPage").then((m) => ({
+    default: m.FriendDetailPage,
+  })),
 );
 const LandingPage = lazy(() =>
   import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })),
@@ -114,6 +124,8 @@ function CompletedApp() {
         <Route path="units" element={<UnitsPage me={me.data} />} />
         <Route path="units/manage" element={<UnitManagePage me={me.data} />} />
         <Route path="leaves" element={<LeavesPage />} />
+        <Route path="friends" element={<FriendsPage />} />
+        <Route path="friends/:userId" element={<FriendDetailPage />} />
         {/* grants가 :leaveId보다 먼저 와야 보유 휴가가 휴가 id로 잡히지 않는다. */}
         <Route
           path="leaves/grants"

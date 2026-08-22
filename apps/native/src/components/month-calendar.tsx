@@ -26,7 +26,7 @@ import {
 } from "@leave/shared";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import type { Calendar, MyLeaveDay } from "@leave/client";
+import type { Calendar, MyLeaveDay, PersonalEvent } from "@leave/client";
 import { makeStyles, radius, spacing, useTheme } from "@/theme";
 
 /** 칸 안에 미리 보여줄 출타자 수. 넘치면 "+N"으로 접는다. */
@@ -79,6 +79,7 @@ export function MonthCalendar(props: {
   currentCycle?: RegularOvernightCycle | null;
   /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
   dischargeAt?: ISODate | null;
+  personalEvents?: PersonalEvent[];
 }) {
   const {
     calendar,
@@ -90,6 +91,7 @@ export function MonthCalendar(props: {
     cycles,
     currentCycle,
     dischargeAt,
+    personalEvents,
   } = props;
   const styles = useStyles();
   const { colors, balance } = useTheme();
@@ -149,6 +151,12 @@ export function MonthCalendar(props: {
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
+            const personalCount = cell.inMonth
+              ? (personalEvents?.filter(
+                  (event) =>
+                    event.startDate <= cell.date && cell.date <= event.endDate,
+                ).length ?? 0)
+              : 0;
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
@@ -196,7 +204,7 @@ export function MonthCalendar(props: {
                         signal?.percent == null
                           ? "출타 기준 미설정"
                           : `출타율 ${signal.percent}퍼센트, ${signal.label}`
-                      }${preview ? `, 출타 ${preview.total}명` : ""}${
+                      }${preview ? `, 출타 ${preview.total}명` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}${
                         blocked ? ", 제한 가능 기간" : ""
                       }`
                     : undefined
@@ -281,6 +289,13 @@ export function MonthCalendar(props: {
                             {BALANCE_LABELS[mine.key]}
                           </Text>
                         )}
+                      </View>
+                    )}
+                    {!compact && personalCount > 0 && (
+                      <View style={styles.personalPill}>
+                        <Text style={styles.personalText}>
+                          ◇ 개인{personalCount > 1 ? ` ${personalCount}` : ""}
+                        </Text>
                       </View>
                     )}
                     {/* 칸이 넉넉한 창에서만 — 그날 나가는 사람을 이니셜로 미리 본다.
@@ -473,6 +488,20 @@ const useStyles = makeStyles(({ colors }) => ({
     borderBottomRightRadius: 0,
   },
   myChipText: { fontSize: 10, lineHeight: 12, fontWeight: "700" },
+  personalPill: {
+    minHeight: 14,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    justifyContent: "center",
+  },
+  personalText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "700",
+    color: colors.brand,
+  },
   attendeeRow: {
     height: 16,
     flexDirection: "row",

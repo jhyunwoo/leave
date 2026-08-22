@@ -42,4 +42,20 @@ export const queryKeys = {
   notificationSummary: ["notifications", "summary"] as const,
   /** 알림 수신 설정. */
   notificationPrefs: ["notificationPrefs"] as const,
+
+  friends: ["friends"] as const,
+  friendList: ["friends", "list"] as const,
+  incomingFriendRequests: ["friends", "requests", "incoming"] as const,
+  outgoingFriendRequests: ["friends", "requests", "outgoing"] as const,
+  friendSchedules: ["friends", "schedule"] as const,
+  friendSchedule: (userId: string, startDate: string, endDate: string) =>
+    ["friends", "schedule", userId, startDate, endDate] as const,
+  friendCalendars: ["friends", "calendar"] as const,
+  friendCalendar: (friendIds: readonly string[], month: string) =>
+    ["friends", "calendar", [...friendIds].sort(), month] as const,
+
+  personalEvents: ["personalEvents"] as const,
+  personalEventsMonth: (month: string) =>
+    ["personalEvents", "month", month] as const,
+  personalEvent: (id: string) => ["personalEvents", "detail", id] as const,
 };

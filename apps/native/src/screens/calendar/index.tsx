@@ -259,6 +259,16 @@ export function CalendarScreen() {
             title="그룹 참여·만들기"
             onPress={() => router.push("/units")}
           />
+          <Button
+            title="개인 일정 보기"
+            variant="secondary"
+            onPress={() => router.push("/(tabs)/(calendar)/personal-events")}
+          />
+          <Button
+            title="친구 달력 보기"
+            variant="secondary"
+            onPress={() => router.push("/(tabs)/(friends)")}
+          />
         </ContentPanel>
       </View>
     );
@@ -402,6 +412,15 @@ export function CalendarScreen() {
                 dischargeAt={dischargeAt}
                 onOpenLeave={openLeave}
                 onAddLeave={() => openForm(selectedDate)}
+                onAddPersonalEvent={() =>
+                  router.push({
+                    pathname: "/(tabs)/(calendar)/personal-event",
+                    params: {
+                      date: selectedDate,
+                      month: selectedDate.slice(0, 7),
+                    },
+                  })
+                }
                 style={styles.inspectorDayPanel}
               />
             ) : (
@@ -440,6 +459,11 @@ export function CalendarScreen() {
       />
 
       <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          onPress={() => router.push("/(tabs)/(calendar)/personal-events")}
+        >
+          개인 일정
+        </Stack.Toolbar.Button>
         <Stack.Toolbar.Button
           onPress={() => scrollRef.current?.scrollToToday()}
         >
@@ -506,6 +530,15 @@ export function CalendarScreen() {
                 dischargeAt={dischargeAt}
                 onOpenLeave={openLeave}
                 onAddLeave={() => openForm(selectedDate)}
+                onAddPersonalEvent={() =>
+                  router.push({
+                    pathname: "/(tabs)/(calendar)/personal-event",
+                    params: {
+                      date: selectedDate,
+                      month: selectedDate.slice(0, 7),
+                    },
+                  })
+                }
               />
             ) : (
               <View style={{ padding: spacing.xxxl, alignItems: "center" }}>

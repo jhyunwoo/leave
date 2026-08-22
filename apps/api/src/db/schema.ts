@@ -22,12 +22,14 @@ import {
   RANKS,
 } from "@leave/shared";
 import {
+  check,
   index,
   integer,
   primaryKey,
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const users = sqliteTable(
   "users",
@@ -421,6 +423,68 @@ export const userBlocks = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.blockedUserId] })],
 );
 
+/**
+ * 친구 요청과 수락 관계를 한 행으로 표현한다. user_a_id < user_b_id 정규화로
+ * 양방향 중복을 DB에서 원천 차단하고, requested_by_user_id가 대기 방향을 나타낸다.
+ */
+export const friendships = sqliteTable(
+  "friendships",
+  {
+    userAId: text("user_a_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userBId: text("user_b_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestedByUserId: text("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "accepted"] })
+      .notNull()
+      .default("pending"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    acceptedAt: text("accepted_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userAId, t.userBId] }),
+    check("friendships_order_check", sql`${t.userAId} < ${t.userBId}`),
+    check(
+      "friendships_requester_check",
+      sql`${t.requestedByUserId} = ${t.userAId} OR ${t.requestedByUserId} = ${t.userBId}`,
+    ),
+    check(
+      "friendships_acceptance_check",
+      sql`(${t.status} = 'pending' AND ${t.acceptedAt} IS NULL) OR (${t.status} = 'accepted' AND ${t.acceptedAt} IS NOT NULL)`,
+    ),
+    index("friendships_a_status_idx").on(t.userAId, t.status, t.updatedAt),
+    index("friendships_b_status_idx").on(t.userBId, t.status, t.updatedAt),
+  ],
+);
+
+/** 개인 일정은 휴가와 분리되어 집계·잔여량·알림 쿼리에 들어갈 수 없다. */
+export const personalEvents = sqliteTable(
+  "personal_events",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    note: text("note"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    check("personal_events_dates_check", sql`${t.startDate} <= ${t.endDate}`),
+    index("personal_events_owner_start_idx").on(t.ownerUserId, t.startDate),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitInviteRow = typeof unitInvites.$inferSelect;
@@ -429,6 +493,8 @@ export type UserNotificationPrefsRow =
   typeof userNotificationPrefs.$inferSelect;
 export type ContentReportRow = typeof contentReports.$inferSelect;
 export type UserBlockRow = typeof userBlocks.$inferSelect;
+export type FriendshipRow = typeof friendships.$inferSelect;
+export type PersonalEventRow = typeof personalEvents.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type LeaveGrantRow = typeof leaveGrants.$inferSelect;

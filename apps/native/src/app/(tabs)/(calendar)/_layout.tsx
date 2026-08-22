@@ -17,6 +17,17 @@ export default function CalendarStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "부대 달력" }} />
+      <Stack.Screen name="friend-calendar" options={{ title: "친구 달력" }} />
+      <Stack.Screen name="personal-events" options={{ title: "개인 일정" }} />
+      <Stack.Screen
+        name="personal-event"
+        options={{
+          title: "개인 일정 편집",
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.75, 1],
+          sheetGrabberVisible: true,
+        }}
+      />
     </Stack>
   );
 }

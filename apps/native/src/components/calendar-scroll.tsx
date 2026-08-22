@@ -44,7 +44,7 @@ import {
   View,
 } from "react-native";
 import type { MyLeaveDay } from "@leave/client";
-import { useCalendar } from "@leave/client";
+import { useCalendar, usePersonalEvents } from "@leave/client";
 import { useWindowSizeClass, type WindowSizeClass } from "@/adaptive";
 import { MonthCalendar } from "@/components/month-calendar";
 import { makeStyles, spacing, useColors } from "@/theme";
@@ -383,6 +383,7 @@ function MonthBlock(props: {
   const styles = useStyles();
   const colors = useColors();
   const calendar = useCalendar(props.unitId, props.month);
+  const personalEvents = usePersonalEvents(props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
@@ -411,6 +412,7 @@ function MonthBlock(props: {
           cycles={cycles}
           currentCycle={props.currentCycle}
           dischargeAt={props.dischargeAt}
+          personalEvents={personalEvents.data?.events}
         />
       )}
     </View>

@@ -122,3 +122,25 @@ export type NotificationPrefs = InferResponseType<
   Client["notifications"]["preferences"]["$get"],
   200
 >["preferences"];
+
+export type Friend = InferResponseType<
+  Client["friends"]["$get"],
+  200
+>["friends"][number];
+export type FriendRequest = InferResponseType<
+  Client["friends"]["requests"]["incoming"]["$get"],
+  200
+>["requests"][number];
+export type FriendCalendar = InferResponseType<
+  Client["friends"]["calendar"]["$get"],
+  200
+>;
+export type FriendCalendarLeave = FriendCalendar["leaves"][number];
+export type FriendSchedule = InferResponseType<
+  Client["friends"][":userId"]["schedule"]["$get"],
+  200
+>;
+export type PersonalEvent = InferResponseType<
+  Client["personal-events"]["$get"],
+  200
+>["events"][number];

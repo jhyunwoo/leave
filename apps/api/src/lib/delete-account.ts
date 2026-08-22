@@ -28,9 +28,11 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import {
   accessLogs,
   contentReports,
+  friendships,
   leaves,
   notifications,
   pushLogs,
+  personalEvents,
   sessions,
   unitInvites,
   units,
@@ -91,6 +93,9 @@ async function purgeUserData(db: Db, userId: string): Promise<void> {
     db.delete(sessions).where(eq(sessions.userId, userId)),
     db.delete(accessLogs).where(eq(accessLogs.userId, userId)),
     db.delete(pushLogs).where(eq(pushLogs.userId, userId)),
+    db.delete(personalEvents).where(eq(personalEvents.ownerUserId, userId)),
+    db.delete(friendships).where(eq(friendships.userAId, userId)),
+    db.delete(friendships).where(eq(friendships.userBId, userId)),
     db
       .delete(userNotificationPrefs)
       .where(eq(userNotificationPrefs.userId, userId)),

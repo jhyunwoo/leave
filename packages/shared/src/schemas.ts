@@ -20,6 +20,11 @@ import {
   sortSegments,
 } from "./leave";
 import { BRANCHES, RANKS } from "./rank";
+import {
+  MAX_FRIEND_CALENDAR_SELECTION,
+  normalizeEmail,
+  normalizeFriendIds,
+} from "./friends";
 
 export const isoDateSchema = z
   .string()
@@ -29,9 +34,14 @@ export const monthSchema = z
   .string()
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "YYYY-MM 형식이어야 합니다");
 
+export const normalizedEmailSchema = z
+  .string()
+  .transform(normalizeEmail)
+  .pipe(z.email("올바른 이메일 주소를 입력해주세요"));
+
 export const signupSchema = z
   .object({
-    email: z.email("올바른 이메일 주소를 입력해주세요"),
+    email: normalizedEmailSchema,
     password: z
       .string()
       .min(8, "비밀번호는 8자 이상이어야 합니다")
@@ -69,7 +79,7 @@ export const signupSchema = z
   });
 
 export const loginSchema = z.object({
-  email: z.email("올바른 이메일 주소를 입력해주세요"),
+  email: normalizedEmailSchema,
   password: z.string().min(1, "비밀번호를 입력해주세요"),
 });
 
@@ -364,6 +374,78 @@ export const blockCreateSchema = z.object({
   userId: z.string().min(1).max(100),
 });
 
+export const friendRequestCreateSchema = z.object({
+  email: normalizedEmailSchema,
+});
+
+export const friendIdsSchema = z
+  .array(z.string().trim().min(1).max(100))
+  .transform(normalizeFriendIds)
+  .refine((ids) => ids.length >= 1, "친구를 한 명 이상 선택해주세요")
+  .refine(
+    (ids) => ids.length <= MAX_FRIEND_CALENDAR_SELECTION,
+    `친구는 최대 ${MAX_FRIEND_CALENDAR_SELECTION}명까지 선택할 수 있습니다`,
+  );
+
+export const localTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:mm 형식의 유효한 시간이어야 합니다");
+
+function validatePersonalEventRange(
+  value: {
+    startDate?: string;
+    endDate?: string;
+    startTime?: string | null;
+    endTime?: string | null;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (value.startDate && value.endDate && value.startDate > value.endDate) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endDate"],
+      message: "종료일은 시작일과 같거나 뒤여야 합니다",
+    });
+  }
+  if (
+    value.startDate === value.endDate &&
+    value.startTime &&
+    value.endTime &&
+    value.startTime > value.endTime
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endTime"],
+      message: "종료 시간은 시작 시간과 같거나 뒤여야 합니다",
+    });
+  }
+}
+
+export const personalEventCreateSchema = z
+  .object({
+    title: z.string().trim().min(1, "일정 제목을 입력해주세요").max(80),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    startTime: localTimeSchema.nullable().optional(),
+    endTime: localTimeSchema.nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .superRefine(validatePersonalEventRange);
+
+export const personalEventUpdateSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "일정 제목을 입력해주세요")
+    .max(80)
+    .optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  startTime: localTimeSchema.nullable().optional(),
+  endTime: localTimeSchema.nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
+});
+
 /** 알림 종류별 수신 설정. 보낸 항목만 바꾼다. */
 export const notificationPrefsSchema = z.object({
   overage: z.boolean().optional(),
@@ -398,6 +480,15 @@ export type UnitTransferInput = z.infer<typeof unitTransferSchema>;
 export type BlackoutCreateInput = z.infer<typeof blackoutCreateSchema>;
 export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
 export type BlockCreateInput = z.infer<typeof blockCreateSchema>;
+export type FriendRequestCreateInput = z.infer<
+  typeof friendRequestCreateSchema
+>;
+export type PersonalEventCreateInput = z.infer<
+  typeof personalEventCreateSchema
+>;
+export type PersonalEventUpdateInput = z.infer<
+  typeof personalEventUpdateSchema
+>;
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;

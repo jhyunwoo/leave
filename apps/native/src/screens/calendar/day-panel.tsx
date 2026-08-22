@@ -24,6 +24,7 @@ export function DayPanel(props: {
   calendar: Calendar;
   date: ISODate;
   onAddLeave: () => void;
+  onAddPersonalEvent?: () => void;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
@@ -97,6 +98,13 @@ export function DayPanel(props: {
       />
 
       <Button title="이 날부터 휴가 등록" onPress={props.onAddLeave} />
+      {props.onAddPersonalEvent ? (
+        <Button
+          title="이 날에 개인 일정 추가"
+          variant="secondary"
+          onPress={props.onAddPersonalEvent}
+        />
+      ) : null}
     </View>
   );
 }

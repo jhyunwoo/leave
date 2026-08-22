@@ -1,0 +1,47 @@
+# 가입된 테스트 계정으로 친구/달력 핵심 내비게이션과 개인 일정 편집 경로를 검증한다.
+# E2E_EMAIL/E2E_PASSWORD 계정에는 결정론적으로 수락된 친구가 하나 이상 있어야 한다.
+appId: app.leave.mobile
+env:
+  EMAIL: ${E2E_EMAIL}
+  PASSWORD: ${E2E_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn: "로그인"
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit"
+
+- tapOn: "친구"
+- assertVisible: "친구 추가"
+- assertVisible: ".* / 10 선택"
+- tapOn: "친구.*"
+- tapOn: "선택한 친구와 달력 보기"
+- assertVisible: "친구 달력"
+
+- tapOn: "달력"
+- tapOn: "개인 일정"
+- tapOn: "추가"
+- tapOn:
+    id: "personal-event-title"
+- inputText: "maestro-private-event"
+- tapOn:
+    id: "personal-event-save"
+- assertVisible: "maestro-private-event"
+- tapOn: "maestro-private-event"
+- tapOn:
+    id: "personal-event-title"
+- eraseText
+- inputText: "maestro-private-event-edited"
+- tapOn:
+    id: "personal-event-save"
+- assertVisible: "maestro-private-event-edited"
+- tapOn: "maestro-private-event-edited"
+- tapOn: "삭제"
+- tapOn: "삭제"
+- assertNotVisible: "maestro-private-event-edited"

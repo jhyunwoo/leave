@@ -446,3 +446,17 @@
 .cal-mine.is-tentative {
   border: 1px dashed currentColor;
 }
+.cal-personal {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border: 1px solid var(--brand);
+  border-radius: var(--r-pill);
+  color: var(--brand);
+  background: var(--canvas);
+  font-size: 10px;
+  font-weight: 700;
+}

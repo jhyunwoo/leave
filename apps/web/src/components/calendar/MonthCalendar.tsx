@@ -19,7 +19,7 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import { useMemo } from "react";
-import type { Calendar } from "@leave/client";
+import type { Calendar, PersonalEvent } from "@leave/client";
 import { buildMonthGrid, WEEKDAYS } from "@leave/shared";
 import type { MyLeaveDay } from "@leave/client";
 import "./calendar.css";
@@ -38,6 +38,7 @@ export function MonthCalendar(props: {
   currentCycle?: RegularOvernightCycle | null;
   /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
   dischargeAt?: string | null;
+  personalEvents?: PersonalEvent[];
 }) {
   const {
     calendar,
@@ -48,6 +49,7 @@ export function MonthCalendar(props: {
     cycles,
     currentCycle,
     dischargeAt,
+    personalEvents,
   } = props;
   const today = todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
@@ -91,6 +93,12 @@ export function MonthCalendar(props: {
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
+            const personal = cell.inMonth
+              ? (personalEvents?.filter(
+                  (event) =>
+                    event.startDate <= cell.date && cell.date <= event.endDate,
+                ) ?? [])
+              : [];
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
@@ -119,7 +127,7 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}, ${
+                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}${personal.length ? `, 개인 일정 ${personal.length}개` : ""}, ${
                         signal?.percent == null
                           ? "출타 기준 미설정"
                           : `출타율 ${signal.percent}퍼센트, ${signal.label}`
@@ -172,6 +180,14 @@ export function MonthCalendar(props: {
                     {mine.isSegmentStart
                       ? `${mine.isDraft ? "초안 " : ""}${BALANCE_LABELS[mine.key]}`
                       : ""}
+                  </span>
+                )}
+                {personal.length > 0 && (
+                  <span
+                    className="cal-personal"
+                    title={personal.map((event) => event.title).join(", ")}
+                  >
+                    개인{personal.length > 1 ? ` ${personal.length}` : ""}
                   </span>
                 )}
                 {/* 혼잡도는 날짜를 열어보지 않아도 되게 늘 보여준다.

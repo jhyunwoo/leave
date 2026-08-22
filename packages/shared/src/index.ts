@@ -36,3 +36,4 @@ export * from "./onboarding";
 export * from "./regular-overnight";
 export * from "./regular-overnight-guidance";
 export * from "./availability";
+export * from "./friends";

@@ -25,6 +25,8 @@ import { accessLogMiddleware } from "./middleware/access-log";
 import { minVersionMiddleware } from "./middleware/min-version";
 import { authRoutes } from "./routes/auth";
 import { leaveRoutes } from "./routes/leaves";
+import { friendRoutes } from "./routes/friends";
+import { personalEventRoutes } from "./routes/personal-events";
 import { moderationRoutes } from "./routes/moderation";
 import { notificationRoutes } from "./routes/notifications";
 import { pushRoutes } from "./routes/push";
@@ -101,6 +103,8 @@ const routes = app
   .route("/auth", authRoutes)
   .route("/units", unitRoutes)
   .route("/leaves", leaveRoutes)
+  .route("/friends", friendRoutes)
+  .route("/personal-events", personalEventRoutes)
   .route("/notifications", notificationRoutes)
   .route("/push", pushRoutes)
   .route("/moderation", moderationRoutes);

@@ -38,6 +38,9 @@ export function AppLayout(props: { me: Me }) {
             <NavLink to="/leaves" className={navClassName}>
               내 휴가
             </NavLink>
+            <NavLink to="/friends" className={navClassName}>
+              친구
+            </NavLink>
             <NavLink to="/notifications" className={navClassName}>
               알림
               {unread > 0 ? (

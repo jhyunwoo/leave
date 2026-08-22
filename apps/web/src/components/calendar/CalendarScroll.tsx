@@ -39,7 +39,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useCalendar } from "@leave/client";
+import { useCalendar, usePersonalEvents } from "@leave/client";
 import type { MyLeaveDay } from "@leave/client";
 import { MonthCalendar } from "./MonthCalendar";
 import "./calendar.css";
@@ -532,6 +532,7 @@ const MonthBlock = memo(function MonthBlock(props: {
   dischargeAt: string | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
+  const personalEvents = usePersonalEvents(props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
@@ -566,6 +567,7 @@ const MonthBlock = memo(function MonthBlock(props: {
       cycles={cycles}
       currentCycle={props.currentCycle}
       dischargeAt={props.dischargeAt}
+      personalEvents={personalEvents.data?.events}
     />
   );
 });

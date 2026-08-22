@@ -27,7 +27,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:5173",
+        'pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:5173 --var \'RATE_LIMITS:{"signup":100000,"login":100000}\'',
       url: "http://localhost:8787/",
       reuseExistingServer: true,
       timeout: 60_000,

@@ -203,6 +203,58 @@ export const blockedUserSchema = z
   })
   .openapi("BlockedUser");
 
+export const friendSummarySchema = z
+  .object({
+    userId: z.string(),
+    name: z.string(),
+    since: z.string(),
+  })
+  .openapi("FriendSummary");
+
+export const friendRequestSchema = z
+  .object({
+    userId: z.string(),
+    name: z.string(),
+    createdAt: z.string(),
+  })
+  .openapi("FriendRequest");
+
+export const friendCalendarPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  isViewer: z.boolean(),
+});
+
+export const friendCalendarLeaveSchema = z.object({
+  leaveId: z.string(),
+  userId: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  status: z.enum(LEAVE_STATUSES),
+});
+
+export const friendCalendarSchema = z
+  .object({
+    month: z.string(),
+    people: z.array(friendCalendarPersonSchema),
+    leaves: z.array(friendCalendarLeaveSchema),
+  })
+  .openapi("FriendCalendar");
+
+export const personalEventSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    startTime: z.string().nullable(),
+    endTime: z.string().nullable(),
+    note: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("PersonalEvent");
+
 export const notificationPrefsResponseSchema = z
   .object({
     // 내 계획 날짜가 최대 출타 인원을 넘겼을 때

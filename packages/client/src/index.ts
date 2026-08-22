@@ -22,5 +22,7 @@ export * from "./hooks/leaves";
 export * from "./hooks/blackouts";
 export * from "./hooks/notifications";
 export * from "./hooks/moderation";
+export * from "./hooks/friends";
+export * from "./hooks/personal-events";
 
 export * from "./forms/use-leave-form";

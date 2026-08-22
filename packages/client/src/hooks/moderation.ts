@@ -7,6 +7,7 @@ import type { BlockCreateInput, ReportCreateInput } from "@leave/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
+import { purgeFriendCalendarAccess } from "./friends";
 import type { Calendar, Member } from "../types";
 
 /** 신고는 접수만 하면 되므로 캐시를 건드리지 않는다. */
@@ -29,6 +30,7 @@ export function useBlockUser() {
     mutationFn: async (input: BlockCreateInput) =>
       unwrap(await client.moderation.blocks.$post({ json: input })),
     onSuccess: async (_data, input) => {
+      await purgeFriendCalendarAccess(queryClient, input.userId);
       // A GET that started before the block can otherwise restore the person
       // immediately after this local filter. Stop both families first, then
       // apply exactly the server-side visibility rule without refetching every
@@ -36,6 +38,7 @@ export function useBlockUser() {
       await Promise.all([
         queryClient.cancelQueries({ queryKey: queryKeys.allUnitMembers }),
         queryClient.cancelQueries({ queryKey: queryKeys.calendars }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.friends }),
       ]);
       queryClient.setQueriesData<{ members: Member[] }>(
         { queryKey: queryKeys.allUnitMembers },
