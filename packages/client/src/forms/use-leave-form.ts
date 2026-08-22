@@ -35,7 +35,13 @@ import {
   type SegmentDraft,
   type SegmentLike,
 } from "@leave/shared";
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SetStateAction,
+} from "react";
 import { useCalendarDays } from "../hooks/calendar";
 import { useMe } from "../hooks/auth";
 import {
@@ -89,6 +95,21 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const create = useCreateLeave();
   const update = useUpdateLeave();
 
+  /** 등록할 때는 실제 잔여가 가장 많은 재원을 먼저 제안한다. 동률이면 API 순서를 따른다. */
+  const preferredBalanceKey = useMemo<BalanceKey | undefined>(
+    () =>
+      balances.data?.balances.reduce<
+        (typeof balances.data.balances)[number] | undefined
+      >(
+        (preferred, item) =>
+          !preferred || item.remainingDays > preferred.remainingDays
+            ? item
+            : preferred,
+        undefined,
+      )?.key,
+    [balances.data?.balances],
+  );
+
   /* --- 폼 상태 -------------------------------------------------------- */
   const [title, setTitle] = useState(editing?.title ?? "");
   const [reason, setReason] = useState(editing?.reason ?? "");
@@ -100,7 +121,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const [status, setStatus] = useState<LeaveStatus>(
     editing?.status ?? "shared",
   );
-  const [drafts, setDrafts] = useState<SegmentDraft[]>(() =>
+  const [drafts, setDraftState] = useState<SegmentDraft[]>(() =>
     editing?.segments.length
       ? segmentsToDrafts(editing.segments)
       : fitDrafts(
@@ -110,6 +131,25 @@ export function useLeaveForm(options: LeaveFormOptions) {
         ),
   );
   const [error, setError] = useState<string | null>(null);
+  // 잔여 조회는 폼보다 늦게 끝날 수 있다. 한 번 기본값을 적용했거나 사용자가 구간을
+  // 건드렸다면 백그라운드 재조회 결과로 현재 선택을 덮어쓰지 않는다.
+  const preferredBalanceHandled = useRef(Boolean(editing));
+
+  useEffect(() => {
+    if (preferredBalanceHandled.current || !preferredBalanceKey) return;
+    preferredBalanceHandled.current = true;
+    setDraftState((current) =>
+      current.map((draft, index) =>
+        index === 0 ? { ...draft, key: preferredBalanceKey } : draft,
+      ),
+    );
+  }, [preferredBalanceKey]);
+
+  /** 화면에서 구간을 직접 바꾸는 순간부터는 사용자의 선택을 우선한다. */
+  const setDrafts = (next: SetStateAction<SegmentDraft[]>) => {
+    preferredBalanceHandled.current = true;
+    setDraftState(next);
+  };
 
   const pending = create.isPending || update.isPending;
   const validRange = Boolean(startDate && endDate && startDate <= endDate);
@@ -191,7 +231,9 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const applyRange = (nextStart: string, nextEnd: string) => {
     setStartDate(nextStart);
     setEndDate(nextEnd);
-    setDrafts((current) => fitDrafts(current, nextStart, nextEnd));
+    setDraftState((current) =>
+      fitDrafts(current, nextStart, nextEnd, preferredBalanceKey),
+    );
   };
 
   /* --- 재원 잔여 계산 -------------------------------------------------- */

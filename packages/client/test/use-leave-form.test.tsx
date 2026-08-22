@@ -13,6 +13,13 @@ import { describe, expect, it, vi } from "vitest";
 import { useLeaveForm } from "../src/forms/use-leave-form";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
+type BalanceFixture = {
+  key: string;
+  totalDays: number;
+  usedDays: number;
+  remainingDays: number;
+};
+
 /** 연가 5일만 남은 사용자. 그룹은 없어 달력 조회가 일어나지 않는다. */
 function setup(
   createLeave = vi.fn((_args: { json: unknown }) =>
@@ -21,6 +28,11 @@ function setup(
       exceededDates: [],
     }),
   ),
+  balanceItems: BalanceFixture[] = [
+    { key: "annual", totalDays: 5, usedDays: 0, remainingDays: 5 },
+  ],
+  getBalances = () =>
+    Promise.resolve({ balances: balanceItems, regularOvernight: null }),
 ) {
   const client = {
     auth: {
@@ -35,13 +47,7 @@ function setup(
     leaves: {
       mine: { $get: () => Promise.resolve({ leaves: [] }) },
       balances: {
-        $get: () =>
-          Promise.resolve({
-            balances: [
-              { key: "annual", totalDays: 5, usedDays: 0, remainingDays: 5 },
-            ],
-            regularOvernight: null,
-          }),
+        $get: getBalances,
       },
       $post: createLeave,
     },
@@ -68,6 +74,63 @@ async function renderForm(wrapper: ReturnType<typeof setup>["wrapper"]) {
   );
   return view;
 }
+
+describe("기본 휴가 종류", () => {
+  it("등록할 때 실제 잔여가 가장 많은 종류를 선택한다", async () => {
+    const { wrapper } = setup(undefined, [
+      // 총 보유량보다 지금 쓸 수 있는 잔여량을 기준으로 고른다.
+      { key: "annual", totalDays: 20, usedDays: 18, remainingDays: 2 },
+      { key: "award", totalDays: 10, usedDays: 3, remainingDays: 7 },
+      {
+        key: "consolation",
+        totalDays: 6,
+        usedDays: 1,
+        remainingDays: 5,
+      },
+    ]);
+    const { result } = await renderForm(wrapper);
+
+    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("award"));
+  });
+
+  it("잔여를 불러오는 동안 사용자가 고른 종류는 덮어쓰지 않는다", async () => {
+    let resolveBalances!: (value: {
+      balances: BalanceFixture[];
+      regularOvernight: null;
+    }) => void;
+    const balancesResponse = new Promise<{
+      balances: BalanceFixture[];
+      regularOvernight: null;
+    }>((resolve) => {
+      resolveBalances = resolve;
+    });
+    const { wrapper } = setup(undefined, [], () => balancesResponse);
+    const { result } = await renderForm(wrapper);
+
+    act(() => {
+      result.current.setDrafts((current) =>
+        current.map((draft) => ({ ...draft, key: "consolation" })),
+      );
+    });
+    await act(async () => {
+      resolveBalances({
+        balances: [
+          { key: "annual", totalDays: 2, usedDays: 0, remainingDays: 2 },
+          { key: "award", totalDays: 8, usedDays: 0, remainingDays: 8 },
+        ],
+        regularOvernight: null,
+      });
+      await balancesResponse;
+    });
+
+    await waitFor(() =>
+      expect(
+        result.current.rowAvailable("2026-09-01", "2026-09-01").get("award"),
+      ).toBe(8),
+    );
+    expect(result.current.drafts[0]?.key).toBe("consolation");
+  });
+});
 
 describe("기간 변경", () => {
   it("구간이 항상 기간 전체를 빈틈없이 덮는다", async () => {
