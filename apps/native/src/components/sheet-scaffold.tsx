@@ -148,7 +148,13 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   title: { flex: 1, fontSize: 20, fontWeight: "700", color: colors.ink },
   closeButton: { alignSelf: "center" },
-  scroll: { flex: 1 },
+  /**
+   * `overflow: hidden`은 장식이 아니다. iOS RN의 `ScrollView`는 콘텐츠를 자기
+   * 경계로 잘라내지 않아서, 스크롤 오프셋이 생기는 순간 본문이 위쪽 고정 헤더와
+   * 아래쪽 푸터 '위로' 그려진다. 시트가 열리는 도중 키보드가 뜨면 UIKit이
+   * 포커스된 입력을 보이려고 스크롤을 밀고, 그 오프셋이 그대로 남아 겹쳐 보였다.
+   */
+  scroll: { flex: 1, overflow: "hidden" },
   content: {
     width: "100%",
     alignSelf: "center",

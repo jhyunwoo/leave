@@ -158,11 +158,15 @@ function PersonalEventEditor(props: {
     >
       <>
         <Field label="제목">
+          {/*
+            autoFocus를 걸지 않는다. 시트가 올라오는 애니메이션 도중 키보드가 뜨면
+            UIKit이 포커스된 입력을 보이려고 스크롤 본문을 밀어 올려, 제목 칸이
+            헤더 위로 튀어나온 채 굳는다. 앱의 다른 시트들도 열자마자 포커스하지 않는다.
+          */}
           <Input
             value={title}
             onChangeText={setTitle}
             maxLength={80}
-            autoFocus
             testID="personal-event-title"
           />
         </Field>
