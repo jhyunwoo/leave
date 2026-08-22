@@ -6,15 +6,12 @@ import {
   useUpdatePersonalEvent,
   type PersonalEvent,
 } from "@leave/client";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Button } from "@/components/button";
 import { Field, Input } from "@/components/field";
-import {
-  SHEET_GRABBER_INSET,
-  SheetScaffold,
-} from "@/components/sheet-scaffold";
+import { SheetScaffold } from "@/components/sheet-scaffold";
 import { confirmAction } from "@/lib/dialog";
 import { makeStyles, spacing, useColors } from "@/theme";
 
@@ -42,13 +39,12 @@ export function PersonalEventFormScreen() {
   );
   if (params.eventId && !existing) {
     return (
-      <SheetScaffold
-        title="개인 일정"
-        onClose={() => router.back()}
-        headerTopInset={SHEET_GRABBER_INSET}
-      >
-        <Text>일정을 찾을 수 없어요.</Text>
-      </SheetScaffold>
+      <>
+        <SheetTitle title="개인 일정" onClose={() => router.back()} />
+        <SheetScaffold>
+          <Text>일정을 찾을 수 없어요.</Text>
+        </SheetScaffold>
+      </>
     );
   }
   return (
@@ -132,90 +128,132 @@ function PersonalEventEditor(props: {
   };
 
   return (
-    <SheetScaffold
-      title={props.existing ? "개인 일정 수정" : "개인 일정 추가"}
-      onClose={props.onClose}
-      // 시트 위쪽 드래그 인디케이터 자리를 헤더 안쪽 여백으로 비운다.
-      headerTopInset={SHEET_GRABBER_INSET}
-      footer={
-        <View style={styles.footer}>
-          <Button
-            title="저장"
-            loading={pending}
-            onPress={() => void save()}
-            testID="personal-event-save"
-          />
-          {props.existing ? (
+    <>
+      <SheetTitle
+        title={props.existing ? "개인 일정 수정" : "개인 일정 추가"}
+        onClose={props.onClose}
+      />
+      <SheetScaffold
+        footer={
+          <View style={styles.footer}>
             <Button
-              title="삭제"
-              variant="danger"
-              disabled={pending}
-              onPress={() => void remove()}
+              title="저장"
+              loading={pending}
+              onPress={() => void save()}
+              testID="personal-event-save"
             />
-          ) : null}
-        </View>
-      }
-    >
-      <>
-        <Field label="제목">
-          {/*
+            {props.existing ? (
+              <Button
+                title="삭제"
+                variant="danger"
+                disabled={pending}
+                onPress={() => void remove()}
+              />
+            ) : null}
+          </View>
+        }
+      >
+        <>
+          <Field label="제목">
+            {/*
             autoFocus를 걸지 않는다. 시트가 올라오는 애니메이션 도중 키보드가 뜨면
             UIKit이 포커스된 입력을 보이려고 스크롤 본문을 밀어 올려, 제목 칸이
             헤더 위로 튀어나온 채 굳는다. 앱의 다른 시트들도 열자마자 포커스하지 않는다.
           */}
-          <Input
-            value={title}
-            onChangeText={setTitle}
-            maxLength={80}
-            testID="personal-event-title"
-          />
-        </Field>
-        <View style={styles.pair}>
-          <Field label="시작일" hint="YYYY-MM-DD">
             <Input
-              value={startDate}
-              onChangeText={setStartDate}
-              autoCapitalize="none"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={80}
+              testID="personal-event-title"
             />
           </Field>
-          <Field label="종료일" hint="YYYY-MM-DD">
+          <View style={styles.pair}>
+            <Field label="시작일" hint="YYYY-MM-DD">
+              <Input
+                value={startDate}
+                onChangeText={setStartDate}
+                autoCapitalize="none"
+              />
+            </Field>
+            <Field label="종료일" hint="YYYY-MM-DD">
+              <Input
+                value={endDate}
+                onChangeText={setEndDate}
+                autoCapitalize="none"
+              />
+            </Field>
+          </View>
+          <View style={styles.pair}>
+            <Field label="시작 시간 (선택)" hint="HH:mm">
+              <Input
+                value={startTime}
+                onChangeText={setStartTime}
+                autoCapitalize="none"
+              />
+            </Field>
+            <Field label="종료 시간 (선택)" hint="HH:mm">
+              <Input
+                value={endTime}
+                onChangeText={setEndTime}
+                autoCapitalize="none"
+              />
+            </Field>
+          </View>
+          <Field label="메모 (선택)" error={error}>
             <Input
-              value={endDate}
-              onChangeText={setEndDate}
-              autoCapitalize="none"
+              value={note}
+              onChangeText={setNote}
+              maxLength={500}
+              multiline
+              numberOfLines={4}
             />
           </Field>
-        </View>
-        <View style={styles.pair}>
-          <Field label="시작 시간 (선택)" hint="HH:mm">
-            <Input
-              value={startTime}
-              onChangeText={setStartTime}
-              autoCapitalize="none"
-            />
-          </Field>
-          <Field label="종료 시간 (선택)" hint="HH:mm">
-            <Input
-              value={endTime}
-              onChangeText={setEndTime}
-              autoCapitalize="none"
-            />
-          </Field>
-        </View>
-        <Field label="메모 (선택)" error={error}>
-          <Input
-            value={note}
-            onChangeText={setNote}
-            maxLength={500}
-            multiline
-            numberOfLines={4}
-          />
-        </Field>
-        <Text style={styles.privacy}>
-          나만 볼 수 있는 일정이며 휴가 계산·부대 통계·알림에 포함되지 않아요.
-        </Text>
-      </>
-    </SheetScaffold>
+          <Text style={styles.privacy}>
+            나만 볼 수 있는 일정이며 휴가 계산·부대 통계·알림에 포함되지 않아요.
+          </Text>
+        </>
+      </SheetScaffold>
+    </>
+  );
+}
+
+/**
+ * 시트의 제목과 닫기 버튼을 시스템 내비게이션 바에 실어 보낸다.
+ *
+ * 시트 안에 RN으로 헤더를 그리지 않는 이유는 `(tabs)/(calendar)/_layout.tsx`에
+ * 적어 두었다 — formSheet 안에서는 그 헤더만 레이아웃 자리를 못 잡아 입력칸이
+ * 제목과 닫기 버튼을 덮었다.
+ */
+function SheetTitle(props: { title: string; onClose: () => void }) {
+  const colors = useColors();
+  return (
+    <Stack.Screen
+      options={{
+        title: props.title,
+        // 내비게이션 바 안에는 SwiftUI 호스트(@expo/ui Button) 대신 평범한
+        // 텍스트 버튼을 둔다. 호스트는 자기 크기를 스스로 정해 바 높이에 맞지 않는다.
+        headerLeft: () => (
+          <Pressable
+            accessibilityRole="button"
+            onPress={props.onClose}
+            hitSlop={12}
+            testID="personal-event-close"
+          >
+            {({ pressed }) => (
+              <Text
+                style={{
+                  color: colors.brand,
+                  fontSize: 17,
+                  opacity: pressed ? 0.5 : 1,
+                }}
+              >
+                닫기
+              </Text>
+            )}
+          </Pressable>
+        ),
+      }}
+    />
   );
 }
 
