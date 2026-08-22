@@ -148,7 +148,7 @@ importers:
   apps/native:
     dependencies:
       '@expo/ui':
-        specifier: ^57.0.11
+        specifier: 57.0.11
         version: 57.0.11(@babel/core@7.29.7)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(expo@57.0.14)(react-dom@19.2.3(react@19.2.3))(react-native-worklets@0.10.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       '@leave/api':
         specifier: workspace:*
@@ -160,7 +160,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@react-native-community/netinfo':
-        specifier: ^12.0.1
+        specifier: 12.0.1
         version: 12.0.1(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       '@tanstack/react-query':
         specifier: ^5.101.4
@@ -169,64 +169,67 @@ importers:
         specifier: ^5.101.4
         version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.3))(react@19.2.3)
       expo:
-        specifier: ^57.0.14
+        specifier: 57.0.14
         version: 57.0.14(@babel/core@7.29.7)(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.11)(expo-router@57.0.14)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      expo-application:
+        specifier: 57.0.2
+        version: 57.0.2(expo@57.0.14)
       expo-blur:
-        specifier: ^57.0.2
+        specifier: 57.0.2
         version: 57.0.2(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-build-properties:
-        specifier: ^57.0.12
+        specifier: 57.0.12
         version: 57.0.12(expo@57.0.14)
       expo-constants:
-        specifier: ^57.0.12
+        specifier: 57.0.12
         version: 57.0.12(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
       expo-device:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)
       expo-font:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-glass-effect:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-haptics:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)
       expo-insights:
-        specifier: ^57.0.11
+        specifier: 57.0.11
         version: 57.0.11(expo@57.0.14)
       expo-linking:
-        specifier: ^57.0.6
+        specifier: 57.0.6
         version: 57.0.6(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-notifications:
-        specifier: ^57.0.12
+        specifier: 57.0.12
         version: 57.0.12(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       expo-router:
-        specifier: ^57.0.14
+        specifier: 57.0.14
         version: 57.0.14(e786f7aac4917f879840bbaa8dcef168)
       expo-secure-store:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)
       expo-splash-screen:
-        specifier: ^57.0.7
+        specifier: 57.0.7
         version: 57.0.7(expo@57.0.14)(typescript@6.0.3)
       expo-sqlite:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-status-bar:
-        specifier: ^57.0.1
+        specifier: 57.0.1
         version: 57.0.1(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-symbols:
-        specifier: ^57.0.2
+        specifier: 57.0.2
         version: 57.0.2(expo-font@57.0.1)(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-system-ui:
-        specifier: ^57.0.2
+        specifier: 57.0.2
         version: 57.0.2(expo@57.0.14)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
       expo-updates:
-        specifier: ^57.0.15
+        specifier: 57.0.15
         version: 57.0.15(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-web-browser:
-        specifier: ^57.0.2
+        specifier: 57.0.2
         version: 57.0.2(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
       hono:
         specifier: 4.13.2
@@ -241,28 +244,28 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
       react-native:
-        specifier: ^0.86.2
+        specifier: 0.86.2
         version: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
       react-native-gesture-handler:
-        specifier: ^2.32.0
+        specifier: 2.32.0
         version: 2.32.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-reanimated:
-        specifier: ^4.5.3
+        specifier: 4.5.3
         version: 4.5.3(react-native-worklets@0.10.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-safe-area-context:
-        specifier: ^5.9.0
+        specifier: 5.9.0
         version: 5.9.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-screens:
-        specifier: ^4.27.0
+        specifier: 4.27.0
         version: 4.27.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-svg:
-        specifier: ^15.15.5
+        specifier: 15.15.5
         version: 15.15.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-web:
         specifier: ^0.21.2
         version: 0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react-native-worklets:
-        specifier: ^0.10.4
+        specifier: 0.10.4
         version: 0.10.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
     devDependencies:
       '@types/react':
@@ -2951,10 +2954,12 @@ packages:
   '@xmldom/xmldom@0.8.14':
     resolution: {integrity: sha512-T4EDRUBVZYRldYApjEJiU0e1stYWaRAX7CuSnKzrpwdZKo53zGV8/pqfzV6FfwNl9YThD2OumQYvqtvjvgG7aQ==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xmldom/xmldom@0.9.11':
     resolution: {integrity: sha512-tW8bcK3hsG0/uqSnNz6TK4BkcuZSezoU7DlnYssILmZDktPnSHHuDJJFM0AJv+13gz2r0iGdrj6qqKeUnxXEDg==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -3783,6 +3788,7 @@ packages:
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'

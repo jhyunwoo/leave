@@ -43,6 +43,7 @@ import {
   type Me,
 } from "@leave/client";
 import { Avatar } from "@/components/avatar";
+import { BuildInfo } from "@/components/build-info";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
@@ -236,6 +237,9 @@ export function ProfileScreen() {
 
         {/* 고지는 카드가 아니라 화면 전체에 걸리는 문장이라 열 밖에 둔다. */}
         <OfficialDisclaimer />
+
+        {/* 배포 식별용. 화면 맨 아래에 두어 평소에는 눈에 걸리지 않게 한다. */}
+        <BuildInfo />
       </ScrollView>
 
       {editing && (

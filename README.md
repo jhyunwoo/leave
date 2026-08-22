@@ -111,24 +111,28 @@ pnpm test --filter @leave/api    # API 통합 테스트 (격리 D1 + wrangler de
 | `leave-api` (API·문서)  | `https://api.leave.moveto.kr`   |
 
 ```bash
-# 1. 리소스 생성
+# 1. 리소스 생성 (최초 1회)
 cd apps/api
 npx wrangler d1 create leave-db          # 출력된 database_id를 wrangler.jsonc에 반영
-npx wrangler r2 bucket create leave-images
 npx wrangler kv namespace create CACHE   # 출력된 id를 wrangler.jsonc의 kv_namespaces에 반영
 
-# 2. API 배포 + 원격 마이그레이션
-pnpm db:migrate:remote
-pnpm deploy
-
-# 3. 웹 배포 (API 주소는 apps/web/.env.production에서 빌드에 주입됨)
-cd ../web
-pnpm deploy
-
-# 4. 관리자 배포
-cd ../admin
-pnpm deploy
+# 2. 배포 — 바뀐 앱만 올립니다. `run`이 반드시 필요합니다(아래 주의 참고).
+pnpm --filter @leave/api   run deploy   # ⚠ 운영 D1 마이그레이션을 먼저 돌립니다
+pnpm --filter @leave/web   run deploy   # API 주소는 apps/web/.env.production에서 주입
+pnpm --filter @leave/admin run deploy
 ```
+
+`run` 없이 `pnpm --filter @leave/web deploy`를 치면 `ERR_PNPM_INVALID_DEPLOY_TARGET`으로
+죽습니다. `deploy`가 pnpm 내장 명령과 이름이 겹치기 때문이며, 오류 메시지는 스크립트와
+무관해 보입니다.
+
+`@leave/api`의 `deploy`는 `db:migrate:remote && wrangler deploy`라 **운영 D1에 마이그레이션이
+먼저 돕니다.** 올리기 전에 `npx wrangler d1 migrations list leave-db --remote`로 미적용분을
+확인하세요.
+
+**무엇을 올릴지는 `apps/` diff만으로 정할 수 없습니다.** `packages/shared`는 api·web·admin·native
+전부에, `packages/client`는 web·native에 들어갑니다. 이 전파를 놓쳐 관리자 앱이 stale로 남은
+적이 있습니다. 판단 절차와 배포 후 검증 방법은 `deploy-web` skill에 정리돼 있습니다.
 
 API의 `CORS_ORIGIN`은 `apps/api/wrangler.jsonc`에서 `https://leave.moveto.kr`로
 좁혀 두었습니다(관리자 앱은 자기 워커에서 `/api/*`를 처리하므로 CORS 대상이 아니고,
@@ -136,19 +140,38 @@ API의 `CORS_ORIGIN`은 `apps/api/wrangler.jsonc`에서 `https://leave.moveto.kr
 
 ### 앱 스토어 배포 (EAS)
 
+**OTA로 되면 OTA로 하고, fingerprint가 갈라졌을 때만 새 빌드를 냅니다.**
+`runtimeVersion.policy`가 `"fingerprint"`라, 발행 전에 작업 트리의 fingerprint가 현재 스토어
+빌드와 같은지 확인하면 OTA가 닿을지 미리 알 수 있습니다.
+
 ```bash
 cd apps/native
-npx eas init                          # projectId 발급 (푸시 토큰 발급에 필요)
-pnpm eas:build --platform all         # = EAS_BUILD_NO_EXPO_GO_WARNING=true eas build
-pnpm eas:update:preview --message "변경 내용"
-pnpm eas:update:production --message "변경 내용"
+
+# 1. 판단 — 두 플랫폼의 fingerprint를 현재 스토어 빌드의 Runtime Version과 비교
+npx expo-updates fingerprint:generate --platform ios      # android도 따로
+npx eas build:list --platform all --status finished --limit 8   # tail로 자르지 말 것
+
+# 2-a. 일치 → OTA
+npx eas workflow:run publish-update.yml
+
+# 2-b. 불일치 → 새 빌드 + 제출
+pnpm eas:build --platform all --profile production
+pnpm eas:submit --profile production
 ```
+
+**로컬 `pnpm eas:update:*`는 aarch64 개발 머신에서 동작하지 않습니다.** `hermes-compiler`가
+x86-64 바이너리만 담고 있어 export가 `ELF: not found`로 죽습니다. 그래서 OTA 발행은
+`.eas/workflows/publish-update.yml`로 EAS 서버에 맡깁니다. `eas build`는 서버가 직접
+번들하므로 영향이 없습니다.
+
+지금 기기에서 돌고 있는 빌드와 OTA는 **프로필 탭 맨 아래**에 표시됩니다.
+전체 절차와 함정은 `deploy-app` skill에 정리돼 있습니다.
 
 `eas` 를 직접 부르면 production 프로파일에서 "Detected that your app uses Expo Go for development" 경고가 뜹니다. 위 스크립트가 `EAS_BUILD_NO_EXPO_GO_WARNING=true` 를 붙여 이를 억제합니다(`eas.json` 의 `env` 로는 억제되지 않음 — 그 값은 빌드 서버로만 전달되고 경고는 로컬 CLI가 출력).
 
 푸시 알림은 실기기 + EAS projectId가 있어야 동작합니다. 시뮬레이터/권한 거부 시 앱은 푸시 없이 정상 동작하며, 인앱 알림 목록은 항상 제공됩니다.
 
-Expo Insights는 새 네이티브 빌드부터 앱 콜드 스타트 사용량을 자동 집계합니다. OTA 업데이트는 먼저 `preview` 채널에서 검증한 뒤 같은 커밋을 `production` 채널에 발행합니다. 네이티브 모듈·권한·Expo SDK가 바뀌면 OTA 대신 새 스토어 빌드가 필요하며, 업데이트는 앱 실행 시 내려받아 다음 재시작부터 적용됩니다.
+Expo Insights는 새 네이티브 빌드부터 앱 콜드 스타트 사용량을 자동 집계합니다. 네이티브 모듈·권한·Expo SDK가 바뀌면 OTA 대신 새 스토어 빌드가 필요합니다 — 그래서 네이티브 의존성은 버전을 고정해 둡니다(`apps/native/AGENTS.md`). 업데이트는 앱 실행 시 내려받아 **다음 재시작부터** 적용되므로, 기기에서 확인하려면 재시작이 두 번 필요합니다.
 
 ## 동작 규칙 요약
 
