@@ -82,6 +82,12 @@ import { CalendarOverviewPanel } from "./overview-panel";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
+/**
+ * 헤더 툴바와 글래스 스트립 첫 줄 사이 숨 틈. 툴바 버튼과 요일 행이 맞닿아 한
+ * 덩어리로 보이는 걸 막는다. 스트립 높이(glassStripHeight)에도 함께 더해야
+ * 달력 스크롤의 상단 인셋이 어긋나지 않는다.
+ */
+const STRIP_TOP_GAP = spacing.xs;
 /** 동기화 시각 한 줄. 아래 styles.syncStatus의 height와 같아야 한다. */
 const STATUS_ROW_HEIGHT = 20;
 const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
@@ -181,7 +187,10 @@ export function CalendarScreen() {
   const holdings = summarizeHoldings(balances.data?.balances);
 
   const glassStripHeight =
-    STATUS_ROW_HEIGHT + WEEK_ROW_HEIGHT + (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
+    STRIP_TOP_GAP +
+    STATUS_ROW_HEIGHT +
+    WEEK_ROW_HEIGHT +
+    (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
   const headerHeight = insets.top + NATIVE_HEADER_HEIGHT + glassStripHeight;
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
@@ -619,6 +628,7 @@ const useStyles = makeStyles(({ colors }) => ({
     position: "absolute",
     left: 0,
     right: 0,
+    paddingTop: STRIP_TOP_GAP,
     zIndex: 10,
     borderRadius: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
