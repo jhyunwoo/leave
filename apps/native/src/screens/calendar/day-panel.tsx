@@ -24,7 +24,6 @@ import type { Calendar, PersonalEvent } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
-import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { makeStyles, radius, spacing } from "@/theme";
 import { DayRoster } from "./day-roster";
 
@@ -106,8 +105,6 @@ export function DayPanel(props: {
           </Text>
         </ContentPanel>
       ) : null}
-
-      <OfficialDisclaimer />
 
       {props.cycle && (
         <Text style={styles.cycleLine}>

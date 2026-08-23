@@ -98,7 +98,7 @@ const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 export function CalendarScreen() {
   const styles = useStyles();
   const colors = useColors();
-  const { sizeClass, isCompact } = useWindowSizeClass();
+  const { sizeClass, isCompact, height: windowHeight } = useWindowSizeClass();
   const me = useMe();
   const netInfo = useNetInfo();
   const queryClient = useQueryClient();
@@ -324,6 +324,9 @@ export function CalendarScreen() {
    * 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 것.
    */
   const daySheetPresented = isCompact && selectedDate != null && !formDate;
+  // 날짜 상세 시트 높이. 시트 디텐트와 시트 안 RN 콘텐츠가 같은 값을 써야
+  // 안쪽 스크롤이 바닥까지 닿는다(sheet-snap-point.ts의 pinnedSheetHeight).
+  const daySheetHeight = Math.round(windowHeight * 0.75);
 
   const calendarPane = (
     <View style={styles.calendarPane}>
@@ -493,9 +496,11 @@ export function CalendarScreen() {
       {/* 좁은 창의 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
       <NativeBottomSheet
         isPresented={daySheetPresented}
-        // 디텐트는 하나만 준다. 여러 개면 SwiftUI가 콘텐츠를 최대 디텐트 기준으로
-        // 배치해 RN 루트가 보이는 시트보다 커지고, 안쪽 스크롤이 바닥에 닿지 못한다.
-        snapPoints={[{ fraction: 0.75 }]}
+        // 디텐트는 절대 높이 하나로 준다. 여러 개면 SwiftUI가 콘텐츠를 최대 디텐트
+        // 기준으로 배치해 RN 루트가 보이는 시트보다 커지고, 비율(fraction)로 주면
+        // 그 비율의 기준 높이를 RN이 알 수 없어 시트와 RN 콘텐츠의 높이가 어긋난다.
+        // 둘 중 어느 쪽이든 안쪽 스크롤이 바닥에 닿지 못한다(sheet-snap-point.ts).
+        snapPoints={[{ height: daySheetHeight }]}
         testID="calendar-day-sheet"
         // 사용자가 시트를 직접 내렸다. 대기 중이던 폼 요청은 무효로 본다.
         // 창이 넓어져서 내려간 경우에는 선택을 지우지 않는다 — 같은 선택이

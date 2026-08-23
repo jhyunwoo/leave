@@ -22,8 +22,8 @@ import {
   type PresentationDetent,
 } from "@expo/ui/swift-ui/modifiers";
 import type { ReactElement } from "react";
-
-type SnapPoint = "half" | "full" | { fraction: number } | { height: number };
+import { View } from "react-native";
+import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
 
 function toDetent(snapPoint: SnapPoint): PresentationDetent {
   if (snapPoint === "half") return "medium";
@@ -48,6 +48,7 @@ export function NativeBottomSheet(props: {
   // 대신 RN 콘텐츠가 시트를 가득 채우게 두고(시트가 모서리를 알아서 클리핑한다),
   // 드래그 인디케이터 자리는 콘텐츠 '안쪽' 여백(SHEET_GRABBER_INSET)으로 잡는다.
   const fitToContents = snapPoints.length === 0;
+  const pinned = pinnedSheetHeight(props.snapPoints);
   const modifiers: ModifierConfig[] = [
     frame({
       maxWidth: Infinity,
@@ -82,7 +83,14 @@ export function NativeBottomSheet(props: {
         testID={props.testID}
       >
         <Group modifiers={modifiers}>
-          <RNHostView>{props.children}</RNHostView>
+          <RNHostView>
+            {pinned === null ? (
+              props.children
+            ) : (
+              // 시트 높이를 RN 쪽에도 못 박는다(pinnedSheetHeight 주석 참고).
+              <View style={{ height: pinned }}>{props.children}</View>
+            )}
+          </RNHostView>
         </Group>
       </BottomSheet>
     </Host>

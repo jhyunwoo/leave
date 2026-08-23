@@ -7,9 +7,8 @@
 import { BottomSheet } from "@expo/ui/community/bottom-sheet";
 import type { ReactElement } from "react";
 import { View } from "react-native";
+import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
 import { useSheetClosed } from "./use-sheet-closed";
-
-type SnapPoint = "half" | "full" | { fraction: number } | { height: number };
 
 export function NativeBottomSheet(props: {
   isPresented: boolean;
@@ -32,6 +31,9 @@ export function NativeBottomSheet(props: {
     return point.height;
   });
 
+  // 시트 높이를 RN 쪽에도 못 박는다(pinnedSheetHeight 주석 참고).
+  const pinned = pinnedSheetHeight(props.snapPoints);
+
   return (
     <BottomSheet
       onDismiss={props.onDismiss}
@@ -39,7 +41,10 @@ export function NativeBottomSheet(props: {
       enablePanDownToClose
       snapPoints={snapPoints}
     >
-      <View style={{ flex: 1 }} testID={props.testID}>
+      <View
+        style={pinned === null ? { flex: 1 } : { height: pinned }}
+        testID={props.testID}
+      >
         {props.children}
       </View>
     </BottomSheet>
