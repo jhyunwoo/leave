@@ -1,10 +1,30 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 const API = "http://localhost:8787";
 const PASSWORD = "password123";
 
-async function signup(request: APIRequestContext, tag: string, name: string) {
-  const email = `friends-e2e-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`;
+function uniqueTag() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/**
+ * 계정을 만들고 공개 사용자 이름까지 정해 준다.
+ *
+ * 0023부터 친구 찾기가 이름 기반이라, 이름이 없는 계정은 검색되지도 요청을 받지도
+ * 못한다. `username: null`을 넘기면 이름 없는 옛 계정을 그대로 흉내 낸다.
+ */
+async function signup(
+  request: APIRequestContext,
+  tag: string,
+  name: string,
+  username?: string | null,
+) {
+  const email = `friends-e2e-${tag}-${uniqueTag()}@test.com`;
   const response = await request.post(`${API}/auth/signup`, {
     data: {
       email,
@@ -22,11 +42,31 @@ async function signup(request: APIRequestContext, tag: string, name: string) {
     token: string;
     user: { id: string };
   };
-  return { email, token: body.token, id: body.user.id };
+  let handle: string | null = null;
+  if (username !== null) {
+    // 꼬리표에 하이픈이 섞여 들어올 수 있다(`friend-0`). 이름에 쓸 수 없는
+    // 문자라 그대로 넣으면 서버가 400으로 거절하고, 화면 흐름은 시작도 못 한다.
+    const chosen =
+      username ??
+      `e2e${tag}${uniqueTag()}`.toLowerCase().replace(/[^a-z0-9._]/g, "");
+    const set = await request.put(`${API}/users/me/username`, {
+      headers: authorization(body.token),
+      data: { username: chosen },
+    });
+    expect(set.ok(), `username ${chosen}: ${await set.text()}`).toBeTruthy();
+    handle = ((await set.json()) as { username: string }).username;
+  }
+  return { email, token: body.token, id: body.user.id, username: handle };
 }
 
 function authorization(token: string) {
   return { Authorization: `Bearer ${token}` };
+}
+
+async function signIn(page: Page, token: string) {
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -36,25 +76,168 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("친구 탭은 공개 검색 없이 빈 상태와 정확한 이메일 요청을 제공한다", async ({
+test("사용자 이름 검색 → 프로필 → 요청 → 명시적 수락 → 삭제", async ({
   page,
   request,
 }) => {
-  const me = await signup(request, "empty", "빈친구");
-  const target = await signup(request, "target", "요청상대");
-  await page.addInitScript((token) => {
-    localStorage.setItem("leave.token", token);
-  }, me.token);
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
 
+  const me = await signup(request, "a", "요청보낸이");
+  const target = await signup(request, "b", "요청받은이");
+  await signIn(page, me.token);
+
+  // 1) 친구 탭에는 이메일 입력칸이 없다.
   await page.goto("/friends");
   await expect(
     page.getByRole("heading", { name: "친구", exact: true }),
   ).toBeVisible();
+  await expect(page.getByLabel("정확한 가입 이메일")).toHaveCount(0);
   await expect(page.getByText("아직 친구가 없어요.")).toBeVisible();
-  await page.getByLabel("정확한 가입 이메일").fill(target.email.toUpperCase());
-  await page.getByRole("button", { name: "요청 보내기" }).click();
-  await expect(page.getByRole("status")).toContainText("요청을 보냈어요");
-  await expect(page.getByText("요청상대 · 수락 대기")).toBeVisible();
+
+  // 2) @아이디로 검색한다. 대문자로 쳐도 같은 사람이 나온다.
+  await page
+    .getByTestId("friend-search-input")
+    .fill(target.username!.toUpperCase());
+  const result = page.getByTestId(`search-result-${target.username}`);
+  await expect(result).toBeVisible();
+  await expect(result).toContainText(`@${target.username}`);
+
+  // 3) 결과를 누르면 프로필이 열리고, 거기서 요청을 보낸다.
+  await result.click();
+  await expect(page).toHaveURL(new RegExp(`/u/${target.username}$`));
+  await expect(page.getByRole("heading", { name: "요청받은이" })).toBeVisible();
+  await page.getByTestId("profile-add-friend").click();
+  await expect(page.getByRole("status").first()).toContainText(
+    "친구 요청을 보냈어요",
+  );
+  await expect(page.getByTestId("profile-cancel-request")).toBeVisible();
+  // 아직 친구가 아니므로 일정 섹션이 없다.
+  await expect(page.getByText("공유된 휴가 일정")).toHaveCount(0);
+
+  // 4) 받은 쪽이 같은 사람에게 요청을 보내도 자동으로 친구가 되지 않는다.
+  const crossed = await request.post(`${API}/friends/requests`, {
+    headers: authorization(target.token),
+    data: { username: me.username },
+  });
+  expect(crossed.status()).toBe(409);
+  expect(((await crossed.json()) as { code: string }).code).toBe(
+    "incoming_request_exists",
+  );
+
+  // 5) 받은 쪽이 화면에서 명시적으로 수락한다.
+  const targetPage = await page.context().newPage();
+  await targetPage.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, target.token);
+  await targetPage.goto("/friends");
+  const incoming = targetPage.locator("section").filter({
+    has: targetPage.getByRole("heading", { name: "받은 요청" }),
+  });
+  await expect(incoming).toContainText(`@${me.username}`);
+  await incoming.getByRole("button", { name: "수락" }).click();
+  await expect(targetPage.getByRole("status").first()).toContainText(
+    "친구가 되었어요",
+  );
+
+  // 6) 요청을 보낸 쪽 프로필이 친구 상태가 되고 일정 섹션이 열린다.
+  await page.reload();
+  await expect(page.getByTestId("profile-remove-friend")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "공유된 휴가 일정" }),
+  ).toBeVisible();
+
+  // 7) 프로필 링크 공유(클립보드 대체 경로) — 정본 HTTPS 주소를 쓴다.
+  await expect(page.getByTestId("profile-share")).toBeVisible();
+  await expect(
+    page.getByText(`leave.moveto.kr/u/${target.username}`),
+  ).toBeVisible();
+
+  // 8) 어느 한쪽이 삭제하면 양쪽에서 사라진다.
+  const removed = await request.delete(`${API}/friends/${me.id}`, {
+    headers: authorization(target.token),
+  });
+  expect(removed.ok()).toBeTruthy();
+  await page.reload();
+  await expect(page.getByTestId("profile-add-friend")).toBeVisible();
+  await expect(page.getByText("공유된 휴가 일정")).toHaveCount(0);
+
+  const stale = await request.get(
+    `${API}/friends/${target.id}/schedule?startDate=2026-01-01&endDate=2026-12-31`,
+    { headers: authorization(me.token) },
+  );
+  expect(stale.status()).toBe(403);
+
+  await targetPage.close();
+  expect(consoleErrors).toEqual([]);
+});
+
+test("한글 사용자 이름 검색과 이름 중복 안내", async ({ page, request }) => {
+  const tag = uniqueTag();
+  const me = await signup(request, "ko", "한글찾는이");
+  const korean = await signup(request, "ko2", "한글이름", `현우${tag}`);
+  await signIn(page, me.token);
+
+  await page.goto("/friends");
+  await page.getByTestId("friend-search-input").fill(`현우${tag}`);
+  const result = page.getByTestId(`search-result-${korean.username}`);
+  await expect(result).toBeVisible();
+  await expect(result).toContainText("한글이름");
+
+  // 이미 쓰이는 이름으로 바꾸려 하면 중복 안내가 뜬다.
+  await page.goto("/profile");
+  await page.getByTestId("profile-edit-username").click();
+  await page.getByTestId("profile-username-input").fill(korean.username!);
+  await expect(page.getByText("이미 사용 중인 이름이에요")).toBeVisible();
+});
+
+test("로그아웃 상태의 /u/{username}은 로그인 뒤 그 자리로 돌아온다", async ({
+  page,
+  request,
+}) => {
+  const target = await signup(request, "deep", "딥링크대상");
+  const visitor = await signup(request, "visitor", "방문자");
+
+  await page.goto(`/u/${target.username}`);
+  await expect(page).toHaveURL(
+    new RegExp(`/login\\?next=%2Fu%2F${target.username}$`),
+  );
+  await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
+
+  await page.getByPlaceholder("you@example.com").fill(visitor.email);
+  await page.locator('input[type="password"]').fill(PASSWORD);
+  await page.getByRole("button", { name: "로그인" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/u/${target.username}$`), {
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("heading", { name: "딥링크대상" })).toBeVisible();
+  await expect(page.getByTestId("profile-add-friend")).toBeVisible();
+});
+
+test("이름 없는 옛 계정은 1회성 설정 화면을 지나야 앱에 들어간다", async ({
+  page,
+  request,
+}) => {
+  const tag = uniqueTag();
+  const legacy = await signup(request, "legacy", "옛계정", null);
+  expect(legacy.username).toBeNull();
+  await signIn(page, legacy.token);
+
+  await page.goto("/friends");
+  await expect(
+    page.getByRole("heading", { name: "사용자 이름을 정해주세요" }),
+  ).toBeVisible();
+  await page.getByTestId("username-setup-input").fill(`legacy${tag}`);
+  await expect(page.getByText("사용할 수 있어요")).toBeVisible();
+  await page.getByTestId("username-setup-submit").click();
+
+  // 설정이 끝나면 원래 가려던 주소가 그대로 열린다.
+  await expect(
+    page.getByRole("heading", { name: "친구", exact: true }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async ({
@@ -75,7 +258,7 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   for (const friend of friends) {
     const sent = await request.post(`${API}/friends/requests`, {
       headers: authorization(friend.token),
-      data: { email: me.email },
+      data: { username: me.username },
     });
     expect(
       sent.ok(),
@@ -108,16 +291,16 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   });
   expect(friendLeave.ok()).toBeTruthy();
 
-  await page.addInitScript((token) => {
-    localStorage.setItem("leave.token", token);
-  }, me.token);
+  await signIn(page, me.token);
   await page.goto("/friends");
   const incoming = page.locator("section").filter({
     has: page.getByRole("heading", { name: "받은 요청" }),
   });
   await expect(incoming.getByText("친구01")).toBeVisible();
   await incoming.getByRole("button", { name: "수락" }).click();
-  await expect(page.getByRole("status")).toContainText("친구가 되었어요");
+  await expect(page.getByRole("status").first()).toContainText(
+    "친구가 되었어요",
+  );
 
   const friendSection = page.locator("section").filter({
     has: page.getByRole("heading", { name: "내 친구" }),

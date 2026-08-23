@@ -30,11 +30,17 @@ export function resolveApiUrl(options: {
   return PRODUCTION_API_URL;
 }
 
-/** 서버가 내려준 error 메시지와 상태 코드를 담는 오류. */
+/**
+ * 서버가 내려준 error 메시지와 상태 코드를 담는 오류.
+ *
+ * `code`는 문구와 별개로 안정적인 분기 키다(@leave/shared의 SOCIAL_ERROR_CODES).
+ * 화면이 한국어 메시지를 비교해 분기하면 문구를 다듬는 순간 조용히 깨진다.
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -55,11 +61,16 @@ export interface UnwrappableResponse {
 export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    const body =
+      data && typeof data === "object"
+        ? (data as Record<string, unknown>)
+        : null;
     const message =
-      data && typeof data === "object" && "error" in data
-        ? String(data.error)
+      body && "error" in body
+        ? String(body.error)
         : "요청을 처리하지 못했습니다";
-    throw new ApiError(message, res.status);
+    const code = body && typeof body.code === "string" ? body.code : undefined;
+    throw new ApiError(message, res.status, code);
   }
   return data as T;
 }

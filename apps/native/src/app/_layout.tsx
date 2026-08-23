@@ -13,7 +13,8 @@
 
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { type ErrorBoundaryProps, Stack } from "expo-router";
+import { type ErrorBoundaryProps, Stack, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
@@ -24,13 +25,20 @@ import { ApiProvider } from "@/api/provider";
 import { ErrorScreen } from "@/components/error-screen";
 import { persistFatalError, toFatalRecord } from "@/lib/fatal-error";
 import {
+  capturePendingProfile,
+  takePendingProfile,
+} from "@/lib/pending-profile-link";
+import {
   configureQueryOnlineManager,
   QUERY_CACHE_MAX_AGE,
   queryPersistenceOptions,
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { tokenAtom } from "@/state/auth";
-import { useOnboardingStatus } from "@leave/client";
+import {
+  useOnboardingStatus,
+  watchFriendAccessRevocation,
+} from "@leave/client";
 import { useColors } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -70,6 +78,48 @@ const queryClient = new QueryClient({
   },
 });
 
+// 서버가 친구 권한을 거절하면(403/404) 캐시에 남은 일정 본문도 함께 버린다.
+// 재조회가 실패해도 TanStack은 마지막 성공 데이터를 들고 있어, 이게 없으면
+// 친구가 나를 끊은 뒤에도 화면이 예전 일정을 계속 그린다.
+// (디스크 캐시에는 애초에 친구 데이터를 저장하지 않는다 — query-persistence.ts)
+watchFriendAccessRevocation(queryClient);
+
+/**
+ * 로그인 전에 도착한 프로필 딥링크를 기억했다가, 갈 수 있게 된 순간 보낸다.
+ *
+ * 인증·온보딩·이름 설정이 모두 끝나기 전에는 `/u/{username}`이 라우트 트리에
+ * 없어 목적지가 사라진다. 자세한 배경은 lib/pending-profile-link.ts에 있다.
+ */
+function usePendingProfileLink(ready: boolean, canNavigate: boolean) {
+  const router = useRouter();
+  useEffect(() => {
+    // `ready`가 되기 전에는 인증 상태를 모르므로 판단을 미룬다. 그 전에 도착한
+    // 링크도 getInitialURL로 다시 읽을 수 있어 놓치지 않는다.
+    if (!ready) return;
+    let cancelled = false;
+    void Linking.getInitialURL().then((url) => {
+      if (!cancelled && url) capturePendingProfile(url);
+    });
+    const subscription = Linking.addEventListener("url", (event) => {
+      capturePendingProfile(event.url);
+    });
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [ready]);
+
+  // 갈 수 있게 된 순간 한 번만 꺼낸다. `takePendingProfile`이 값을 비우므로
+  // 이 effect가 다시 돌아도 같은 곳으로 두 번 이동하지 않는다.
+  useEffect(() => {
+    if (!canNavigate) return;
+    const username = takePendingProfile();
+    if (username) {
+      router.push({ pathname: "/u/[username]", params: { username } });
+    }
+  }, [canNavigate, router]);
+}
+
 function RootNavigator() {
   const colors = useColors();
   const token = useAtomValue(tokenAtom);
@@ -91,9 +141,16 @@ function RootNavigator() {
   // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)
   useNotificationLogging(isAuthed);
 
+  const onboardingComplete = onboarding.data?.completed === true;
+  // 0023 이전에 가입해 아직 공개 이름이 없는 계정은 1회성 설정 화면을 지난다.
+  const hasUsername = Boolean(onboarding.data?.username);
+  const canBrowse = isAuthed && onboardingComplete && hasUsername;
+
+  // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
+  usePendingProfileLink(ready, canBrowse);
+
   if (!ready || token === undefined || (isAuthed && onboarding.isPending))
     return null; // 스플래시 유지
-  const onboardingComplete = onboarding.data?.completed === true;
 
   return (
     <Stack
@@ -102,8 +159,22 @@ function RootNavigator() {
         contentStyle: { backgroundColor: colors.canvasSoft },
       }}
     >
-      <Stack.Protected guard={isAuthed && onboardingComplete}>
+      <Stack.Protected guard={canBrowse}>
         <Stack.Screen name="(tabs)" />
+        {/* 공유 주소(`https://leave.moveto.kr/u/…`, `leave://u/…`)의 착지점.
+            탭 그룹 밖의 최상위 라우트라 어디서 열려도 같은 카드로 뜬다. */}
+        <Stack.Screen
+          name="u/[username]"
+          options={{
+            headerShown: true,
+            title: "프로필",
+            headerBackTitle: "뒤로",
+            headerTransparent: process.env.EXPO_OS !== "web",
+            headerShadowVisible: false,
+            headerTintColor: colors.brand,
+            headerTitleStyle: { fontWeight: "600", color: colors.ink },
+          }}
+        />
         <Stack.Screen
           name="units"
           options={{
@@ -175,6 +246,9 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={isAuthed && !onboardingComplete}>
         <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+      <Stack.Protected guard={isAuthed && onboardingComplete && !hasUsername}>
+        <Stack.Screen name="username-setup" />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthed}>
         <Stack.Screen name="login" />

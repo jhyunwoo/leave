@@ -1,0 +1,72 @@
+# 사용자 이름 기반 친구 흐름 — 검색 → 프로필 → 요청, 그리고 프로필 딥링크.
+#
+# E2E_EMAIL/E2E_PASSWORD 계정에는 공개 사용자 이름이 있어야 하고,
+# E2E_SEARCH_USERNAME은 그 계정이 아직 친구가 아닌 다른 사용자의 @아이디여야 한다.
+# (관계 상태에 따라 버튼이 달라지므로, "친구 추가"가 떠 있어야 하는 대상이다.)
+appId: app.leave.mobile
+env:
+  EMAIL: ${E2E_EMAIL}
+  PASSWORD: ${E2E_PASSWORD}
+  SEARCH_USERNAME: ${E2E_SEARCH_USERNAME}
+---
+- launchApp:
+    clearState: true
+- tapOn: "로그인"
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "login-submit"
+
+# 친구 탭에는 이메일 입력칸이 없다 — 찾기는 언제나 @아이디로 한다.
+- tapOn: "친구"
+- assertVisible: "친구 찾기"
+- tapOn: "친구 찾기"
+- assertVisible: "사용자 이름으로 찾기"
+- assertNotVisible: "정확한 가입 이메일"
+- tapOn:
+    id: "friend-search-input"
+- inputText: ${SEARCH_USERNAME}
+
+# 결과를 누르면 프로필이 열린다. 요청은 목록이 아니라 프로필에서 보낸다 —
+# 작은 버튼을 잘못 눌러 엉뚱한 사람에게 요청이 나가는 일을 막는다.
+- tapOn:
+    id: "search-result-${SEARCH_USERNAME}"
+- assertVisible: "@${SEARCH_USERNAME}"
+- assertVisible:
+    id: "profile-add-friend"
+# 친구가 아니면 일정 섹션이 아예 없다.
+- assertNotVisible: "공유된 휴가 일정"
+- tapOn:
+    id: "profile-add-friend"
+# 요청을 보내면 그 자리에서 "요청 취소"로 바뀐다(자동 수락이 아니다).
+- assertVisible:
+    id: "profile-cancel-request"
+- assertNotVisible:
+    id: "profile-remove-friend"
+- tapOn:
+    id: "profile-cancel-request"
+- assertVisible:
+    id: "profile-add-friend"
+
+# 커스텀 스킴 딥링크 — 앱이 이미 떠 있는 상태(warm start)에서 프로필로 간다.
+- openLink: "leave://u/${SEARCH_USERNAME}"
+- assertVisible: "@${SEARCH_USERNAME}"
+
+# 콜드 스타트에서도 같은 링크가 같은 화면으로 떨어진다.
+- stopApp
+- openLink: "leave://u/${SEARCH_USERNAME}"
+- assertVisible: "@${SEARCH_USERNAME}"
+
+# 없는 이름은 오류 화면으로 떨어지고 앱이 죽지 않는다.
+- openLink: "leave://u/no.such.user.here"
+- assertVisible: "사용자를 찾을 수 없어요"
+
+# 내 프로필에서 @아이디를 바꿀 수 있다.
+- tapOn: "프로필"
+- assertVisible: "사용자 이름"
+- assertVisible:
+    id: "profile-edit-username"

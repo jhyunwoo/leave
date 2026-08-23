@@ -14,7 +14,13 @@ import {
   units,
   users,
 } from "@leave/api/server";
-import { BRANCHES, RANKS, isoDateSchema } from "@leave/shared";
+import {
+  BRANCHES,
+  RANKS,
+  isoDateSchema,
+  normalizeUsername,
+  usernameSchema,
+} from "@leave/shared";
 import { and, asc, desc, eq, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
@@ -43,6 +49,11 @@ const userCreateSchema = z
     dischargeAt: isoDateSchema,
     signupRank: z.enum(RANKS),
     unitId: nullableId,
+    /**
+     * 공개 사용자 이름. 운영자가 대신 정하지 않는 것이 기본이라 선택 값이다 —
+     * 본인이 온보딩에서 정하고, 여기서는 지원 과정에서 꼭 필요할 때만 넣는다.
+     */
+    username: usernameSchema.optional(),
     dataConsent: z.literal(true, {
       error: "개인정보 수집 동의가 확인되어야 합니다",
     }),
@@ -62,6 +73,8 @@ const userUpdateSchema = z
     dischargeAt: isoDateSchema.optional(),
     signupRank: z.enum(RANKS).optional(),
     unitId: nullableId,
+    // 부적절한 이름 신고를 처리할 때만 쓴다. 규칙과 정규화는 사용자 API와 같다.
+    username: usernameSchema.optional(),
     consented: z.boolean().optional(),
   })
   .refine(
@@ -92,6 +105,9 @@ function userDto(user: typeof users.$inferSelect) {
     id: user.id,
     email: user.email,
     name: user.name,
+    // 지원 문의는 대개 "@아이디로 찾아 주세요"로 들어온다. 운영자 화면에서
+    // 계정을 특정하는 데 쓰이므로 목록·상세에 함께 싣는다.
+    username: user.username,
     branch: user.branch,
     enlistedAt: user.enlistedAt,
     dischargeAt: user.dischargeAt,
@@ -101,6 +117,34 @@ function userDto(user: typeof users.$inferSelect) {
     consentedAt: user.consentedAt,
     createdAt: user.createdAt,
   };
+}
+
+/**
+ * 사용자 이름 유니크 위반인가.
+ *
+ * D1은 SQLite 오류를 코드가 아니라 문자열로 준다. drizzle이 실패한 문장을 한 번
+ * 감싸므로 `cause`를 따라 내려간다 — 바깥 메시지만 보면 제약 위반이 500으로 샌다.
+ * (사용자 API 쪽 같은 판정은 apps/api/src/lib/username.ts에 있다.)
+ */
+function isUsernameConflict(error: unknown): boolean {
+  // Error 체인만 따라간다. D1과 drizzle은 항상 Error를 던지고, 그 밖의 것이
+  // 올라왔다면 유일성 위반인지 알 방법이 없으므로 500으로 흘려보내는 편이 맞다.
+  for (
+    let current: unknown = error, depth = 0;
+    current instanceof Error && depth < 5;
+    depth += 1
+  ) {
+    const { message } = current;
+    if (
+      message.includes("UNIQUE constraint failed") &&
+      (message.includes("users.username") ||
+        message.includes("users_username_idx"))
+    ) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
 }
 
 async function ensureUser(
@@ -129,11 +173,14 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     const branch = c.req.query("branch");
     const consented = parseBoolean(c.req.query("consented"));
     if (q) {
+      // 검색어에 @가 붙어 오는 경우가 많아 정규형으로도 함께 찾는다.
+      const handle = normalizeUsername(q.replace(/^@+/, ""));
       conditions.push(
         or(
           like(users.name, `%${q}%`),
           like(users.email, `%${q}%`),
           like(users.id, `%${q}%`),
+          like(users.username, `%${handle}%`),
         )!,
       );
     }
@@ -196,12 +243,22 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       enlistedAt: input.data.enlistedAt,
       dischargeAt: input.data.dischargeAt,
       signupRank: input.data.signupRank,
+      username: input.data.username ?? null,
       unitId: input.data.unitId ?? null,
       expoPushToken: null,
       consentedAt: now,
       createdAt: now,
     };
-    await db.insert(users).values(user);
+    try {
+      await db.insert(users).values(user);
+    } catch (error) {
+      // 유일성은 users_username_idx가 지킨다. 여기서 "조회 후 삽입"으로 흉내 내면
+      // 동시 요청 사이에서 반드시 깨지므로, 제약 위반을 그대로 409로 옮긴다.
+      if (isUsernameConflict(error)) {
+        return c.json({ error: "이미 사용 중인 사용자 이름입니다" }, 409);
+      }
+      throw error;
+    }
     const after = userDto(user as typeof users.$inferSelect);
     await writeAudit(c, {
       action: "create",
@@ -257,6 +314,7 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       patch.signupRank = input.data.signupRank;
     }
     if (input.data.unitId !== undefined) patch.unitId = input.data.unitId;
+    if (input.data.username !== undefined) patch.username = input.data.username;
     if (input.data.consented !== undefined) {
       patch.consentedAt = input.data.consented ? nowIso() : null;
     }
@@ -266,7 +324,14 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
       patch.passwordSalt = salt;
     }
     if (Object.keys(patch).length) {
-      await db.update(users).set(patch).where(eq(users.id, id));
+      try {
+        await db.update(users).set(patch).where(eq(users.id, id));
+      } catch (error) {
+        if (isUsernameConflict(error)) {
+          return c.json({ error: "이미 사용 중인 사용자 이름입니다" }, 409);
+        }
+        throw error;
+      }
     }
     if (input.data.password) {
       await db.delete(sessions).where(eq(sessions.userId, id));

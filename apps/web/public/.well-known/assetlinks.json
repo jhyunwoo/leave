@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.leave.mobile",
+      "sha256_cert_fingerprints": [
+        "40:94:8C:4A:76:DD:83:36:2E:A5:B9:9D:EF:65:28:B5:C5:27:8A:D2:19:9D:2F:78:45:D4:FB:AB:EA:AC:64:2E"
+      ]
+    }
+  }
+]

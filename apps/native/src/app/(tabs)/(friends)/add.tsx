@@ -1,4 +1,4 @@
-import { FriendAddScreen } from "@/screens/friend-add";
-export default function FriendAddRoute() {
-  return <FriendAddScreen />;
+import { FriendSearchScreen } from "@/screens/friend-search";
+export default function FriendSearchRoute() {
+  return <FriendSearchScreen />;
 }

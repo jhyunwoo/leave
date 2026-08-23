@@ -6,7 +6,8 @@
 
 import { signupSchema } from "@leave/shared";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
+import { safeNext, withNext } from "../state/next-destination";
 import { useSignup } from "@leave/client";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
@@ -31,6 +32,10 @@ export function SignupPage() {
 
   const signup = useSignup();
   const navigate = useNavigate();
+  const location = useLocation();
+  // 공유된 프로필 링크로 들어온 신규 사용자도 목적지를 잃지 않는다.
+  // 온보딩과 이름 설정은 주소를 바꾸지 않으므로, 그 단계가 끝나면 이 주소가 열린다.
+  const next = safeNext(location.search);
 
   const submit = async () => {
     if (password !== passwordConfirm) {
@@ -59,7 +64,7 @@ export function SignupPage() {
       // 알림 선택은 가입을 막지 않는다. 로그인 후 알림의 가치를 확인한
       // 설정 화면에서 다시 선택한다.
       void notificationOptIn;
-      void navigate("/", { replace: true });
+      void navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "가입하지 못했습니다");
     }
@@ -191,7 +196,11 @@ export function SignupPage() {
 
         <p className="body-sm text-body" style={{ textAlign: "center" }}>
           이미 계정이 있나요?{" "}
-          <Link to="/login" className="strong" style={{ color: "var(--ink)" }}>
+          <Link
+            to={withNext("/login", next)}
+            className="strong"
+            style={{ color: "var(--ink)" }}
+          >
             로그인
           </Link>
         </p>

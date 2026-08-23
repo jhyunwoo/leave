@@ -15,6 +15,7 @@ import {
   BRANCH_LABELS,
   BRANCHES,
   fmtDateK,
+  formatUsername,
   profileUpdateSchema,
   RANK_LABELS,
   RANKS,
@@ -39,6 +40,7 @@ import {
   useDeleteAccount,
   useLogout,
   useMe,
+  useSetUsername,
   useUpdateProfile,
   type Me,
 } from "@leave/client";
@@ -54,10 +56,104 @@ import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { NativeSegmentedControl } from "@/components/segmented-control";
 import { ServiceProgress } from "@/components/service-progress";
 import { SheetScaffold } from "@/components/sheet-scaffold";
+import { UsernameField, useUsernameDraft } from "@/components/username-field";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction, notify } from "@/lib/dialog";
 import { ResponsiveGrid, useWindowSizeClass } from "@/adaptive";
 import { layout, makeStyles, spacing, useColors } from "@/theme";
+
+/**
+ * 공개 사용자 이름 카드 — 지금 이름을 보여주고 그 자리에서 바꾼다.
+ *
+ * 이름을 바꿔도 사용자 id는 그대로라 친구 관계·휴가 소유권·로그인은 영향을 받지
+ * 않는다. 바뀌는 것은 프로필 주소 하나뿐이고, 옛 주소는 그 순간 열리지 않는다.
+ * 이전 이름을 예약해 두는 장치는 두지 않았다 — 아무도 못 쓰는 이름만 쌓인다.
+ */
+function UsernameCard(props: { username: string | null }) {
+  const styles = useStyles();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const draft = useUsernameDraft(props.username ?? "");
+  const setUsername = useSetUsername();
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!draft.valid) return;
+    setError(null);
+    try {
+      await setUsername.mutateAsync({ username: draft.username });
+      setEditing(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "저장하지 못했습니다",
+      );
+    }
+  };
+
+  return (
+    <ContentPanel style={styles.card}>
+      <Text style={styles.sectionTitle}>사용자 이름</Text>
+      <Text selectable style={styles.alias}>
+        {props.username
+          ? formatUsername(props.username)
+          : "아직 정하지 않았어요"}
+      </Text>
+      <Text style={styles.privacyHint}>
+        친구가 나를 찾는 공개 이름이에요. 바꾸면 이전 프로필 주소는 더 이상
+        열리지 않지만, 이미 맺은 친구 관계는 그대로 유지돼요.
+      </Text>
+      {editing ? (
+        <>
+          <UsernameField
+            draft={draft}
+            serverError={error}
+            autoFocus
+            onSubmit={() => void submit()}
+            testID="profile-username-input"
+          />
+          <Button
+            title="저장"
+            disabled={!draft.valid}
+            loading={setUsername.isPending}
+            onPress={() => void submit()}
+            testID="profile-save-username"
+          />
+          <Button
+            title="취소"
+            variant="ghost"
+            onPress={() => {
+              setEditing(false);
+              setError(null);
+              draft.setRaw(props.username ?? "");
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <Button
+            title="사용자 이름 바꾸기"
+            variant="secondary"
+            onPress={() => setEditing(true)}
+            testID="profile-edit-username"
+          />
+          {props.username ? (
+            <Button
+              title="내 공개 프로필 보기"
+              variant="ghost"
+              onPress={() =>
+                router.push({
+                  pathname: "/u/[username]",
+                  params: { username: props.username! },
+                })
+              }
+              testID="profile-open-public"
+            />
+          ) : null}
+        </>
+      )}
+    </ContentPanel>
+  );
+}
 
 export function ProfileScreen() {
   const styles = useStyles();
@@ -156,6 +252,11 @@ export function ProfileScreen() {
                 <Text selectable style={styles.alias}>
                   {user.name}
                 </Text>
+                {user.username ? (
+                  <Text selectable style={styles.email}>
+                    {formatUsername(user.username)}
+                  </Text>
+                ) : null}
                 <Text selectable style={styles.email}>
                   {user.email}
                 </Text>
@@ -184,6 +285,8 @@ export function ProfileScreen() {
               testID="edit-profile"
             />
           </ContentPanel>
+
+          <UsernameCard username={user.username} />
 
           <ContentPanel style={styles.card}>
             <ServiceProgress

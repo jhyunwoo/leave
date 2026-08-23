@@ -76,6 +76,9 @@ function newUserRow(input: SignupInput): UserRow {
     passwordHash: "",
     passwordSalt: "",
     name: input.name ?? PLACEHOLDER_PROFILE.name,
+    // 공개 이름은 서버가 짓지 않는다 — 이메일·별칭에서 파생하면 비공개 정보가
+    // 공개 식별자가 된다. 온보딩의 username 단계에서 본인이 정한다(0023).
+    username: null,
     branch: input.branch ?? "army",
     enlistedAt: input.enlistedAt ?? PLACEHOLDER_PROFILE.enlistedAt,
     dischargeAt: input.dischargeAt ?? PLACEHOLDER_PROFILE.dischargeAt,

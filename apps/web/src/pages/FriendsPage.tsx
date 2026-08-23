@@ -1,3 +1,12 @@
+/**
+ * 친구 화면 — 사용자 이름 검색, 받은/보낸 요청, 친구 목록과 달력 비교.
+ *
+ * 예전에는 "정확한 가입 이메일"을 받아 요청을 보냈다. 그 방식은 요청 결과가 곧
+ * "이 주소로 가입했는가"에 대한 답이라 친구 찾기가 이메일 열거 수단이 됐고,
+ * 무엇보다 상대의 이메일을 이미 알고 있어야 했다. 지금은 공개 사용자 이름으로
+ * 찾는다 — 애초에 공개하려고 만든 식별자다.
+ */
+
 import {
   useAcceptFriendRequest,
   useCancelFriendRequest,
@@ -6,21 +15,126 @@ import {
   useIncomingFriendRequests,
   useOutgoingFriendRequests,
   useRemoveFriend,
-  useSendFriendRequest,
+  useUserSearch,
+  type UserProfile,
 } from "@leave/client";
-import { MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
-import { useState } from "react";
+import {
+  formatUsername,
+  isUsernameQuery,
+  MAX_FRIEND_CALENDAR_SELECTION,
+  normalizeUsernameQuery,
+} from "@leave/shared";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Avatar } from "../components/Avatar";
 
-function Section(props: { title: string; children: React.ReactNode }) {
+function Section(props: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <section
       className="card"
       style={{ padding: "var(--sp-xl)", display: "grid", gap: "var(--sp-md)" }}
     >
-      <h2 className="display-xs">{props.title}</h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--sp-md)",
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 className="display-xs">{props.title}</h2>
+        {props.action}
+      </div>
       {props.children}
     </section>
+  );
+}
+
+/** 이름 + @아이디를 한 줄로. 표시 이름과 공개 이름을 눈으로 구분할 수 있게 둘 다 보여준다. */
+function PersonLine(props: { name: string; username: string | null }) {
+  return (
+    <span style={{ display: "grid", minWidth: 0 }}>
+      <strong style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+        {props.name}
+      </strong>
+      {props.username ? (
+        <span className="caption text-mute">
+          {formatUsername(props.username)}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+const RELATIONSHIP_LABEL: Record<UserProfile["relationship"], string> = {
+  self: "나",
+  none: "",
+  outgoing: "요청함",
+  incoming: "요청 받음",
+  friends: "친구",
+};
+
+function SearchResults(props: { query: string }) {
+  const search = useUserSearch(props.query);
+  const normalized = normalizeUsernameQuery(props.query);
+
+  if (!isUsernameQuery(normalized)) {
+    return (
+      <p className="field-hint">
+        @아이디로 찾아보세요. 영문·한글·숫자와 마침표(.), 밑줄(_)을 쓸 수
+        있어요.
+      </p>
+    );
+  }
+  if (search.isPending) {
+    return <div className="spinner" aria-label="검색 중" />;
+  }
+  if (search.isError) {
+    return (
+      <p role="alert" className="field-error">
+        검색하지 못했어요. 잠시 후 다시 시도해주세요.
+      </p>
+    );
+  }
+  if (!search.data?.results.length) {
+    return (
+      <p className="text-body" role="status">
+        {formatUsername(normalized)} 와(과) 맞는 사용자가 없어요.
+      </p>
+    );
+  }
+  return (
+    <ul
+      style={{
+        display: "grid",
+        gap: "var(--sp-sm)",
+        listStyle: "none",
+        margin: 0,
+        padding: 0,
+      }}
+      aria-label="검색 결과"
+    >
+      {search.data.results.map((result) => (
+        <li key={result.userId}>
+          <Link
+            to={`/u/${result.username}`}
+            className="friend-row"
+            data-testid={`search-result-${result.username}`}
+          >
+            <Avatar name={result.name} size={36} />
+            <PersonLine name={result.name} username={result.username} />
+            <span className="caption text-mute" style={{ marginLeft: "auto" }}>
+              {RELATIONSHIP_LABEL[result.relationship]}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -28,21 +142,26 @@ export function FriendsPage() {
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
   const outgoing = useOutgoingFriendRequests();
-  const send = useSendFriendRequest();
   const accept = useAcceptFriendRequest();
   const decline = useDeclineFriendRequest();
   const cancel = useCancelFriendRequest();
   const remove = useRemoveFriend();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const pending =
-    send.isPending ||
     accept.isPending ||
     decline.isPending ||
     cancel.isPending ||
     remove.isPending;
+
+  // 타이핑 도중 글자마다 서버에 묻지 않는다. 규칙 판정은 즉시, 요청만 늦춘다.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const run = async (work: Promise<unknown>, success: string) => {
     try {
@@ -79,58 +198,45 @@ export function FriendsPage() {
           {message}
         </p>
       ) : null}
-      <Section title="친구 추가">
-        <form
-          style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void run(
-              send.mutateAsync({ email }).then(() => setEmail("")),
-              "친구 요청을 보냈어요.",
-            );
-          }}
-        >
-          <label className="field" style={{ flex: "1 1 260px" }}>
-            <span className="field-label">정확한 가입 이메일</span>
-            <input
-              className="input"
-              type="email"
-              autoCapitalize="none"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="friend@example.com"
-            />
+
+      <Section title="사용자 이름으로 찾기">
+        <div className="field">
+          <label className="field-label" htmlFor="friend-search">
+            사용자 이름 검색
           </label>
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={pending || !email.trim()}
-            style={{ alignSelf: "end" }}
-          >
-            요청 보내기
-          </button>
-        </form>
-        <p className="field-hint">
-          이메일은 정확히 일치해야 하며 공개 사용자 검색은 제공하지 않아요.
-        </p>
+          <div className="username-input">
+            <span className="username-input-at" aria-hidden="true">
+              @
+            </span>
+            <input
+              id="friend-search"
+              className="input"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="hyunwoo 또는 현우"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
+              data-testid="friend-search-input"
+            />
+          </div>
+        </div>
+        {query.trim() ? <SearchResults query={debouncedQuery} /> : null}
       </Section>
 
       {(incoming.data?.requests.length ?? 0) > 0 ? (
         <Section title="받은 요청">
           {incoming.data!.requests.map((request) => (
-            <div
-              key={request.userId}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--sp-md)",
-                flexWrap: "wrap",
-              }}
-            >
-              <strong>{request.name}</strong>
+            <div key={request.userId} className="friend-row">
+              <Link
+                to={`/u/${request.username ?? ""}`}
+                className="friend-row-main"
+              >
+                <Avatar name={request.name} size={36} />
+                <PersonLine name={request.name} username={request.username} />
+              </Link>
               <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
                 <button
                   className="btn btn-primary btn-sm"
@@ -161,19 +267,19 @@ export function FriendsPage() {
           ))}
         </Section>
       ) : null}
+
       {(outgoing.data?.requests.length ?? 0) > 0 ? (
         <Section title="보낸 요청">
           {outgoing.data!.requests.map((request) => (
-            <div
-              key={request.userId}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--sp-md)",
-              }}
-            >
-              <span>{request.name} · 수락 대기</span>
+            <div key={request.userId} className="friend-row">
+              <Link
+                to={`/u/${request.username ?? ""}`}
+                className="friend-row-main"
+              >
+                <Avatar name={request.name} size={36} />
+                <PersonLine name={request.name} username={request.username} />
+              </Link>
+              <span className="caption text-mute">수락 대기</span>
               <button
                 className="btn btn-secondary btn-sm"
                 disabled={pending}
@@ -228,17 +334,7 @@ export function FriendsPage() {
                 const limitReached =
                   selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
                 return (
-                  <div
-                    key={friend.userId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--sp-md)",
-                      padding: "var(--sp-md)",
-                      border: "1px solid var(--hairline)",
-                      borderRadius: "var(--r-md)",
-                    }}
-                  >
+                  <div key={friend.userId} className="friend-row">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -254,10 +350,14 @@ export function FriendsPage() {
                       style={{ width: 20, height: 20 }}
                     />
                     <Link
-                      to={`/friends/${friend.userId}`}
-                      style={{ flex: 1, fontWeight: 700 }}
+                      to={`/u/${friend.username ?? ""}`}
+                      className="friend-row-main"
                     >
-                      {friend.name}
+                      <Avatar name={friend.name} size={36} />
+                      <PersonLine
+                        name={friend.name}
+                        username={friend.username}
+                      />
                     </Link>
                     <button
                       className="btn btn-secondary btn-sm"
@@ -296,8 +396,8 @@ export function FriendsPage() {
           </>
         ) : (
           <p className="text-body">
-            아직 친구가 없어요. 이메일로 요청을 보내고 상대가 수락하면 일정
-            비교를 시작할 수 있어요.
+            아직 친구가 없어요. 위에서 @아이디로 찾아 요청을 보내고, 상대가
+            수락하면 일정 비교를 시작할 수 있어요.
           </p>
         )}
       </Section>

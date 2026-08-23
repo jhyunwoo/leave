@@ -1,14 +1,36 @@
+/**
+ * 친구 라우트 — 요청·수락·거절·취소·삭제와 친구 달력.
+ *
+ * 마운트 위치: `/friends` (apps/api/src/index.ts). 명세는 ./friends.contract.ts,
+ * 상태 기계와 차단 판정은 ../lib/social.ts.
+ *
+ * 이 라우터의 규칙 하나: **화면 상태를 믿지 않는다.** 친구 일정을 돌려주는 모든
+ * 경로가 매 요청마다 DB에서 수락 상태와 양방향 차단을 다시 확인한다. 친구를
+ * 끊은 다음 요청은 그 자리에서 403이 되고, 이미 열려 있던 화면이 남아 있어도
+ * 다음 요청부터는 아무것도 받지 못한다.
+ */
+
 import {
-  canonicalFriendPair,
   COUNTED_LEAVE_STATUSES,
   isValidISODate,
   monthBounds,
+  normalizeUsername,
+  SOCIAL_ERROR_CODES,
 } from "@leave/shared";
 import { and, asc, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { friendships, leaves, userBlocks, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import type { Db } from "../lib/db";
+import { codedError } from "../lib/responses";
+import {
+  acceptFriendRequest,
+  areBlocked,
+  cancelFriendRequest,
+  createFriendRequest,
+  declineFriendRequest,
+  removeFriendship,
+} from "../lib/social";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
 import { rateLimit } from "../middleware/rate-limit";
@@ -38,6 +60,7 @@ function relationPeopleQuery(db: Db, viewerId: string) {
       acceptedAt: friendships.acceptedAt,
       otherUserId: users.id,
       otherName: users.name,
+      otherUsername: users.username,
     })
     .from(friendships)
     .innerJoin(
@@ -87,35 +110,9 @@ async function visibleRelations(db: Db, viewerId: string) {
   return relations.filter((row) => !blocked.has(row.otherUserId));
 }
 
-function pairWhere(first: string, second: string) {
-  const [userAId, userBId] = canonicalFriendPair(first, second);
-  return and(
-    eq(friendships.userAId, userAId),
-    eq(friendships.userBId, userBId),
-  );
-}
-
-async function areBlocked(
-  db: Db,
-  first: string,
-  second: string,
-): Promise<boolean> {
-  const row = await db
-    .select({ userId: userBlocks.userId })
-    .from(userBlocks)
-    .where(
-      or(
-        and(eq(userBlocks.userId, first), eq(userBlocks.blockedUserId, second)),
-        and(eq(userBlocks.userId, second), eq(userBlocks.blockedUserId, first)),
-      ),
-    )
-    .get();
-  return Boolean(row);
-}
-
 async function buildFriendCalendars(input: {
   db: Db;
-  viewer: { id: string; name: string };
+  viewer: { id: string; name: string; username: string | null };
   friendIds: string[];
   months: string[];
 }) {
@@ -126,11 +123,17 @@ async function buildFriendCalendars(input: {
   if (allowed.length !== friendIds.length) return null;
 
   const people = [
-    { userId: viewer.id, name: viewer.name, isViewer: true },
+    {
+      userId: viewer.id,
+      name: viewer.name,
+      username: viewer.username,
+      isViewer: true,
+    },
     ...allowed
       .map((row) => ({
         userId: row.otherUserId,
         name: row.otherName,
+        username: row.otherUsername,
         isViewer: false,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
@@ -191,6 +194,19 @@ app.use(
   rateLimit({ name: "friend-calendar", limit: 120, windowSeconds: 60 }),
 );
 
+/**
+ * 친구 일정·달력 응답에 `no-store`를 붙인다.
+ *
+ * 권한이 사라진 뒤(친구 삭제·차단) 서버는 곧바로 403을 주지만, 중간 캐시나
+ * 브라우저 디스크 캐시에 남은 본문은 그 판정을 거치지 않는다. 이 응답은 조회자
+ * 한 사람에게만 뜻이 있고 몇 초 만에 낡으므로 어디에도 남기지 않는 편이 맞다.
+ * (네이티브의 디스크 쿼리 캐시도 `friends` 키를 저장하지 않는다 —
+ *  apps/native/src/lib/query-persistence.ts)
+ */
+function noStore(c: { header: (name: string, value: string) => void }) {
+  c.header("Cache-Control", "no-store");
+}
+
 export const friendRoutes = app
   .openapi(listFriendsRoute, async (c) => {
     const rows = (
@@ -201,6 +217,7 @@ export const friendRoutes = app
         friends: rows.map((row) => ({
           userId: row.otherUserId,
           name: row.otherName,
+          username: row.otherUsername,
           since: row.acceptedAt!,
         })),
       },
@@ -217,6 +234,7 @@ export const friendRoutes = app
         requests: rows.map((row) => ({
           userId: row.otherUserId,
           name: row.otherName,
+          username: row.otherUsername,
           createdAt: row.createdAt,
         })),
       },
@@ -233,6 +251,7 @@ export const friendRoutes = app
         requests: rows.map((row) => ({
           userId: row.otherUserId,
           name: row.otherName,
+          username: row.otherUsername,
           createdAt: row.createdAt,
         })),
       },
@@ -242,62 +261,59 @@ export const friendRoutes = app
   .openapi(sendFriendRequestRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
+    const username = normalizeUsername(c.req.valid("json").username);
+
+    // 자기 자신은 이름을 대조하기 전에 걸러 낸다. "없는 사람"으로 답하면
+    // 사용자가 자기 이름을 잘못 알고 있다고 오해한다.
+    if (user.username && username === user.username) {
+      return c.json(
+        codedError(
+          "자기 자신에게는 요청할 수 없어요",
+          SOCIAL_ERROR_CODES.selfRequest,
+        ),
+        400,
+      );
+    }
+
     const target = await db
-      .select({ id: users.id })
+      .select({ id: users.id, onboardedAt: users.onboardingCompletedAt })
       .from(users)
-      .where(eq(users.email, c.req.valid("json").email))
+      .where(eq(users.username, username))
       .get();
+    // 없는 이름·온보딩 미완료·차단을 한 응답으로 합친다. 셋을 구분해 주면
+    // 그 차이가 곧 "이 사람이 나를 차단했는가"에 대한 답이 된다.
     if (
       !target ||
+      !target.onboardedAt ||
       target.id === user.id ||
       (await areBlocked(db, user.id, target.id))
-    )
-      return c.json({ error: "사용자를 찾을 수 없습니다" }, 404);
-    const existing = await db
-      .select()
-      .from(friendships)
-      .where(pairWhere(user.id, target.id))
-      .get();
-    if (existing?.status === "accepted")
-      return c.json({ error: "이미 친구입니다" }, 409);
-    const now = new Date().toISOString();
-    if (existing) {
-      if (existing.requestedByUserId !== user.id) {
-        await db
-          .update(friendships)
-          .set({ status: "accepted", acceptedAt: now, updatedAt: now })
-          .where(pairWhere(user.id, target.id));
-      }
-      return c.json({ ok: true as const }, 200);
-    }
-    const [userAId, userBId] = canonicalFriendPair(user.id, target.id);
-    await db
-      .insert(friendships)
-      .values({
-        userAId,
-        userBId,
-        requestedByUserId: user.id,
-        status: "pending",
-        createdAt: now,
-        updatedAt: now,
-        acceptedAt: null,
-      })
-      .onConflictDoNothing();
-    // If the inverse request won the unique-key race, converge on an accepted
-    // friendship instead of leaving one side's request pending.
-    const persisted = await db
-      .select()
-      .from(friendships)
-      .where(pairWhere(user.id, target.id))
-      .get();
-    if (
-      persisted?.status === "pending" &&
-      persisted.requestedByUserId !== user.id
     ) {
-      await db
-        .update(friendships)
-        .set({ status: "accepted", acceptedAt: now, updatedAt: now })
-        .where(pairWhere(user.id, target.id));
+      return c.json(
+        codedError(
+          "사용자를 찾을 수 없습니다",
+          SOCIAL_ERROR_CODES.userUnavailable,
+        ),
+        404,
+      );
+    }
+
+    const outcome = await createFriendRequest(db, user.id, target.id);
+    if (outcome === "friends") {
+      return c.json(
+        codedError("이미 친구입니다", SOCIAL_ERROR_CODES.alreadyFriends),
+        409,
+      );
+    }
+    if (outcome === "incoming") {
+      // 반대 방향 요청을 수락으로 수렴시키지 않는다 — 받는 사람이 수락을 누른
+      // 적 없이 일정이 공개되는 일을 막는다(lib/social.ts 머리주석).
+      return c.json(
+        codedError(
+          "상대가 이미 친구 요청을 보냈어요. 받은 요청에서 수락해주세요",
+          SOCIAL_ERROR_CODES.incomingRequestExists,
+        ),
+        409,
+      );
     }
     return c.json({ ok: true as const }, 200);
   })
@@ -305,50 +321,60 @@ export const friendRoutes = app
     const user = c.get("user");
     const otherId = c.req.valid("param").userId;
     const db = drizzle(c.env.DB);
-    if (await areBlocked(db, user.id, otherId))
-      return c.json({ error: "친구 요청을 찾을 수 없습니다" }, 404);
-    const row = await db
-      .select()
-      .from(friendships)
-      .where(pairWhere(user.id, otherId))
-      .get();
-    if (!row || row.requestedByUserId === user.id)
-      return c.json({ error: "친구 요청을 찾을 수 없습니다" }, 404);
-    if (row.status === "pending") {
-      const now = new Date().toISOString();
-      await db
-        .update(friendships)
-        .set({ status: "accepted", acceptedAt: now, updatedAt: now })
-        .where(pairWhere(user.id, otherId));
+    if (await areBlocked(db, user.id, otherId)) {
+      return c.json(
+        codedError(
+          "친구 요청을 찾을 수 없습니다",
+          SOCIAL_ERROR_CODES.requestNotFound,
+        ),
+        404,
+      );
     }
-    return c.json({ ok: true as const }, 200);
+    const accepted = await acceptFriendRequest(db, user.id, otherId);
+    if (accepted) return c.json({ ok: true as const }, 200);
+
+    // 한 번 더 눌렀거나(이미 친구) 사라진 요청이거나 둘 중 하나다. 이미 친구면
+    // 재수락은 멱등 성공으로 둔다 — 화면이 두 번 눌린 것뿐이다.
+    const row = await db
+      .select({ status: friendships.status })
+      .from(friendships)
+      .where(
+        or(
+          and(
+            eq(friendships.userAId, user.id),
+            eq(friendships.userBId, otherId),
+          ),
+          and(
+            eq(friendships.userAId, otherId),
+            eq(friendships.userBId, user.id),
+          ),
+        ),
+      )
+      .get();
+    if (row?.status === "accepted") return c.json({ ok: true as const }, 200);
+    return c.json(
+      codedError(
+        "친구 요청을 찾을 수 없습니다",
+        SOCIAL_ERROR_CODES.requestNotFound,
+      ),
+      404,
+    );
   })
   .openapi(declineFriendRequestRoute, async (c) => {
-    const user = c.get("user");
-    const otherId = c.req.valid("param").userId;
-    await drizzle(c.env.DB)
-      .delete(friendships)
-      .where(
-        and(
-          pairWhere(user.id, otherId),
-          eq(friendships.status, "pending"),
-          eq(friendships.requestedByUserId, otherId),
-        ),
-      );
+    await declineFriendRequest(
+      drizzle(c.env.DB),
+      c.get("user").id,
+      c.req.valid("param").userId,
+    );
+    // 없던 요청을 거절해도 결과 상태(관계 없음)는 같다 — 멱등으로 둔다.
     return c.json({ ok: true as const }, 200);
   })
   .openapi(cancelFriendRequestRoute, async (c) => {
-    const user = c.get("user");
-    const otherId = c.req.valid("param").userId;
-    await drizzle(c.env.DB)
-      .delete(friendships)
-      .where(
-        and(
-          pairWhere(user.id, otherId),
-          eq(friendships.status, "pending"),
-          eq(friendships.requestedByUserId, user.id),
-        ),
-      );
+    await cancelFriendRequest(
+      drizzle(c.env.DB),
+      c.get("user").id,
+      c.req.valid("param").userId,
+    );
     return c.json({ ok: true as const }, 200);
   })
   .openapi(friendCalendarRoute, async (c) => {
@@ -360,8 +386,16 @@ export const friendRoutes = app
       friendIds: query.friendIds,
       months: [query.month],
     });
-    if (!payloads)
-      return c.json({ error: "선택한 친구의 달력을 볼 권한이 없습니다" }, 403);
+    noStore(c);
+    if (!payloads) {
+      return c.json(
+        codedError(
+          "선택한 친구의 달력을 볼 권한이 없습니다",
+          SOCIAL_ERROR_CODES.notFriends,
+        ),
+        403,
+      );
+    }
     return c.json(payloads[0]!, 200);
   })
   .openapi(friendCalendarsRoute, async (c) => {
@@ -373,8 +407,16 @@ export const friendRoutes = app
       friendIds: query.friendIds,
       months: query.months.split(","),
     });
-    if (!calendars)
-      return c.json({ error: "선택한 친구의 달력을 볼 권한이 없습니다" }, 403);
+    noStore(c);
+    if (!calendars) {
+      return c.json(
+        codedError(
+          "선택한 친구의 달력을 볼 권한이 없습니다",
+          SOCIAL_ERROR_CODES.notFriends,
+        ),
+        403,
+      );
+    }
     return c.json({ calendars }, 200);
   })
   .openapi(friendScheduleRoute, async (c) => {
@@ -388,11 +430,20 @@ export const friendRoutes = app
     )
       return c.json({ error: "조회 기간이 올바르지 않습니다" }, 400);
     const db = drizzle(c.env.DB);
+    // 매 요청마다 다시 판정한다. 캐시된 친구 목록은 권한이 아니다.
     const allowed = (await visibleRelations(db, user.id)).find(
       (row) => row.otherUserId === otherId && row.status === "accepted",
     );
-    if (!allowed)
-      return c.json({ error: "친구의 일정을 볼 권한이 없습니다" }, 403);
+    noStore(c);
+    if (!allowed) {
+      return c.json(
+        codedError(
+          "친구의 일정을 볼 권한이 없습니다",
+          SOCIAL_ERROR_CODES.notFriends,
+        ),
+        403,
+      );
+    }
     const rows = await db
       .select({
         leaveId: leaves.id,
@@ -414,21 +465,24 @@ export const friendRoutes = app
       .all();
     return c.json(
       {
-        people: [{ userId: otherId, name: allowed.otherName, isViewer: false }],
+        people: [
+          {
+            userId: otherId,
+            name: allowed.otherName,
+            username: allowed.otherUsername,
+            isViewer: false,
+          },
+        ],
         leaves: rows,
       },
       200,
     );
   })
   .openapi(removeFriendRoute, async (c) => {
-    const user = c.get("user");
-    await drizzle(c.env.DB)
-      .delete(friendships)
-      .where(
-        and(
-          pairWhere(user.id, c.req.valid("param").userId),
-          eq(friendships.status, "accepted"),
-        ),
-      );
+    await removeFriendship(
+      drizzle(c.env.DB),
+      c.get("user").id,
+      c.req.valid("param").userId,
+    );
     return c.json({ ok: true as const }, 200);
   });

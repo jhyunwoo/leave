@@ -2,13 +2,132 @@
  * 프로필 화면 — 내 정보와 복무 진행률, 로그아웃·회원 탈퇴.
  */
 
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Me } from "@leave/client";
-import { useDeleteAccount, useLogout } from "@leave/client";
+import { useDeleteAccount, useLogout, useSetUsername } from "@leave/client";
+import { formatUsername } from "@leave/shared";
 import { Avatar } from "../components/Avatar";
+import { UsernameField, useUsernameDraft } from "../components/UsernameField";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { fmtDateShort } from "@leave/shared";
+
+/**
+ * 공개 사용자 이름 카드 — 지금 이름을 보여주고 그 자리에서 바꾼다.
+ *
+ * 이름을 바꿔도 사용자 id는 그대로라 친구 관계·휴가 소유권·로그인은 영향을 받지
+ * 않는다. 바뀌는 것은 프로필 주소 하나뿐이고, 옛 주소는 그 순간 열리지 않는다.
+ * 이전 이름을 예약해 두는 장치는 두지 않았다 — 아무도 못 쓰는 이름만 쌓인다.
+ */
+function UsernameCard(props: { username: string | null }) {
+  const [editing, setEditing] = useState(false);
+  const draft = useUsernameDraft(props.username ?? "");
+  const setUsername = useSetUsername();
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!draft.valid) return;
+    setError(null);
+    try {
+      await setUsername.mutateAsync({ username: draft.username });
+      setSaved(draft.username);
+      setEditing(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "저장하지 못했습니다",
+      );
+    }
+  };
+
+  return (
+    <section
+      className="card"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--sp-md)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--sp-md)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h2 className="display-xs">사용자 이름</h2>
+          <p className="caption text-mute">
+            {props.username
+              ? formatUsername(props.username)
+              : "아직 정하지 않았어요"}
+          </p>
+        </div>
+        {editing ? null : (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setEditing(true)}
+            data-testid="profile-edit-username"
+          >
+            바꾸기
+          </button>
+        )}
+      </div>
+      <p className="caption text-body">
+        친구가 나를 찾는 공개 이름이에요. 바꾸면 이전 프로필 주소는 더 이상
+        열리지 않지만, 이미 맺은 친구 관계는 그대로 유지돼요.
+      </p>
+      {editing ? (
+        <>
+          <UsernameField
+            draft={draft}
+            serverError={error}
+            autoFocus
+            onSubmit={() => void submit()}
+            testId="profile-username-input"
+          />
+          <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={!draft.valid || setUsername.isPending}
+              onClick={() => void submit()}
+              data-testid="profile-save-username"
+            >
+              {setUsername.isPending ? "저장 중…" : "저장"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-tertiary btn-sm"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+                draft.setRaw(props.username ?? "");
+              }}
+            >
+              취소
+            </button>
+          </div>
+        </>
+      ) : null}
+      {saved ? (
+        <p className="field-hint" role="status">
+          {formatUsername(saved)} 으로 바꿨어요.
+        </p>
+      ) : null}
+      {props.username ? (
+        <Link to={`/u/${props.username}`} className="btn btn-secondary btn-sm">
+          내 공개 프로필 보기
+        </Link>
+      ) : null}
+    </section>
+  );
+}
 
 export function ProfilePage(props: { me: Me }) {
   const { user, unit } = props.me;
@@ -138,6 +257,11 @@ export function ProfilePage(props: { me: Me }) {
           <Avatar name={user.name} size={64} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className="display-xs">{user.name}</p>
+            {user.username ? (
+              <p className="caption text-mute">
+                {formatUsername(user.username)}
+              </p>
+            ) : null}
             <p className="caption text-mute">{user.email}</p>
           </div>
         </div>
@@ -150,6 +274,8 @@ export function ProfilePage(props: { me: Me }) {
           <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
         </dl>
       </section>
+
+      <UsernameCard username={user.username} />
 
       <OfficialDisclaimer />
 

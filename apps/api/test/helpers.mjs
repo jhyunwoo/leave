@@ -6,7 +6,7 @@ export function uniq(prefix = "") {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** 공통 요청 함수 — { status, data } 반환 */
+/** 공통 요청 함수 — { status, headers, data } 반환 */
 export async function req(method, path, { token, body, headers } = {}) {
   const h = { "content-type": "application/json", ...(headers ?? {}) };
   if (token) h.authorization = `Bearer ${token}`;
@@ -21,11 +21,22 @@ export async function req(method, path, { token, body, headers } = {}) {
   } catch {
     data = null;
   }
-  return { status: res.status, data };
+  return {
+    status: res.status,
+    headers: Object.fromEntries(res.headers),
+    data,
+  };
 }
 
-/** 기본값이 채워진 회원가입 헬퍼 (동의 포함) */
+/**
+ * 기본값이 채워진 회원가입 헬퍼 (동의 포함).
+ *
+ * 공개 사용자 이름까지 함께 정해 준다 — 0023부터 친구 찾기가 이름 기반이라
+ * 이름이 없는 계정은 검색되지도, 요청을 받지도 못한다. `username: null`을 넘기면
+ * 이름 없는 계정(0023 이전 가입자)을 그대로 흉내 낸다.
+ */
 export async function signup(overrides = {}) {
+  const { username, ...profile } = overrides;
   const email = `${uniq("u")}@test.com`;
   const body = {
     email,
@@ -36,10 +47,22 @@ export async function signup(overrides = {}) {
     dischargeAt: "2027-07-04",
     rank: "private",
     dataConsent: true,
-    ...overrides,
+    ...profile,
   };
   const res = await req("POST", "/auth/signup", { body });
-  return { ...res, email, token: res.data?.token };
+  const token = res.data?.token;
+  let handle = null;
+  if (token && username !== null) {
+    const set = await setUsername(token, username ?? uniq("u"));
+    // 서버가 돌려준 정규형을 쓴다 — 보낸 값과 저장된 값이 다를 수 있다.
+    handle = set.status === 200 ? set.data.username : null;
+  }
+  return { ...res, email, token, username: handle };
+}
+
+/** 공개 사용자 이름 설정 (PUT /users/me/username) */
+export function setUsername(token, username) {
+  return req("PUT", "/users/me/username", { token, body: { username } });
 }
 
 /** 부대 생성 (기본 하루 최대 출타 3명) */

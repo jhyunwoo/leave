@@ -35,6 +35,30 @@ maestro test .maestro/launch.yaml
 
 - `launch.yaml` — 가입 전 데모, 비공식 고지, 로그인 ↔ 가입 이동.
 - `signup.yaml` — 최소수집 가입 → 비식별 그룹 생성 → 일정 시뮬레이션·저장 → 인앱 계정 삭제.
+- `username-setup.yaml` — 가입 → 온보딩의 사용자 이름 단계(규칙 위반 안내 포함) → 완료.
+- `friends-usernames.yaml` — @아이디 검색 → 프로필 → 요청/취소 → 프로필 딥링크
+  (`leave://u/…`, warm·cold start).
+- `friends-personal-events.yaml` — 친구 달력 비교와 개인 일정 편집.
+
+`friends-usernames.yaml`은 `E2E_SEARCH_USERNAME`이 더 필요하다 — 로그인 계정과
+**아직 친구가 아닌** 다른 사용자의 @아이디여야 한다(관계 상태에 따라 버튼이 달라진다).
+
+## HTTPS 링크(Universal Link / App Link)
+
+`leave://u/…`는 여기서 그대로 검증되지만, `https://leave.moveto.kr/u/…`는 서명된
+앱과 실제로 배포된 `.well-known` 파일이 있어야 검증된다. 확인 방법:
+
+```bash
+# 애플이 실제로 읽는 파일 (리디렉션 없이 200 + JSON이어야 한다)
+curl -sI https://leave.moveto.kr/.well-known/apple-app-site-association
+# 구글 검증기
+curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://leave.moveto.kr&relation=delegate_permission/common.handle_all_urls"
+# 안드로이드 기기에서 검증 상태 확인
+adb shell pm get-app-links app.leave.mobile
+```
+
+`app.json`의 `associatedDomains`·`intentFilters`는 네이티브 설정이라 **OTA로 나가지
+않는다.** 새 EAS 빌드가 필요하다(runtimeVersion fingerprint도 함께 바뀐다).
 
 ## 참고
 

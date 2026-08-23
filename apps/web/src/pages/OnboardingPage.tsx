@@ -52,6 +52,7 @@ import {
   WelcomeStep,
 } from "./onboarding/ProfileSteps";
 import { ServiceHero } from "./onboarding/ServiceHero";
+import { UsernameStep } from "./onboarding/UsernameStep";
 import "./onboarding.css";
 
 const PENDING_INVITE_KEY = "leave.pendingInvite";
@@ -88,6 +89,9 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
     ),
   );
   const [inGroup, setInGroup] = useState(Boolean(props.status.unitId));
+  // 이름은 이 단계에서 곧바로 서버에 저장된다(UsernameStep 주석). 여기서 드는 값은
+  // 뒤로 갔다 돌아왔을 때 입력칸을 비우지 않기 위한 것뿐이다.
+  const [username, setUsername] = useState(props.status.username ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const saveProfile = useSaveOnboardingProfile();
@@ -287,6 +291,14 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
               error={error}
               pending={saveProfile.isPending}
               onNext={() => void submitProfile()}
+            />
+          ) : step === "username" ? (
+            <UsernameStep
+              initial={username}
+              onSaved={(saved) => {
+                setUsername(saved);
+                advance();
+              }}
             />
           ) : step === "overnight" ? (
             <OvernightStep

@@ -28,6 +28,12 @@ import { REGULAR_OVERNIGHT_DEFAULTS } from "./regular-overnight-guidance";
  * 화면 순서. 한 화면에서 하나만 묻는다는 원칙이라 단계가 곧 질문 하나다.
  * `dates`만 예외로 입대일과 전역예정일을 함께 둔다 — 전역일은 입대일에서
  * 자동 계산되는 값이라, 따로 떼면 사용자가 이미 정해진 답을 한 번 더 넘기게 된다.
+ *
+ * `username`이 별칭(`name`) 바로 뒤가 아니라 `rank` 뒤에 있는 것은 이어하기 때문이다.
+ * 1~5단계의 답은 `rank`의 "다음"에서 프로필 한 벌로 처음 저장된다. 사용자 이름은
+ * 유일성 때문에 그 자리에서 바로 서버에 넣어야 하는데, 별칭 뒤에 두면 "이름은
+ * 저장됐지만 별칭은 아직 없는" 상태가 생기고 앱을 껐다 켠 사람에게 별칭을 다시
+ * 묻게 된다. 프로필 저장 뒤로 옮기면 이어하기 판정이 저장된 값 두 개로 끝난다.
  */
 export const ONBOARDING_STEP_IDS = [
   "welcome",
@@ -35,6 +41,7 @@ export const ONBOARDING_STEP_IDS = [
   "branch",
   "dates",
   "rank",
+  "username",
   "overnight",
   "group",
   "done",
@@ -65,10 +72,13 @@ export function onboardingStepIndex(
  */
 export function onboardingResumeStep(status: {
   profile: { branch: Branch } | null;
+  username: string | null;
   regularOvernight: object | null;
   unitId: string | null;
 }): OnboardingStepId {
   if (!status.profile) return "welcome";
+  // 사용자 이름은 저장되는 순간 유일성을 얻는다 — 있으면 다시 묻지 않는다.
+  if (!status.username) return "username";
   if (status.unitId) return "done";
   const next: OnboardingStepId = status.regularOvernight
     ? "group"
@@ -106,6 +116,10 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
   rank: {
     title: "지금 계급이 맞나요?",
     lead: "입대일 기준으로 골라뒀어요. 조기 진급했다면 바꿔주세요.",
+  },
+  username: {
+    title: "친구가 찾을 이름을 정해주세요",
+    lead: "@아이디는 공개돼요. 친구는 이 이름으로만 나를 찾을 수 있어요.",
   },
   overnight: {
     title: "정기외박 기준일이 언제인가요?",
@@ -419,6 +433,8 @@ const LAYER_RULES: Record<
   // 미끄러지는 편이 "계산됐다"는 신호로도 더 강하다.
   progress: { from: "welcome", active: "dates" },
   readout: { from: "welcome", active: "dates" },
+  // 별칭 칩은 `name`에서 등장하고 `username` 단계에서 한 번 더 강조된다 —
+  // 두 단계가 모두 "화면에 보일 나"를 정하는 자리라 같은 레이어를 가리킨다.
   badge: { from: "name", active: "name" },
   sky: { from: "branch", active: "branch" },
   emblem: { from: "branch", active: "branch" },

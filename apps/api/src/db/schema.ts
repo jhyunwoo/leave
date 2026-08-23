@@ -28,6 +28,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
@@ -39,6 +40,20 @@ export const users = sqliteTable(
     passwordHash: text("password_hash").notNull(),
     passwordSalt: text("password_salt").notNull(),
     name: text("name").notNull(),
+    /**
+     * 공개 사용자 이름(@아이디) — 친구 찾기와 프로필 링크의 유일한 공개 식별자.
+     *
+     * 저장되는 값은 언제나 `normalizeUsername`이 만든 정규형이다(소문자·NFC).
+     * 유일성은 앱이 아니라 `users_username_idx` 유니크 인덱스가 지킨다 —
+     * "있는지 보고 넣는다"는 동시 요청 두 건 사이에서 반드시 깨진다.
+     *
+     * nullable인 이유는 마이그레이션이다. 0023 이전에 가입한 계정에는 이름이
+     * 없고, 그렇다고 서버가 대신 지어 줄 수도 없다 — 이메일·실명·부대에서
+     * 파생한 이름은 그 순간 비공개 정보를 공개 식별자로 만든다. 그래서 저장
+     * 계층은 null을 허용하고, "활성 사용자에게는 이름이 있다"는 불변식은
+     * 애플리케이션 경계가 지킨다(온보딩 완료 조건 + 로그인 직후 1회 설정 화면).
+     */
+    username: text("username"),
     branch: text("branch", { enum: BRANCHES }).notNull(),
     enlistedAt: text("enlisted_at").notNull(),
     dischargeAt: text("discharge_at").notNull(),
@@ -51,9 +66,16 @@ export const users = sqliteTable(
     onboardingCompletedAt: text("onboarding_completed_at"),
     createdAt: text("created_at").notNull(),
   },
-  // 부대원 목록은 항상 이름순이다 — 정렬 컬럼을 뒤에 붙여 TEMP B-TREE를 없앤다.
-  // 인원수 세기(count)는 이 인덱스만 읽는 COVERING INDEX로 그대로 처리된다.
-  (t) => [index("users_unit_name_idx").on(t.unitId, t.name)],
+  (t) => [
+    // 부대원 목록은 항상 이름순이다 — 정렬 컬럼을 뒤에 붙여 TEMP B-TREE를 없앤다.
+    // 인원수 세기(count)는 이 인덱스만 읽는 COVERING INDEX로 그대로 처리된다.
+    index("users_unit_name_idx").on(t.unitId, t.name),
+    // 유일성과 검색을 한 인덱스로 끝낸다. 사용자 검색은 접두어 범위 조회
+    // (`username >= q AND username < q⁺`)라 이 인덱스의 정렬 순서를 그대로
+    // 타고, 정확히 일치하는 이름이 접두어들보다 먼저 나온다(routes/users.ts).
+    // SQLite에서 NULL끼리는 서로 다르므로 이름 없는 옛 계정이 충돌하지 않는다.
+    uniqueIndex("users_username_idx").on(t.username),
+  ],
 );
 
 export const sessions = sqliteTable(

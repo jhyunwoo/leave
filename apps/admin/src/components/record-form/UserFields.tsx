@@ -44,6 +44,13 @@ export function UserFields({
           initial={undefined}
         />
         <Field label="이름" name="name" required initial={initial} />
+        {/* 공개 사용자 이름. 본인이 온보딩에서 정하는 값이라 여기서는 선택이며,
+            부적절한 이름 신고를 처리할 때만 손댄다. */}
+        <Field
+          label="사용자 이름 (@아이디, 선택)"
+          name="username"
+          initial={initial}
+        />
         <SelectField
           label="군 종류"
           name="branch"

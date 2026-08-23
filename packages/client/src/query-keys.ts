@@ -54,6 +54,19 @@ export const queryKeys = {
   friendCalendar: (friendIds: readonly string[], month: string) =>
     ["friends", "calendar", [...friendIds].sort(), month] as const,
 
+  /**
+   * 사용자 검색·공개 프로필. `friends` 아래가 아니라 따로 둔 이유는 무효화 범위다 —
+   * 친구 목록 하나가 바뀌어도 검색 결과의 관계 상태가 함께 낡으므로, 친구 뮤테이션은
+   * 이 접두사 전체를 무효화한다. 반대로 달력·일정 캐시까지 끌고 다닐 이유는 없다.
+   */
+  users: ["users"] as const,
+  userSearches: ["users", "search"] as const,
+  userSearch: (query: string) => ["users", "search", query] as const,
+  userProfiles: ["users", "profile"] as const,
+  userProfile: (username: string) => ["users", "profile", username] as const,
+  usernameAvailability: (username: string) =>
+    ["users", "availability", username] as const,
+
   personalEvents: ["personalEvents"] as const,
   personalEventsMonth: (month: string) =>
     ["personalEvents", "month", month] as const,

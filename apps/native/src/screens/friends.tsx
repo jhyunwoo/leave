@@ -5,12 +5,15 @@
  *
  * 이 화면이 하는 일은 두 가지다. 이미 맺은 친구 중에서 달력을 함께 볼 사람을
  * 고르는 것, 그리고 받은 요청에 답하는 것. 둘 다 "지금 여기 있는 사람"에 대한
- * 일이다. 반대로 새 친구를 찾아 요청을 보내는 일은 이메일을 입력하고 결과를
- * 기다리는 별개의 흐름이라 화면을 나눴다(friend-add.tsx). 목록이 늘어날수록
- * 매번 입력칸을 지나쳐 스크롤해야 하는 값이 커지기 때문이다.
+ * 일이다. 반대로 새 친구를 찾는 일은 이름을 입력하고 결과를 훑는 별개의 흐름이라
+ * 화면을 나눴다(friend-search.tsx). 목록이 늘어날수록 매번 입력칸을 지나쳐
+ * 스크롤해야 하는 값이 커지기 때문이다.
+ *
+ * 이름을 누르면 프로필로 간다. 삭제·비교는 목록에 남긴다 — 이미 친구인 사람에게
+ * 자주 하는 일이라 한 번 더 들어갔다 나오게 할 이유가 없다.
  */
 
-import { MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
+import { formatUsername, MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
 import {
   useAcceptFriendRequest,
   useDeclineFriendRequest,
@@ -28,6 +31,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
@@ -59,6 +63,10 @@ export function FriendsScreen() {
     }
   };
   const openAdd = () => router.push("/(tabs)/(friends)/add");
+  const openProfile = (username: string | null) => {
+    if (!username) return;
+    router.push({ pathname: "/u/[username]", params: { username } });
+  };
   const compare = () =>
     router.push({
       pathname: "/(tabs)/(calendar)/friend-calendar",
@@ -88,7 +96,7 @@ export function FriendsScreen() {
           tintColor={colors.brand}
           onPress={openAdd}
         >
-          친구 추가
+          친구 찾기
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
       {process.env.EXPO_OS === "web" ? (
@@ -98,7 +106,7 @@ export function FriendsScreen() {
         actions={[
           {
             id: "add-friend",
-            title: "친구 추가",
+            title: "친구 찾기",
             variant: "primary",
             onPress: openAdd,
             testID: "friends-open-add",
@@ -115,7 +123,20 @@ export function FriendsScreen() {
           <Text style={styles.heading}>받은 요청</Text>
           {incoming.data!.requests.map((request) => (
             <View key={request.userId} style={styles.row}>
-              <Text style={styles.name}>{request.name}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${request.name} 프로필 열기`}
+                disabled={!request.username}
+                onPress={() => openProfile(request.username)}
+                style={styles.who}
+              >
+                <Text style={styles.name}>{request.name}</Text>
+                {request.username ? (
+                  <Text style={styles.caption}>
+                    {formatUsername(request.username)}
+                  </Text>
+                ) : null}
+              </Pressable>
               <View style={styles.actions}>
                 <Button
                   title="수락"
@@ -150,32 +171,51 @@ export function FriendsScreen() {
             const disabled =
               selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
             return (
-              <Pressable
+              <View
                 key={friend.userId}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked, disabled }}
-                accessibilityLabel={`${friend.name} 달력 비교 선택`}
-                disabled={disabled}
-                onPress={() =>
-                  setSelected((current) =>
-                    checked
-                      ? current.filter((id) => id !== friend.userId)
-                      : [...current, friend.userId],
-                  )
-                }
-                style={({ pressed }) => [
+                style={[
                   styles.friend,
                   checked && styles.friendSelected,
                   disabled && styles.disabled,
-                  pressed && styles.pressed,
                 ]}
               >
-                <View
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked, disabled }}
+                  accessibilityLabel={`${friend.name} 달력 비교 선택`}
+                  disabled={disabled}
+                  onPress={() =>
+                    setSelected((current) =>
+                      checked
+                        ? current.filter((id) => id !== friend.userId)
+                        : [...current, friend.userId],
+                    )
+                  }
+                  hitSlop={8}
                   style={[styles.checkbox, checked && styles.checkboxChecked]}
                 >
                   <Text style={styles.checkmark}>{checked ? "✓" : ""}</Text>
-                </View>
-                <Text style={styles.name}>{friend.name}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${friend.name} 프로필 열기`}
+                  disabled={!friend.username}
+                  onPress={() => openProfile(friend.username)}
+                  style={({ pressed }) => [
+                    styles.friendMain,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Avatar name={friend.name} size={36} />
+                  <View style={styles.who}>
+                    <Text style={styles.name}>{friend.name}</Text>
+                    {friend.username ? (
+                      <Text style={styles.caption}>
+                        {formatUsername(friend.username)}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
                 <Button
                   title="삭제"
                   size="sm"
@@ -183,13 +223,13 @@ export function FriendsScreen() {
                   disabled={pending}
                   onPress={() => void removeFriend(friend.userId, friend.name)}
                 />
-              </Pressable>
+              </View>
             );
           })
         ) : (
           <View style={styles.empty}>
             <Text style={styles.body}>
-              아직 친구가 없어요. 가입 이메일로 요청을 보내고, 상대가 수락하면
+              아직 친구가 없어요. @아이디로 찾아 요청을 보내고, 상대가 수락하면
               여기에서 달력을 함께 볼 수 있어요.
             </Text>
             <Button
@@ -250,7 +290,15 @@ const useStyles = makeStyles(({ colors }) => ({
     flexWrap: "wrap",
   },
   actions: { flexDirection: "row", gap: spacing.sm },
-  name: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.ink },
+  who: { flex: 1, minWidth: 0 },
+  name: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  friendMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minWidth: 0,
+  },
   body: { color: colors.body, lineHeight: 21 },
   caption: { fontSize: 12, color: colors.mute },
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },

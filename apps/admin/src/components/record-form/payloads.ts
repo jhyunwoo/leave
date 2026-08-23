@@ -39,6 +39,10 @@ export function userPayload(form: FormData, mode: FormMode): RecordPayload {
       ? { password: fieldValue(form, "password") }
       : {}),
     name: fieldValue(form, "name"),
+    // 비워 두면 "건드리지 않음"이다. 빈 문자열을 보내면 서버 스키마가 400을 준다.
+    ...(fieldValue(form, "username")
+      ? { username: fieldValue(form, "username") }
+      : {}),
     branch: fieldValue(form, "branch"),
     enlistedAt: fieldValue(form, "enlistedAt"),
     dischargeAt: fieldValue(form, "dischargeAt"),

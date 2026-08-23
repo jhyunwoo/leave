@@ -86,11 +86,22 @@ export const listOutgoingRoute = createRoute({
     401: authErrors[401],
   },
 });
+
+/**
+ * 공개 사용자 이름으로 친구 요청.
+ *
+ * 이메일로 받던 것을 0023에서 바꿨다. 이메일로 요청할 수 있으면 응답이 곧
+ * "이 주소로 가입했는가"에 대한 답이 되어 친구 찾기가 이메일 열거 수단이 된다.
+ *
+ * 반대 방향 요청이 이미 있으면 **친구로 만들지 않고** 409를 준다
+ * (`incoming_request_exists`). 받는 사람이 수락을 누른 적 없이 일정이 공개되는
+ * 일을 막기 위해서다 — 자세한 배경은 lib/social.ts 머리주석에 있다.
+ */
 export const sendFriendRequestRoute = createRoute({
   method: "post",
   path: "/requests",
   tags: TAGS,
-  summary: "정확한 이메일로 친구 요청",
+  summary: "사용자 이름으로 친구 요청",
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -99,16 +110,18 @@ export const sendFriendRequestRoute = createRoute({
     },
   },
   responses: {
-    200: jsonContent(okSchema, "요청 또는 상호 요청 수락 완료"),
+    200: jsonContent(okSchema, "요청 완료 (같은 방향 재요청은 멱등)"),
     ...authErrors,
-    409: errorResponse("이미 친구임"),
+    409: errorResponse("이미 친구이거나, 상대가 보낸 요청이 대기 중"),
   },
 });
 export const acceptFriendRequestRoute = createRoute({
   method: "post",
   path: "/requests/{userId}/accept",
   tags: TAGS,
-  summary: "친구 요청 수락",
+  summary: "받은 친구 요청 수락",
+  description:
+    "받은 사람만 수락할 수 있습니다. 대기 중인 요청이 pending에서 accepted로 가는 유일한 경로입니다.",
   security: [{ Bearer: [] }],
   request: { params: userIdParam },
   responses: { 200: jsonContent(okSchema, "수락 완료"), ...authErrors },
@@ -136,6 +149,8 @@ export const removeFriendRoute = createRoute({
   path: "/{userId}",
   tags: TAGS,
   summary: "친구 삭제",
+  description:
+    "관계는 사용자 쌍 한 행이라 어느 쪽이 지우든 양쪽 모두에게서 사라집니다. 삭제 직후의 일정 조회는 곧바로 403이 됩니다.",
   security: [{ Bearer: [] }],
   request: { params: userIdParam },
   responses: { 200: jsonContent(okSchema, "삭제 완료"), ...authErrors },

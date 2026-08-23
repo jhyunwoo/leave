@@ -97,6 +97,11 @@ export function serializeOnboardingStatus(
 ) {
   return {
     completed: Boolean(user.onboardingCompletedAt),
+    /**
+     * 0023 이전 계정은 온보딩을 마쳤어도 이름이 없다. 클라이언트는
+     * `completed && username === null`을 보고 1회성 설정 화면을 띄운다.
+     */
+    username: user.username,
     profile: hasPlaceholderProfile(user)
       ? null
       : {
@@ -176,6 +181,12 @@ export async function completeOnboarding(
     user.enlistedAt >= user.dischargeAt
   ) {
     return { ok: false, error: "복무정보를 먼저 완료해주세요" };
+  }
+  // 신규 계정에 대해 "활성 사용자에게는 공개 이름이 있다"를 지키는 자리.
+  // 저장 계층은 NULL을 허용하므로(0023) 이 관문이 없으면 이름 없는 계정이
+  // 계속 만들어지고, 그만큼 1회성 설정 화면을 봐야 하는 사람이 늘어난다.
+  if (!user.username) {
+    return { ok: false, error: "사용자 이름을 먼저 정해주세요" };
   }
 
   await ensureDefaultAnnualGrant(db, user);

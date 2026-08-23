@@ -1,0 +1,13 @@
+# Workers 정적 자산의 응답 헤더 (Cloudflare `_headers`).
+#
+# 앱 연결 파일 두 개는 확장자가 없거나(.well-known/apple-app-site-association)
+# 사람이 읽을 문서가 아니라 기계가 읽는 선언이다. 애플·구글의 검증기가
+# JSON으로 받도록 Content-Type을 못 박고, 오래 캐시되지 않게 한다 —
+# 서명 인증서나 앱 ID가 바뀌면 그날 안에 반영돼야 한다.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600

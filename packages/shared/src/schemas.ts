@@ -25,6 +25,13 @@ import {
   normalizeEmail,
   normalizeFriendIds,
 } from "./friends";
+import {
+  isCanonicalUsername,
+  isUsernameQuery,
+  normalizeUsername,
+  normalizeUsernameQuery,
+  usernameProblem,
+} from "./username";
 
 export const isoDateSchema = z
   .string()
@@ -374,8 +381,49 @@ export const blockCreateSchema = z.object({
   userId: z.string().min(1).max(100),
 });
 
+/**
+ * 공개 사용자 이름 — 저장·조회에 쓰는 정규형으로 바꾼 뒤 규칙을 본다.
+ *
+ * `transform`이 먼저 도는 덕분에 서버·앱·딥링크가 전부 같은 값을 보게 되고,
+ * 실패 메시지는 `usernameProblem`이 한 벌로 만든다(화면이 문구를 새로 짓지 않는다).
+ */
+export const usernameSchema = z
+  .string()
+  .max(200, "사용자 이름이 너무 깁니다")
+  .transform(normalizeUsername)
+  .superRefine((value, ctx) => {
+    if (isCanonicalUsername(value)) return;
+    ctx.addIssue({
+      code: "custom",
+      message: usernameProblem(value) ?? "사용할 수 없는 사용자 이름이에요",
+    });
+  });
+
+/** 사용자 이름 설정·변경 본문. */
+export const usernameSetSchema = z.object({ username: usernameSchema });
+
+/**
+ * 사용자 검색어. 앞에 붙은 `@`를 떼고 정규화한다.
+ * 접두어 단계라 마침표 위치·예약어는 보지 않는다(username.ts의 `isUsernameQuery`).
+ */
+export const usernameQuerySchema = z
+  .string()
+  .max(200, "검색어가 너무 깁니다")
+  .transform(normalizeUsernameQuery)
+  .refine(
+    isUsernameQuery,
+    "영문·한글·숫자와 마침표(.), 밑줄(_)로 검색해주세요",
+  );
+
+/**
+ * 친구 요청 대상.
+ *
+ * 이메일이 아니라 공개 사용자 이름으로 받는다. 이메일로 요청을 보낼 수 있으면
+ * "이 주소로 가입했는가"를 요청 결과로 떠볼 수 있어, 친구 찾기가 곧 이메일 열거
+ * 수단이 된다. 사용자 이름은 애초에 공개하려고 만든 식별자다.
+ */
 export const friendRequestCreateSchema = z.object({
-  email: normalizedEmailSchema,
+  username: usernameSchema,
 });
 
 export const friendIdsSchema = z
@@ -483,6 +531,7 @@ export type BlockCreateInput = z.infer<typeof blockCreateSchema>;
 export type FriendRequestCreateInput = z.infer<
   typeof friendRequestCreateSchema
 >;
+export type UsernameSetInput = z.infer<typeof usernameSetSchema>;
 export type PersonalEventCreateInput = z.infer<
   typeof personalEventCreateSchema
 >;

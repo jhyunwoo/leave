@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createUnit, req, signup, sleep, uniq } from "./helpers.mjs";
+import {
+  createUnit,
+  req,
+  setUsername,
+  signup,
+  sleep,
+  uniq,
+} from "./helpers.mjs";
 
 test("회원가입은 개인정보 동의(dataConsent)가 없으면 400", async () => {
   const email = `${uniq("u")}@test.com`;
@@ -72,11 +79,21 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
   });
   assert.equal(regular.status, 200);
 
+  // 공개 사용자 이름이 없으면 온보딩을 마칠 수 없다 — 활성 사용자에게는 항상
+  // 이름이 있다는 불변식을 애플리케이션 경계가 지킨다(0023).
+  const tooEarly = await req("POST", "/auth/onboarding/complete", { token });
+  assert.equal(tooEarly.status, 400);
+  const handle = uniq("ob");
+  assert.equal((await setUsername(token, handle)).status, 200);
+  const withName = await req("GET", "/auth/onboarding", { token });
+  assert.equal(withName.data.username, handle);
+
   const completed = await req("POST", "/auth/onboarding/complete", { token });
   assert.equal(completed.status, 200);
   const me = await req("GET", "/auth/me", { token });
   assert.equal(me.status, 200);
   assert.equal(me.data.user.branch, "air_force");
+  assert.equal(me.data.user.username, handle);
   const completedBootstrap = await req("GET", "/auth/bootstrap", { token });
   assert.equal(completedBootstrap.status, 200);
   assert.equal(completedBootstrap.data.onboarding.completed, true);

@@ -1,0 +1,74 @@
+# 가입 → 온보딩의 사용자 이름 단계 → 완료.
+#
+# 온보딩은 이름 없이 끝나지 않는다(POST /auth/onboarding/complete가 막는다).
+# 이 흐름은 그 관문이 화면에서도 지켜지는지 확인한다.
+appId: app.leave.mobile
+env:
+  PASSWORD: "test-only-password-123"
+---
+- launchApp:
+    clearState: true
+- tapOn: "가입하기"
+- tapOn:
+    id: "signup-email"
+- inputRandomEmail
+- tapOn:
+    id: "signup-password"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "signup-password-confirm"
+- inputText: ${PASSWORD}
+- tapOn:
+    id: "signup-terms-consent"
+- tapOn:
+    id: "signup-data-consent"
+- tapOn:
+    id: "signup-age-confirmation"
+- tapOn:
+    id: "signup-next"
+
+- assertVisible: "전역까지, 같이 세어드릴게요"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "뭐라고 부를까요?"
+- tapOn:
+    id: "onboarding-name"
+- inputText: "lime-whale"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "어느 군에 계신가요?"
+- tapOn:
+    id: "onboarding-branch-army"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "언제 입대하셨나요?"
+- tapOn:
+    id: "onboarding-enlisted-at"
+- tapOn: "1"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "지금 계급이 맞나요?"
+- tapOn:
+    id: "onboarding-next"
+
+# 프로필을 저장한 뒤에 이름을 묻는다(이어하기 판정이 저장된 값 두 개로 끝나도록).
+- assertVisible: "친구가 찾을 이름을 정해주세요"
+# 규칙에 어긋난 값은 그 자리에서 이유를 알려주고 "다음"이 열리지 않는다.
+- tapOn:
+    id: "onboarding-username"
+- inputText: "bad name"
+- assertVisible: "영문·한글·숫자와 마침표(.), 밑줄(_)만 쓸 수 있어요"
+- eraseText
+- inputText: "limewhale"
+- inputRandomNumber:
+    length: 6
+- tapOn:
+    id: "onboarding-next"
+
+- assertVisible: "함께 쓸 그룹이 있나요?"
+- tapOn:
+    id: "onboarding-group-skip"
+- assertVisible: "준비 끝났어요"
+- tapOn:
+    id: "onboarding-complete"
+- assertVisible: "부대 달력"

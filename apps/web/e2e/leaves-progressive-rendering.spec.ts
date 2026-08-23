@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { handleSafe } from "./helpers";
 
 const SECTION_SIZE = 200;
 const INITIAL_VISIBLE_PER_SECTION = 20;
@@ -20,6 +21,14 @@ async function createAccount(request: APIRequestContext): Promise<string> {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  const handle = await request.put("http://localhost:8787/users/me/username", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { username: handleSafe("list") },
+  });
+  expect(
+    handle.ok(),
+    `username failed (${handle.status()}): ${await handle.text()}`,
+  ).toBeTruthy();
   const unit = await request.post("http://localhost:8787/units", {
     headers: { Authorization: `Bearer ${token}` },
     data: { name: `대형목록부대-${Date.now()}`, maxLeaveCount: 3 },

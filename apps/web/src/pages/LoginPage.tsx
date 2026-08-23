@@ -1,8 +1,9 @@
 /** 로그인 화면. 성공하면 토큰이 저장되고 App.tsx가 달력으로 넘긴다. */
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useLogin } from "@leave/client";
+import { safeNext, withNext } from "../state/next-destination";
 import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
@@ -14,12 +15,16 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const login = useLogin();
   const navigate = useNavigate();
+  const location = useLocation();
+  // 공유된 프로필 링크(/u/{username})로 들어왔다가 로그인으로 튕긴 사람을
+  // 원래 목적지로 되돌린다. 값 검증은 safeNext가 한다(오픈 리다이렉트 방지).
+  const next = safeNext(location.search);
 
   const submit = async () => {
     setError(null);
     try {
       await login.mutateAsync({ email, password });
-      void navigate("/", { replace: true });
+      void navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인하지 못했습니다");
     }
@@ -96,7 +101,11 @@ export function LoginPage() {
         </button>
         <p className="body-sm text-body" style={{ textAlign: "center" }}>
           처음이신가요?{" "}
-          <Link to="/signup" className="strong" style={{ color: "var(--ink)" }}>
+          <Link
+            to={withNext("/signup", next)}
+            className="strong"
+            style={{ color: "var(--ink)" }}
+          >
             가입하기
           </Link>
         </p>

@@ -140,6 +140,18 @@ export type FriendSchedule = InferResponseType<
   Client["friends"][":userId"]["schedule"]["$get"],
   200
 >;
+/** 공개 프로필 한 사람 — 검색 결과와 `/u/{username}` 화면이 같은 모양을 쓴다. */
+export type UserProfile = InferResponseType<
+  Client["users"][":username"]["$get"],
+  200
+>;
+export type UserSearchResults = InferResponseType<
+  Client["users"]["search"]["$get"],
+  200
+>;
+/** 조회자와 상대의 관계. 화면은 이 값 하나로 버튼을 고른다. */
+export type UserRelationship = UserProfile["relationship"];
+
 export type PersonalEvent = InferResponseType<
   Client["personal-events"]["$get"],
   200

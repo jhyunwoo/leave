@@ -1,0 +1,114 @@
+/**
+ * 공개 사용자 이름 훅 — 설정·중복 확인·검색·프로필 조회.
+ *
+ * 사용처: 온보딩의 이름 단계, 1회성 이름 설정 화면, 친구 찾기, 프로필 화면,
+ * `/u/{username}` 딥링크 착지점.
+ *
+ * 검색과 중복 확인은 타이핑 도중 계속 불린다. 디바운스는 화면이 하고(입력의
+ * 리듬은 플랫폼마다 다르다), 이 훅은 "이 값이면 물어볼 만한가"만 판정한다 —
+ * 규칙에 어긋난 값은 아예 요청하지 않아 서버 왕복과 rate limit을 아낀다.
+ */
+import {
+  isCanonicalUsername,
+  isUsernameQuery,
+  normalizeUsername,
+  normalizeUsernameQuery,
+  type UsernameSetInput,
+} from "@leave/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryRequestOptions, useLeaveApi } from "../context";
+import { queryKeys } from "../query-keys";
+import type { UserProfile, UserSearchResults } from "../types";
+
+/**
+ * 사용자 이름 검색.
+ *
+ * 키에는 정규형을 넣는다. `@Hyun`과 `hyun`이 같은 요청이라 캐시가 갈리지 않는다.
+ */
+export function useUserSearch(rawQuery: string) {
+  const adapter = useLeaveApi();
+  const query = normalizeUsernameQuery(rawQuery);
+  return useQuery({
+    queryKey: queryKeys.userSearch(query),
+    enabled: isUsernameQuery(query),
+    // 관계 상태가 함께 실려 오므로 오래 들고 있으면 "친구 추가" 버튼이 낡는다.
+    staleTime: 0,
+    queryFn: (context) =>
+      adapter.client.users.search
+        .$get(
+          { query: { q: query } },
+          queryRequestOptions(adapter.useRequestAbortSignal, context),
+        )
+        .then((response) => adapter.unwrap<UserSearchResults>(response)),
+  });
+}
+
+/** 공개 프로필. 없는 이름·차단은 서버가 구분 없이 404로 답한다. */
+export function useUserProfile(rawUsername: string | null | undefined) {
+  const adapter = useLeaveApi();
+  const username = rawUsername ? normalizeUsername(rawUsername) : "";
+  return useQuery({
+    queryKey: queryKeys.userProfile(username),
+    enabled: username.length > 0,
+    staleTime: 0,
+    queryFn: (context) =>
+      adapter.client.users[":username"]
+        .$get(
+          { param: { username } },
+          queryRequestOptions(adapter.useRequestAbortSignal, context),
+        )
+        .then((response) => adapter.unwrap<UserProfile>(response)),
+  });
+}
+
+/**
+ * 중복 확인. 답은 조언일 뿐이라 최종 판정이 아니다 — 확인과 저장 사이에 남이
+ * 가져갈 수 있고, 진짜 판정은 저장 시점의 유니크 인덱스가 내린다.
+ */
+export function useUsernameAvailability(rawUsername: string) {
+  const adapter = useLeaveApi();
+  const username = normalizeUsername(rawUsername);
+  return useQuery({
+    queryKey: queryKeys.usernameAvailability(username),
+    enabled: isCanonicalUsername(username),
+    staleTime: 0,
+    queryFn: (context) =>
+      adapter.client.users.availability
+        .$get(
+          { query: { username } },
+          queryRequestOptions(adapter.useRequestAbortSignal, context),
+        )
+        .then((response) =>
+          adapter.unwrap<{ username: string; available: boolean }>(response),
+        ),
+  });
+}
+
+/**
+ * 이름 설정·변경.
+ *
+ * 이름은 여러 응답에 박혀 나간다 — 내 정보, 온보딩 상태, 검색 결과, 프로필,
+ * 친구 달력의 참가자 목록(내 이름이 들어 있다). 바꾸는 일 자체가 드물기 때문에
+ * 이 자리에서는 좁게 고르는 대신 그 묶음을 통째로 다시 받는다.
+ * 사용자 id는 바뀌지 않으므로 친구 관계·휴가 소유권은 그대로다.
+ */
+export function useSetUsername() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UsernameSetInput) =>
+      unwrap<{ username: string }>(
+        await client.users.me.username.$put({ json: input }),
+      ),
+    onSuccess: async () => {
+      await Promise.all(
+        [
+          queryKeys.me,
+          queryKeys.onboarding,
+          queryKeys.users,
+          queryKeys.friends,
+        ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      );
+    },
+  });
+}

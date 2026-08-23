@@ -4,6 +4,7 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
+import { handleSafe } from "./helpers";
 
 async function seedCalendarUser(request: APIRequestContext): Promise<string> {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -21,6 +22,14 @@ async function seedCalendarUser(request: APIRequestContext): Promise<string> {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  const handle = await request.put("http://localhost:8787/users/me/username", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { username: handleSafe("cal") },
+  });
+  expect(
+    handle.ok(),
+    `username failed (${handle.status()}): ${await handle.text()}`,
+  ).toBeTruthy();
 
   const unit = await request.post("http://localhost:8787/units", {
     headers: { Authorization: `Bearer ${token}` },

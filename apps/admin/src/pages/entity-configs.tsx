@@ -146,6 +146,8 @@ export const entityConfigs: Record<EntityResource, ResourceConfig> = {
     deletable: true,
     columns: [
       col.person("name"),
+      // 지원 문의는 대개 "@아이디로 찾아 주세요"로 들어온다.
+      col.plain("username", "@아이디", "username"),
       col.plain("branch", "군 종류", "branch"),
       col.plain("unit", "부대", "unitName"),
       {

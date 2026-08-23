@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { handleSafe } from "./helpers";
 
 /**
  * 인증 흐름 e2e (로그인 화면, 동의 기반 회원가입).
@@ -24,7 +25,7 @@ test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async
   await expect(page.getByRole("link", { name: "가입하기" })).toBeVisible();
 });
 
-test("회원가입 후 한 화면 한 입력 온보딩 8단계", async ({ page }) => {
+test("회원가입 후 한 화면 한 입력 온보딩 9단계", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -76,6 +77,21 @@ test("회원가입 후 한 화면 한 입력 온보딩 8단계", async ({ page }
   await expect(step("rank").getByText("자동 계산")).toBeVisible();
   await next.click();
 
+  // 공개 사용자 이름은 프로필을 저장한 뒤에 묻는다(이어하기 판정 때문 —
+  // packages/shared/src/onboarding.ts의 단계 목록 주석 참고).
+  await expect(step("username")).toBeVisible();
+  const handle = `e2e${Date.now().toString(36)}`;
+  await page.getByTestId("onboarding-username").fill("bad name");
+  await expect(
+    step("username").getByText(
+      "영문·한글·숫자와 마침표(.), 밑줄(_)만 쓸 수 있어요",
+    ),
+  ).toBeVisible();
+  await expect(next).toBeDisabled();
+  await page.getByTestId("onboarding-username").fill(handle);
+  await expect(step("username").getByText("사용할 수 있어요")).toBeVisible();
+  await next.click();
+
   // 공군이므로 정기외박 단계가 있다(육군이면 건너뛴다).
   await expect(step("overnight")).toBeVisible();
   await page.getByTestId("onboarding-overnight-skip").click();
@@ -112,6 +128,16 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   });
   expect(signup.ok()).toBeTruthy();
   const auth = (await signup.json()) as { token: string };
+  // 0023부터 이름이 없으면 웹 앱이 1회성 설정 화면을 먼저 띄운다. 이 테스트가
+  // 보려는 것은 적립분 화면이므로 여기서 이름을 정하고 지나간다.
+  const handle = await request.put("http://localhost:8787/users/me/username", {
+    headers: { Authorization: `Bearer ${auth.token}` },
+    data: { username: handleSafe("grant") },
+  });
+  expect(
+    handle.ok(),
+    `username failed (${handle.status()}): ${await handle.text()}`,
+  ).toBeTruthy();
   const unit = await request.post("http://localhost:8787/units", {
     headers: { Authorization: `Bearer ${auth.token}` },
     data: {

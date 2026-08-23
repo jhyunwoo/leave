@@ -67,6 +67,11 @@ export const loginRoute = createRoute({
 
 const onboardingStatusSchema = z.object({
   completed: z.boolean(),
+  /**
+   * 공개 사용자 이름. 0023 이전 계정은 온보딩을 마쳤어도 null이라,
+   * 클라이언트가 `completed && username === null`로 1회성 설정 화면을 띄운다.
+   */
+  username: z.string().nullable(),
   profile: z
     .object({
       name: z.string(),

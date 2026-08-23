@@ -37,6 +37,7 @@ export function serializeUser(
     id: user.id,
     email: user.email,
     name: user.name,
+    username: user.username,
     branch: user.branch,
     branchLabel: BRANCH_LABELS[user.branch],
     enlistedAt: user.enlistedAt,

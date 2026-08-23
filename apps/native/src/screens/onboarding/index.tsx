@@ -59,6 +59,7 @@ import {
   WelcomeStep,
 } from "./profile-steps";
 import { ServiceHero } from "./service-hero";
+import { UsernameStep } from "./username-step";
 
 export function OnboardingScreen() {
   const query = useOnboardingStatus();
@@ -99,6 +100,9 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
     ),
   );
   const [inGroup, setInGroup] = useState(Boolean(status.unitId));
+  // 이름은 이 단계에서 곧바로 서버에 저장된다(username-step.tsx 주석). 여기서 드는
+  // 값은 뒤로 갔다 돌아왔을 때 입력칸을 비우지 않기 위한 것뿐이다.
+  const [username, setUsername] = useState(status.username ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const saveProfile = useSaveOnboardingProfile();
@@ -292,6 +296,14 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
               error={error}
               pending={saveProfile.isPending}
               onNext={() => void submitProfile()}
+            />
+          ) : step === "username" ? (
+            <UsernameStep
+              initial={username}
+              onSaved={(saved) => {
+                setUsername(saved);
+                advance();
+              }}
             />
           ) : step === "overnight" ? (
             <OvernightStep

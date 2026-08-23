@@ -31,6 +31,7 @@ import { moderationRoutes } from "./routes/moderation";
 import { notificationRoutes } from "./routes/notifications";
 import { pushRoutes } from "./routes/push";
 import { unitRoutes } from "./routes/units";
+import { userRoutes } from "./routes/users";
 
 /**
  * Hono의 `app.use("*", ...)` 콜백이 받는 Context는 경로 제네릭이 `"*"`로 굳어
@@ -101,6 +102,7 @@ const routes = app
     }),
   )
   .route("/auth", authRoutes)
+  .route("/users", userRoutes)
   .route("/units", unitRoutes)
   .route("/leaves", leaveRoutes)
   .route("/friends", friendRoutes)

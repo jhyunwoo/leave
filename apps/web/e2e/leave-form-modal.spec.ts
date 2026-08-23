@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { handleSafe } from "./helpers";
 
 /**
  * 화면 기준으로 떠야 하는 UI(모달·토스트)의 배치 e2e.
@@ -29,6 +30,15 @@ async function seedLongLeaveList(request: APIRequestContext) {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  // 0023부터 이름이 없으면 웹 앱이 1회성 설정 화면을 먼저 띄운다.
+  const handle = await request.put("http://localhost:8787/users/me/username", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { username: handleSafe("modal") },
+  });
+  expect(
+    handle.ok(),
+    `username failed (${handle.status()}): ${await handle.text()}`,
+  ).toBeTruthy();
 
   const unit = await request.post("http://localhost:8787/units", {
     headers: { Authorization: `Bearer ${token}` },
@@ -279,7 +289,16 @@ test("초과 등록 토스트가 페이지가 아니라 화면 아래에 붙는�
       },
     });
     expect(res.ok()).toBeTruthy();
-    return ((await res.json()) as { token: string }).token;
+    const token = ((await res.json()) as { token: string }).token;
+    const handle = await request.put(`${api}/users/me/username`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { username: handleSafe(`toast${tag}`) },
+    });
+    expect(
+      handle.ok(),
+      `username failed (${handle.status()}): ${await handle.text()}`,
+    ).toBeTruthy();
+    return token;
   };
   const other = await signup("A");
   const mine = await signup("B");

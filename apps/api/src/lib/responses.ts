@@ -12,14 +12,20 @@ import { z } from "@hono/zod-openapi";
 import {
   BALANCE_KEYS,
   BRANCHES,
+  FRIEND_RELATIONSHIPS,
   LEAVE_CATEGORIES,
   LEAVE_STATUSES,
   OVERNIGHT_KINDS,
   RANKS,
 } from "@leave/shared";
 
+/**
+ * `code`는 문구와 별개로 안정적인 분기 키다(@leave/shared의 SOCIAL_ERROR_CODES).
+ * 화면이 한국어 메시지를 비교해 분기하면 문구를 다듬는 순간 조용히 깨지므로,
+ * 상태 구분이 필요한 오류에는 코드를 함께 싣는다. 없는 응답도 그대로 유효하다.
+ */
 export const errorSchema = z
-  .object({ error: z.string() })
+  .object({ error: z.string(), code: z.string().optional() })
   .openapi("ErrorResponse");
 
 export const okSchema = z.object({ ok: z.literal(true) }).openapi("Ok");
@@ -29,6 +35,8 @@ export const userSchema = z
     id: z.string(),
     email: z.string(),
     name: z.string(),
+    /** 공개 사용자 이름. 0023 이전 계정은 설정 전까지 null이다. */
+    username: z.string().nullable(),
     branch: z.enum(BRANCHES),
     branchLabel: z.string(),
     enlistedAt: z.string(),
@@ -207,6 +215,7 @@ export const friendSummarySchema = z
   .object({
     userId: z.string(),
     name: z.string(),
+    username: z.string().nullable(),
     since: z.string(),
   })
   .openapi("FriendSummary");
@@ -215,13 +224,32 @@ export const friendRequestSchema = z
   .object({
     userId: z.string(),
     name: z.string(),
+    username: z.string().nullable(),
     createdAt: z.string(),
   })
   .openapi("FriendRequest");
 
+/**
+ * 공개 프로필 — 사회 기능에서 남에게 보여도 되는 것만 담는다.
+ *
+ * 이 표에 있다는 이유로 필드를 늘리지 않는다. 이메일·소속 그룹·군 종류·계급·
+ * 입대일/전역일은 전부 빠져 있고, 앞으로도 빠져 있어야 한다 — 이 응답은
+ * 친구가 아닌 사람도, 링크만 받은 사람도 볼 수 있는 자리다.
+ * `relationship`을 함께 실어 화면이 관계를 알아내려고 한 번 더 왕복하지 않게 한다.
+ */
+export const userProfileSchema = z
+  .object({
+    userId: z.string(),
+    username: z.string(),
+    name: z.string(),
+    relationship: z.enum(FRIEND_RELATIONSHIPS),
+  })
+  .openapi("UserProfile");
+
 export const friendCalendarPersonSchema = z.object({
   userId: z.string(),
   name: z.string(),
+  username: z.string().nullable(),
   isViewer: z.boolean(),
 });
 
@@ -444,6 +472,15 @@ export const activitySchema = z
     pushLogs: z.array(pushLogSchema),
   })
   .openapi("Activity");
+
+/**
+ * 코드가 붙은 오류 본문. 라우트에서 `c.json(codedError(...), 409)`로 쓴다.
+ * 메시지와 코드를 한 자리에서 짝지어 두면 둘이 어긋나지 않는다.
+ */
+export const codedError = (message: string, code: string) => ({
+  error: message,
+  code,
+});
 
 export const jsonContent = <T extends z.ZodType>(
   schema: T,

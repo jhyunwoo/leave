@@ -106,7 +106,8 @@
             ]
           }
         ]
-      }
+      },
+      "associatedDomains": ["applinks:leave.moveto.kr"]
     },
     "android": {
       "predictiveBackGestureEnabled": false,
@@ -131,7 +132,21 @@
         "foregroundImage": "./assets/images/leave-adaptive-foreground.png",
         "monochromeImage": "./assets/images/leave-monochrome.png",
         "backgroundColor": "#9fe870"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "leave.moveto.kr",
+              "pathPrefix": "/u"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",

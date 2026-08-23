@@ -8,6 +8,14 @@
  * `me`를 여기서 한 번만 받아 각 화면에 props로 내려준다. 화면마다 다시 받으면
  * 같은 사용자 정보가 화면 전환 중 잠깐씩 달라 보일 수 있다.
  *
+ * ## 딥링크 목적지를 잃지 않는다
+ *
+ * `/u/{username}`은 공유되는 주소라 로그아웃 상태로 열리는 일이 잦다. 그때
+ * 로그인으로 보내되 원래 주소를 `?next=`에 실어 보내고, 로그인·가입이 끝나면
+ * 그 자리로 되돌린다. 온보딩과 이름 설정은 라우트를 바꾸지 않고 그 위에 덮어
+ * 그리므로, 그 단계가 끝나면 주소는 여전히 `/u/{username}`이고 화면이 그대로
+ * 열린다 — 중간 단계마다 목적지를 다시 넘겨줄 필요가 없다.
+ *
  * ## 화면은 전부 `lazy()`로 받는다
  *
  * 로그아웃 방문자가 보는 것(랜딩)과 로그인 사용자가 보는 것(달력·휴가·부대)은
@@ -19,10 +27,17 @@
 
 import { lazy, Suspense, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router";
 import { useAuthBootstrap, useMe } from "@leave/client";
 import { LoginPage } from "./pages/LoginPage";
 import { isAuthedAtom } from "./state/auth";
+import { safeNext } from "./state/next-destination";
 
 const AppLayout = lazy(() =>
   import("./layouts/AppLayout").then((m) => ({ default: m.AppLayout })),
@@ -38,6 +53,16 @@ const FriendsPage = lazy(() =>
 const FriendDetailPage = lazy(() =>
   import("./pages/FriendDetailPage").then((m) => ({
     default: m.FriendDetailPage,
+  })),
+);
+const UserProfilePage = lazy(() =>
+  import("./pages/UserProfilePage").then((m) => ({
+    default: m.UserProfilePage,
+  })),
+);
+const UsernameSetupPage = lazy(() =>
+  import("./pages/UsernameSetupPage").then((m) => ({
+    default: m.UsernameSetupPage,
   })),
 );
 const LandingPage = lazy(() =>
@@ -107,6 +132,18 @@ function RouteSuspense(props: { children: ReactNode }) {
   return <Suspense fallback={<FullPageSpinner />}>{props.children}</Suspense>;
 }
 
+/**
+ * 로그인으로 보내면서 지금 주소를 목적지로 실어 준다.
+ *
+ * `?next=`에 담는 값은 항상 이 사이트 안의 경로다. 아래 `safeNext`가 그것을
+ * 다시 확인한다 — 그러지 않으면 `?next=https://evil.example`로 오픈 리다이렉트가 된다.
+ */
+function RedirectToLogin() {
+  const location = useLocation();
+  const next = `${location.pathname}${location.search}`;
+  return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
+}
+
 function CompletedApp() {
   const me = useMe();
 
@@ -125,7 +162,9 @@ function CompletedApp() {
         <Route path="units/manage" element={<UnitManagePage me={me.data} />} />
         <Route path="leaves" element={<LeavesPage />} />
         <Route path="friends" element={<FriendsPage />} />
+        {/* 내부 id를 쓰던 옛 주소. 정본 `/u/{username}`으로 넘긴다. */}
         <Route path="friends/:userId" element={<FriendDetailPage />} />
+        <Route path="u/:username" element={<UserProfilePage />} />
         {/* grants가 :leaveId보다 먼저 와야 보유 휴가가 휴가 id로 잡히지 않는다. */}
         <Route
           path="leaves/grants"
@@ -147,12 +186,21 @@ function CompletedApp() {
   );
 }
 
+/**
+ * 인증된 사용자를 세 갈래로 나눈다: 온보딩 → 이름 설정 → 앱.
+ *
+ * 앞의 두 갈래는 라우트를 갈아치우지 않고 그 자리에 덮어 그린다. 그래서
+ * `/u/hyunwoo`로 들어온 사람이 온보딩과 이름 설정을 마치면, 주소가 그대로라
+ * 곧바로 그 프로필이 열린다.
+ */
 function AuthedApp() {
   const onboarding = useAuthBootstrap();
   if (onboarding.isPending) return <FullPageSpinner />;
   if (!onboarding.data) return <Navigate to="/login" replace />;
   if (!onboarding.data.completed)
     return <OnboardingPage status={onboarding.data} />;
+  // 0023 이전에 가입해 아직 공개 이름이 없는 계정 — 1회성 설정 화면.
+  if (!onboarding.data.username) return <UsernameSetupPage />;
   return <CompletedApp />;
 }
 
@@ -161,9 +209,15 @@ function PublicApp() {
   return (
     <Routes>
       <Route index element={<LandingPage />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<RedirectToLogin />} />
     </Routes>
   );
+}
+
+/** 이미 로그인한 사람이 /login·/signup에 오면 원래 가려던 곳으로 보낸다. */
+function AuthedRedirect() {
+  const location = useLocation();
+  return <Navigate to={safeNext(location.search)} replace />;
 }
 
 export function App() {
@@ -179,11 +233,11 @@ export function App() {
           <Route path="/invite" element={<InviteLandingPage />} />
           <Route
             path="/login"
-            element={isAuthed ? <Navigate to="/" replace /> : <LoginPage />}
+            element={isAuthed ? <AuthedRedirect /> : <LoginPage />}
           />
           <Route
             path="/signup"
-            element={isAuthed ? <Navigate to="/" replace /> : <SignupPage />}
+            element={isAuthed ? <AuthedRedirect /> : <SignupPage />}
           />
           <Route path="*" element={isAuthed ? <AuthedApp /> : <PublicApp />} />
         </Routes>

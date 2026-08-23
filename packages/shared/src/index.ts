@@ -16,6 +16,7 @@
  *  - leave-grants   : 적립분(언제 얼마가 부여됐고 언제 만료되는가)
  *  - regular-overnight : 주기 기반 정기외박
  *  - overage/availability : 하루 출타 인원 집계와 대안 날짜 추천
+ *  - username       : 공개 사용자 이름(@아이디)의 정규화·검증 규칙
  *  - schemas        : 모든 API 입력의 zod 스키마(서버 검증 = 앱 검증)
  *  - http           : API 주소 해석과 응답 unwrap
  */
@@ -37,3 +38,4 @@ export * from "./regular-overnight";
 export * from "./regular-overnight-guidance";
 export * from "./availability";
 export * from "./friends";
+export * from "./username";
