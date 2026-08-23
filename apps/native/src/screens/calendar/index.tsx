@@ -53,6 +53,7 @@ import {
   useLeaveBalances,
   useMe,
   useMyLeaves,
+  usePersonalEvents,
   type Calendar,
 } from "@leave/client";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
@@ -188,6 +189,8 @@ export function CalendarScreen() {
     ? selectedDate.slice(0, 7)
     : today.slice(0, 7);
   const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
+  // 그 달의 내 개인 일정. 달력 스크롤이 이미 채워 둔 캐시를 그대로 다시 쓴다.
+  const panelPersonalEvents = usePersonalEvents(panelMonth);
   const isOffline =
     netInfo.isConnected === false || netInfo.isInternetReachable === false;
   const lastUpdatedAt = Math.max(
@@ -422,6 +425,13 @@ export function CalendarScreen() {
                     },
                   })
                 }
+                personalEvents={panelPersonalEvents.data?.events}
+                onOpenPersonalEvent={(eventId) =>
+                  router.push({
+                    pathname: "/(tabs)/(calendar)/personal-event",
+                    params: { eventId, month: selectedDate.slice(0, 7) },
+                  })
+                }
                 style={styles.inspectorDayPanel}
               />
             ) : (
@@ -541,6 +551,13 @@ export function CalendarScreen() {
                       date: selectedDate,
                       month: selectedDate.slice(0, 7),
                     },
+                  })
+                }
+                personalEvents={panelPersonalEvents.data?.events}
+                onOpenPersonalEvent={(eventId) =>
+                  router.push({
+                    pathname: "/(tabs)/(calendar)/personal-event",
+                    params: { eventId, month: selectedDate.slice(0, 7) },
                   })
                 }
               />
