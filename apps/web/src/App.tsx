@@ -3,18 +3,17 @@
  *
  * 로그인 상태(jotai의 isAuthedAtom)에 따라 두 갈래로 갈린다.
  *  - 로그인:   AppLayout 아래의 달력·휴가·알림·프로필 화면
- *  - 비로그인: 첫 화면은 홍보 랜딩, 그 밖의 경로는 로그인으로 보낸다
+ *  - 비로그인: 첫 화면은 홍보 랜딩, 공유 프로필은 공개 화면, 그 밖은 로그인
  *
  * `me`를 여기서 한 번만 받아 각 화면에 props로 내려준다. 화면마다 다시 받으면
  * 같은 사용자 정보가 화면 전환 중 잠깐씩 달라 보일 수 있다.
  *
  * ## 딥링크 목적지를 잃지 않는다
  *
- * `/u/{username}`은 공유되는 주소라 로그아웃 상태로 열리는 일이 잦다. 그때
- * 로그인으로 보내되 원래 주소를 `?next=`에 실어 보내고, 로그인·가입이 끝나면
- * 그 자리로 되돌린다. 온보딩과 이름 설정은 라우트를 바꾸지 않고 그 위에 덮어
- * 그리므로, 그 단계가 끝나면 주소는 여전히 `/u/{username}`이고 화면이 그대로
- * 열린다 — 중간 단계마다 목적지를 다시 넘겨줄 필요가 없다.
+ * `/u/{username}`은 공유되는 주소라 로그아웃 상태로 열리면 최소 공개 프로필을
+ * 보여준다. 그 화면의 로그인 CTA가 원래 주소를 `?next=`에 실어 보내므로 로그인·
+ * 가입이 끝나면 인증 프로필로 돌아온다. 온보딩과 이름 설정은 라우트를 바꾸지 않고
+ * 그 위에 덮어 그려, 중간 단계를 지나도 목적지를 잃지 않는다.
  *
  * ## 화면은 전부 `lazy()`로 받는다
  *
@@ -58,6 +57,11 @@ const FriendDetailPage = lazy(() =>
 const UserProfilePage = lazy(() =>
   import("./pages/UserProfilePage").then((m) => ({
     default: m.UserProfilePage,
+  })),
+);
+const PublicUserProfilePage = lazy(() =>
+  import("./pages/PublicUserProfilePage").then((m) => ({
+    default: m.PublicUserProfilePage,
   })),
 );
 const UsernameSetupPage = lazy(() =>
@@ -204,11 +208,12 @@ function AuthedApp() {
   return <CompletedApp />;
 }
 
-/** 로그아웃 상태: 첫 화면은 홍보 랜딩, 그 외 경로는 로그인으로. */
+/** 로그아웃 상태: 첫 화면과 공유 프로필은 공개, 그 외 경로는 로그인으로. */
 function PublicApp() {
   return (
     <Routes>
       <Route index element={<LandingPage />} />
+      <Route path="u/:username" element={<PublicUserProfilePage />} />
       <Route path="*" element={<RedirectToLogin />} />
     </Routes>
   );

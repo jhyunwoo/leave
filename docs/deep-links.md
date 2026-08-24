@@ -10,7 +10,8 @@
 https://leave.moveto.kr/u/{username}
 ```
 
-공유 버튼은 언제나 이 HTTPS 주소를 준다. `leave://u/{username}`도 열리지만
+공유 버튼은 언제나 이 HTTPS 주소를 먼저 클립보드에 복사한 뒤 시스템 공유 시트를
+연다. `leave://u/{username}`도 열리지만
 **공유하지 않는다** — 받는 사람이 앱을 깔았는지 보낸 사람이 알 수 없기 때문이다.
 HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link), 없으면 웹 화면이
 열린다. 커스텀 스킴은 앱이 없는 기기에서 아무 데도 가지 않는다.
@@ -26,17 +27,18 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
 
 ## 경로별 착지점
 
-| 진입                               | 웹                              | 네이티브                                   |
-| ---------------------------------- | ------------------------------- | ------------------------------------------ |
-| `https://leave.moveto.kr/u/{name}` | `/u/:username` 라우트           | Universal Link / App Link → `u/[username]` |
-| `leave://u/{name}`                 | —                               | 커스텀 스킴 → `u/[username]`               |
-| 로그아웃 상태                      | `/login?next=/u/{name}` 뒤 복귀 | 로그인·온보딩·이름 설정을 마친 뒤 복귀     |
+| 진입                               | 웹                     | 네이티브                                   |
+| ---------------------------------- | ---------------------- | ------------------------------------------ |
+| `https://leave.moveto.kr/u/{name}` | `/u/:username` 라우트  | Universal Link / App Link → `u/[username]` |
+| `leave://u/{name}`                 | —                      | 커스텀 스킴 → `u/[username]`               |
+| 로그아웃 상태                      | 별칭·@아이디 공개 화면 | 로그인·온보딩·이름 설정을 마친 뒤 복귀     |
 
-로그아웃 상태의 목적지 보존은 두 앱이 다른 방법을 쓴다.
+로그아웃 상태의 동작은 두 앱이 다르다.
 
-- 웹: `?next=`에 실어 보내고 로그인·가입이 끝나면 그 자리로 돌린다. 온보딩과 이름
-  설정은 라우트를 갈아치우지 않고 덮어 그리므로, 그 단계가 끝나면 주소가 그대로다.
-  `?next=`는 [`state/next-destination.ts`](../apps/web/src/state/next-destination.ts)에서
+- 웹: 인증 없이 별칭과 @아이디만 공개 API에서 받아 보여준다. 이메일·내부 사용자
+  id·친구 관계·부대·복무·일정 정보는 응답에도 넣지 않는다. "로그인하고 친구 추가"를
+  누른 경우에만 `?next=`에 현재 경로를 실어 보내고, 로그인·가입이 끝나면 그 자리로
+  돌린다. `?next=`는 [`state/next-destination.ts`](../apps/web/src/state/next-destination.ts)에서
   **내부 경로로만** 해석한다(오픈 리다이렉트 방지).
 - 네이티브: `/u/{username}`이 `Stack.Protected` 안에 있어 인증 전에는 트리에 없다.
   그대로 두면 목적지가 사라지므로, 인증되지 않은 동안 도착한 링크만 모듈에 담아
@@ -44,6 +46,10 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
   ([`lib/pending-profile-link.ts`](../apps/native/src/lib/pending-profile-link.ts)).
   이미 인증된 상태의 링크는 담지 않는다 — expo-router가 알아서 가고, 여기서 또
   이동시키면 같은 화면이 두 장 쌓인다.
+
+익명 요청에는 조회자 관계가 없으므로 차단 여부를 판정하지 않는다. 차단·친구 관계와
+일정 권한은 로그인한 뒤 기존 인증 프로필 API에서 그대로 적용한다. 로그아웃 화면에서
+보이는 것은 누구에게나 공개하기로 한 별칭과 @아이디뿐이다.
 
 ## 연결 파일
 
@@ -55,6 +61,9 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
 - `apple-app-site-association` — `appIDs: ["Y4FP7J24AX.app.leave.mobile"]`,
   `components`는 `/u/*`만. 팀 ID는 EAS에 등록된 배포 인증서에서 확인한 값이다.
 - `assetlinks.json` — `package_name: app.leave.mobile`과 서명 인증서 SHA-256.
+
+Android 앱의 intent filter도 `/u/` 접두어만 받는다. `/u`로 끝 슬래시 없이
+두면 `/units` 같은 앱 내부 페이지까지 프로필 링크로 오인해 브라우저에서 가로챈다.
 
 ### 안드로이드 서명 인증서에 대한 주의
 

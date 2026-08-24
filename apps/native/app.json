@@ -141,7 +141,7 @@
             {
               "scheme": "https",
               "host": "leave.moveto.kr",
-              "pathPrefix": "/u"
+              "pathPrefix": "/u/"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

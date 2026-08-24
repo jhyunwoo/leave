@@ -28,32 +28,18 @@ import {
   formatUsername,
   LEAVE_STATUS_LABELS,
   monthBounds,
-  profileLink,
   shiftMonth,
   todayInSeoul,
 } from "@leave/shared";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, Share, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
+import { ProfileShareButton } from "@/components/profile-share-button";
 import { confirmAction } from "@/lib/dialog";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
-
-/**
- * 공유하는 것은 커스텀 스킴이 아니라 언제나 HTTPS 정본 주소다.
- * 받는 사람이 앱을 깔았는지 보낸 사람이 알 수 없으므로, 앱이 있으면 앱에서 열리고
- * 없으면 웹에서 열리는 주소여야 한다.
- */
-async function shareProfile(username: string) {
-  const url = profileLink(username);
-  await Share.share(
-    process.env.EXPO_OS === "ios"
-      ? { url, message: `@${username}` }
-      : { message: `@${username}\n${url}` },
-  );
-}
 
 function SharedSchedule(props: { userId: string }) {
   const styles = useStyles();
@@ -158,10 +144,9 @@ function RelationshipActions(props: {
           variant="secondary"
           onPress={() => router.push("/(tabs)/profile")}
         />
-        <Button
-          title="프로필 링크 공유"
-          variant="secondary"
-          onPress={() => void shareProfile(profile.username)}
+        <ProfileShareButton
+          username={profile.username}
+          own
           testID="profile-share"
         />
       </View>
@@ -230,12 +215,7 @@ function RelationshipActions(props: {
           testID="profile-remove-friend"
         />
       ) : null}
-      <Button
-        title="프로필 링크 공유"
-        variant="secondary"
-        onPress={() => void shareProfile(profile.username)}
-        testID="profile-share"
-      />
+      <ProfileShareButton username={profile.username} testID="profile-share" />
     </View>
   );
 }

@@ -29,6 +29,7 @@ import { friendRoutes } from "./routes/friends";
 import { personalEventRoutes } from "./routes/personal-events";
 import { moderationRoutes } from "./routes/moderation";
 import { notificationRoutes } from "./routes/notifications";
+import { publicUserRoutes } from "./routes/public-users";
 import { pushRoutes } from "./routes/push";
 import { unitRoutes } from "./routes/units";
 import { userRoutes } from "./routes/users";
@@ -102,6 +103,7 @@ const routes = app
     }),
   )
   .route("/auth", authRoutes)
+  .route("/public/users", publicUserRoutes)
   .route("/users", userRoutes)
   .route("/units", unitRoutes)
   .route("/leaves", leaveRoutes)

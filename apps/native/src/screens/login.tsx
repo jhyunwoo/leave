@@ -15,7 +15,6 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LegalLinks } from "@/components/legal-links";
-import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { makeStyles, spacing } from "@/theme";
 
 export function LoginScreen() {
@@ -84,7 +83,6 @@ export function LoginScreen() {
               </View>
             ))}
           </View>
-          <OfficialDisclaimer />
         </ContentPanel>
 
         <ContentPanel style={styles.card}>

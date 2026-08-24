@@ -70,3 +70,5 @@ env:
 - assertVisible: "사용자 이름"
 - assertVisible:
     id: "profile-edit-username"
+- assertVisible:
+    id: "profile-share-own"

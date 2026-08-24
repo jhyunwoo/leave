@@ -18,7 +18,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
-import type { UserProfile, UserSearchResults } from "../types";
+import type {
+  PublicUserProfile,
+  UserProfile,
+  UserSearchResults,
+} from "../types";
 
 /**
  * 사용자 이름 검색.
@@ -58,6 +62,28 @@ export function useUserProfile(rawUsername: string | null | undefined) {
           queryRequestOptions(adapter.useRequestAbortSignal, context),
         )
         .then((response) => adapter.unwrap<UserProfile>(response)),
+  });
+}
+
+/**
+ * 로그인 없이 보는 최소 공개 프로필.
+ *
+ * 인증 프로필과 캐시를 섞지 않는다. 인증 응답에는 관계와 내부 사용자 id가 있어
+ * 익명 화면이 잘못된 캐시를 읽으면 공개하면 안 되는 정보가 노출될 수 있다.
+ */
+export function usePublicUserProfile(rawUsername: string | null | undefined) {
+  const adapter = useLeaveApi();
+  const username = rawUsername ? normalizeUsername(rawUsername) : "";
+  return useQuery({
+    queryKey: queryKeys.publicUserProfile(username),
+    enabled: isCanonicalUsername(username),
+    queryFn: (context) =>
+      adapter.client.public.users[":username"]
+        .$get(
+          { param: { username } },
+          queryRequestOptions(adapter.useRequestAbortSignal, context),
+        )
+        .then((response) => adapter.unwrap<PublicUserProfile>(response)),
   });
 }
 
@@ -106,6 +132,7 @@ export function useSetUsername() {
           queryKeys.me,
           queryKeys.onboarding,
           queryKeys.users,
+          queryKeys.publicUserProfiles,
           queryKeys.friends,
         ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       );

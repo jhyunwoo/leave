@@ -67,6 +67,11 @@ export const queryKeys = {
   usernameAvailability: (username: string) =>
     ["users", "availability", username] as const,
 
+  /** 인증 프로필과 응답 계약이 다르므로 별도 캐시에서 관리한다. */
+  publicUserProfiles: ["publicUsers", "profile"] as const,
+  publicUserProfile: (username: string) =>
+    ["publicUsers", "profile", username] as const,
+
   personalEvents: ["personalEvents"] as const,
   personalEventsMonth: (month: string) =>
     ["personalEvents", "month", month] as const,

@@ -193,7 +193,7 @@ test("한글 사용자 이름 검색과 이름 중복 안내", async ({ page, re
   await expect(page.getByText("이미 사용 중인 이름이에요")).toBeVisible();
 });
 
-test("로그아웃 상태의 /u/{username}은 로그인 뒤 그 자리로 돌아온다", async ({
+test("로그아웃 공개 프로필은 최소 정보만 보이고 로그인 뒤 인증 프로필로 돌아온다", async ({
   page,
   request,
 }) => {
@@ -201,6 +201,25 @@ test("로그아웃 상태의 /u/{username}은 로그인 뒤 그 자리로 돌아
   const visitor = await signup(request, "visitor", "방문자");
 
   await page.goto(`/u/${target.username}`);
+  await expect(page).toHaveURL(new RegExp(`/u/${target.username}$`));
+  await expect(page.getByTestId("public-profile")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "딥링크대상" })).toBeVisible();
+  await expect(
+    page.getByText(`@${target.username}`, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("공개 프로필에는 이름과 사용자 이름만 표시돼요."),
+  ).toBeVisible();
+  await expect(page.getByText(target.email)).toHaveCount(0);
+  await expect(page.getByTestId("profile-add-friend")).toHaveCount(0);
+  await expect(page.getByText("공유된 휴가 일정")).toHaveCount(0);
+
+  const loginCta = page.getByTestId("public-profile-login");
+  await expect(loginCta).toHaveAttribute(
+    "href",
+    `/login?next=%2Fu%2F${target.username}`,
+  );
+  await loginCta.click();
   await expect(page).toHaveURL(
     new RegExp(`/login\\?next=%2Fu%2F${target.username}$`),
   );
@@ -215,6 +234,22 @@ test("로그아웃 상태의 /u/{username}은 로그인 뒤 그 자리로 돌아
   });
   await expect(page.getByRole("heading", { name: "딥링크대상" })).toBeVisible();
   await expect(page.getByTestId("profile-add-friend")).toBeVisible();
+});
+
+test("없는 공개 사용자 이름은 로그인 없이 찾을 수 없음 화면을 보여준다", async ({
+  page,
+}) => {
+  const missing = `missing${uniqueTag()}`;
+  await page.goto(`/u/${missing}`);
+
+  await expect(page).toHaveURL(new RegExp(`/u/${missing}$`));
+  await expect(
+    page.getByRole("heading", { name: "사용자를 찾을 수 없어요" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("사용자 이름이 바뀌었거나 공개 프로필이 없는 계정이에요."),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "리브 홈으로" })).toBeVisible();
 });
 
 test("이름 없는 옛 계정은 1회성 설정 화면을 지나야 앱에 들어간다", async ({

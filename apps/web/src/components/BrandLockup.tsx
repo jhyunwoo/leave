@@ -6,21 +6,13 @@
 type BrandLockupProps = {
   className?: string;
   iconSize?: number;
-  stacked?: boolean;
 };
 
 export function BrandLockup({
   className = "",
   iconSize = 30,
-  stacked = false,
 }: BrandLockupProps) {
-  const classes = [
-    "brand-lockup",
-    stacked ? "brand-lockup--stacked" : "",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const classes = ["brand-lockup", className].filter(Boolean).join(" ");
 
   return (
     <span className={classes}>

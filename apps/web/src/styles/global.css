@@ -648,11 +648,6 @@ textarea.input {
   line-height: 1;
 }
 
-.brand-lockup--stacked {
-  flex-direction: column;
-  gap: var(--sp-md);
-}
-
 .brand-lockup__mark {
   display: block;
   flex: 0 0 auto;
@@ -910,5 +905,5 @@ a.friend-row {
 
 a.friend-row:hover,
 a.friend-row:focus-visible {
-  border-color: var(--primary);
+  border-color: var(--primary-active);
 }

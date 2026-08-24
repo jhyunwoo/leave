@@ -53,6 +53,7 @@ import { Field, Input } from "@/components/field";
 import { FormSheet } from "@/components/form-sheet";
 import { LegalLinks } from "@/components/legal-links";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
+import { ProfileShareButton } from "@/components/profile-share-button";
 import { NativeSegmentedControl } from "@/components/segmented-control";
 import { ServiceProgress } from "@/components/service-progress";
 import { SheetScaffold } from "@/components/sheet-scaffold";
@@ -137,17 +138,24 @@ function UsernameCard(props: { username: string | null }) {
             testID="profile-edit-username"
           />
           {props.username ? (
-            <Button
-              title="내 공개 프로필 보기"
-              variant="ghost"
-              onPress={() =>
-                router.push({
-                  pathname: "/u/[username]",
-                  params: { username: props.username! },
-                })
-              }
-              testID="profile-open-public"
-            />
+            <>
+              <ProfileShareButton
+                username={props.username}
+                own
+                testID="profile-share-own"
+              />
+              <Button
+                title="내 공개 프로필 보기"
+                variant="ghost"
+                onPress={() =>
+                  router.push({
+                    pathname: "/u/[username]",
+                    params: { username: props.username! },
+                  })
+                }
+                testID="profile-open-public"
+              />
+            </>
           ) : null}
         </>
       )}

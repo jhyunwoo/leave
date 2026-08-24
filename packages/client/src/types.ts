@@ -140,6 +140,11 @@ export type FriendSchedule = InferResponseType<
   Client["friends"][":userId"]["schedule"]["$get"],
   200
 >;
+/** 로그인 없이 볼 수 있는 최소 공개 프로필. 관계·일정·내부 id는 포함하지 않는다. */
+export type PublicUserProfile = InferResponseType<
+  Client["public"]["users"][":username"]["$get"],
+  200
+>;
 /** 공개 프로필 한 사람 — 검색 결과와 `/u/{username}` 화면이 같은 모양을 쓴다. */
 export type UserProfile = InferResponseType<
   Client["users"][":username"]["$get"],

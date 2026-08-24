@@ -1,11 +1,10 @@
-# 앱 기동 스모크 — 가입 전에 가치 데모와 비공식 고지가 보이는지 확인한다.
+# 앱 기동 스모크 — 가입 전에 가치 데모가 보이는지 확인한다.
 appId: app.leave.mobile
 ---
 - launchApp:
     clearState: true
 - assertVisible: "리브"
 - assertVisible: "가입 전 미리보기"
-- assertVisible: "공식 승인과 무관"
 - assertVisible: "로그인"
 - tapOn: "가입하기"
 - assertVisible: "60초 안에 시작하기"

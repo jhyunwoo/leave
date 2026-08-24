@@ -6,7 +6,11 @@ import {
   useSendFriendRequest,
   watchFriendAccessRevocation,
 } from "../src/hooks/friends";
-import { useSetUsername, useUserSearch } from "../src/hooks/users";
+import {
+  usePublicUserProfile,
+  useSetUsername,
+  useUserSearch,
+} from "../src/hooks/users";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
@@ -61,6 +65,73 @@ describe("사용자 검색", () => {
     const { result } = renderHook(() => useUserSearch("hyun woo"), { wrapper });
     expect(result.current.fetchStatus).toBe("idle");
     expect(search).not.toHaveBeenCalled();
+  });
+});
+
+describe("비로그인 공개 프로필", () => {
+  it("정규형으로 별도 캐시 키와 공개 API 요청을 만든다", async () => {
+    const queryClient = testQueryClient();
+    const getProfile = vi.fn((_input?: unknown) =>
+      Promise.resolve({ name: "현우", username: "hyunwoo" }),
+    );
+    const wrapper = wrapperFor(
+      queryClient,
+      testAdapter({
+        client: {
+          public: {
+            users: { ":username": { $get: getProfile } },
+          },
+        },
+      }),
+    );
+
+    const first = renderHook(() => usePublicUserProfile(" HyunWoo "), {
+      wrapper,
+    });
+    await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
+    const second = renderHook(() => usePublicUserProfile("hyunwoo"), {
+      wrapper,
+    });
+    await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+
+    for (const call of getProfile.mock.calls) {
+      expect(call[0]).toMatchObject({ param: { username: "hyunwoo" } });
+    }
+    expect(
+      queryClient.getQueryData(queryKeys.publicUserProfile("hyunwoo")),
+    ).toEqual({ name: "현우", username: "hyunwoo" });
+    expect(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .filter((query) => query.queryKey[0] === "publicUsers"),
+    ).toHaveLength(1);
+    expect(
+      queryClient.getQueryData(queryKeys.userProfile("hyunwoo")),
+    ).toBeUndefined();
+  });
+
+  it("규칙에 어긋난 사용자 이름은 공개 API로 보내지 않는다", () => {
+    const queryClient = testQueryClient();
+    const getProfile = vi.fn(() =>
+      Promise.resolve({ name: "현우", username: "hyunwoo" }),
+    );
+    const wrapper = wrapperFor(
+      queryClient,
+      testAdapter({
+        client: {
+          public: {
+            users: { ":username": { $get: getProfile } },
+          },
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => usePublicUserProfile("@hyunwoo"), {
+      wrapper,
+    });
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(getProfile).not.toHaveBeenCalled();
   });
 });
 
@@ -149,6 +220,7 @@ describe("이름 변경", () => {
       queryKeys.me,
       queryKeys.onboarding,
       queryKeys.userProfile("old"),
+      queryKeys.publicUserProfile("old"),
       queryKeys.friendList,
     ]) {
       queryClient.setQueryData(key, {});
@@ -168,6 +240,7 @@ describe("이름 변경", () => {
       queryKeys.me,
       queryKeys.onboarding,
       queryKeys.userProfile("old"),
+      queryKeys.publicUserProfile("old"),
       queryKeys.friendList,
     ]) {
       expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);

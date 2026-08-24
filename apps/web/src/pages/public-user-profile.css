@@ -1,0 +1,108 @@
+.public-profile-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 50% 12%, var(--primary-pale), transparent 32rem),
+    var(--canvas-soft);
+}
+
+.public-profile-nav {
+  min-height: var(--nav-h);
+  background: var(--glass-chrome);
+  border-bottom: 1px solid var(--glass-chrome-border);
+  -webkit-backdrop-filter: blur(24px) saturate(1.32);
+  backdrop-filter: blur(24px) saturate(1.32);
+}
+
+.public-profile-nav-inner {
+  min-height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-lg);
+}
+
+.public-profile-brand {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.public-profile-main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding-top: var(--sp-3xl);
+  padding-bottom: var(--sp-3xl);
+}
+
+.public-profile-card,
+.public-profile-message {
+  width: min(100%, 560px);
+}
+
+.public-profile-card {
+  overflow: hidden;
+  padding: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.public-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xl);
+  padding: var(--sp-2xl);
+}
+
+.public-profile-identity .eyebrow {
+  margin-bottom: var(--sp-xs);
+}
+
+.public-profile-identity .body-lg {
+  margin-top: var(--sp-xs);
+}
+
+.public-profile-action {
+  display: grid;
+  gap: var(--sp-md);
+  padding: var(--sp-xl) var(--sp-2xl) var(--sp-2xl);
+  background: var(--surface-card);
+  border-top: 1px solid var(--hairline-soft);
+  text-align: center;
+}
+
+.public-profile-message {
+  display: grid;
+  gap: var(--sp-lg);
+  text-align: center;
+  box-shadow: var(--shadow-card);
+}
+
+.public-profile-message .btn {
+  justify-self: center;
+}
+
+.public-profile-footer {
+  padding: var(--sp-md) var(--sp-xl) var(--sp-xl);
+}
+
+@media (max-width: 520px) {
+  .public-profile-main {
+    place-items: start center;
+    padding-top: var(--sp-2xl);
+  }
+
+  .public-profile-identity {
+    flex-direction: column;
+    padding: var(--sp-2xl) var(--sp-xl);
+    text-align: center;
+  }
+
+  .public-profile-action {
+    padding: var(--sp-xl);
+  }
+}

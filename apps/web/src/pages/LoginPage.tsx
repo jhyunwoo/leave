@@ -7,7 +7,6 @@ import { safeNext, withNext } from "../state/next-destination";
 import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
-import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -43,7 +42,7 @@ export function LoginPage() {
       }}
     >
       <div className="anim-rise" style={{ textAlign: "center" }}>
-        <BrandLockup className="display-xl" iconSize={76} stacked />
+        <BrandLockup className="display-xl" iconSize={56} />
         <p className="body-lg text-body" style={{ marginTop: "var(--sp-md)" }}>
           부대 휴가, 겹치기 전에 미리 보기.
         </p>
@@ -65,7 +64,6 @@ export function LoginPage() {
         }}
       >
         <h1 className="display-xs">로그인</h1>
-        <OfficialDisclaimer />
         <Field label="이메일">
           <input
             className="input"
