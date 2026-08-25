@@ -34,6 +34,7 @@ import {
   splitLastDraft,
   titleFromDrafts,
   todayInSeoul,
+  USER_EDITABLE_LEAVE_STATUSES,
   type LeaveStatus,
 } from "@leave/shared";
 import { useState } from "react";
@@ -49,14 +50,6 @@ import { OfficialDisclaimer } from "./official-disclaimer";
 import { SegmentRow } from "./segment-row";
 import { NativeSegmentedControl } from "./segmented-control";
 import { SheetScaffold } from "./sheet-scaffold";
-
-/** 폼에서 사용자가 직접 고를 수 있는 상태. 나머지는 서버·관리자 흐름에서 바뀐다. */
-const STATUS_OPTIONS = [
-  "draft",
-  "shared",
-  "requested",
-  "approved",
-] as const satisfies readonly LeaveStatus[];
 
 /** 계획 상태가 무슨 뜻인지 한 줄로 설명한다. */
 function statusHint(status: LeaveStatus): string {
@@ -206,9 +199,11 @@ export function LeaveFormModal(props: {
                 계획 상태
               </Text>
               <NativeSegmentedControl
-                values={STATUS_OPTIONS}
+                values={USER_EDITABLE_LEAVE_STATUSES}
                 labels={LEAVE_STATUS_LABELS}
-                value={form.status as (typeof STATUS_OPTIONS)[number]}
+                value={
+                  form.status as (typeof USER_EDITABLE_LEAVE_STATUSES)[number]
+                }
                 onValueChange={form.setStatus}
                 testID="leave-status"
               />

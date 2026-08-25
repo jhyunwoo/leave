@@ -48,6 +48,25 @@ export const LEAVE_STATUSES = [
 
 export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
 
+/** 사용자가 앱에서 직접 고를 수 있는 진행 상태. 종료 상태는 서버·관리 흐름이 맡는다. */
+export const USER_EDITABLE_LEAVE_STATUSES = [
+  "draft",
+  "shared",
+  "requested",
+  "approved",
+] as const satisfies readonly LeaveStatus[];
+
+export type UserEditableLeaveStatus =
+  (typeof USER_EDITABLE_LEAVE_STATUSES)[number];
+
+export function isUserEditableLeaveStatus(
+  status: LeaveStatus,
+): status is UserEditableLeaveStatus {
+  return (USER_EDITABLE_LEAVE_STATUSES as readonly LeaveStatus[]).includes(
+    status,
+  );
+}
+
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
   draft: "초안(나만 보기)",
   shared: "희망",

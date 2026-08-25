@@ -8,6 +8,7 @@ import type {
   LeaveCreateInput,
   LeaveGrantCreateInput,
   LeaveGrantUpdateInput,
+  LeaveStatusUpdateInput,
   RegularOvernightConfigInput,
 } from "@leave/shared";
 import { monthsSpanning } from "@leave/shared";
@@ -36,6 +37,7 @@ type MyLeavesPage = { leaves: MyLeave[] };
 
 /** 서로의 총량을 바꾸는 보유 휴가 쓰기는 서버 적용 순서대로 한 건씩 처리한다. */
 const LEAVE_HOLDINGS_MUTATION_SCOPE = { id: "leave-holdings" } as const;
+const LEAVE_STATUS_MUTATION_KEY = ["leave-status"] as const;
 
 function monthsForLeave(leave: Pick<MyLeave, "startDate" | "endDate">) {
   return monthsSpanning(leave.startDate, leave.endDate);
@@ -121,6 +123,89 @@ export function useUpdateLeave() {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.notifications,
         });
+      }
+    },
+  });
+}
+
+/** 목록에서 제목·기간·구간을 건드리지 않고 진행 상태만 빠르게 바꾼다. */
+export function useUpdateLeaveStatus() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: LEAVE_STATUS_MUTATION_KEY,
+    mutationFn: async (vars: {
+      id: string;
+      status: LeaveStatusUpdateInput["status"];
+    }) =>
+      unwrap<LeaveResult>(
+        await client.leaves[":id"].status.$patch({
+          param: { id: vars.id },
+          json: { status: vars.status },
+        }),
+      ),
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.myLeaves,
+        exact: true,
+      });
+      const previousPage = queryClient.getQueryData<MyLeavesPage>(
+        queryKeys.myLeaves,
+      );
+      const previousLeave = previousPage?.leaves.find(
+        (leave) => leave.id === variables.id,
+      );
+      if (previousPage) {
+        queryClient.setQueryData<MyLeavesPage>(queryKeys.myLeaves, {
+          leaves: previousPage.leaves.map((leave) =>
+            leave.id === variables.id
+              ? { ...leave, status: variables.status }
+              : leave,
+          ),
+        });
+      }
+      return { previousLeave };
+    },
+    onError: (_error, _variables, context) => {
+      const previousLeave = context?.previousLeave;
+      if (!previousLeave) return;
+      queryClient.setQueryData<MyLeavesPage>(queryKeys.myLeaves, (current) =>
+        current
+          ? {
+              leaves: current.leaves.map((leave) =>
+                leave.id === previousLeave.id
+                  ? { ...leave, status: previousLeave.status }
+                  : leave,
+              ),
+            }
+          : current,
+      );
+    },
+    onSuccess: (data, _variables, context) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leaveBalances });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leaveGrants });
+      invalidateCalendarMonths(
+        queryClient,
+        context?.previousLeave
+          ? new Set([
+              ...monthsForLeave(context.previousLeave),
+              ...monthsForLeave(data.leave),
+            ])
+          : null,
+      );
+      if (data.exceededDates.length > 0) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.notifications,
+        });
+      }
+    },
+    onSettled: () => {
+      // 동시에 바꾼 다른 행의 낙관적 상태를 중간 refetch가 덮지 않도록 마지막
+      // 상태 요청이 끝날 때 서버의 병합 결과를 한 번만 다시 받는다.
+      if (
+        queryClient.isMutating({ mutationKey: LEAVE_STATUS_MUTATION_KEY }) === 1
+      ) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.myLeaves });
       }
     },
   });

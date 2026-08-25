@@ -18,6 +18,7 @@ import {
   LEAVE_STATUSES,
   OVERNIGHT_KINDS,
   sortSegments,
+  USER_EDITABLE_LEAVE_STATUSES,
 } from "./leave";
 import { BRANCHES, RANKS } from "./rank";
 import {
@@ -245,6 +246,13 @@ export const leaveCreateSchema = z
   });
 
 export const leaveUpdateSchema = leaveCreateSchema;
+
+/** 목록의 빠른 변경은 사용자가 직접 선택할 수 있는 상태 한 필드만 받는다. */
+export const leaveStatusUpdateSchema = z.object({
+  status: z.enum(USER_EDITABLE_LEAVE_STATUSES),
+});
+
+export type LeaveStatusUpdateInput = z.infer<typeof leaveStatusUpdateSchema>;
 
 export const leaveBalanceUpdateSchema = z.object({
   totals: z.record(z.enum(BALANCE_KEYS), z.int().min(0).max(999)),

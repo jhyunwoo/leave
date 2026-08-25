@@ -77,23 +77,62 @@ test("초안을 공유로 바꾸면 그때부터 집계에 잡힌다", async () 
   });
   assert.equal(renamed.data.leave.status, "draft");
 
-  const shared = await req("PATCH", `/leaves/${id}`, {
+  const shared = await req("PATCH", `/leaves/${id}/status`, {
     token: owner.token,
-    body: {
-      title: "이름만 변경",
-      status: "shared",
-      segments: [
-        { category: "annual", startDate: "2026-09-15", endDate: "2026-09-15" },
-      ],
-    },
+    body: { status: "shared" },
   });
   assert.equal(shared.data.leave.status, "shared");
+  assert.equal(shared.data.leave.title, "이름만 변경");
+  assert.deepEqual(shared.data.leave.segments, renamed.data.leave.segments);
 
   const calendar = await req("GET", `/units/${unitId}/calendar?month=2026-09`, {
     token: owner.token,
   });
   const day = calendar.data.days.find((d) => d.date === "2026-09-15");
   assert.equal(day.count, 1);
+});
+
+test("빠른 상태 변경은 종료 상태와 다른 사용자의 휴가를 건드리지 않는다", async () => {
+  const owner = await signup();
+  await createUnit(owner.token);
+  const terminal = await req("POST", "/leaves", {
+    token: owner.token,
+    body: {
+      title: "복귀한 휴가",
+      reason: "보존할 메모",
+      status: "completed",
+      segments: [
+        { category: "annual", startDate: "2026-10-20", endDate: "2026-10-20" },
+      ],
+    },
+  });
+  assert.equal(terminal.status, 201);
+  const id = terminal.data.leave.id;
+
+  const fromTerminal = await req("PATCH", `/leaves/${id}/status`, {
+    token: owner.token,
+    body: { status: "approved" },
+  });
+  assert.equal(fromTerminal.status, 400);
+
+  const invalidTarget = await req("PATCH", `/leaves/${id}/status`, {
+    token: owner.token,
+    body: { status: "completed" },
+  });
+  assert.equal(invalidTarget.status, 400);
+
+  const other = await signup();
+  const forbidden = await req("PATCH", `/leaves/${id}/status`, {
+    token: other.token,
+    body: { status: "draft" },
+  });
+  assert.equal(forbidden.status, 404);
+
+  const mine = await req("GET", "/leaves/mine", { token: owner.token });
+  const unchanged = mine.data.leaves.find((leave) => leave.id === id);
+  assert.equal(unchanged.status, "completed");
+  assert.equal(unchanged.title, "복귀한 휴가");
+  assert.equal(unchanged.reason, "보존할 메모");
 });
 
 test("복귀일 계산 설정이 서버 집계에 그대로 반영된다", async () => {

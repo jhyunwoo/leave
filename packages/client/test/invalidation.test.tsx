@@ -13,6 +13,7 @@ import {
   useCreateLeaveGrant,
   useDeleteLeave,
   useUpdateLeave,
+  useUpdateLeaveStatus,
 } from "../src/hooks/leaves";
 import { useCreateBlackout } from "../src/hooks/blackouts";
 import { queryKeys } from "../src/query-keys";
@@ -236,6 +237,139 @@ describe("휴가 수정", () => {
       "2026-10",
       "2026-11",
     ]);
+  });
+});
+
+describe("휴가 상태 빠른 변경", () => {
+  it("상태만 보내고 즉시 반영한 뒤 관련 캐시를 비운다", async () => {
+    let finish!: (value: unknown) => void;
+    const patch = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const client = {
+      leaves: { ":id": { status: { $patch: patch } } },
+    };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.myLeaves, {
+      leaves: [
+        {
+          id: "leave-1",
+          status: "shared",
+          startDate: "2026-10-01",
+          endDate: "2026-10-03",
+        },
+      ],
+    });
+    const { result } = renderHook(() => useUpdateLeaveStatus(), { wrapper });
+
+    result.current.mutate({ id: "leave-1", status: "requested" });
+
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<{ leaves: Array<{ status: string }> }>(
+          queryKeys.myLeaves,
+        )?.leaves[0]?.status,
+      ).toBe("requested"),
+    );
+    expect(patch).toHaveBeenCalledWith({
+      param: { id: "leave-1" },
+      json: { status: "requested" },
+    });
+
+    finish({
+      leave: {
+        id: "leave-1",
+        status: "requested",
+        startDate: "2026-10-01",
+        endDate: "2026-10-03",
+      },
+      exceededDates: [],
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(staleCalendarMonths(queryClient)).toEqual(["2026-10"]);
+    expect(staleKeys(queryClient)).toEqual(
+      expect.arrayContaining(
+        [
+          queryKeys.myLeaves,
+          queryKeys.leaveBalances,
+          queryKeys.leaveGrants,
+        ].map((key) => JSON.stringify(key)),
+      ),
+    );
+  });
+
+  it("요청이 실패하면 낙관적으로 바꾼 상태를 되돌린다", async () => {
+    let fail!: (error: Error) => void;
+    const client = {
+      leaves: {
+        ":id": {
+          status: {
+            $patch: () =>
+              new Promise((_resolve, reject) => {
+                fail = reject;
+              }),
+          },
+        },
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.myLeaves, {
+      leaves: [
+        {
+          id: "leave-1",
+          status: "shared",
+          startDate: "2026-10-01",
+          endDate: "2026-10-03",
+        },
+        {
+          id: "leave-2",
+          status: "shared",
+          startDate: "2026-11-01",
+          endDate: "2026-11-02",
+        },
+      ],
+    });
+    const { result } = renderHook(() => useUpdateLeaveStatus(), { wrapper });
+
+    result.current.mutate({ id: "leave-1", status: "approved" });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<{ leaves: Array<{ status: string }> }>(
+          queryKeys.myLeaves,
+        )?.leaves[0]?.status,
+      ).toBe("approved"),
+    );
+
+    queryClient.setQueryData<{
+      leaves: Array<{
+        id: string;
+        status: string;
+        startDate: string;
+        endDate: string;
+      }>;
+    }>(queryKeys.myLeaves, (current) => ({
+      leaves: (current?.leaves ?? []).map((leave) =>
+        leave.id === "leave-2" ? { ...leave, status: "requested" } : leave,
+      ),
+    }));
+
+    fail(new Error("network"));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(
+      queryClient.getQueryData<{ leaves: Array<{ status: string }> }>(
+        queryKeys.myLeaves,
+      )?.leaves[0]?.status,
+    ).toBe("shared");
+    expect(
+      queryClient
+        .getQueryData<{ leaves: Array<{ id: string; status: string }> }>(
+          queryKeys.myLeaves,
+        )
+        ?.leaves.find((leave) => leave.id === "leave-2")?.status,
+    ).toBe("requested");
   });
 });
 

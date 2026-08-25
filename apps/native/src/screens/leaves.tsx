@@ -40,6 +40,7 @@ import { ActionMenu } from "@/components/action-menu";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveFormModal } from "@/components/leave-form-modal";
+import { LeaveStatusControl } from "@/components/leave-status-control";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
@@ -198,41 +199,46 @@ export function LeavesScreen() {
           selected && styles.leaveRowSelected,
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={isExpanded ? { selected } : undefined}
-          accessibilityLabel={`${l.title} 자세히 보기`}
-          onPress={() => openLeave(l)}
-          style={{ flex: 1, minWidth: 0 }}
-        >
-          <Text style={styles.leaveTitle}>{l.title}</Text>
-          <Text style={styles.leaveDates}>
-            {fmtRange(l.startDate, l.endDate)}
-          </Text>
-          {l.reason ? <Text style={styles.leaveReason}>{l.reason}</Text> : null}
-          <SegmentBadges segments={l.segments} />
-        </Pressable>
-        <ActionMenu
-          label={`${l.title} 작업`}
-          buttonLabel="휴가 관리"
-          testID={`leave-actions-${l.id}`}
-          actions={[
-            {
-              id: "edit",
-              title: "수정",
-              systemImage: "pencil",
-              onPress: () => setEditing(l),
-            },
-            {
-              id: "delete",
-              title: "삭제",
-              systemImage: "trash",
-              destructive: true,
-              disabled: del.isPending,
-              onPress: () => void confirmDelete(l),
-            },
-          ]}
-        />
+        <View style={styles.leaveMainRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={isExpanded ? { selected } : undefined}
+            accessibilityLabel={`${l.title} 자세히 보기`}
+            onPress={() => openLeave(l)}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            <Text style={styles.leaveTitle}>{l.title}</Text>
+            <Text style={styles.leaveDates}>
+              {fmtRange(l.startDate, l.endDate)}
+            </Text>
+            {l.reason ? (
+              <Text style={styles.leaveReason}>{l.reason}</Text>
+            ) : null}
+            <SegmentBadges segments={l.segments} />
+          </Pressable>
+          <ActionMenu
+            label={`${l.title} 작업`}
+            buttonLabel="휴가 관리"
+            testID={`leave-actions-${l.id}`}
+            actions={[
+              {
+                id: "edit",
+                title: "수정",
+                systemImage: "pencil",
+                onPress: () => setEditing(l),
+              },
+              {
+                id: "delete",
+                title: "삭제",
+                systemImage: "trash",
+                destructive: true,
+                disabled: del.isPending,
+                onPress: () => void confirmDelete(l),
+              },
+            ]}
+          />
+        </View>
+        <LeaveStatusControl leave={l} />
       </View>
     );
   };
@@ -527,9 +533,7 @@ const useStyles = makeStyles(({ colors }) => ({
   leaveList: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   leaveRow: {
     paddingVertical: spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
+    gap: spacing.md,
     // 선택 표시선이 들어올 자리를 미리 비워 둬 행이 흔들리지 않게 한다.
     borderLeftWidth: 3,
     borderLeftColor: "transparent",
@@ -539,6 +543,11 @@ const useStyles = makeStyles(({ colors }) => ({
   leaveRowSelected: {
     borderLeftColor: colors.brand,
     backgroundColor: colors.primaryPale,
+  },
+  leaveMainRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
   },
   leaveTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
   leaveDates: { fontSize: 14, color: colors.body, marginTop: 2 },

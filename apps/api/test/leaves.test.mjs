@@ -1141,11 +1141,11 @@ test("겹치는 휴가는 날짜를 짚어 막는다", async () => {
   assert.equal(mine.data.leaves.length, 1);
 });
 
-test("상태가 다르면 붙어 있어도 따로 남는다", async () => {
+test("상태가 다르면 붙어 있어도 따로 남고 빠른 상태 변경 때 합쳐진다", async () => {
   const { token } = await signup();
   await createUnit(token, { name: uniq("병합부대-") });
 
-  await req("POST", "/leaves", {
+  const draft = await req("POST", "/leaves", {
     token,
     body: {
       title: "연가 계획",
@@ -1167,6 +1167,18 @@ test("상태가 다르면 붙어 있어도 따로 남는다", async () => {
 
   const mine = await req("GET", "/leaves/mine", { token });
   assert.equal(mine.data.leaves.length, 2);
+
+  const changed = await req("PATCH", `/leaves/${draft.data.leave.id}/status`, {
+    token,
+    body: { status: "shared" },
+  });
+  assert.equal(changed.status, 200);
+  assert.equal(changed.data.leave.startDate, "2026-06-01");
+  assert.equal(changed.data.leave.endDate, "2026-06-04");
+
+  const merged = await req("GET", "/leaves/mine", { token });
+  assert.equal(merged.data.leaves.length, 1);
+  assert.equal(merged.data.leaves[0].segments[0].days, 4);
 });
 
 test("흡수된 휴가의 id는 더 이상 수정할 수 없다", async () => {

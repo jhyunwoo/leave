@@ -11,6 +11,7 @@ import {
   leaveCreateSchema,
   leaveGrantCreateSchema,
   leaveGrantUpdateSchema,
+  leaveStatusUpdateSchema,
   leaveUpdateSchema,
   regularOvernightConfigSchema,
 } from "@leave/shared";
@@ -201,6 +202,29 @@ export const updateLeaveRoute = createRoute({
   responses: {
     200: jsonContent(leaveResultSchema, "수정된 휴가 + 초과일"),
     400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    404: errorResponse("휴가 없음 또는 권한 없음"),
+  },
+});
+
+export const updateLeaveStatusRoute = createRoute({
+  method: "patch",
+  path: "/{id}/status",
+  tags: ["휴가"],
+  summary: "내 휴가 상태 빠른 변경",
+  description:
+    "제목·기간·구간은 유지하고 사용자가 직접 고를 수 있는 진행 상태만 변경합니다.",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: leaveStatusUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveResultSchema, "상태가 변경된 휴가 + 초과일"),
+    400: errorResponse("종료 상태 또는 휴가 규칙 위반"),
     401: errorResponse("인증 실패"),
     404: errorResponse("휴가 없음 또는 권한 없음"),
   },

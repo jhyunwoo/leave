@@ -12,6 +12,7 @@ export function NativeSegmentedControl<T extends string>(props: {
   labels: Record<T, string>;
   value: T;
   onValueChange: (value: T) => void;
+  enabled?: boolean;
   testID?: string;
 }) {
   const selectedIndex = Math.max(0, props.values.indexOf(props.value));
@@ -20,6 +21,7 @@ export function NativeSegmentedControl<T extends string>(props: {
       <SegmentedControl
         values={props.values.map((value) => props.labels[value])}
         selectedIndex={selectedIndex}
+        enabled={props.enabled}
         onChange={({ nativeEvent }) => {
           const next = props.values[nativeEvent.selectedSegmentIndex];
           if (next) props.onValueChange(next);

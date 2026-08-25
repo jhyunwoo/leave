@@ -13,6 +13,7 @@
 
 import {
   inclusiveDays,
+  isUserEditableLeaveStatus,
   sortSegments,
   type LeaveCreateInput,
   type LeaveSegment,
@@ -26,6 +27,7 @@ import {
   foldSegmentRows,
   getLeaveBalanceSummary,
   saveRegularOvernightConfig,
+  segmentsForLeaves,
   segmentsOfUserQuery,
   updateLeaveBalanceTotals,
 } from "../lib/leave-balances";
@@ -50,6 +52,7 @@ import {
   regularOvernightRoute,
   updateBalancesRoute,
   updateGrantRoute,
+  updateLeaveStatusRoute,
   updateLeaveRoute,
 } from "./leaves.contract";
 
@@ -212,6 +215,62 @@ export const leaveRoutes = app
         exceededDates,
       },
       201,
+    );
+  })
+  .openapi(updateLeaveStatusRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const { status } = c.req.valid("json");
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+
+    const existing = await db
+      .select()
+      .from(leaves)
+      .where(and(eq(leaves.id, id), eq(leaves.userId, user.id)))
+      .get();
+    if (!existing) {
+      return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
+    }
+    if (!isUserEditableLeaveStatus(existing.status)) {
+      return c.json(
+        { error: "종료된 휴가는 수정 화면에서 상태를 변경해주세요" },
+        400,
+      );
+    }
+
+    const segments = (await segmentsForLeaves(db, [id])).get(id) ?? [];
+    const saved = await saveLeaveWithMerge(
+      db,
+      user,
+      {
+        id,
+        title: existing.title,
+        reason: existing.reason,
+        status,
+        createdAt: existing.createdAt,
+        segments,
+      },
+      { existingId: id },
+    );
+    if (!saved.ok) return c.json({ error: saved.error }, 400);
+
+    const exceededDates = user.unitId
+      ? await checkOverageAndNotify({
+          db,
+          unitId: user.unitId,
+          changedLeave: saved.row,
+          waitUntil: (p) => c.executionCtx.waitUntil(p),
+        })
+      : [];
+    return c.json(
+      {
+        leave: serializeLeave(
+          saved.row,
+          new Map([[saved.row.id, saved.segments]]),
+        ),
+        exceededDates,
+      },
+      200,
     );
   })
   .openapi(updateLeaveRoute, async (c) => {
