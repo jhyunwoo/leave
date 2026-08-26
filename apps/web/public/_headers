@@ -11,3 +11,30 @@
 /.well-known/assetlinks.json
   Content-Type: application/json
   Cache-Control: public, max-age=3600
+
+# 모든 응답에 붙는 보안 헤더.
+#
+# `frame-ancestors 'none'`은 이 앱을 iframe에 넣어 클릭재킹으로 휴가 등록·계정
+# 삭제 버튼을 누르게 하는 경로를 막는다. 계정 삭제가 되돌릴 수 없으므로
+# X-Frame-Options도 함께 둔다(CSP를 모르는 오래된 브라우저 대비).
+#
+# 지시문마다 이유가 있다. 값을 넓히기 전에 무엇이 실제로 필요한지 확인할 것.
+#  - script-src 'self'         : 번들 외의 스크립트는 없다. 인라인 <script>도 없다.
+#  - style-src 'unsafe-inline' : React의 style={{...}} 속성과 공개 법적 문서(HTML에
+#                                <style> 블록이 통째로 들어 있다)가 이걸 요구한다.
+#                                이 둘을 없애기 전에는 뺄 수 없다.
+#  - font-src cdn.jsdelivr.net : 로컬 서브셋이 못 덮는 글자의 Pretendard 폴백
+#                                (styles/pretendard-fallback.css).
+#  - connect-src               : API는 별도 오리진이라 명시해야 한다.
+#  - upgrade-insecure-requests : 평문으로 새는 하위 리소스가 없게 한다.
+#
+# HSTS에 preload는 넣지 않는다 — 브라우저 목록에 한번 올라가면 사실상 되돌릴 수
+# 없고, moveto.kr 존 전체의 결정이지 이 앱 혼자 내릴 결정이 아니다.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net data:; connect-src 'self' https://api.leave.moveto.kr; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin

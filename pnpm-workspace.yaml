@@ -57,3 +57,35 @@ supportedArchitectures:
     - arm64
 
 verifyDepsBeforeRun: false
+
+# `npx expo install --fix`가 채우는 목록이다. pnpm 11은 갓 배포된 패키지를 기본으로
+# 한 번 걸러 내는데(minimumReleaseAge), Expo SDK 패치는 나온 지 며칠 안 된 것이
+# 정상이라 그 관문에 그대로 걸린다. 여기 적힌 버전만 예외로 통과시킨다.
+#
+# 손으로 고치지 않는다 — 다음 `expo install --fix`가 다시 쓴다. 오래돼서 lockfile에
+# 없는 버전이 남아 있어도 해가 없으므로(존재하지 않는 예외일 뿐) 정리는 선택이다.
+# 없애면 EAS·CI의 새 설치에서 같은 버전이 다시 걸린다.
+minimumReleaseAgeExclude:
+  - "@expo/cli@57.0.18"
+  - "@expo/config-plugins@57.0.9"
+  - "@expo/config@57.0.9"
+  - "@expo/fingerprint@0.20.10"
+  - "@expo/image-utils@0.11.5"
+  - "@expo/metro-config@57.0.10"
+  - "@expo/metro-file-map@57.0.2"
+  - "@expo/prebuild-config@57.0.14"
+  - "@expo/require-utils@57.0.5"
+  - babel-preset-expo@57.0.8
+  - expo-asset@57.0.14
+  - expo-constants@57.0.14
+  - expo-modules-autolinking@57.0.11
+  - expo-modules-core@57.0.13
+  - expo@57.0.16
+  - "@expo/metro-runtime@57.0.13"
+  - "@expo/ui@57.0.13"
+  - expo-build-properties@57.0.14
+  - expo-insights@57.0.13
+  - expo-notifications@57.0.14
+  - expo-router@57.0.16
+  - expo-splash-screen@57.0.8
+  - expo-updates@57.0.17

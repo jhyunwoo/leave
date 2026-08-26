@@ -41,6 +41,19 @@ function isExpoToken(t: string | null | undefined): t is string {
 }
 
 /**
+ * Expo가 돌려주는 오류 문구에서 푸시 토큰을 지운다.
+ *
+ * Expo는 실패 사유에 토큰 원문을 그대로 넣어 준다
+ * (`"ExponentPushToken[xxx]" is not a registered push token`). 그걸 그대로
+ * console에 찍으면 기기 식별자가 Workers 로그로 새어 나간다 — push_logs에서
+ * 토큰·제목·본문을 물리적으로 들어내고 status만 남긴 결정(마이그레이션 0012)과
+ * 정면으로 어긋난다. 무엇이 잘못됐는지는 남기고 누구인지는 지운다.
+ */
+function redactPushTokens(text: string): string {
+  return text.replace(/ExponentPushToken\[[^\]]*\]/g, "ExponentPushToken[…]");
+}
+
+/**
  * 유효한 Expo 토큰들에 푸시를 보내고, 토큰별 발송 결과를 반환한다.
  * (반환값은 push_logs에 발송 이력으로 남기기 위한 것이다.)
  */
@@ -81,7 +94,7 @@ export async function sendExpoPushMessages(
       });
       if (!res.ok) {
         const text = await res.text();
-        console.error("expo push failed", res.status, text);
+        console.error("expo push failed", res.status, redactPushTokens(text));
         for (const entry of chunk) {
           results.push({
             token: entry.token,
