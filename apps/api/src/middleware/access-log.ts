@@ -29,6 +29,30 @@ function runAfter(
 }
 
 /**
+ * 이 표에 저장하는 문자열의 길이 상한.
+ *
+ * 경로와 두 클라이언트 헤더는 **요청자가 정하는 값**이고, 이 미들웨어는 인증 여부와
+ * 무관하게 요청 하나당 한 행을 쓴다. 상한이 없으면 아무나 헤더에 큰 문자열을 담아
+ * 보내는 것만으로 D1에 원하는 만큼 써 넣을 수 있다 — 기록이 저장 비용을 태우는
+ * 수단이 되고, 관리자 화면의 로그 조회도 함께 나빠진다.
+ *
+ * 실제 값은 이보다 훨씬 짧다(`/units/{uuid}/calendars`, `ios`, `1.2.3`).
+ * 자르는 편이 통째로 버리는 것보다 낫다 — 무엇을 부른 요청인지는 남아야 한다.
+ */
+const MAX_PATH_LENGTH = 512;
+const MAX_CLIENT_HINT_LENGTH = 32;
+
+/** 상한까지만 남긴다. */
+function clamp(value: string, max: number): string {
+  return value.length > max ? value.slice(0, max) : value;
+}
+
+/** 헤더처럼 아예 없을 수 있는 값. 없으면 null 그대로 둔다. */
+function clampHeader(value: string | undefined, max: number): string | null {
+  return value === undefined ? null : clamp(value, max);
+}
+
+/**
  * 접속 기록 미들웨어 — 요청(프리플라이트 제외)의 메타데이터를 D1 access_logs에 저장한다.
  * 가장 바깥에서 실행되므로 next() 이후에는 인증 미들웨어가 설정한 c.var.user를 읽을 수 있다.
  * 수집 범위는 접속 시각·경로·상태·명시적 앱 플랫폼/버전으로 한정한다.
@@ -69,10 +93,16 @@ export const accessLogMiddleware = createMiddleware<AppEnv>(async (c, next) => {
         id: crypto.randomUUID(),
         userId: user?.id ?? null,
         method: req.method,
-        path: req.path,
+        path: clamp(req.path, MAX_PATH_LENGTH),
         status: c.res.status,
-        platform: req.header("X-Client-Platform") ?? null,
-        appVersion: req.header("X-Client-Version") ?? null,
+        platform: clampHeader(
+          req.header("X-Client-Platform"),
+          MAX_CLIENT_HINT_LENGTH,
+        ),
+        appVersion: clampHeader(
+          req.header("X-Client-Version"),
+          MAX_CLIENT_HINT_LENGTH,
+        ),
         durationMs,
         createdAt: new Date().toISOString(),
       });

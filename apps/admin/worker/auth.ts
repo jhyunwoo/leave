@@ -18,6 +18,7 @@ import {
   hashPassword,
   sha256Hex,
   verifyPassword,
+  verifyPasswordOrDecoy,
 } from "@leave/api/server";
 import { and, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -37,7 +38,12 @@ const MAX_LOGIN_ATTEMPTS = 5;
 
 export const loginInputSchema = z.object({
   email: z.email("올바른 이메일 주소를 입력해주세요"),
-  password: z.string().min(1, "비밀번호를 입력해주세요"),
+  // 관리자 비밀번호는 변경 화면에서 100자로 막힌다. 그보다 긴 입력은 어떤 계정과도
+  // 맞을 수 없으므로, PBKDF2까지 들여보내지 않고 여기서 끊는다.
+  password: z
+    .string()
+    .min(1, "비밀번호를 입력해주세요")
+    .max(200, "비밀번호가 너무 깁니다"),
 });
 
 export const changePasswordInputSchema = z.object({
@@ -189,13 +195,14 @@ export async function loginAdmin(c: Context<AdminAppEnv>) {
     .from(adminAccounts)
     .where(eq(adminAccounts.email, email))
     .get();
-  const valid =
-    admin?.active === true &&
-    (await verifyPassword(
-      input.data.password,
-      admin.passwordSalt,
-      admin.passwordHash,
-    ));
+  // 계정이 없거나 비활성이어도 PBKDF2를 한 번 돌린다. 조건을 먼저 보고 빠져나가면
+  // 응답 시간이 "그 주소의 관리자 계정이 있는가"를 알려준다
+  // (@leave/api/server의 verifyPasswordOrDecoy 참고).
+  const passwordMatches = await verifyPasswordOrDecoy(
+    input.data.password,
+    admin ? { salt: admin.passwordSalt, hash: admin.passwordHash } : null,
+  );
+  const valid = admin?.active === true && passwordMatches;
 
   if (!admin || !valid) {
     await c.env.CACHE.put(rateKey, String(attempts + 1), {

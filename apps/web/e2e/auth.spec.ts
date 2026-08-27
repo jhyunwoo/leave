@@ -25,6 +25,46 @@ test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async
   await expect(page.getByRole("link", { name: "가입하기" })).toBeVisible();
 });
 
+/*
+ * 오픈 리다이렉트.
+ *
+ * `?next=`는 로그인 뒤 돌아갈 곳이다. 앞글자가 `/`인지만 보는 검사로는 부족하다 —
+ * `//evil.example`은 막히지만 `/\evil.example`은 그대로 통과하는데, URL 파서는
+ * 슬래시 뒤의 역슬래시를 슬래시와 똑같이 읽어 두 값을 같은 외부 주소로 만든다.
+ *
+ * 로그인까지 가지 않고도 판정을 볼 수 있다 — 로그인 화면의 "가입하기"가 같은
+ * `safeNext` 결과를 링크로 달고 나오기 때문이다.
+ */
+test("로그인 화면의 ?next=는 이 사이트 안의 경로로만 해석된다", async ({
+  page,
+}) => {
+  const signupLink = page.getByRole("link", { name: "가입하기" });
+
+  for (const hostile of [
+    "/\\evil.example",
+    "//evil.example",
+    "/\\\\evil.example",
+    "https://evil.example",
+  ]) {
+    await page.goto(`/login?next=${encodeURIComponent(hostile)}`);
+    const href = await signupLink.getAttribute("href");
+    expect(href, `${hostile} 이(가) 목적지로 살아남았다: ${href}`).toBe(
+      "/signup",
+    );
+  }
+
+  // 이 사이트 안의 경로는 그대로 실려 간다 — 막느라 정상 동작까지 잃지 않는다.
+  await page.goto(`/login?next=${encodeURIComponent("/leaves?tab=mine")}`);
+  expect(await signupLink.getAttribute("href")).toBe(
+    `/signup?next=${encodeURIComponent("/leaves?tab=mine")}`,
+  );
+
+  // 목적지를 들고 이동해도 외부로 새지 않는다.
+  await page.goto(`/login?next=${encodeURIComponent("/\\evil.example")}`);
+  await signupLink.click();
+  expect(new URL(page.url()).origin).toBe("http://localhost:5173");
+});
+
 test("회원가입 후 한 화면 한 입력 온보딩 9단계", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {

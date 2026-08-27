@@ -20,7 +20,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import type { Calendar, PersonalEvent } from "@leave/client";
+import type { Calendar, PersonalEvent, UnitEvent } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -42,10 +42,14 @@ export function DayPanel(props: {
   date: ISODate;
   onAddLeave: () => void;
   onAddPersonalEvent?: () => void;
+  /** 부대 관리자에게만 제공되는 부대 일정 추가 동작. */
+  onAddUnitEvent?: () => void;
   /** 이 날이 속한 달의 내 개인 일정. 그 중 이 날에 걸친 것만 보여준다. */
   personalEvents?: readonly PersonalEvent[];
   /** 개인 일정 줄을 눌러 그 일정으로 갈 수 있게 한다. */
   onOpenPersonalEvent?: (eventId: string) => void;
+  /** 부대 관리자라면 부대 일정 줄을 눌러 수정 화면으로 간다. */
+  onOpenUnitEvent?: (eventId: string) => void;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
   /** 이 날이 속한 정기외박 주기. */
@@ -70,11 +74,17 @@ export function DayPanel(props: {
   const dayEvents = (props.personalEvents ?? []).filter(
     (event) => event.startDate <= date && date <= event.endDate,
   );
+  const unitDayEvents = (calendar.events ?? []).filter(
+    (event) => event.startDate <= date && date <= event.endDate,
+  );
+  const isUnitHoliday = unitDayEvents.some((event) => event.isHoliday);
 
   return (
     <View style={[styles.card, props.style]}>
       <Text style={styles.eyebrow}>선택한 날짜</Text>
-      <Text style={styles.date}>{fmtDateK(date)}</Text>
+      <Text style={[styles.date, isUnitHoliday && styles.unitHolidayDate]}>
+        {fmtDateK(date)}
+      </Text>
       {date === props.dischargeAt && (
         <Text style={styles.discharge}>전역일</Text>
       )}
@@ -113,6 +123,21 @@ export function DayPanel(props: {
         </Text>
       )}
 
+      {unitDayEvents.length > 0 && (
+        <View style={styles.unitEventList}>
+          <Text style={styles.unitEventHeading} selectable>
+            부대 일정 {unitDayEvents.length}건
+          </Text>
+          {unitDayEvents.map((event) => (
+            <UnitEventRow
+              key={event.id}
+              event={event}
+              onOpen={props.onOpenUnitEvent}
+            />
+          ))}
+        </View>
+      )}
+
       <DayRoster
         attendees={calendar.attendees}
         date={date}
@@ -144,8 +169,74 @@ export function DayPanel(props: {
             onPress={props.onAddPersonalEvent}
           />
         ) : null}
+        {props.onAddUnitEvent ? (
+          <Button
+            title="이 날에 부대 일정 추가"
+            variant="secondary"
+            onPress={props.onAddUnitEvent}
+          />
+        ) : null}
       </View>
     </View>
+  );
+}
+
+function UnitEventRow(props: {
+  event: UnitEvent;
+  onOpen?: (eventId: string) => void;
+}) {
+  const styles = useStyles();
+  const { event } = props;
+  const time = event.startTime
+    ? `${event.startTime}${event.endTime ? `–${event.endTime}` : ""}`
+    : "하루 종일";
+  const span =
+    event.startDate === event.endDate
+      ? null
+      : fmtRangeTiny(event.startDate, event.endDate);
+  const meta = [event.isHoliday ? "휴일" : "평일", span, time]
+    .filter(Boolean)
+    .join(" · ");
+  const open = props.onOpen;
+  const Row = open ? Pressable : View;
+  return (
+    <Row
+      {...(open
+        ? {
+            accessibilityRole: "button" as const,
+            accessibilityLabel: `부대 일정 ${event.title} 수정`,
+            onPress: () => open(event.id),
+          }
+        : {})}
+      style={[
+        styles.unitEventRow,
+        event.isHoliday && styles.unitHolidayEventRow,
+      ]}
+    >
+      <Text
+        selectable
+        style={[
+          styles.unitEventTitle,
+          event.isHoliday && styles.unitHolidayEventText,
+        ]}
+      >
+        {event.title}
+      </Text>
+      <Text
+        selectable
+        style={[
+          styles.unitEventMeta,
+          event.isHoliday && styles.unitHolidayEventText,
+        ]}
+      >
+        {meta}
+      </Text>
+      {event.details ? (
+        <Text selectable style={styles.unitEventDetails}>
+          {event.details}
+        </Text>
+      ) : null}
+    </Row>
   );
 }
 
@@ -228,6 +319,26 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.negativeDeep,
   },
   cycleLine: { fontSize: 12, color: colors.body, marginTop: -spacing.sm },
+  unitHolidayDate: { color: colors.negative },
+  unitEventList: { gap: spacing.sm },
+  unitEventHeading: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  unitEventRow: {
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.surfaceCard,
+    padding: spacing.md,
+    gap: 3,
+  },
+  unitHolidayEventRow: {
+    borderColor: colors.negative,
+    backgroundColor: colors.negativeTint,
+  },
+  unitEventTitle: { fontSize: 14, fontWeight: "700", color: colors.ink },
+  unitEventMeta: { fontSize: 12, fontWeight: "600", color: colors.body },
+  unitHolidayEventText: { color: colors.negativeDeep },
+  unitEventDetails: { fontSize: 12, lineHeight: 18, color: colors.body },
   personalList: { gap: spacing.sm },
   personalHeading: { fontSize: 14, fontWeight: "600", color: colors.ink },
   personalRow: {

@@ -16,6 +16,7 @@ import {
   useUpdateLeaveStatus,
 } from "../src/hooks/leaves";
 import { useCreateBlackout } from "../src/hooks/blackouts";
+import { useLeaveUnit } from "../src/hooks/units";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
@@ -464,5 +465,51 @@ describe("제한 기간 등록", () => {
         ),
       ),
     );
+  });
+});
+
+/*
+ * 그룹에서 나가는 것은 "낡았다"가 아니라 "볼 근거가 사라졌다"이다.
+ *
+ * 무효화만 하면 본문은 캐시에 그대로 남는다. 앱은 `calendar`를 오프라인용으로
+ * 디스크에 최대 24시간 남기므로(apps/native/src/lib/query-persistence.ts),
+ * 나간 뒤에도 옛 동료의 이름과 휴가 날짜가 기기에 하루 더 머물게 된다.
+ * 친구를 끊을 때와 같은 판단(hooks/friends.ts의 purgeFriendCalendarAccess)을 따른다.
+ */
+describe("그룹 탈퇴", () => {
+  it("그룹에 딸린 캐시는 무효화가 아니라 본문째 지운다", async () => {
+    const { queryClient, wrapper } = setup({
+      units: { leave: { $post: () => Promise.resolve({ ok: true }) } },
+    });
+    const { result } = renderHook(() => useLeaveUnit(), { wrapper });
+
+    // 나가기 전에는 본문이 실제로 들어 있다.
+    expect(
+      queryClient.getQueryData(queryKeys.calendar("unit-1", "2026-09")),
+    ).toEqual({ seeded: true });
+
+    result.current.mutate();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    await waitFor(() => {
+      for (const key of [
+        queryKeys.calendar("unit-1", "2026-09"),
+        queryKeys.calendar("unit-1", "2026-10"),
+        queryKeys.calendar("unit-1", "2026-11"),
+        queryKeys.unitMembers("unit-1"),
+        queryKeys.blackouts("unit-1"),
+      ]) {
+        expect(
+          queryClient.getQueryData(key),
+          `${JSON.stringify(key)}의 본문이 남아 있다`,
+        ).toBeUndefined();
+      }
+    });
+
+    // 그룹과 무관한 캐시까지 날리지는 않는다 — 다시 받게만 한다.
+    expect(queryClient.getQueryData(queryKeys.myLeaves)).toEqual({
+      seeded: true,
+    });
+    expect(staleKeys(queryClient)).toContain(JSON.stringify(queryKeys.me));
   });
 });

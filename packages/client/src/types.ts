@@ -33,6 +33,9 @@ export type CalendarDay = Calendar["days"][number];
 /** 달력에 표시되는 남의 휴가 한 건. */
 export type CalendarLeave = Calendar["leaves"][number];
 
+/** 부대 관리자가 등록해 같은 부대원 모두가 공유하는 일정. */
+export type UnitEvent = Calendar["events"][number];
+
 /** 내가 등록한 휴가 한 건(구간 포함). */
 export type MyLeave = InferResponseType<
   Client["leaves"]["mine"]["$get"],

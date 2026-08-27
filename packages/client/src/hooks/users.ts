@@ -47,6 +47,18 @@ export function useUserSearch(rawQuery: string) {
   });
 }
 
+/**
+ * 경로 파라미터로 보낼 값을 감싼다.
+ *
+ * Hono 클라이언트는 `:param` 자리에 값을 **그대로** 끼워 넣는다(hono/client의
+ * `replaceUrlParam`). 사용자 이름은 주소창과 딥링크에서 오므로 `..`나 `%2F`가
+ * 섞여 들어오면 그대로 API 경로가 되어 다른 엔드포인트를 가리킬 수 있다.
+ * 정상적인 이름(영문·숫자·마침표·밑줄·한글)에는 인코딩이 아무 영향도 주지 않는다.
+ */
+function pathParam(value: string): string {
+  return encodeURIComponent(value);
+}
+
 /** 공개 프로필. 없는 이름·차단은 서버가 구분 없이 404로 답한다. */
 export function useUserProfile(rawUsername: string | null | undefined) {
   const adapter = useLeaveApi();
@@ -58,7 +70,7 @@ export function useUserProfile(rawUsername: string | null | undefined) {
     queryFn: (context) =>
       adapter.client.users[":username"]
         .$get(
-          { param: { username } },
+          { param: { username: pathParam(username) } },
           queryRequestOptions(adapter.useRequestAbortSignal, context),
         )
         .then((response) => adapter.unwrap<UserProfile>(response)),
@@ -80,7 +92,7 @@ export function usePublicUserProfile(rawUsername: string | null | undefined) {
     queryFn: (context) =>
       adapter.client.public.users[":username"]
         .$get(
-          { param: { username } },
+          { param: { username: pathParam(username) } },
           queryRequestOptions(adapter.useRequestAbortSignal, context),
         )
         .then((response) => adapter.unwrap<PublicUserProfile>(response)),

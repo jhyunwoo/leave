@@ -8,6 +8,7 @@ export {
   hashPassword,
   sha256Hex,
   verifyPassword,
+  verifyPasswordOrDecoy,
 } from "./lib/crypto";
 export { checkOverageAndNotify } from "./lib/overage";
 export {

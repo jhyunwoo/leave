@@ -9,6 +9,7 @@ import {
 import {
   usePublicUserProfile,
   useSetUsername,
+  useUserProfile,
   useUserSearch,
 } from "../src/hooks/users";
 import { queryKeys } from "../src/query-keys";
@@ -132,6 +133,61 @@ describe("비로그인 공개 프로필", () => {
     });
     expect(result.current.fetchStatus).toBe("idle");
     expect(getProfile).not.toHaveBeenCalled();
+  });
+
+  /*
+   * hono 클라이언트는 `:username` 자리에 받은 문자열을 그대로 이어 붙인다.
+   * 인증 프로필 훅은 이름이 비어 있지 않은지만 보므로, 딥링크에서 흘러든 값이
+   * 그대로 경로가 되면 `/users/..%2F..%2Fauth%2Fme`가 다른 엔드포인트로 풀린다.
+   * 훅이 넘기는 값 자체가 경로 구분자를 잃은 상태여야 한다.
+   */
+  it("경로를 벗어나는 사용자 이름은 인코딩해서 넘긴다", async () => {
+    const queryClient = testQueryClient();
+    const getProfile = vi.fn((_input?: unknown) =>
+      Promise.resolve({ name: "현우", username: "hyunwoo" }),
+    );
+    const wrapper = wrapperFor(
+      queryClient,
+      testAdapter({
+        client: { users: { ":username": { $get: getProfile } } },
+      }),
+    );
+
+    const { result } = renderHook(() => useUserProfile("../../auth/me"), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const sent = (
+      getProfile.mock.calls[0]?.[0] as { param: { username: string } }
+    ).param.username;
+    expect(sent).not.toContain("/");
+    expect(sent).toBe(encodeURIComponent("../../auth/me"));
+  });
+
+  it("평범한 이름에는 인코딩이 아무 영향도 주지 않는다", async () => {
+    const queryClient = testQueryClient();
+    const getProfile = vi.fn((_input?: unknown) =>
+      Promise.resolve({ name: "현우", username: "hyunwoo" }),
+    );
+    const wrapper = wrapperFor(
+      queryClient,
+      testAdapter({
+        client: { users: { ":username": { $get: getProfile } } },
+      }),
+    );
+
+    for (const username of ["hyunwoo", "yonsei.hyunwoo", "_x24"]) {
+      const { result } = renderHook(() => useUserProfile(username), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    }
+    expect(
+      getProfile.mock.calls.map(
+        (call) => (call[0] as { param: { username: string } }).param.username,
+      ),
+    ).toEqual(["hyunwoo", "yonsei.hyunwoo", "_x24"]);
   });
 });
 

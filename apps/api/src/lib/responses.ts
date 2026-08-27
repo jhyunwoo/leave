@@ -178,6 +178,21 @@ export const blackoutSchema = z
   })
   .openapi("UnitBlackout");
 
+export const unitEventSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    isHoliday: z.boolean(),
+    startDate: z.string(),
+    endDate: z.string(),
+    startTime: z.string().nullable(),
+    endTime: z.string().nullable(),
+    details: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("UnitEvent");
+
 export const calendarSchema = z
   .object({
     month: z.string(),
@@ -188,6 +203,8 @@ export const calendarSchema = z
     // 이름을 붙여 그룹 전체에 공개하는 출타 명단(내 것 포함).
     attendees: z.array(calendarAttendeeSchema),
     blackouts: z.array(blackoutSchema),
+    // 부대 관리자가 등록해 모든 부대원이 함께 보는 일정.
+    events: z.array(unitEventSchema),
   })
   .openapi("UnitCalendar");
 

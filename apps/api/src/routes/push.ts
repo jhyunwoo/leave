@@ -8,10 +8,11 @@
 
 import { createRoute } from "@hono/zod-openapi";
 import { pushEventSchema, pushTokenSchema } from "@leave/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { pushLogs, users } from "../db/schema";
 import { createApp } from "../lib/app";
+import { runBatch } from "../lib/d1";
 import { errorResponse, jsonContent, okSchema } from "../lib/responses";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
@@ -65,10 +66,26 @@ export const pushRoutes = app
     const { token } = c.req.valid("json");
     const user = c.get("user");
     const db = drizzle(c.env.DB);
-    await db
-      .update(users)
-      .set({ expoPushToken: token })
-      .where(eq(users.id, user.id));
+    /**
+     * 푸시 토큰은 사람이 아니라 **기기**를 가리킨다. 한 기기를 여러 계정이 쓰는 일은
+     * 드물지 않다 — 기기를 물려주거나, 한 대에서 계정을 갈아 끼우거나, 같은 기기로
+     * 두 사람이 번갈아 로그인한다. 그때 이전 계정 행에 같은 토큰이 남아 있으면 그
+     * 계정 앞으로 가는 알림이 지금 주인의 기기로 계속 간다.
+     *
+     * 그래서 등록은 "내 행에 쓴다"가 아니라 "이 토큰을 나에게로 옮긴다"여야 한다.
+     * 두 문장을 한 batch에 담아, 남의 행에서 떼는 것과 내 행에 붙이는 것 사이에
+     * 토큰이 두 계정에 동시에 걸린 순간이 생기지 않게 한다.
+     */
+    await runBatch(db, [
+      db
+        .update(users)
+        .set({ expoPushToken: null })
+        .where(and(eq(users.expoPushToken, token), ne(users.id, user.id))),
+      db
+        .update(users)
+        .set({ expoPushToken: token })
+        .where(eq(users.id, user.id)),
+    ]);
     return c.json({ ok: true as const }, 200);
   })
   .openapi(pushEventRoute, async (c) => {

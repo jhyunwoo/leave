@@ -204,6 +204,9 @@
   color: var(--negative);
   line-height: 1.2;
 }
+.cal-holiday.is-unit-event {
+  color: var(--brand);
+}
 
 /* 전역일 배지. 공휴일과 같은 자리를 쓰되(칸 높이가 꽉 차 있다) 채운 배지로 세운다.
    세로 패딩을 두지 않아 줄 높이는 공휴일 이름과 같다. `.cal-cell`이
@@ -459,4 +462,24 @@
   background: var(--canvas);
   font-size: 10px;
   font-weight: 700;
+}
+
+.unit-event-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: var(--sp-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  color: var(--ink);
+  background: var(--surface-card);
+  font: inherit;
+  text-align: left;
+}
+button.unit-event-card {
+  cursor: pointer;
+}
+.unit-event-card.is-holiday {
+  border-color: var(--negative);
+  background: var(--negative-tint);
 }

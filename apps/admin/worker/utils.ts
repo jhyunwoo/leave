@@ -49,16 +49,33 @@ export function listMeta(
   };
 }
 
+/*
+ * 감사 로그에 남는 요청자 제어 문자열의 상한.
+ *
+ * 로그인 실패도 감사 행을 하나 남기는데, 그 요청은 인증 전이라 아무나 보낼 수 있고
+ * `admin_audit_logs`는 보관 기간 정리(apps/api/src/lib/retention.ts)의 대상이 아니라
+ * 영구히 쌓인다. 상한이 없으면 헤더 하나로 요청당 수 KB를 D1에 눌러 담을 수 있다.
+ * 정상 UA는 256자를 넘지 않고, IP 문자열은 IPv6라도 45자면 충분하다.
+ */
+const MAX_CLIENT_IP_LENGTH = 64;
+const MAX_USER_AGENT_LENGTH = 256;
+
+/** 상한까지만 남긴다. 값이 아예 없으면 null 그대로 둔다. */
+function clampHeader(value: string | undefined | null, max: number) {
+  if (value === undefined || value === null) return null;
+  return value.length > max ? value.slice(0, max) : value;
+}
+
 export function clientIp(c: Context<AdminAppEnv>): string | null {
-  return (
+  return clampHeader(
     c.req.header("CF-Connecting-IP") ??
-    c.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ??
-    null
+      c.req.header("X-Forwarded-For")?.split(",")[0]?.trim(),
+    MAX_CLIENT_IP_LENGTH,
   );
 }
 
 export function userAgent(c: Context<AdminAppEnv>): string | null {
-  return c.req.header("User-Agent") ?? null;
+  return clampHeader(c.req.header("User-Agent"), MAX_USER_AGENT_LENGTH);
 }
 
 export function parseBoolean(value: string | undefined): boolean | undefined {

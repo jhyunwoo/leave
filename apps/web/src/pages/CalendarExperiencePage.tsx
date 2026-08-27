@@ -28,6 +28,7 @@ import {
   type LeaveResult,
   type Me,
   type PersonalEvent,
+  type UnitEvent,
 } from "@leave/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -41,6 +42,7 @@ import {
 } from "../components/LazyLeaveFormModal";
 import { Modal } from "../components/Modal";
 import { PersonalEventModal } from "../components/PersonalEventModal";
+import { UnitEventModal } from "../components/UnitEventModal";
 import "../components/calendar/calendar.css";
 
 function personColor(userId: string): string {
@@ -103,6 +105,83 @@ function PersonalItems(props: {
         ))
       ) : (
         <p className="text-body">이 날의 개인 일정이 없어요.</p>
+      )}
+    </section>
+  );
+}
+
+function UnitItems(props: {
+  events: UnitEvent[];
+  date: string;
+  canManage: boolean;
+  onEdit: (event: UnitEvent) => void;
+  onAdd: () => void;
+}) {
+  const events = props.events.filter(
+    (event) => event.startDate <= props.date && props.date <= event.endDate,
+  );
+  return (
+    <section
+      className="card"
+      style={{ padding: "var(--sp-lg)", display: "grid", gap: "var(--sp-sm)" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h2 className="display-xs">부대 일정</h2>
+        {props.canManage ? (
+          <button className="btn btn-secondary btn-sm" onClick={props.onAdd}>
+            추가
+          </button>
+        ) : null}
+      </div>
+      {events.length ? (
+        events.map((event) => {
+          const content = (
+            <>
+              <strong
+                style={{
+                  color: event.isHoliday ? "var(--negative)" : undefined,
+                }}
+              >
+                {event.title}
+              </strong>
+              <span className="caption text-mute">
+                {event.isHoliday ? "휴일" : "평일"}
+                {event.startTime ? ` · ${event.startTime}` : " · 하루 종일"}
+                {event.endTime ? `–${event.endTime}` : ""}
+              </span>
+              {event.details ? (
+                <span className="text-body" style={{ whiteSpace: "pre-wrap" }}>
+                  {event.details}
+                </span>
+              ) : null}
+            </>
+          );
+          return props.canManage ? (
+            <button
+              type="button"
+              key={event.id}
+              className={`unit-event-card ${event.isHoliday ? "is-holiday" : ""}`}
+              onClick={() => props.onEdit(event)}
+            >
+              {content}
+            </button>
+          ) : (
+            <div
+              key={event.id}
+              className={`unit-event-card ${event.isHoliday ? "is-holiday" : ""}`}
+            >
+              {content}
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-body">이 날의 부대 일정이 없어요.</p>
       )}
     </section>
   );
@@ -330,6 +409,8 @@ export function CalendarPage(props: { me: Me }) {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PersonalEvent>();
+  const [unitEventOpen, setUnitEventOpen] = useState(false);
+  const [editingUnitEvent, setEditingUnitEvent] = useState<UnitEvent>();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const scrollRef = useRef<CalendarScrollHandle>(null);
@@ -340,6 +421,7 @@ export function CalendarPage(props: { me: Me }) {
   const events = usePersonalEvents(eventMonth);
   const friendCalendar = useFriendCalendar(selectedFriendIds, month);
   const unit = props.me.unit;
+  const isUnitAdmin = unit?.adminId === props.me.user.id;
   const dischargeAt = props.me.user.dischargeAt;
   const myLeaveDays = useMemo(
     () => buildMyLeaveDayMap(myLeaves.data?.leaves),
@@ -392,6 +474,10 @@ export function CalendarPage(props: { me: Me }) {
   const openNewEvent = () => {
     setEditingEvent(undefined);
     setEventOpen(true);
+  };
+  const openNewUnitEvent = () => {
+    setEditingUnitEvent(undefined);
+    setUnitEventOpen(true);
   };
 
   return (
@@ -453,6 +539,11 @@ export function CalendarPage(props: { me: Me }) {
           <button className="btn btn-secondary" onClick={openNewEvent}>
             개인 일정 추가
           </button>
+          {mode === "unit" && unit && isUnitAdmin ? (
+            <button className="btn btn-secondary" onClick={openNewUnitEvent}>
+              부대 일정 추가
+            </button>
+          ) : null}
           {mode === "unit" && unit ? (
             <button
               className="btn btn-primary"
@@ -534,6 +625,18 @@ export function CalendarPage(props: { me: Me }) {
             </div>
             {selectedDate ? (
               <div style={{ display: "grid", gap: "var(--sp-md)" }}>
+                {panelCalendar.data ? (
+                  <UnitItems
+                    events={panelCalendar.data.events ?? []}
+                    date={selectedDate}
+                    canManage={isUnitAdmin}
+                    onAdd={openNewUnitEvent}
+                    onEdit={(event) => {
+                      setEditingUnitEvent(event);
+                      setUnitEventOpen(true);
+                    }}
+                  />
+                ) : null}
                 <PersonalItems
                   events={events.data?.events ?? []}
                   date={selectedDate}
@@ -799,6 +902,17 @@ export function CalendarPage(props: { me: Me }) {
           onClose={() => {
             setEventOpen(false);
             setEditingEvent(undefined);
+          }}
+        />
+      ) : null}
+      {unitEventOpen && unit && isUnitAdmin ? (
+        <UnitEventModal
+          unitId={unit.id}
+          initialDate={selectedDate ?? `${month}-01`}
+          event={editingUnitEvent}
+          onClose={() => {
+            setUnitEventOpen(false);
+            setEditingUnitEvent(undefined);
           }}
         />
       ) : null}

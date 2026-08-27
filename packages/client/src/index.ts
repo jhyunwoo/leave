@@ -18,6 +18,7 @@ export * from "./leave-holdings";
 export * from "./hooks/auth";
 export * from "./hooks/units";
 export * from "./hooks/calendar";
+export * from "./hooks/unit-events";
 export * from "./hooks/leaves";
 export * from "./hooks/blackouts";
 export * from "./hooks/notifications";

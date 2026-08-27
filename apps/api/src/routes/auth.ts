@@ -26,7 +26,12 @@ import {
 } from "../db/schema";
 import { createApp } from "../lib/app";
 import { buildAuthBootstrap } from "../lib/auth-bootstrap";
-import { hashPassword, sha256Hex, verifyPassword } from "../lib/crypto";
+import {
+  hashPassword,
+  sha256Hex,
+  verifyPassword,
+  verifyPasswordOrDecoy,
+} from "../lib/crypto";
 import { deleteAccount } from "../lib/delete-account";
 import { leaveRuleMessage } from "../lib/errors";
 import { saveRegularOvernightConfig } from "../lib/leave-balances";
@@ -171,14 +176,13 @@ export const authRoutes = app
       .from(users)
       .where(eq(users.email, input.email))
       .get();
-    if (
-      !user ||
-      !(await verifyPassword(
-        input.password,
-        user.passwordSalt,
-        user.passwordHash,
-      ))
-    ) {
+    // 계정이 없어도 PBKDF2를 한 번 돌린다. 여기서 곧장 401로 빠지면 응답 시간이
+    // "이 주소로 가입했는가"를 알려준다 — lib/crypto.ts의 verifyPasswordOrDecoy 참고.
+    const valid = await verifyPasswordOrDecoy(
+      input.password,
+      user ? { salt: user.passwordSalt, hash: user.passwordHash } : null,
+    );
+    if (!user || !valid) {
       return c.json({ error: "이메일 또는 비밀번호가 올바르지 않습니다" }, 401);
     }
 

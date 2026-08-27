@@ -20,6 +20,7 @@ import { Hono } from "hono";
 import type { AdminAppEnv } from "../types";
 import { listMeta, listParams, nowIso, parseJsonObject } from "../utils";
 import { writeAudit } from "../audit";
+import { csvResponse } from "../csv";
 
 function seoulDayBounds(): { start: string; end: string } {
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -28,35 +29,6 @@ function seoulDayBounds(): { start: string; end: string } {
     start: new Date(`${date}T00:00:00+09:00`).toISOString(),
     end: new Date(`${date}T23:59:59.999+09:00`).toISOString(),
   };
-}
-
-function csvCell(value: unknown): string {
-  let text =
-    value === null || value === undefined
-      ? ""
-      : typeof value === "string"
-        ? value
-        : JSON.stringify(value);
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-function csvResponse(
-  rows: Array<Record<string, unknown>>,
-  filename: string,
-): Response {
-  const headers = Object.keys(rows[0] ?? {});
-  const lines = [
-    headers.map(csvCell).join(","),
-    ...rows.map((row) => headers.map((key) => csvCell(row[key])).join(",")),
-  ];
-  return new Response(`\uFEFF${lines.join("\r\n")}`, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
 }
 
 export const overviewLogRoutes = new Hono<AdminAppEnv>()

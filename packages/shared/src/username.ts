@@ -185,13 +185,19 @@ export function profileLink(username: string): string {
  * 앞에 `/`가 오거나 문자열 처음일 때만 `u/`를 세그먼트로 인정한다. 그러지 않으면
  * `/menu/x` 같은 주소가 걸린다. 주소창의 값은 사람이 손으로 고칠 수 있으므로
  * 저장 형식과 같은 정규형으로 접는다 — `/u/HyunWoo`도 같은 사람을 가리켜야 한다.
+ *
+ * **규칙에 맞는 이름만 내보낸다.** 링크는 아무나 만들어 보낼 수 있고, 여기서 나온
+ * 값은 그대로 라우트 파라미터가 되어 API 경로에 박힌다. 캡처 문자열은 `/ ? #`를
+ * 빼고 잡지만 `decodeURIComponent`가 `%2F`·`%3F`·`%23`을 도로 되살리므로,
+ * 걸러내는 자리는 정규화 **뒤**여야 한다. 이름으로 성립하지 않는 값은 어차피
+ * 아무 계정도 가리키지 않으니, 화면을 띄우지 말고 링크 자체를 무시한다.
  */
 export function profileUsernameFromUrl(url: string): string | null {
   const match = /(?:^|\/)u\/([^/?#]+)/.exec(url);
   if (!match?.[1]) return null;
   try {
     const username = normalizeUsername(decodeURIComponent(match[1]));
-    return username.length > 0 ? username : null;
+    return isCanonicalUsername(username) ? username : null;
   } catch {
     // 잘못 인코딩된 링크(`%`로 끝나는 등). 목적지를 알 수 없으니 없는 것으로 본다.
     return null;
