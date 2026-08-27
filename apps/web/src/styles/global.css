@@ -408,6 +408,94 @@ a {
   border-top: 1px solid var(--hairline-soft);
 }
 
+.leave-row {
+  display: grid;
+  gap: var(--sp-lg);
+}
+
+.leave-row__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-lg);
+}
+
+.leave-row__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--sp-sm);
+}
+
+.leave-status-control {
+  display: grid;
+  gap: var(--sp-sm);
+  padding: var(--sp-md);
+  border-radius: var(--r-md);
+  background: var(--surface-card);
+}
+
+.leave-status-control__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  min-height: 20px;
+}
+
+.leave-status-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface-strong);
+}
+
+.leave-status-option {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 var(--sp-sm);
+  overflow: hidden;
+  border: 0;
+  border-radius: 9px;
+  color: var(--body);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+}
+
+.leave-status-option[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--canvas);
+  box-shadow: var(--shadow-hairline);
+  font-weight: 700;
+}
+
+.leave-status-option:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.leave-status-option:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .leave-status-option:hover:not(:disabled, [aria-pressed="true"]) {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.55);
+  }
+}
+
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -798,6 +886,18 @@ textarea.input {
 
   .content-row {
     padding: var(--sp-lg);
+  }
+
+  .leave-row__main {
+    align-items: flex-start;
+  }
+
+  .leave-row__actions {
+    flex-direction: column;
+  }
+
+  .leave-row__actions .btn {
+    min-height: 36px;
   }
 
   .metric-strip__item {

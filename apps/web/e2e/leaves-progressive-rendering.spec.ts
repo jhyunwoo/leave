@@ -90,9 +90,7 @@ test("400건 목록은 섹션별로 점진 렌더링한다", async ({ page, requ
   await expect(page.getByText("200건", { exact: true })).toHaveCount(2);
   expect(initialDomNodes).toBeLessThan(1_500);
 
-  const pastMore = page.getByRole("button", {
-    name: "지난 휴가 20건 더 보기 · 180건 남음",
-  });
+  const pastMore = page.locator('button[aria-controls="past-leaves"]');
   await pastMore.click();
   await expect(page.locator(".content-row")).toHaveCount(
     INITIAL_VISIBLE_PER_SECTION * 3,
@@ -100,6 +98,54 @@ test("400건 목록은 섹션별로 점진 렌더링한다", async ({ page, requ
   await expect(pastMore).toHaveAccessibleName(
     "지난 휴가 20건 더 보기 · 160건 남음",
   );
+});
+
+test("내 휴가 목록에서 진행 상태를 바로 바꾸고 새로고침 후에도 유지한다", async ({
+  page,
+  request,
+}) => {
+  const token = await createAccount(request);
+  const created = await request.post("http://localhost:8787/leaves", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      title: "상태 변경 휴가",
+      status: "shared",
+      segments: [
+        {
+          category: "annual",
+          startDate: "2026-09-01",
+          endDate: "2026-09-03",
+        },
+      ],
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+  await page.goto("/leaves");
+
+  const statusControl = page.getByRole("group", {
+    name: "상태 변경 휴가 휴가 상태 변경",
+  });
+  await expect(statusControl).toBeVisible();
+  await expect(
+    statusControl.getByRole("button", { name: "희망" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await statusControl.getByRole("button", { name: "신청함" }).click();
+  await expect(
+    statusControl.getByRole("button", { name: "신청함" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("상태 · 신청함")).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page
+      .getByRole("group", { name: "상태 변경 휴가 휴가 상태 변경" })
+      .getByRole("button", { name: "신청함" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("내비게이션 배지와 알림함은 하나의 폴링 응답만 활성화한다", async ({

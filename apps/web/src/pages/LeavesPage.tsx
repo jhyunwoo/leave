@@ -5,6 +5,7 @@
 
 import {
   BALANCE_LABELS,
+  fmtRange,
   fmtRangeTiny,
   segmentBalanceKey,
   todayInSeoul,
@@ -22,7 +23,7 @@ import {
   LazyLeaveFormModal,
   preloadLeaveFormModal,
 } from "../components/LazyLeaveFormModal";
-import { fmtRange } from "@leave/shared";
+import { LeaveStatusControl } from "../components/LeaveStatusControl";
 
 /**
  * A large leave history is uncommon but can otherwise mount hundreds of
@@ -265,65 +266,59 @@ function LeaveRow(props: {
 }) {
   const l = props.leave;
   return (
-    <li
-      className="content-row"
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: "var(--sp-lg)",
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <Link
-          to={`/leaves/${l.id}`}
-          className="body-lg strong"
-          style={{ textDecoration: "none" }}
-        >
-          {l.title}
-        </Link>
-        <p className="body-sm text-body" style={{ marginTop: 2 }}>
-          {fmtRange(l.startDate, l.endDate)}
-        </p>
-        {l.reason && (
-          <p className="caption text-mute" style={{ marginTop: 4 }}>
-            {l.reason}
+    <li className="content-row leave-row">
+      <div className="leave-row__main">
+        <div style={{ minWidth: 0 }}>
+          <Link
+            to={`/leaves/${l.id}`}
+            className="body-lg strong"
+            style={{ textDecoration: "none" }}
+          >
+            {l.title}
+          </Link>
+          <p className="body-sm text-body" style={{ marginTop: 2 }}>
+            {fmtRange(l.startDate, l.endDate)}
           </p>
-        )}
-        <div
-          style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}
-        >
-          {l.segments.map((segment) => {
-            const key = segmentBalanceKey(segment);
-            return (
-              <span key={`${key}-${segment.startDate}`} className="badge">
-                {BALANCE_LABELS[key]}{" "}
-                {fmtRangeTiny(segment.startDate, segment.endDate)}
-              </span>
-            );
-          })}
+          {l.reason && (
+            <p className="caption text-mute" style={{ marginTop: 4 }}>
+              {l.reason}
+            </p>
+          )}
+          <div
+            style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}
+          >
+            {l.segments.map((segment) => {
+              const key = segmentBalanceKey(segment);
+              return (
+                <span key={`${key}-${segment.startDate}`} className="badge">
+                  {BALANCE_LABELS[key]}{" "}
+                  {fmtRangeTiny(segment.startDate, segment.endDate)}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+        <div className="leave-row__actions">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onMouseEnter={preloadLeaveFormModal}
+            onFocus={preloadLeaveFormModal}
+            onClick={() => props.onEdit(l)}
+          >
+            수정
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            disabled={props.deleting}
+            onClick={() => props.onDelete(l)}
+          >
+            삭제
+          </button>
         </div>
       </div>
-      <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onMouseEnter={preloadLeaveFormModal}
-          onFocus={preloadLeaveFormModal}
-          onClick={() => props.onEdit(l)}
-        >
-          수정
-        </button>
-        <button
-          type="button"
-          className="btn btn-danger btn-sm"
-          disabled={props.deleting}
-          onClick={() => props.onDelete(l)}
-        >
-          삭제
-        </button>
-      </div>
+      <LeaveStatusControl leave={l} />
     </li>
   );
 }
