@@ -150,6 +150,10 @@ export function CalendarScreen() {
       ? (cachedCalendar?.unit ?? null)
       : null;
   const unit = me.data?.unit ?? offlineCachedUnit;
+  const isUnitAdmin =
+    unit != null &&
+    me.data?.user.id != null &&
+    unit.adminId === me.data.user.id;
   const dischargeAt = me.data?.user.dischargeAt ?? null;
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
@@ -437,12 +441,36 @@ export function CalendarScreen() {
                     },
                   })
                 }
+                onAddUnitEvent={
+                  isUnitAdmin
+                    ? () =>
+                        router.push({
+                          pathname: "/(tabs)/(calendar)/unit-event",
+                          params: {
+                            date: selectedDate,
+                            month: selectedDate.slice(0, 7),
+                          },
+                        })
+                    : undefined
+                }
                 personalEvents={panelPersonalEvents.data?.events}
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",
                     params: { eventId, month: selectedDate.slice(0, 7) },
                   })
+                }
+                onOpenUnitEvent={
+                  isUnitAdmin
+                    ? (eventId) =>
+                        router.push({
+                          pathname: "/(tabs)/(calendar)/unit-event",
+                          params: {
+                            eventId,
+                            month: selectedDate.slice(0, 7),
+                          },
+                        })
+                    : undefined
                 }
                 style={styles.inspectorDayPanel}
               />
@@ -487,6 +515,21 @@ export function CalendarScreen() {
         >
           개인 일정
         </Stack.Toolbar.Button>
+        {isUnitAdmin ? (
+          <Stack.Toolbar.Button
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/(calendar)/unit-event",
+                params: {
+                  date: selectedDate ?? today,
+                  month: (selectedDate ?? today).slice(0, 7),
+                },
+              })
+            }
+          >
+            부대 일정
+          </Stack.Toolbar.Button>
+        ) : null}
         <Stack.Toolbar.Button
           onPress={() => scrollRef.current?.scrollToToday()}
         >
@@ -567,12 +610,36 @@ export function CalendarScreen() {
                     },
                   })
                 }
+                onAddUnitEvent={
+                  isUnitAdmin
+                    ? () =>
+                        router.push({
+                          pathname: "/(tabs)/(calendar)/unit-event",
+                          params: {
+                            date: selectedDate,
+                            month: selectedDate.slice(0, 7),
+                          },
+                        })
+                    : undefined
+                }
                 personalEvents={panelPersonalEvents.data?.events}
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",
                     params: { eventId, month: selectedDate.slice(0, 7) },
                   })
+                }
+                onOpenUnitEvent={
+                  isUnitAdmin
+                    ? (eventId) =>
+                        router.push({
+                          pathname: "/(tabs)/(calendar)/unit-event",
+                          params: {
+                            eventId,
+                            month: selectedDate.slice(0, 7),
+                          },
+                        })
+                    : undefined
                 }
               />
             ) : (

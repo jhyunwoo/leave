@@ -189,6 +189,36 @@ export const unitBlackouts = sqliteTable(
 );
 
 /**
+ * 부대 관리자가 등록하고 부대원 모두가 달력에서 공유하는 일정.
+ * 휴가·블랙아웃과 분리해 출타 집계와 제한 판정에는 영향을 주지 않는다.
+ */
+export const unitEvents = sqliteTable(
+  "unit_events",
+  {
+    id: text("id").primaryKey(),
+    unitId: text("unit_id")
+      .notNull()
+      .references(() => units.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    isHoliday: integer("is_holiday", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    details: text("details"),
+    createdBy: text("created_by").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    check("unit_events_dates_check", sql`${t.startDate} <= ${t.endDate}`),
+    index("unit_events_unit_start_idx").on(t.unitId, t.startDate),
+  ],
+);
+
+/**
  * 휴가를 이루는 구간. "8/2~8/5는 연가, 8/6~8/9는 정기외박"처럼 날짜별 재원을 담는다.
  * 한 휴가 안에서 같은 재원이 여러 번 나올 수 있어 유일 제약을 두지 않는다.
  * days는 날짜에서 파생되지만 잔여량 집계 쿼리를 단순하게 유지하려고 함께 저장한다.
@@ -511,6 +541,7 @@ export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitInviteRow = typeof unitInvites.$inferSelect;
 export type UnitBlackoutRow = typeof unitBlackouts.$inferSelect;
+export type UnitEventRow = typeof unitEvents.$inferSelect;
 export type UserNotificationPrefsRow =
   typeof userNotificationPrefs.$inferSelect;
 export type ContentReportRow = typeof contentReports.$inferSelect;

@@ -15,6 +15,8 @@ import {
   unitCreateSchema,
   unitInviteCreateSchema,
   unitJoinSchema,
+  unitEventCreateSchema,
+  unitEventUpdateSchema,
   unitTransferSchema,
   unitUpdateSchema,
 } from "@leave/shared";
@@ -27,6 +29,7 @@ import {
   memberSchema,
   okSchema,
   unitSchema,
+  unitEventSchema,
 } from "../lib/responses";
 
 const TAGS = ["부대"];
@@ -332,5 +335,65 @@ export const deleteBlackoutRoute = createRoute({
     401: errorResponse("인증 실패"),
     403: errorResponse("관리자만 삭제 가능"),
     404: errorResponse("기간 없음"),
+  },
+});
+
+export const createUnitEventRoute = createRoute({
+  method: "post",
+  path: "/{id}/events",
+  tags: TAGS,
+  summary: "부대 일정 등록 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: idParam,
+    body: {
+      content: { "application/json": { schema: unitEventCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: jsonContent(z.object({ event: unitEventSchema }), "등록된 부대 일정"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 등록 가능"),
+  },
+});
+
+const unitEventParam = z.object({ id: z.string(), eventId: z.string() });
+
+export const updateUnitEventRoute = createRoute({
+  method: "patch",
+  path: "/{id}/events/{eventId}",
+  tags: TAGS,
+  summary: "부대 일정 수정 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: {
+    params: unitEventParam,
+    body: {
+      content: { "application/json": { schema: unitEventUpdateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(z.object({ event: unitEventSchema }), "수정된 부대 일정"),
+    400: errorResponse("입력값 오류"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 수정 가능"),
+    404: errorResponse("일정 없음"),
+  },
+});
+
+export const deleteUnitEventRoute = createRoute({
+  method: "delete",
+  path: "/{id}/events/{eventId}",
+  tags: TAGS,
+  summary: "부대 일정 삭제 (관리자 전용)",
+  security: [{ Bearer: [] }],
+  request: { params: unitEventParam },
+  responses: {
+    200: jsonContent(okSchema, "삭제 완료"),
+    401: errorResponse("인증 실패"),
+    403: errorResponse("관리자만 삭제 가능"),
+    404: errorResponse("일정 없음"),
   },
 });

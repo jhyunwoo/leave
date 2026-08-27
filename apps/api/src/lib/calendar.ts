@@ -19,7 +19,14 @@ import {
   monthBounds,
 } from "@leave/shared";
 import { and, asc, eq, gte, lte } from "drizzle-orm";
-import { leaves, unitBlackouts, units, userBlocks, users } from "../db/schema";
+import {
+  leaves,
+  unitBlackouts,
+  unitEvents,
+  units,
+  userBlocks,
+  users,
+} from "../db/schema";
 import type { Db } from "./db";
 import { segmentsOfUnitDuring } from "./leave-balances";
 import { serializeMember, serializeUnit } from "./serialize";
@@ -82,51 +89,74 @@ export async function buildCalendarPayloads(input: {
   );
 
   /*
-   * 다섯 조회는 서로를 기다릴 이유가 없다(모두 unitId·viewerId·기간만 있으면 된다).
+   * 여섯 조회는 서로를 기다릴 이유가 없다(모두 unitId·viewerId·기간만 있으면 된다).
    * 예전에는 부대원 id 목록을 먼저 뽑아 휴가 조회의 IN(...)에 넣느라 순서가 강제됐고,
    * 그 목록이 D1의 바인드 파라미터 상한(100개)을 넘으면 요청 자체가 죽었다 —
    * 부대원 99명이면 달력이 500이었다. 부대 조인으로 바꿔 상한을 없애고,
-   * batch로 묶어 왕복을 다섯에서 하나로 줄인다.
+   * batch로 묶어 왕복을 여섯에서 하나로 줄인다.
    */
-  const [unitRows, members, rows, blackouts, blockedRows] = await db.batch([
-    db.select().from(units).where(eq(units.id, unitId)),
-    db
-      .select(memberColumns)
-      .from(users)
-      .where(eq(users.unitId, unitId))
-      .orderBy(asc(users.name)),
-    // 요청 달 범위에 하루라도 걸치는 휴가만 가져온다. 개별 달 응답은 아래에서
-    // 다시 좁힌다. 연속 9개월 제한 덕분에 멀리 떨어진 두 달 사이를 통째로 읽지 않는다.
-    db
-      .select(leaveColumns)
-      .from(leaves)
-      .innerJoin(users, eq(leaves.userId, users.id))
-      .where(
-        and(
-          eq(users.unitId, unitId),
-          lte(leaves.startDate, rangeEnd),
-          gte(leaves.endDate, rangeStart),
-        ),
-      )
-      .orderBy(asc(leaves.startDate)),
-    db
-      .select({
-        id: unitBlackouts.id,
-        startDate: unitBlackouts.startDate,
-        endDate: unitBlackouts.endDate,
-        reason: unitBlackouts.reason,
-      })
-      .from(unitBlackouts)
-      .where(
-        and(
-          eq(unitBlackouts.unitId, unitId),
-          lte(unitBlackouts.startDate, rangeEnd),
-          gte(unitBlackouts.endDate, rangeStart),
-        ),
-      )
-      .orderBy(asc(unitBlackouts.startDate)),
-    blockedUserIdsQuery(db, viewerId),
-  ]);
+  const [unitRows, members, rows, blackouts, events, blockedRows] =
+    await db.batch([
+      db.select().from(units).where(eq(units.id, unitId)),
+      db
+        .select(memberColumns)
+        .from(users)
+        .where(eq(users.unitId, unitId))
+        .orderBy(asc(users.name)),
+      // 요청 달 범위에 하루라도 걸치는 휴가만 가져온다. 개별 달 응답은 아래에서
+      // 다시 좁힌다. 연속 9개월 제한 덕분에 멀리 떨어진 두 달 사이를 통째로 읽지 않는다.
+      db
+        .select(leaveColumns)
+        .from(leaves)
+        .innerJoin(users, eq(leaves.userId, users.id))
+        .where(
+          and(
+            eq(users.unitId, unitId),
+            lte(leaves.startDate, rangeEnd),
+            gte(leaves.endDate, rangeStart),
+          ),
+        )
+        .orderBy(asc(leaves.startDate)),
+      db
+        .select({
+          id: unitBlackouts.id,
+          startDate: unitBlackouts.startDate,
+          endDate: unitBlackouts.endDate,
+          reason: unitBlackouts.reason,
+        })
+        .from(unitBlackouts)
+        .where(
+          and(
+            eq(unitBlackouts.unitId, unitId),
+            lte(unitBlackouts.startDate, rangeEnd),
+            gte(unitBlackouts.endDate, rangeStart),
+          ),
+        )
+        .orderBy(asc(unitBlackouts.startDate)),
+      db
+        .select({
+          id: unitEvents.id,
+          title: unitEvents.title,
+          isHoliday: unitEvents.isHoliday,
+          startDate: unitEvents.startDate,
+          endDate: unitEvents.endDate,
+          startTime: unitEvents.startTime,
+          endTime: unitEvents.endTime,
+          details: unitEvents.details,
+          createdAt: unitEvents.createdAt,
+          updatedAt: unitEvents.updatedAt,
+        })
+        .from(unitEvents)
+        .where(
+          and(
+            eq(unitEvents.unitId, unitId),
+            lte(unitEvents.startDate, rangeEnd),
+            gte(unitEvents.endDate, rangeStart),
+          ),
+        )
+        .orderBy(asc(unitEvents.startDate)),
+      blockedUserIdsQuery(db, viewerId),
+    ]);
 
   const unit = unitRows[0];
   if (!unit) return null;
@@ -152,6 +182,9 @@ export async function buildCalendarPayloads(input: {
     );
     const monthBlackouts = blackouts.filter(
       (blackout) => blackout.startDate <= end && blackout.endDate >= start,
+    );
+    const monthEvents = events.filter(
+      (event) => event.startDate <= end && event.endDate >= start,
     );
     const isBlocked = (date: string) =>
       monthBlackouts.some(
@@ -218,6 +251,7 @@ export async function buildCalendarPayloads(input: {
       leaves: calendarLeaves,
       attendees,
       blackouts: monthBlackouts,
+      events: monthEvents,
     };
   });
 }

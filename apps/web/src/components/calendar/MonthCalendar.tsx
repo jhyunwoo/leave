@@ -92,6 +92,19 @@ export function MonthCalendar(props: {
             const dayNum = Number(cell.date.slice(8));
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
+            const unitEvents = cell.inMonth
+              ? (calendar.events ?? []).filter(
+                  (event) =>
+                    event.startDate <= cell.date && cell.date <= event.endDate,
+                )
+              : [];
+            const hasUnitHoliday = unitEvents.some((event) => event.isHoliday);
+            const eventLabel = unitEvents.length
+              ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
+              : null;
+            const calendarLabel = [holiday, eventLabel]
+              .filter(Boolean)
+              .join(" · ");
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
             const personal = cell.inMonth
               ? (personalEvents?.filter(
@@ -127,7 +140,7 @@ export function MonthCalendar(props: {
                 aria-selected={isSelected}
                 aria-label={
                   cell.inMonth
-                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}${personal.length ? `, 개인 일정 ${personal.length}개` : ""}, ${
+                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.length}개` : ""}, ${
                         signal?.percent == null
                           ? "출타 기준 미설정"
                           : `출타율 ${signal.percent}퍼센트, ${signal.label}`
@@ -148,7 +161,9 @@ export function MonthCalendar(props: {
                   className={[
                     "cal-daynum",
                     isToday ? "is-today" : "",
-                    (weekend || holiday) && cell.inMonth ? "is-red" : "",
+                    (weekend || holiday || hasUnitHoliday) && cell.inMonth
+                      ? "is-red"
+                      : "",
                     exceeded ? "is-exceeded" : "",
                   ].join(" ")}
                 >
@@ -157,12 +172,24 @@ export function MonthCalendar(props: {
                 {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 칸 높이(92px)가
                     꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는 날에는
                     전역이 이기고, 공휴일 이름은 날짜 상세에서 그대로 보인다. */}
-                {(isDischarge || holiday) && (
+                {(isDischarge || calendarLabel) && (
                   <span
-                    className={`cal-holiday ${isDischarge ? "is-discharge" : ""}`}
-                    title={isDischarge ? "전역일" : (holiday ?? undefined)}
+                    className={[
+                      "cal-holiday",
+                      isDischarge ? "is-discharge" : "",
+                      !isDischarge && !holiday && !hasUnitHoliday
+                        ? "is-unit-event"
+                        : "",
+                    ].join(" ")}
+                    title={
+                      isDischarge
+                        ? "전역일"
+                        : [holiday, ...unitEvents.map((event) => event.title)]
+                            .filter(Boolean)
+                            .join(", ")
+                    }
                   >
-                    {isDischarge ? "전역" : holiday}
+                    {isDischarge ? "전역" : calendarLabel}
                   </span>
                 )}
                 {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}

@@ -380,3 +380,110 @@ test("휴가 등록 뒤 달력 집계와 본인 상세에 즉시 반영된다", 
   assert.equal(after.data.leaves.length, 1);
   assert.equal(after.data.leaves[0].title, "9월 휴가");
 });
+
+test("부대 관리자는 공유 일정을 등록·수정·삭제하고 부대원은 달력에서 본다", async () => {
+  const owner = await signup();
+  const created = await createUnit(owner.token);
+  const unitId = created.data.unit.id;
+  const member = await signup();
+  await joinCreatedUnit(member.token, created);
+
+  const forbiddenCreate = await req("POST", `/units/${unitId}/events`, {
+    token: member.token,
+    body: {
+      title: "권한 없는 일정",
+      isHoliday: false,
+      startDate: "2026-09-01",
+      endDate: "2026-09-01",
+    },
+  });
+  assert.equal(forbiddenCreate.status, 403);
+
+  const invalid = await req("POST", `/units/${unitId}/events`, {
+    token: owner.token,
+    body: {
+      title: "잘못된 기간",
+      isHoliday: true,
+      startDate: "2026-09-02",
+      endDate: "2026-09-01",
+    },
+  });
+  assert.equal(invalid.status, 400);
+
+  const createdEvent = await req("POST", `/units/${unitId}/events`, {
+    token: owner.token,
+    body: {
+      title: "부대 창설 기념일",
+      isHoliday: true,
+      startDate: "2026-08-31",
+      endDate: "2026-09-01",
+      startTime: "09:00",
+      endTime: "18:00",
+      details: "전 부대원이 함께 보는 상세 안내",
+    },
+  });
+  assert.equal(createdEvent.status, 201);
+  assert.equal(createdEvent.data.event.isHoliday, true);
+  assert.equal(
+    createdEvent.data.event.details,
+    "전 부대원이 함께 보는 상세 안내",
+  );
+
+  const memberCalendar = await req(
+    "GET",
+    `/units/${unitId}/calendar?month=2026-09`,
+    { token: member.token },
+  );
+  assert.equal(memberCalendar.status, 200);
+  assert.deepEqual(memberCalendar.data.events, [createdEvent.data.event]);
+
+  const forbiddenUpdate = await req(
+    "PATCH",
+    `/units/${unitId}/events/${createdEvent.data.event.id}`,
+    {
+      token: member.token,
+      body: { title: "가로챈 일정" },
+    },
+  );
+  assert.equal(forbiddenUpdate.status, 403);
+
+  const updated = await req(
+    "PATCH",
+    `/units/${unitId}/events/${createdEvent.data.event.id}`,
+    {
+      token: owner.token,
+      body: {
+        title: "전투 휴무일",
+        isHoliday: false,
+        startDate: "2026-09-02",
+        endDate: "2026-09-02",
+        startTime: null,
+        endTime: null,
+      },
+    },
+  );
+  assert.equal(updated.status, 200);
+  assert.equal(updated.data.event.title, "전투 휴무일");
+  assert.equal(updated.data.event.isHoliday, false);
+  assert.equal(updated.data.event.details, "전 부대원이 함께 보는 상세 안내");
+
+  const forbiddenDelete = await req(
+    "DELETE",
+    `/units/${unitId}/events/${createdEvent.data.event.id}`,
+    { token: member.token },
+  );
+  assert.equal(forbiddenDelete.status, 403);
+
+  const removed = await req(
+    "DELETE",
+    `/units/${unitId}/events/${createdEvent.data.event.id}`,
+    { token: owner.token },
+  );
+  assert.equal(removed.status, 200);
+  const afterDelete = await req(
+    "GET",
+    `/units/${unitId}/calendar?month=2026-09`,
+    { token: member.token },
+  );
+  assert.deepEqual(afterDelete.data.events, []);
+});

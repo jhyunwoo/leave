@@ -39,6 +39,16 @@ export default function CalendarStackLayout() {
           sheetGrabberVisible: true,
         }}
       />
+      <Stack.Screen
+        name="unit-event"
+        options={{
+          headerShown: true,
+          headerTransparent: false,
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.75, 1],
+          sheetGrabberVisible: true,
+        }}
+      />
     </Stack>
   );
 }

@@ -12,7 +12,13 @@
  */
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { unitBlackouts, unitInvites, units, users } from "../db/schema";
+import {
+  unitBlackouts,
+  unitEvents,
+  unitInvites,
+  units,
+  users,
+} from "../db/schema";
 import { createApp } from "../lib/app";
 import {
   buildCalendarPayload,
@@ -35,14 +41,17 @@ import {
   CALENDAR_QUERY_PAST_MONTHS,
   shiftMonth,
   todayInSeoul,
+  unitEventCreateSchema,
 } from "@leave/shared";
 import {
   blackoutsRoute,
   calendarRoute,
   calendarsRoute,
   createBlackoutRoute,
+  createUnitEventRoute,
   createUnitRoute,
   deleteBlackoutRoute,
+  deleteUnitEventRoute,
   getUnitRoute,
   joinRoute,
   leaveUnitRoute,
@@ -50,6 +59,7 @@ import {
   removeMemberRoute,
   rotateInviteRoute,
   transferRoute,
+  updateUnitEventRoute,
   updateUnitRoute,
 } from "./units.contract";
 
@@ -418,6 +428,114 @@ export const unitRoutes = app
       .run();
     if (removed.meta.changes === 0) {
       return c.json({ error: "블랙아웃 기간을 찾을 수 없습니다" }, 404);
+    }
+    return c.json({ ok: true as const }, 200);
+  })
+
+  .openapi(createUnitEventRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const db = drizzle(c.env.DB);
+    const user = c.get("user");
+    const check = await checkUnitAdmin(db, user, id);
+    if (check.status !== "ok") {
+      return c.json({ error: "현재 그룹 관리자만 등록할 수 있습니다" }, 403);
+    }
+
+    const input = c.req.valid("json");
+    const now = new Date().toISOString();
+    const row = {
+      id: crypto.randomUUID(),
+      unitId: id,
+      title: input.title,
+      isHoliday: input.isHoliday,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      startTime: input.startTime ?? null,
+      endTime: input.endTime ?? null,
+      details: input.details ?? null,
+      createdBy: user.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.insert(unitEvents).values(row);
+    const { unitId: _unitId, createdBy: _createdBy, ...event } = row;
+    return c.json({ event }, 201);
+  })
+
+  .openapi(updateUnitEventRoute, async (c) => {
+    const { id, eventId } = c.req.valid("param");
+    const db = drizzle(c.env.DB);
+    const check = await checkUnitAdmin(db, c.get("user"), id);
+    if (check.status !== "ok") {
+      return c.json({ error: "현재 그룹 관리자만 수정할 수 있습니다" }, 403);
+    }
+
+    const existing = await db
+      .select()
+      .from(unitEvents)
+      .where(and(eq(unitEvents.id, eventId), eq(unitEvents.unitId, id)))
+      .get();
+    if (!existing) {
+      return c.json({ error: "부대 일정을 찾을 수 없습니다" }, 404);
+    }
+    const input = c.req.valid("json");
+    const merged = unitEventCreateSchema.safeParse({
+      title: input.title ?? existing.title,
+      isHoliday: input.isHoliday ?? existing.isHoliday,
+      startDate: input.startDate ?? existing.startDate,
+      endDate: input.endDate ?? existing.endDate,
+      startTime:
+        input.startTime === undefined ? existing.startTime : input.startTime,
+      endTime: input.endTime === undefined ? existing.endTime : input.endTime,
+      details: input.details === undefined ? existing.details : input.details,
+    });
+    if (!merged.success) {
+      return c.json(
+        {
+          error:
+            merged.error.issues[0]?.message ?? "입력값이 올바르지 않습니다",
+        },
+        400,
+      );
+    }
+
+    const updatedAt = new Date().toISOString();
+    const event = {
+      id: existing.id,
+      ...merged.data,
+      startTime: merged.data.startTime ?? null,
+      endTime: merged.data.endTime ?? null,
+      details: merged.data.details ?? null,
+      createdAt: existing.createdAt,
+      updatedAt,
+    };
+    await db
+      .update(unitEvents)
+      .set({
+        ...merged.data,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        details: event.details,
+        updatedAt,
+      })
+      .where(and(eq(unitEvents.id, eventId), eq(unitEvents.unitId, id)));
+    return c.json({ event }, 200);
+  })
+
+  .openapi(deleteUnitEventRoute, async (c) => {
+    const { id, eventId } = c.req.valid("param");
+    const db = drizzle(c.env.DB);
+    const check = await checkUnitAdmin(db, c.get("user"), id);
+    if (check.status !== "ok") {
+      return c.json({ error: "현재 그룹 관리자만 삭제할 수 있습니다" }, 403);
+    }
+
+    const removed = await db
+      .delete(unitEvents)
+      .where(and(eq(unitEvents.id, eventId), eq(unitEvents.unitId, id)))
+      .run();
+    if (removed.meta.changes === 0) {
+      return c.json({ error: "부대 일정을 찾을 수 없습니다" }, 404);
     }
     return c.json({ ok: true as const }, 200);
   })

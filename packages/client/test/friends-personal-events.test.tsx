@@ -6,6 +6,7 @@ import {
   useCreatePersonalEvent,
   useDeletePersonalEvent,
 } from "../src/hooks/personal-events";
+import { useCreateUnitEvent } from "../src/hooks/unit-events";
 import { useRemoveFriend } from "../src/hooks/friends";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
@@ -156,5 +157,61 @@ describe("personal event invalidation", () => {
       queryClient.getQueryState(queryKeys.personalEventsMonth("2026-10"))
         ?.isInvalidated,
     ).toBe(true);
+  });
+});
+
+describe("unit event invalidation", () => {
+  it("같은 부대의 일정 기간과 겹치는 달력만 무효화한다", async () => {
+    const queryClient = testQueryClient();
+    for (const unitId of ["unit-1", "unit-2"])
+      for (const month of ["2026-08", "2026-09", "2026-10"])
+        queryClient.setQueryData(queryKeys.calendar(unitId, month), {
+          month,
+        });
+    const client = {
+      units: {
+        ":id": {
+          events: {
+            $post: () =>
+              Promise.resolve({
+                event: {
+                  id: "unit-event-1",
+                  title: "부대 행사",
+                  isHoliday: true,
+                  startDate: "2026-09-30",
+                  endDate: "2026-10-02",
+                  startTime: null,
+                  endTime: null,
+                  details: null,
+                  createdAt: "now",
+                  updatedAt: "now",
+                },
+              }),
+          },
+        },
+      },
+    };
+    const wrapper = wrapperFor(queryClient, testAdapter({ client }));
+    const { result } = renderHook(() => useCreateUnitEvent("unit-1"), {
+      wrapper,
+    });
+    await act(() =>
+      result.current.mutateAsync({
+        title: "부대 행사",
+        isHoliday: true,
+        startDate: "2026-09-30",
+        endDate: "2026-10-02",
+      }),
+    );
+
+    const invalidated = queryClient
+      .getQueryCache()
+      .getAll()
+      .filter((query) => query.state.isInvalidated)
+      .map((query) => query.queryKey.slice(1));
+    expect(invalidated).toEqual([
+      ["unit-1", "2026-09"],
+      ["unit-1", "2026-10"],
+    ]);
   });
 });

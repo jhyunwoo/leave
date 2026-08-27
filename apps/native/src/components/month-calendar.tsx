@@ -150,6 +150,19 @@ export function MonthCalendar(props: {
             const dayNum = Number(cell.date.slice(8));
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
+            const unitEvents = cell.inMonth
+              ? (calendar.events ?? []).filter(
+                  (event) =>
+                    event.startDate <= cell.date && cell.date <= event.endDate,
+                )
+              : [];
+            const hasUnitHoliday = unitEvents.some((event) => event.isHoliday);
+            const eventLabel = unitEvents.length
+              ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
+              : null;
+            const calendarLabel = [holiday, eventLabel]
+              .filter(Boolean)
+              .join(" · ");
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
             const personalCount = cell.inMonth
               ? (personalEvents?.filter(
@@ -204,7 +217,7 @@ export function MonthCalendar(props: {
                         signal?.percent == null
                           ? "출타 기준 미설정"
                           : `출타율 ${signal.percent}퍼센트, ${signal.label}`
-                      }${preview ? `, 출타 ${preview.total}명` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}${
+                      }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}${
                         blocked ? ", 제한 가능 기간" : ""
                       }`
                     : undefined
@@ -236,7 +249,9 @@ export function MonthCalendar(props: {
                       <Text
                         style={[
                           styles.dayNum,
-                          (weekend || holiday) && { color: colors.negative },
+                          (weekend || holiday || hasUnitHoliday) && {
+                            color: colors.negative,
+                          },
                           exceeded && { color: colors.negativeDeep },
                           (isToday || isSelected) && {
                             color: colors.onPrimary,
@@ -255,13 +270,16 @@ export function MonthCalendar(props: {
                           전역
                         </Text>
                       </View>
-                    ) : !compact && holiday ? (
+                    ) : !compact && calendarLabel ? (
                       <Text
-                        style={styles.holiday}
+                        style={[
+                          styles.calendarLabel,
+                          (holiday || hasUnitHoliday) && styles.holidayLabel,
+                        ]}
                         numberOfLines={1}
-                        ellipsizeMode="clip"
+                        ellipsizeMode="tail"
                       >
-                        {holiday}
+                        {calendarLabel}
                       </Text>
                     ) : null}
                     {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
@@ -414,14 +432,15 @@ const useStyles = makeStyles(({ colors }) => ({
   todayWrap: { backgroundColor: colors.primary },
   selectedWrap: { backgroundColor: colors.ink },
   dayNum: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  holiday: {
+  calendarLabel: {
     fontSize: 9,
     lineHeight: 11,
     fontWeight: "600",
-    color: colors.negative,
+    color: colors.brand,
     maxWidth: "100%",
     paddingHorizontal: 2,
   },
+  holidayLabel: { color: colors.negative },
   // 공휴일 이름과 같은 자리를 쓰지만 전역일은 채운 배지로 세운다. 세로 패딩을 두지
   // 않아 높이가 공휴일 줄(11)과 같고, 그래서 칸 높이 예산이 그대로 유지된다.
   // 채움은 primary가 아니라 brand다 — 칸 배경이 이미 primaryPale이라 primary 배지를
