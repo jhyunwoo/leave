@@ -11,6 +11,7 @@ import { Avatar } from "../components/Avatar";
 import { UsernameField, useUsernameDraft } from "../components/UsernameField";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
+import { ServiceProgress } from "../components/ServiceProgress";
 import { fmtDateShort } from "@leave/shared";
 
 /**
@@ -150,8 +151,6 @@ export function ProfilePage(props: { me: Me }) {
       );
   };
 
-  const progress = Math.round(user.serviceProgress * 100);
-
   return (
     <div
       className="anim-rise"
@@ -201,45 +200,15 @@ export function ProfilePage(props: { me: Me }) {
           </div>
         </div>
 
-        <div style={{ marginTop: "var(--sp-2xl)" }}>
-          <div
-            role="progressbar"
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="복무 진행률"
-            style={{
-              height: 10,
-              borderRadius: "var(--r-pill)",
-              background: "var(--hairline)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${progress}%`,
-                height: "100%",
-                borderRadius: "var(--r-pill)",
-                background: "var(--primary)",
-                transition: "width 240ms var(--ease-out)",
-              }}
-            />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "var(--sp-sm)",
-            }}
-          >
-            <span className="caption text-mute">복무 {progress}%</span>
-            <span className="caption text-mute">
-              {user.nextPromotionDate
-                ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
-                : "최종 계급"}
-            </span>
-          </div>
-        </div>
+        <ServiceProgress
+          enlistedAt={user.enlistedAt}
+          dischargeAt={user.dischargeAt}
+          caption={
+            user.nextPromotionDate
+              ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
+              : "최종 계급"
+          }
+        />
       </section>
 
       {/* 프로필 정보 */}
