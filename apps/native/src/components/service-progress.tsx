@@ -14,7 +14,8 @@
  * 화면이 앞에 있고 앱이 포그라운드일 때만 시계와 프레임 콜백이 돈다.
  */
 
-import { kstMidnight, serviceProgressAt, type ISODate } from "@leave/shared";
+import { kstMidnight, type ISODate } from "@leave/shared/dates";
+import { serviceProgressAt } from "@leave/shared/rank";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Text, TextInput, View } from "react-native";
@@ -22,6 +23,7 @@ import Animated, {
   useAnimatedProps,
   useDerivedValue,
   useFrameCallback,
+  useReducedMotion,
   useSharedValue,
 } from "react-native-reanimated";
 import { makeStyles, radius, spacing } from "@/theme";
@@ -94,6 +96,7 @@ function useTicker(active: boolean): number {
  * 시계는 프레임 타임스탬프(iOS CACurrentMediaTime, Android nanoTime)를 쓴다.
  * Date.now()는 1ms 격자라 10번째 자리가 21씩 뭉텅이로 튀는데, 활성화 첫 프레임에
  * 벽시계와 프레임 시계를 한 번 맞춰두면 그 뒤로는 서브밀리초로 흐른다.
+ *
  */
 function useLivePercentLabel(
   start: number,
@@ -140,6 +143,43 @@ function useLivePercentLabel(
   }));
 }
 
+/**
+ * 프레임마다 흐르는 퍼센트 글자. 이 부품이 마운트되어 있는 동안에만 프레임
+ * 콜백이 존재한다 — "동작 줄이기"에서는 아예 그리지 않으므로 워클릿도, 매 프레임
+ * 네이티브 텍스트 갱신도 생기지 않는다.
+ */
+function LivePercentReadout(props: {
+  start: number;
+  span: number;
+  active: boolean;
+  initialNow: number;
+  style: TextInput["props"]["style"];
+}) {
+  const animatedProps = useLivePercentLabel(
+    props.start,
+    props.span,
+    props.active,
+    props.initialNow,
+  );
+  return (
+    <AnimatedTextInput
+      style={props.style}
+      // 첫 페인트 값도 animatedProps가 준다(useAnimatedProps는 updater를 한 번
+      // JS에서 돌려 초기 props를 만든다). defaultValue를 따로 주면 둘이 싸운다.
+      animatedProps={animatedProps}
+      editable={false}
+      scrollEnabled={false}
+      caretHidden
+      selectTextOnFocus={false}
+      underlineColorAndroid="transparent"
+      pointerEvents="none"
+      // 초당 120번 바뀌는 값을 스크린리더가 읽으면 안 된다. 아래 progressbar가 대신 말한다.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    />
+  );
+}
+
 /** 복무 진행률 막대와 소수점 열 자리 퍼센트. */
 export function ServiceProgress(props: {
   enlistedAt: ISODate;
@@ -150,8 +190,20 @@ export function ServiceProgress(props: {
   caption: string;
 }) {
   const styles = useStyles();
-  const active = useActiveGate();
-  const now = useTicker(active);
+  const focused = useActiveGate();
+  /**
+   * "동작 줄이기"가 켜져 있으면 프레임 시계를 아예 돌리지 않는다.
+   *
+   * 이 표시는 초당 120번 글자가 흐르는 게 전부인 장식이다. 접근성 설정에서 동작을
+   * 줄여 달라고 한 사용자에게 정확히 그 반대를 하는 것이고, 저사양 기기에서는
+   * 프로필 화면에 머무는 내내 매 프레임 워클릿 + 네이티브 텍스트 갱신을 UI
+   * 스레드에 얹는다.
+   *
+   * 끈다고 정보가 사라지지는 않는다. 아래 `percent`(분 단위 갱신)가 그대로 남아
+   * 같은 문장을 같은 자리에 쓴다 — 소수 자릿수만 조용해진다.
+   */
+  const reducedMotion = useReducedMotion();
+  const now = useTicker(focused);
 
   const start = kstMidnight(props.enlistedAt);
   const end = kstMidnight(props.dischargeAt);
@@ -160,25 +212,28 @@ export function ServiceProgress(props: {
   // 막대와 스크린리더가 읽는 값. 분 단위라 숫자가 초당 120번 읽히는 일이 없다.
   const percent =
     serviceProgressAt(props.enlistedAt, props.dischargeAt, now) * 100;
-  const animatedProps = useLivePercentLabel(start, span, active, now);
 
   return (
     <View style={styles.root}>
-      <AnimatedTextInput
-        style={styles.percent}
-        // 첫 페인트 값도 animatedProps가 준다(useAnimatedProps는 updater를 한 번
-        // JS에서 돌려 초기 props를 만든다). defaultValue를 따로 주면 둘이 싸운다.
-        animatedProps={animatedProps}
-        editable={false}
-        scrollEnabled={false}
-        caretHidden
-        selectTextOnFocus={false}
-        underlineColorAndroid="transparent"
-        pointerEvents="none"
-        // 초당 120번 바뀌는 값을 스크린리더가 읽으면 안 된다. 아래 progressbar가 대신 말한다.
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
+      {reducedMotion ? (
+        // 흐르지 않는 판. 자릿수를 줄여 "멈춘 소수점 열 자리"라는 이상한 그림이
+        // 되지 않게 하고, 나머지는 그대로 둔다.
+        <Text
+          style={styles.percent}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          복무 {percent.toFixed(1)}%
+        </Text>
+      ) : (
+        <LivePercentReadout
+          start={start}
+          span={span}
+          active={focused}
+          initialNow={now}
+          style={styles.percent}
+        />
+      )}
       <View
         style={styles.track}
         accessibilityRole="progressbar"

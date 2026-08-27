@@ -14,16 +14,13 @@
  * 높이만큼 칸 안에 출타자 미리보기까지 들어간다.
  */
 
+import { shiftMonth, splitMonth } from "@leave/shared/calendar";
+import { monthBounds, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import {
-  monthBounds,
-  shiftMonth,
-  splitMonth,
-  todayInSeoul,
-  type ISODate,
+  cyclesInRange,
   type RegularOvernightConfig,
   type RegularOvernightCycle,
-} from "@leave/shared";
-import { cyclesInRange } from "@leave/shared";
+} from "@leave/shared/regular-overnight";
 import * as Haptics from "expo-haptics";
 import {
   forwardRef,
@@ -51,6 +48,34 @@ import { makeStyles, spacing, useColors } from "@/theme";
 
 const INITIAL_SPAN = 2;
 const PAGE_SIZE = 6;
+/**
+ * 목록에 담아 두는 달의 상한.
+ *
+ * 이 목록은 위·아래 양쪽으로 계속 자라기만 했다. 한참 훑고 나면 달이 수십 개
+ * 쌓이는데, 달 하나마다 (a) `useCalendar` 쿼리 한 벌, (b) 42칸짜리 그리드 —
+ * 칸마다 Pressable + 날짜 배지 + 알약 등 6~10개 뷰 — 가 딸린다. 창 밖의 달은
+ * FlatList가 언마운트해 주지만, 쿼리와 배열 자체는 남아 세션 내내 자란다.
+ *
+ * 상한을 두고 스크롤 반대편을 잘라내면 "무한 스크롤"의 감각은 그대로면서
+ * 메모리와 요청 수가 창 크기에 묶인다. 잘라낸 달로 되돌아가면 그때 다시 붙는다.
+ * 25개월이면 windowSize=7이 요구하는 앞뒤 여유보다 한참 넉넉하다.
+ */
+const MAX_MONTHS = 25;
+
+/**
+ * 앞에 붙이며 뒤를 자른다.
+ *
+ * 자르는 쪽을 아래로만 둔 것은 의도적이다. 위쪽(보이는 영역보다 앞)에서 항목을
+ * 없애면 모든 인덱스가 밀리고, 그 보정은 maintainVisibleContentPosition에 기대야
+ * 하는데 — 항목 추가와 달리 제거 보정은 플랫폼마다 결이 다르다. 실기기에서
+ * 확인할 수 없는 변경으로 스크롤이 튈 위험을 만들 이유가 없다.
+ *
+ * 실제로 폭주하는 쪽도 위쪽이다. 아래로는 한 화면에 한 달씩 사람이 넘기는 만큼만
+ * 늘지만, 위로는 끌어 올리는 동안 250ms마다 6개월씩 붙는다.
+ */
+function capTail(months: string[]): string[] {
+  return months.length > MAX_MONTHS ? months.slice(0, MAX_MONTHS) : months;
+}
 /** 이전 달을 이어 붙이는 최소 간격(ms). 아래 onScroll 주석 참고. */
 const PREPEND_INTERVAL_MS = 250;
 /** 좁은 창의 칸 높이 — month-calendar가 좁은 창에서 쓰는 최대 구성과 같다. */
@@ -251,7 +276,10 @@ export const CalendarScroll = forwardRef<
           const older: string[] = [];
           for (let i = PAGE_SIZE; i >= 1; i--)
             older.push(shiftMonth(first, -i));
-          return [...older, ...ms];
+          // 위로 붙이면서 아래 끝을 잘라 목록을 상한 안에 둔다. 잘라내는 쪽은
+          // 화면 아래(이미 언마운트된 달)라 보이는 인덱스가 밀리지 않는다 —
+          // 그래서 maintainVisibleContentPosition의 보정과 싸우지 않는다.
+          return capTail([...older, ...ms]);
         });
       }
     },
@@ -353,7 +381,11 @@ export const CalendarScroll = forwardRef<
         onScrollEndDrag={onScrollEndDrag}
         onMomentumScrollBegin={onMomentumScrollBegin}
         onScrollToTop={onScrollToTop}
-        scrollEventThrottle={16}
+        // onScroll이 하는 일은 "지금 맨 위 근처인가" 하나뿐이고, 그 판정은
+        // PREPEND_INTERVAL_MS(250ms)로 한 번 더 걸러진다. 매 프레임(16ms) 콜백을
+        // 받을 이유가 없어 30Hz로 낮춘다 — 앱에서 가장 무거운 스크롤 구간의
+        // JS 이벤트를 절반으로 줄이면서 판정은 그대로다.
+        scrollEventThrottle={32}
         onEndReached={onEndReached}
         onEndReachedThreshold={1.5}
         snapToInterval={itemHeight}

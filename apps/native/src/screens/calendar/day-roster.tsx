@@ -4,15 +4,15 @@
  * 초안은 서버가 애초에 내려주지 않으므로 여기에 나타나지 않는다.
  */
 
+import { fmtRange } from "@leave/shared/calendar";
+import { type ISODate } from "@leave/shared/dates";
 import {
   BALANCE_LABELS,
-  fmtRange,
   isConfirmedLeaveStatus,
   LEAVE_STATUS_LABELS,
   segmentBalanceKey,
   segmentOnDate,
-  type ISODate,
-} from "@leave/shared";
+} from "@leave/shared/leave";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Avatar } from "@/components/avatar";

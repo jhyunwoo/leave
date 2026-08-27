@@ -8,7 +8,7 @@
  *  - 오프라인용 디스크 쿼리 캐시가 있어, 세션이 바뀌면 그것도 지워야 한다.
  *    안 지우면 앱을 다시 켰을 때 이전 사용자의 화면이 잠깐 되살아난다.
  */
-import { LeaveApiProvider, type LeaveApiAdapter } from "@leave/client";
+import { LeaveApiProvider, type LeaveApiAdapter } from "@leave/client/context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { useEffect, useMemo, type ReactNode } from "react";

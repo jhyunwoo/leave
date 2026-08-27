@@ -11,7 +11,7 @@
  *
  * 규칙이 두 화면에 각각 적히면 한쪽만 고쳐져 순서가 갈린다. 그래서 여기 한 벌만 둔다.
  */
-import { todayInSeoul, type ISODate } from "@leave/shared";
+import { todayInSeoul, type ISODate } from "@leave/shared/dates";
 import type { MyLeave } from "./types";
 
 export type MyLeaveSections = {

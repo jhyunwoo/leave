@@ -234,12 +234,26 @@ function enqueueCalendar(
   return promise;
 }
 
+/**
+ * 달력 한 달은 전역 기본값(15초)보다 오래 신선하게 본다.
+ *
+ * 달력은 달마다 별도 쿼리이고, 무한 스크롤은 같은 달을 오르내리며 몇 번씩 다시
+ * 마운트한다. 15초로는 위아래로 두 번 훑는 것만으로 같은 달을 다시 받는다 —
+ * 저대역·간헐적 연결에서 가장 아픈 종류의 낭비다.
+ *
+ * 그렇다고 오래된 값을 보여주는 것도 아니다. 내 휴가를 등록·수정·삭제하면
+ * `LEAVE_MUTATION_KEYS`가 달력 전체를 무효화하고, 남이 바꾼 것은 앱으로 돌아올 때
+ * (focusManager) 와 재연결 시 다시 받는다.
+ */
+const CALENDAR_STALE_TIME = 60_000;
+
 /** 한 달치 달력(일별 출타 통계 + 그 달에 걸친 휴가들). */
 export function useCalendar(unitId: string | null, month: string) {
   const adapter = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.calendar(unitId, month),
     enabled: unitId !== null,
+    staleTime: CALENDAR_STALE_TIME,
     queryFn: (context) => enqueueCalendar(adapter, unitId!, month, context),
   });
 }
@@ -259,6 +273,7 @@ export function useCalendarDays(unitId: string | null, months: string[]) {
     queries: months.map((month) => ({
       queryKey: queryKeys.calendar(unitId, month),
       enabled: unitId !== null,
+      staleTime: CALENDAR_STALE_TIME,
       queryFn: (context) => enqueueCalendar(adapter, unitId!, month, context),
     })),
     // combine은 결과가 실제로 바뀔 때만 다시 도는 React Query 내장 메모이제이션이다.

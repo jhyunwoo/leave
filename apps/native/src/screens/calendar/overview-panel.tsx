@@ -10,16 +10,16 @@
  * 하루 상세로 바뀐다.
  */
 
+import { availabilitySignal } from "@leave/shared/availability";
 import {
-  availabilitySignal,
   fmtDateK,
   fmtDateTiny,
   fmtRange,
   fmtRangeTiny,
-  getHoliday,
-  type ISODate,
-  type RegularOvernightCycle,
-} from "@leave/shared";
+} from "@leave/shared/calendar";
+import { type ISODate } from "@leave/shared/dates";
+import { getHoliday } from "@leave/shared/holidays";
+import { type RegularOvernightCycle } from "@leave/shared/regular-overnight";
 import { Pressable, Text, View } from "react-native";
 import type { Calendar, LeaveHoldings, MyLeave } from "@leave/client";
 import { Badge } from "@/components/badge";

@@ -14,7 +14,7 @@ import type {
   RegularOvernightConfigInput,
   SignupInput,
 } from "@leave/shared";
-import { ApiError } from "@leave/shared";
+import { ApiError } from "@leave/shared/http";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
 import { useInvalidateKeys } from "./invalidate";

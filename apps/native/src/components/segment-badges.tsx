@@ -3,7 +3,8 @@
  * 사용처: 내 휴가 목록, 휴가 상세, 하루 출타 명단.
  */
 
-import { BALANCE_LABELS, fmtRangeTiny, segmentBalanceKey } from "@leave/shared";
+import { fmtRangeTiny } from "@leave/shared/calendar";
+import { BALANCE_LABELS, segmentBalanceKey } from "@leave/shared/leave";
 import { Text, View } from "react-native";
 import type { MyLeave } from "@leave/client";
 import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";

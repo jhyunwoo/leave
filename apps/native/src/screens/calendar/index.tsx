@@ -26,14 +26,13 @@
  * 뜨려다 UIKit이 표시를 거부하고, 그 상태가 굳어 화면 전체가 먹통이 된다.
  */
 
+import { WEEKDAYS } from "@leave/shared/calendar";
+import { todayInSeoul, type ISODate } from "@leave/shared/dates";
 import {
   cycleForDisplay,
   cycleUsedDays,
   firstGrantDate,
-  todayInSeoul,
-  WEEKDAYS,
-  type ISODate,
-} from "@leave/shared";
+} from "@leave/shared/regular-overnight";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
@@ -64,7 +63,7 @@ import {
   CalendarScroll,
   type CalendarScrollHandle,
 } from "@/components/calendar-scroll";
-import { LeaveFormModal } from "@/components/leave-form-modal";
+import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import {
   SHEET_EXTENDS_UNDER_BOTTOM_INSET,
@@ -651,7 +650,7 @@ export function CalendarScreen() {
       </NativeBottomSheet>
 
       {formDate && (
-        <LeaveFormModal
+        <LazyLeaveFormModal
           visible
           initialDate={formDate}
           onClose={() => setFormDate(null)}
