@@ -465,7 +465,11 @@ export const userUnitRoutes = new Hono<AdminAppEnv>()
     if (input.data.adminId && !(await ensureUser(db, input.data.adminId))) {
       return c.json({ error: "관리자를 찾을 수 없습니다" }, 400);
     }
-    await db.update(units).set(input.data).where(eq(units.id, id));
+    // 전 필드가 선택적이라 본문이 `{}`로 올 수 있다. drizzle의 `set({})`는 "No values
+    // to set"으로 던지므로, 바꿀 것이 없으면 UPDATE 자체를 내지 않는다.
+    if (Object.keys(input.data).length > 0) {
+      await db.update(units).set(input.data).where(eq(units.id, id));
+    }
     if (input.data.adminId) {
       await db
         .update(users)

@@ -55,6 +55,42 @@ export async function verifyPassword(
   return diff === 0;
 }
 
+/**
+ * 계정을 못 찾았을 때도 같은 비용을 치르기 위한 자리표시 재료.
+ *
+ * 실제 salt·hash와 같은 모양이어야 한다 — salt 16바이트(32 hex), hash 32바이트(64 hex).
+ * 길이가 다르면 `verifyPassword`가 PBKDF2 뒤의 비교를 건너뛰어 다시 짧아진다.
+ */
+const ABSENT_ACCOUNT_SALT = "0".repeat(32);
+const ABSENT_ACCOUNT_HASH = "0".repeat(64);
+
+/**
+ * 계정이 있든 없든 **같은 양의 일**을 하고 판정한다.
+ *
+ * 계정을 못 찾았을 때 그냥 실패로 돌아가면, 그 응답은 인덱스 조회 한 번(밀리초)만에
+ * 끝나고 계정이 있을 때는 PBKDF2 10만 회(수십 밀리초)를 거친다. 그 차이가 그대로
+ * "이 주소로 가입했는가"에 대한 답이 된다 — 응답 본문과 상태 코드를 아무리 똑같이
+ * 맞춰도 시간이 알려준다.
+ *
+ * 이 서비스는 그 질문을 열어 두지 않기로 이미 정했다. 친구 찾기를 이메일에서 공개
+ * 사용자 이름으로 옮긴 것(0023)이 같은 이유였다(docs/architecture.md). 로그인만
+ * 시간으로 답하고 있으면 그 결정이 반쪽이 된다.
+ *
+ * @param credentials 계정이 있으면 그 salt·hash, 없으면 null.
+ */
+export async function verifyPasswordOrDecoy(
+  password: string,
+  credentials: { salt: string; hash: string } | null,
+): Promise<boolean> {
+  const material = credentials ?? {
+    salt: ABSENT_ACCOUNT_SALT,
+    hash: ABSENT_ACCOUNT_HASH,
+  };
+  const matched = await verifyPassword(password, material.salt, material.hash);
+  // 자리표시 hash는 어떤 비밀번호와도 맞지 않지만, 우연에 기대지 않는다.
+  return credentials !== null && matched;
+}
+
 export function generateSessionToken(): string {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }

@@ -26,6 +26,22 @@ export { ApiError } from "@leave/shared";
 
 const TOKEN_KEY = "leave.token";
 
+/**
+ * 세션 토큰을 담는 키체인 항목의 접근 조건.
+ *
+ * 기본값(`WHEN_UNLOCKED`)에는 `ThisDeviceOnly`가 없어, 이 항목이 **암호화 백업에
+ * 실려 다른 기기로 복원된다.** 토큰 하나면 30일짜리 세션이 통째로 열리므로
+ * (apps/api/src/lib/sessions.ts) 기기를 넘겨주거나 백업이 새는 순간 계정도 함께
+ * 넘어간다. 잠금 조건은 그대로 두고 기기 밖으로 나가는 것만 막는다 —
+ * `AFTER_FIRST_UNLOCK_*`으로 바꾸면 잠긴 기기에서도 읽히게 되어 두 가지가 한꺼번에
+ * 달라진다.
+ *
+ * Android는 `allowBackup: false`(app.json)로 이미 막혀 있고, 이 옵션은 무시된다.
+ */
+const TOKEN_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 // 개발 중에는 Metro 번들러 호스트(개발 PC)의 8787 포트로, 그 외에는 프로덕션으로.
 // hostUri는 개발 서버에 붙어 있을 때만 채워지므로 스탠드얼론 빌드는 항상 프로덕션이다.
 export const API_URL = resolveApiUrl({
@@ -41,10 +57,17 @@ export function getAuthToken(): string | null {
 
 export async function loadStoredToken(): Promise<string | null> {
   try {
-    authToken =
-      Platform.OS === "web"
-        ? (globalThis.localStorage?.getItem(TOKEN_KEY) ?? null)
-        : await SecureStore.getItemAsync(TOKEN_KEY);
+    if (Platform.OS === "web") {
+      authToken = globalThis.localStorage?.getItem(TOKEN_KEY) ?? null;
+      return authToken;
+    }
+    // 읽을 때는 접근 조건이 조회 조건에 들어가지 않는다 — 예전 조건으로 저장된
+    // 항목도 그대로 읽힌다. 그래서 이미 깔려 있는 기기가 로그아웃 없이 넘어오도록,
+    // 읽자마자 한 번 다시 써서 조건만 갱신한다.
+    authToken = await SecureStore.getItemAsync(TOKEN_KEY);
+    if (authToken) {
+      await SecureStore.setItemAsync(TOKEN_KEY, authToken, TOKEN_STORE_OPTIONS);
+    }
   } catch {
     authToken = null;
   }
@@ -59,8 +82,11 @@ export async function persistToken(token: string | null): Promise<void> {
       else globalThis.localStorage?.removeItem(TOKEN_KEY);
       return;
     }
-    if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
-    else await SecureStore.deleteItemAsync(TOKEN_KEY);
+    if (token) {
+      await SecureStore.setItemAsync(TOKEN_KEY, token, TOKEN_STORE_OPTIONS);
+    } else {
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+    }
   } catch {
     // 저장 실패는 세션을 막지 않는다 (메모리 토큰으로 계속 동작)
   }

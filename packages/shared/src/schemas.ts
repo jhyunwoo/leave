@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { addDays, isValidISODate } from "./dates";
+import { addDays, diffDays, isValidISODate } from "./dates";
 import {
   BALANCE_KEYS,
   LEAVE_CATEGORIES,
@@ -37,6 +37,38 @@ import {
 export const isoDateSchema = z
   .string()
   .refine(isValidISODate, "YYYY-MM-DD 형식의 유효한 날짜여야 합니다");
+
+/**
+ * 날짜 구간 하나가 덮을 수 있는 최대 일수(시작일·종료일 포함).
+ *
+ * 상한이 없으면 `0100-01-01~9999-12-31`(361만 일)짜리 구간이 그대로 통과한다.
+ * 서버는 휴가를 저장한 뒤 그 기간을 하루씩 펼쳐 출타 인원을 세므로
+ * (apps/api/src/lib/overage.ts → computeDayStats), 요청 하나가 워커 격리 환경의
+ * 메모리 상한을 수십 배로 넘겨 죽는다 — 하루당 약 580바이트니 361만 일이면 2GB다.
+ * 복무 기간을 통째로 덮는 일정도 1년을 넘지 않으므로 윤년을 포함한 366일로 자른다.
+ */
+export const MAX_DATE_RANGE_DAYS = 366;
+
+/** 시작·종료를 모두 포함한 구간 길이가 상한을 넘는지. */
+function rangeTooLong(start: string, end: string): boolean {
+  return diffDays(start, end) + 1 > MAX_DATE_RANGE_DAYS;
+}
+
+/** 상한을 넘는 구간이면 종료일 자리에 오류를 남긴다. */
+function refineRangeLength(
+  start: string,
+  end: string,
+  ctx: z.RefinementCtx,
+  path: PropertyKey[] = ["endDate"],
+) {
+  if (rangeTooLong(start, end)) {
+    ctx.addIssue({
+      code: "custom",
+      path,
+      message: `기간은 최대 ${MAX_DATE_RANGE_DAYS}일까지 지정할 수 있습니다`,
+    });
+  }
+}
 
 export const monthSchema = z
   .string()
@@ -86,9 +118,22 @@ export const signupSchema = z
     path: ["dataConsent"],
   });
 
+/**
+ * 확인용 비밀번호 입력의 길이 상한.
+ *
+ * 비밀번호를 **정하는** 자리는 전부 100자로 막혀 있으므로(가입·변경·관리자 생성)
+ * 이 값을 넘는 문자열은 어떤 계정의 비밀번호도 될 수 없다. 그런데도 상한이 없으면
+ * 그 문자열이 그대로 PBKDF2로 들어간다 — 맞을 리 없는 입력에 서버가 일을 한다.
+ * 여유를 두고 200으로 잡아 정상 비밀번호는 절대 걸리지 않게 한다.
+ */
+const MAX_SUBMITTED_PASSWORD_LENGTH = 200;
+
 export const loginSchema = z.object({
   email: normalizedEmailSchema,
-  password: z.string().min(1, "비밀번호를 입력해주세요"),
+  password: z
+    .string()
+    .min(1, "비밀번호를 입력해주세요")
+    .max(MAX_SUBMITTED_PASSWORD_LENGTH, "비밀번호가 너무 깁니다"),
 });
 
 /** 하루 최대 출타 인원. 부대 관리자가 직접 지정한다. */
@@ -199,7 +244,9 @@ export const leaveSegmentSchema = z
         path: ["endDate"],
         message: "구간 종료일은 시작일과 같거나 뒤여야 합니다",
       });
+      return;
     }
+    refineRangeLength(value.startDate, value.endDate, ctx);
   });
 
 export type LeaveSegmentInput = z.infer<typeof leaveSegmentSchema>;
@@ -223,6 +270,13 @@ export const leaveCreateSchema = z
   })
   .superRefine((value, ctx) => {
     const sorted = sortSegments(value.segments);
+    // 구간이 빈틈없이 이어지므로 구간별 상한만으로는 전체 기간이 30배까지 늘어난다.
+    // 출타 집계가 펼치는 것은 휴가 전체 기간이니 여기서 한 번 더 막는다.
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (first && last && first.startDate <= last.endDate) {
+      refineRangeLength(first.startDate, last.endDate, ctx, ["segments"]);
+    }
     for (let i = 1; i < sorted.length; i += 1) {
       const previous = sorted[i - 1]!;
       const current = sorted[i]!;
@@ -340,7 +394,10 @@ export const onboardingProfileSchema = z
  * 성공하면 서버가 기존 세션을 모두 끊고 새 토큰을 발급한다.
  */
 export const passwordChangeSchema = z.object({
-  currentPassword: z.string().min(1, "현재 비밀번호를 입력해주세요"),
+  currentPassword: z
+    .string()
+    .min(1, "현재 비밀번호를 입력해주세요")
+    .max(MAX_SUBMITTED_PASSWORD_LENGTH, "비밀번호가 너무 깁니다"),
   newPassword: z
     .string()
     .min(8, "비밀번호는 8자 이상이어야 합니다")
@@ -354,9 +411,16 @@ export const blackoutCreateSchema = z
     endDate: isoDateSchema,
     reason: z.string().trim().max(200).optional(),
   })
-  .refine((value) => value.startDate <= value.endDate, {
-    path: ["endDate"],
-    message: "종료일은 시작일과 같거나 뒤여야 합니다",
+  .superRefine((value, ctx) => {
+    if (value.startDate > value.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "종료일은 시작일과 같거나 뒤여야 합니다",
+      });
+      return;
+    }
+    refineRangeLength(value.startDate, value.endDate, ctx);
   });
 
 export const REPORT_REASONS = [
@@ -447,7 +511,7 @@ export const localTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:mm 형식의 유효한 시간이어야 합니다");
 
-function validatePersonalEventRange(
+function validateEventRange(
   value: {
     startDate?: string;
     endDate?: string;
@@ -456,12 +520,16 @@ function validatePersonalEventRange(
   },
   ctx: z.RefinementCtx,
 ) {
-  if (value.startDate && value.endDate && value.startDate > value.endDate) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["endDate"],
-      message: "종료일은 시작일과 같거나 뒤여야 합니다",
-    });
+  if (value.startDate && value.endDate) {
+    if (value.startDate > value.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "종료일은 시작일과 같거나 뒤여야 합니다",
+      });
+      return;
+    }
+    refineRangeLength(value.startDate, value.endDate, ctx);
   }
   if (
     value.startDate === value.endDate &&
@@ -486,7 +554,7 @@ export const personalEventCreateSchema = z
     endTime: localTimeSchema.nullable().optional(),
     note: z.string().trim().max(500).nullable().optional(),
   })
-  .superRefine(validatePersonalEventRange);
+  .superRefine(validateEventRange);
 
 export const personalEventUpdateSchema = z.object({
   title: z
@@ -500,6 +568,38 @@ export const personalEventUpdateSchema = z.object({
   startTime: localTimeSchema.nullable().optional(),
   endTime: localTimeSchema.nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
+});
+
+/**
+ * 부대원 모두에게 공개되는 일정. 휴가·개인 일정과 별도 엔티티라 출타 집계나
+ * 잔여량에는 영향을 주지 않는다. isHoliday는 달력에서 공휴일과 같은 빨간색
+ * 표시를 적용할지 정하는 관리자의 명시적 분류다.
+ */
+export const unitEventCreateSchema = z
+  .object({
+    title: z.string().trim().min(1, "부대 일정명을 입력해주세요").max(80),
+    isHoliday: z.boolean(),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    startTime: localTimeSchema.nullable().optional(),
+    endTime: localTimeSchema.nullable().optional(),
+    details: z.string().trim().max(1000).nullable().optional(),
+  })
+  .superRefine(validateEventRange);
+
+export const unitEventUpdateSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "부대 일정명을 입력해주세요")
+    .max(80)
+    .optional(),
+  isHoliday: z.boolean().optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  startTime: localTimeSchema.nullable().optional(),
+  endTime: localTimeSchema.nullable().optional(),
+  details: z.string().trim().max(1000).nullable().optional(),
 });
 
 /** 알림 종류별 수신 설정. 보낸 항목만 바꾼다. */
@@ -546,6 +646,8 @@ export type PersonalEventCreateInput = z.infer<
 export type PersonalEventUpdateInput = z.infer<
   typeof personalEventUpdateSchema
 >;
+export type UnitEventCreateInput = z.infer<typeof unitEventCreateSchema>;
+export type UnitEventUpdateInput = z.infer<typeof unitEventUpdateSchema>;
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;

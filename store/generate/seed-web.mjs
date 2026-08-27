@@ -26,6 +26,34 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const API = process.env.SEED_API_URL || "http://localhost:8787";
+
+/**
+ * 이 스크립트가 만드는 계정은 전부 **같은 비밀번호**를 쓴다. 캡처용 로컬 데이터라
+ * 그래도 되지만, 그 전제가 깨지는 순간 "누구나 아는 비밀번호를 가진 계정"이
+ * 실제 서비스에 생긴다. 그래서 대상이 루프백이 아니면 아예 시작하지 않는다.
+ *
+ * 파일 첫머리에 적힌 "로컬 전용"은 지금까지 주석일 뿐이었다 — `SEED_API_URL`에
+ * 아무 주소나 넣으면 그대로 따라갔다. 정말 원격에 넣어야 한다면
+ * `SEED_ALLOW_REMOTE=1`을 함께 지정해 스스로 그 선택을 밝히게 한다.
+ */
+function assertLocalTarget(url) {
+  if (process.env.SEED_ALLOW_REMOTE === "1") return;
+  const { hostname } = new URL(url);
+  const loopback =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]";
+  if (!loopback) {
+    throw new Error(
+      `이 스크립트는 로컬 전용입니다. 데모 계정은 모두 같은 비밀번호를 쓰므로 ` +
+        `${hostname}에는 넣지 않습니다. 정말 필요하면 SEED_ALLOW_REMOTE=1을 함께 지정하세요.`,
+    );
+  }
+}
+
+assertLocalTarget(API);
+
 const PASSWORD = "leave-demo-1234";
 /** 캡처 결과를 재현할 수 있도록 기준 월을 고정한다. 바꾸면 캡처도 다시 찍어야 한다. */
 export const BASE_MONTH = process.env.SEED_MONTH || "2026-08";

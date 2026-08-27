@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { csvCell } from "../worker/csv.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const baseUrl = "http://[::1]:5174";
@@ -59,6 +60,40 @@ async function request(pathname, init = {}) {
     ? await response.json()
     : await response.text();
   return { response, body };
+}
+
+/**
+ * CSV 본문을 셀 값으로 푼다. 따옴표 안의 `,`와 `""`를 구분해야 하므로
+ * 줄 단위로 자르는 것으로는 부족하다 — 감사 로그 칸에는 JSON이 통째로 들어간다.
+ */
+function csvCells(csv) {
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < csv.length; i += 1) {
+    const ch = csv[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (csv[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === "," || ch === "\r" || ch === "\n") {
+      if (cell !== "") cells.push(cell);
+      cell = "";
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell !== "") cells.push(cell);
+  return cells;
 }
 
 async function run() {
@@ -178,6 +213,97 @@ async function run() {
     assert.equal(typeof list.body.meta.total, "number");
   }
 
+  /*
+   * 부대 수정: 바꿀 값이 하나도 없는 본문.
+   *
+   * 드리즐의 `set({})`은 "No values to set"으로 던진다. 관리자 화면은 바뀐 필드만
+   * 보내므로, 아무것도 고치지 않고 저장을 누르면 그대로 500이 됐다.
+   */
+  const unitCreated = await request("/units", {
+    method: "POST",
+    body: JSON.stringify({
+      name: `관리자 테스트 부대 ${unique}`,
+      description: "빈 PATCH 회귀 테스트",
+      maxLeaveCount: 3,
+      creatorId: userId,
+      adminId: userId,
+    }),
+  });
+  assert.equal(unitCreated.response.status, 201);
+  const unitId = unitCreated.body.item.id;
+
+  const emptyPatch = await request(`/units/${unitId}`, {
+    method: "PATCH",
+    body: JSON.stringify({}),
+  });
+  assert.equal(
+    emptyPatch.response.status,
+    200,
+    `빈 본문 PATCH가 ${emptyPatch.response.status}였다`,
+  );
+  assert.equal(emptyPatch.body.item.id, unitId);
+  assert.equal(emptyPatch.body.item.name, `관리자 테스트 부대 ${unique}`);
+
+  /*
+   * CSV 내보내기의 수식 주입.
+   *
+   * 감사 로그는 요청의 User-Agent를 그대로 한 칸에 담아 내보낸다. 아래 왕복은
+   * "요청자가 정한 문자열이 CSV 한 칸이 되고, 그 칸이 escape된다"까지를 잡는다.
+   *
+   * 선행 공백을 건너뛰는 쪽은 HTTP로 재현되지 않는다 — 헤더 값은 전송 과정에서
+   * 앞의 공백이 잘리고 본문 문자열은 스키마가 `trim()`으로 다듬기 때문이다.
+   * 그래서 그 갈래는 순수 함수를 직접 부른다(아래 csvCell 단위 검사).
+   */
+  const hostileUserAgent = "\t=cmd|'/c calc'!A1";
+  const flagged = await request(`/units/${unitId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ description: "CSV 수식 주입 회귀 테스트" }),
+    headers: { "User-Agent": hostileUserAgent },
+  });
+  assert.equal(flagged.response.status, 200);
+
+  const auditCsv = await request("/audit-logs/export");
+  assert.equal(auditCsv.response.status, 200);
+  assert.equal(typeof auditCsv.body, "string");
+  const hostileCells = csvCells(auditCsv.body).filter((cell) =>
+    cell.includes("=cmd|"),
+  );
+  assert.ok(hostileCells.length > 0, "감사 로그 CSV에서 대상 값을 찾지 못했다");
+  for (const cell of hostileCells) {
+    assert.equal(
+      cell[0],
+      "'",
+      `수식으로 읽히는 셀이 그대로 남았다: ${JSON.stringify(cell)}`,
+    );
+  }
+
+  /*
+   * `trim()`은 공백과 줄바꿈만 걷어낸다. `\u0001` 같은 C0 제어문자는 표시명
+   * (`users.name`)에 남은 채로 CSV 한 칸에 실릴 수 있다. 앞글자만 보는 검사는
+   * 그 한 글자에 그대로 뚫린다.
+   */
+  for (const lead of ["", "\t", " ", "\u0001", "\u001f", "\r\n"]) {
+    for (const trigger of ["=", "+", "-", "@"]) {
+      const cell = csvCell(`${lead}${trigger}cmd|'/c calc'!A1`);
+      assert.equal(
+        cell.slice(0, 2),
+        `"'`,
+        `수식으로 읽히는 셀이 escape되지 않았다: ${JSON.stringify(cell)}`,
+      );
+    }
+  }
+  // 평범한 값에는 따옴표를 덧붙이지 않는다 — 붙이면 내보낸 표가 못 쓰게 된다.
+  assert.equal(
+    csvCell("2026-08-26T00:00:00.000Z"),
+    '"2026-08-26T00:00:00.000Z"',
+  );
+  assert.equal(csvCell("관리자 테스트 사용자"), '"관리자 테스트 사용자"');
+  assert.equal(csvCell(null), '""');
+  assert.equal(csvCell('say "hi"'), '"say ""hi"""');
+
+  const unitRemoved = await request(`/units/${unitId}`, { method: "DELETE" });
+  assert.equal(unitRemoved.response.status, 200);
+
   const removed = await request(`/users/${userId}`, { method: "DELETE" });
   assert.equal(removed.response.status, 200);
 
@@ -192,7 +318,7 @@ async function run() {
   assert.equal(logout.response.status, 200);
 
   process.stdout.write(
-    "관리자 API 통합 테스트 통과: 인증, 비밀번호 변경, CRUD, 알림, 목록 라우트, 감사 로그, 로그아웃\n",
+    "관리자 API 통합 테스트 통과: 인증, 비밀번호 변경, CRUD, 알림, 목록 라우트, 빈 본문 PATCH, CSV 수식 주입, 감사 로그, 로그아웃\n",
   );
 }
 

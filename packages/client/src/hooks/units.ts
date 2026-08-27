@@ -69,13 +69,40 @@ export function useRotateUnitInvite(unitId: string) {
   });
 }
 
-/** 그룹에서 나간다. */
+/**
+ * 그룹에서 나간다.
+ *
+ * 나가는 순간 그룹 달력·구성원 명단·제한 기간을 볼 근거가 사라진다. 무효화만
+ * 하면 본문은 캐시에 그대로 남는다 — 낡았다고 표시될 뿐 지워지지는 않는다.
+ * 그리고 앱은 `calendar`를 오프라인용으로 디스크에 최대 24시간 남기므로
+ * (apps/native/src/lib/query-persistence.ts), 나간 뒤에도 옛 동료의 이름과
+ * 휴가 날짜가 기기에 하루 더 머문다.
+ *
+ * 친구를 끊을 때 이미 같은 판단을 내려 뒀다 — hooks/friends.ts의
+ * `purgeFriendCalendarAccess`는 무효화가 아니라 removeQueries를 쓴다.
+ * 소속이 끊기는 것도 같은 종류의 사건이므로 같게 다룬다.
+ */
 export function useLeaveUnit() {
   const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
   const invalidateAll = useInvalidateAll();
   return useMutation({
     mutationFn: async () => unwrap(await client.units.leave.$post()),
-    onSuccess: invalidateAll,
+    onSuccess: async () => {
+      const revoked = [
+        queryKeys.calendars,
+        queryKeys.allUnitMembers,
+        queryKeys.allBlackouts,
+      ];
+      // 진행 중인 요청이 지운 자리에 응답을 도로 채우지 않도록 먼저 끊는다.
+      await Promise.all(
+        revoked.map((queryKey) => queryClient.cancelQueries({ queryKey })),
+      );
+      for (const queryKey of revoked) {
+        queryClient.removeQueries({ queryKey });
+      }
+      invalidateAll();
+    },
   });
 }
 
