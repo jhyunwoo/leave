@@ -36,7 +36,7 @@ import {
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -78,6 +78,7 @@ import {
 } from "./cycle-banner";
 import { DayPanel } from "./day-panel";
 import { CalendarOverviewPanel } from "./overview-panel";
+import { useLeaveDrag } from "./use-leave-drag";
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
@@ -161,6 +162,15 @@ export function CalendarScreen() {
     () => buildMyLeaveDayMap(myLeaves.data?.leaves),
     [myLeaves.data],
   );
+
+  // 달력에서 휴가 칩을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
+  const leaveDrag = useLeaveDrag(myLeaves.data?.leaves);
+
+  // 끄는 도중에는 시트가 닫히기를 기다리던 요청을 무효로 본다 — 그 사이에 폼이나
+  // 상세 화면이 뜨면 드래그가 갈 곳을 잃는다.
+  useEffect(() => {
+    if (leaveDrag.isDragging) pendingAfterSheet.current = null;
+  }, [leaveDrag.isDragging]);
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
@@ -364,11 +374,17 @@ export function CalendarScreen() {
           },
         ]}
       >
+        {/* 휴가를 끄는 동안에는 이 줄이 "어디로 놓이는지"를 알려준다. 손가락이
+            달력을 가리므로, 새 기간을 읽을 자리가 화면 위쪽에 있어야 한다. */}
         <Text
           accessibilityLiveRegion="polite"
-          style={[styles.syncStatus, isOffline && styles.syncStatusOffline]}
+          style={[
+            styles.syncStatus,
+            isOffline && !leaveDrag.statusLabel && styles.syncStatusOffline,
+            leaveDrag.statusLabel != null && styles.dragStatus,
+          ]}
         >
-          {syncStatusLabel}
+          {leaveDrag.statusLabel ?? syncStatusLabel}
         </Text>
         {currentCycle ? (
           <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
@@ -710,6 +726,11 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   syncStatusOffline: {
     color: colors.negativeDeep,
+    fontWeight: "700",
+  },
+  /** 드래그 안내. 같은 자리를 쓰지만 지금 조작 중인 값이라 또렷하게 읽혀야 한다. */
+  dragStatus: {
+    color: colors.ink,
     fontWeight: "700",
   },
   center: {

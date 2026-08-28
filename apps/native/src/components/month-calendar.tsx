@@ -20,9 +20,23 @@ import {
   cycleColor,
   type RegularOvernightCycle,
 } from "@leave/shared/regular-overnight";
+import { useAtomValue } from "jotai";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
+import {
+  GestureDetector,
+  type NativeGesture,
+} from "react-native-gesture-handler";
 import type { Calendar, MyLeaveDay, PersonalEvent } from "@leave/client";
+import {
+  isDragPressSuppressed,
+  noteCalendarPressStart,
+  useLeaveChipDrag,
+} from "@/components/calendar-drag/use-leave-chip-drag";
+import {
+  calendarDragPreviewAtom,
+  type LeaveDragDay,
+} from "@/state/calendar-drag";
 import { makeStyles, radius, spacing, useTheme } from "@/theme";
 
 /** 칸 안에 미리 보여줄 출타자 수. 넘치면 "+N"으로 접는다. */
@@ -76,6 +90,11 @@ export function MonthCalendar(props: {
   /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
   dischargeAt?: ISODate | null;
   personalEvents?: PersonalEvent[];
+  /**
+   * 달력 목록의 스크롤 제스처. 이게 있어야 내 휴가 칩을 길게 눌러 다른 날짜로
+   * 끌 수 있다 — 끄는 동안 목록이 따라 움직이지 않도록 막을 대상이 필요하다.
+   */
+  dragScrollGesture?: NativeGesture;
 }) {
   const {
     calendar,
@@ -90,7 +109,7 @@ export function MonthCalendar(props: {
     personalEvents,
   } = props;
   const styles = useStyles();
-  const { colors, balance } = useTheme();
+  const { colors } = useTheme();
   const today = todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
   const statByDate = useMemo(
@@ -107,12 +126,20 @@ export function MonthCalendar(props: {
         : new Map<string, { initials: string[]; total: number }>(),
     [showAttendees, calendar.attendees],
   );
-  // 한 칸에 들어갈 수 있는 최대 높이. 달 블록 높이가 여기서 나오므로, 내용이
-  // 이보다 커지면 아래 주가 잘린다. 좁은 창의 최대치는 공휴일 이름 + 내 재원 칩
-  // + 출타 알약 + 주기 선이 다 있는 날로 6+26+11+14+14+3 에 gap 3×4 와 선 아래
-  // 여백 4를 더해 90. 넓은 창에서는 호출자가 창 높이에 맞춰 더 크게 잡고,
-  // 남는 높이에 출타자 미리보기 한 줄(16+3)이 들어간다.
+  // 한 칸의 높이. 달 블록 높이가 여기서 나오므로 칸은 이 높이에 **고정**이고,
+  // 넘치는 내용은 잘린다(styles.cell의 overflow). 예산을 넘겨 칸이 자라면 그 주
+  // 아래의 모든 주가 밀려 블록 높이·스냅 위치와 어긋나고, 휴가를 끌 때 손가락
+  // 아래 칸을 잘못 짚게 된다.
+  //
+  // 좁은 창의 최대치는 공휴일 이름 + 내 재원 칩 + 출타 알약 + 주기 선이 다 있는
+  // 날로 6+26+11+14+14+3 에 gap 3×4 와 선 아래 여백 4를 더해 90. 여기에 개인 일정
+  // 알약이나 제한 알약(각 14+gap 3)까지 겹치는 드문 날은 아래쪽 알약이 잘린다 —
+  // 그 정보는 날짜 상세에 그대로 있으므로, 달 전체가 밀리는 쪽보다 낫다.
+  // 넓은 창에서는 호출자가 창 높이에 맞춰 더 크게 잡고, 남는 높이에 출타자
+  // 미리보기 한 줄(16+3)이 들어간다.
   const cellHeight = props.cellHeight ?? (compact ? 44 : 92);
+  // 지금 끌고 있는 휴가의 덧그림. 드래그가 없으면 null이라 아무 비용도 없다.
+  const dragPreview = useAtomValue(calendarDragPreviewAtom);
 
   return (
     <View accessibilityLabel={`${calendar.month} 휴가 계획 달력`}>
@@ -160,6 +187,9 @@ export function MonthCalendar(props: {
               .filter(Boolean)
               .join(" · ");
             const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
+            const dragDay = cell.inMonth
+              ? dragPreview?.get(cell.date)
+              : undefined;
             const personalCount = cell.inMonth
               ? (personalEvents?.filter(
                   (event) =>
@@ -177,7 +207,6 @@ export function MonthCalendar(props: {
               currentCycle != null &&
               currentCycle.start <= cell.date &&
               cell.date <= currentCycle.end;
-            const tone = mine ? balance[mine.key] : null;
             // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
             const cycle =
               cell.inMonth && !pastDischarge
@@ -218,10 +247,15 @@ export function MonthCalendar(props: {
                       }`
                     : undefined
                 }
-                onPress={() => onSelectDate(cell.date)}
+                onPressIn={noteCalendarPressStart}
+                onPress={() => {
+                  // 휴가를 옮기고 손을 뗀 순간의 탭은 드래그의 잔상이다.
+                  if (isDragPressSuppressed()) return;
+                  onSelectDate(cell.date);
+                }}
                 style={({ pressed }) => [
                   styles.cell,
-                  { minHeight: cellHeight },
+                  { height: cellHeight },
                   inCycle && { backgroundColor: colors.cycleTint },
                   exceeded && { backgroundColor: colors.negativeTint },
                   // 전역일은 복무에서 한 번뿐이라 주기·초과 배경을 이기고 칸 전체를
@@ -230,7 +264,12 @@ export function MonthCalendar(props: {
                     backgroundColor: colors.primaryPale,
                     borderColor: colors.brand,
                   },
-                  pressed && { transform: [{ scale: 0.97 }] },
+                  // 집어 든 칸은 줄이지 않는다. 길게 누르는 250ms 동안 쪼그라들었다가
+                  // 드래그가 시작되며 되돌아오는 깜빡임이 생긴다.
+                  pressed &&
+                    dragDay?.role !== "origin" && {
+                      transform: [{ scale: 0.97 }],
+                    },
                 ]}
               >
                 {cell.inMonth && (
@@ -279,31 +318,14 @@ export function MonthCalendar(props: {
                       </Text>
                     ) : null}
                     {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
-                    {!compact && mine && tone && (
-                      <View
-                        style={[
-                          styles.myChip,
-                          { backgroundColor: tone.bg },
-                          // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
-                          mine.isConfirmed
-                            ? [styles.chipConfirmed, { borderColor: tone.fg }]
-                            : [styles.chipTentative, { borderColor: tone.fg }],
-                          // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
-                          !mine.isSegmentStart && styles.chipJoinLeft,
-                          !mine.isSegmentEnd && styles.chipJoinRight,
-                        ]}
-                      >
-                        {mine.isSegmentStart && (
-                          <Text
-                            style={[styles.myChipText, { color: tone.fg }]}
-                            numberOfLines={1}
-                            ellipsizeMode="clip"
-                          >
-                            {mine.isDraft ? "초안 " : ""}
-                            {BALANCE_LABELS[mine.key]}
-                          </Text>
-                        )}
-                      </View>
+                    {!compact && (mine || dragDay) && (
+                      <MyLeaveChip
+                        date={cell.date}
+                        mine={mine}
+                        preview={dragDay}
+                        scrollGesture={props.dragScrollGesture ?? null}
+                        onTap={() => onSelectDate(cell.date)}
+                      />
                     )}
                     {!compact && personalCount > 0 && (
                       <View style={styles.personalPill}>
@@ -395,6 +417,99 @@ export function MonthCalendar(props: {
   );
 }
 
+/**
+ * 내 휴가 한 칸.
+ *
+ * 저장된 칸(`mine`)과 드래그 미리보기(`preview`) 어느 쪽이 와도 같은 규칙으로
+ * 그린다 — 옮기는 중에도 재원 색과 이어붙임이 그대로 보여야 "이 휴가가 저기로
+ * 간다"가 읽힌다.
+ *
+ * 길게 눌러 다른 날짜로 옮기는 제스처가 여기 붙는다. **끄는 동안에도 원래 자리의
+ * 칩을 계속 그려야 한다**: GestureDetector가 감싼 뷰가 사라지면 RNGH는 네이티브
+ * 핸들러를 버리고 onEnd조차 부르지 않아 드래그가 들린 채로 굳는다. 그래서
+ * 미리보기 맵은 원래 날짜에 `role: "origin"` 항목을 남기고, 여기서는 스타일만 바꾼다.
+ */
+function MyLeaveChip(props: {
+  date: ISODate;
+  /** 저장된 내 휴가. 옮겨 갈 자리를 덧그리는 칸에는 없다. */
+  mine: MyLeaveDay | undefined;
+  preview: LeaveDragDay | undefined;
+  scrollGesture: NativeGesture | null;
+  /** 칩을 그냥 눌렀을 때 — 칸을 눌렀을 때와 같이 그날을 고른다. */
+  onTap: () => void;
+}) {
+  const styles = useStyles();
+  const { colors, balance } = useTheme();
+  const gesture = useLeaveChipDrag({
+    leaveId: props.mine?.leaveId ?? null,
+    status: props.mine?.status ?? null,
+    date: props.date,
+    scrollGesture: props.scrollGesture,
+  });
+
+  // 미리보기가 있으면 그쪽이 이긴다. 원래 자리와 옮길 자리가 겹치는 날에도
+  // 마찬가지 — 사용자가 보고 싶은 건 옮긴 뒤의 모습이다.
+  const day: MyLeaveDay | LeaveDragDay | undefined =
+    props.preview ?? props.mine;
+  if (!day) return null;
+
+  const role = props.preview?.role ?? null;
+  const conflict = props.preview?.verdict === "conflict";
+  const merging = props.preview?.verdict === "merge";
+  const saving = props.preview?.phase === "saving";
+  const tone = balance[day.key];
+  // 겹쳐서 놓을 수 없는 자리는 재원 색을 버리고 경고색으로 그린다.
+  const fg = conflict ? colors.negativeDeep : tone.fg;
+  const bg = conflict ? colors.negativeBg : tone.bg;
+
+  return (
+    <GestureDetector gesture={gesture}>
+      {/* 칩이 제 눌림을 직접 받는다. GestureDetector가 붙은 뒤로는 이 뷰의 누름이
+          감싸고 있는 날짜 칸의 Pressable에 온전히 전달되지 않아서, 이게 없으면
+          휴가가 그려진 자리만 눌러도 아무 일이 없는 죽은 영역이 된다.
+          accessibilityRole은 주지 않는다 — 칸이 이미 버튼이라 웹에서 버튼이
+          중첩되고, 읽어 줄 내용도 칸의 라벨에 이미 다 들어 있다. */}
+      <Pressable
+        // 접근성 트리에는 칸 버튼 하나만 남긴다. 칸의 라벨이 이미 "내 연가 희망"까지
+        // 읽어 주고, 눌렀을 때 하는 일도 칸과 같다 — 따로 초점을 받을 이유가 없다.
+        accessible={false}
+        onPressIn={noteCalendarPressStart}
+        onPress={() => {
+          // 휴가를 옮기고 손을 뗀 순간의 눌림은 드래그의 잔상이다.
+          if (isDragPressSuppressed()) return;
+          props.onTap();
+        }}
+        style={[
+          styles.myChip,
+          { backgroundColor: bg },
+          // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
+          day.isConfirmed
+            ? [styles.chipConfirmed, { borderColor: fg }]
+            : [styles.chipTentative, { borderColor: fg }],
+          // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
+          !day.isSegmentStart && styles.chipJoinLeft,
+          !day.isSegmentEnd && styles.chipJoinRight,
+          role === "origin" && styles.chipLifted,
+          role === "target" && styles.chipTarget,
+          merging && { borderColor: colors.brand },
+          saving && styles.chipSaving,
+        ]}
+      >
+        {day.isSegmentStart && (
+          <Text
+            style={[styles.myChipText, { color: fg }]}
+            numberOfLines={1}
+            ellipsizeMode="clip"
+          >
+            {day.isDraft ? "초안 " : ""}
+            {BALANCE_LABELS[day.key]}
+          </Text>
+        )}
+      </Pressable>
+    </GestureDetector>
+  );
+}
+
 const useStyles = makeStyles(({ colors }) => ({
   weekRow: { flexDirection: "row", gap: 2, marginBottom: 2 },
   weekday: {
@@ -411,6 +526,9 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingTop: 6,
     // 최대 구성(공휴일+재원 칩+출타 알약)이 cellHeight 안에 들어가야 해서
     // 아래 요소들은 lineHeight·minHeight를 명시해 높이를 고정해 둔다.
+    // 그래도 넘치는 드문 날(개인 일정·제한 알약까지 겹칠 때)은 여기서 자른다 —
+    // 칸이 자라면 그 주 아래가 통째로 밀려 달 블록 높이와 어긋난다.
+    overflow: "hidden",
     gap: 3,
     borderRadius: radius.sm,
     borderWidth: 1,
@@ -503,6 +621,12 @@ const useStyles = makeStyles(({ colors }) => ({
     borderBottomRightRadius: 0,
   },
   myChipText: { fontSize: 10, lineHeight: 12, fontWeight: "700" },
+  /** 집어 든 자리. 진짜 자리는 옮겨 간 쪽이므로 원래 자리는 뒤로 물린다. */
+  chipLifted: { opacity: 0.3, borderStyle: "dashed" },
+  /** 놓이게 될 자리. 테두리를 굵혀 이미 저장된 칩과 구분한다. */
+  chipTarget: { borderWidth: 2 },
+  /** 서버에 보내는 중. 아직 확정이 아니라는 뜻으로 살짝 물린다. */
+  chipSaving: { opacity: 0.6 },
   personalPill: {
     minHeight: 14,
     paddingHorizontal: 4,

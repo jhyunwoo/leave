@@ -8,7 +8,7 @@
  * 재원 키(BalanceKey)는 그 구간이 어느 주머니에서 차감되는지를 가리킨다.
  */
 
-import { diffDays, type ISODate } from "./dates";
+import { addDays, diffDays, type ISODate } from "./dates";
 import type { Branch } from "./rank";
 
 export const LEAVE_CATEGORIES = [
@@ -181,6 +181,24 @@ export function clipSegmentsTo<
     .map((segment) =>
       segment.endDate <= date ? segment : { ...segment, endDate: date },
     );
+}
+
+/**
+ * 모든 구간을 같은 일수만큼 통째로 민다. 원본은 건드리지 않는다.
+ *
+ * 달력에서 휴가를 끌어 다른 날짜로 옮길 때 쓴다. 구간의 순서·인접·길이·재원이 그대로
+ * 보존되므로, 저장 전 상태가 유효했다면 옮긴 뒤에도 `leaveCreateSchema`의 불변식
+ * (구간끼리 겹치지 않음 · 사이에 빈 날 없음 · 전체 기간 상한)이 그대로 성립한다.
+ */
+export function shiftSegments<
+  T extends { startDate: ISODate; endDate: ISODate },
+>(segments: readonly T[], days: number): T[] {
+  if (days === 0) return [...segments];
+  return segments.map((segment) => ({
+    ...segment,
+    startDate: addDays(segment.startDate, days),
+    endDate: addDays(segment.endDate, days),
+  }));
 }
 
 /** 그날에 해당하는 구간. 없으면 undefined. */

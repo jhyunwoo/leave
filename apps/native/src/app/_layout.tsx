@@ -20,6 +20,8 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useState } from "react";
+import { StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { loadStoredToken } from "@/api/client";
 import { ApiProvider } from "@/api/provider";
 import { ErrorScreen } from "@/components/error-screen";
@@ -285,15 +287,24 @@ export default function RootLayout() {
   }, [colors.canvasSoft]);
 
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={queryPersistenceOptions}
-    >
-      {/* ApiProvider는 401 처리에서 쿼리 캐시를 비우므로 QueryClient 안쪽이어야 한다. */}
-      <ApiProvider>
-        <StatusBar style="auto" />
-        <RootNavigator />
-      </ApiProvider>
-    </PersistQueryClientProvider>
+    // 달력의 휴가 칩 드래그(components/calendar-drag)가 쓰는 제스처의 뿌리.
+    // GestureDetector는 이 조상이 없으면 개발 빌드에서 던지고, 제스처가 활성화될 때
+    // RN 터치를 취소하는 경로도 이 뷰를 지난다 — 그래서 트리 맨 바깥이어야 한다.
+    <GestureHandlerRootView style={styles.root}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={queryPersistenceOptions}
+      >
+        {/* ApiProvider는 401 처리에서 쿼리 캐시를 비우므로 QueryClient 안쪽이어야 한다. */}
+        <ApiProvider>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </ApiProvider>
+      </PersistQueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { segmentBalanceKey, DEFAULT_ANNUAL_DAYS, inclusiveDays } from "../src";
+import {
+  segmentBalanceKey,
+  shiftSegments,
+  DEFAULT_ANNUAL_DAYS,
+  inclusiveDays,
+  leaveCreateSchema,
+} from "../src";
 
 describe("휴가 재원", () => {
   it("군별 연가 규정값은 수정 가능한 초기 제안값으로 제공", () => {
@@ -27,5 +33,88 @@ describe("휴가 재원", () => {
         overnightKind: "other",
       }),
     ).toBe("other_overnight");
+  });
+});
+
+describe("shiftSegments", () => {
+  const segments = [
+    { category: "annual", startDate: "2026-08-10", endDate: "2026-08-12" },
+    {
+      category: "overnight",
+      overnightKind: "regular",
+      startDate: "2026-08-13",
+      endDate: "2026-08-14",
+    },
+  ] as const;
+
+  it("0일이면 그대로 둔다", () => {
+    expect(shiftSegments(segments, 0)).toEqual(segments);
+  });
+
+  it("모든 구간을 같은 일수만큼 뒤로 민다", () => {
+    expect(shiftSegments(segments, 8)).toEqual([
+      { category: "annual", startDate: "2026-08-18", endDate: "2026-08-20" },
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-08-21",
+        endDate: "2026-08-22",
+      },
+    ]);
+  });
+
+  it("음수면 앞으로 당긴다", () => {
+    expect(shiftSegments(segments, -10)).toEqual([
+      { category: "annual", startDate: "2026-07-31", endDate: "2026-08-02" },
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-08-03",
+        endDate: "2026-08-04",
+      },
+    ]);
+  });
+
+  it("달·해 경계를 넘어간다", () => {
+    expect(
+      shiftSegments([{ startDate: "2025-12-30", endDate: "2025-12-31" }], 2),
+    ).toEqual([{ startDate: "2026-01-01", endDate: "2026-01-02" }]);
+  });
+
+  it("윤년 2월 29일을 지난다", () => {
+    expect(
+      shiftSegments([{ startDate: "2028-02-28", endDate: "2028-02-28" }], 1),
+    ).toEqual([{ startDate: "2028-02-29", endDate: "2028-02-29" }]);
+    // 평년이면 같은 이동이 3월로 넘어간다.
+    expect(
+      shiftSegments([{ startDate: "2027-02-28", endDate: "2027-02-28" }], 1),
+    ).toEqual([{ startDate: "2027-03-01", endDate: "2027-03-01" }]);
+  });
+
+  it("원본 배열을 건드리지 않는다", () => {
+    const original = [{ startDate: "2026-08-10", endDate: "2026-08-12" }];
+    shiftSegments(original, 5);
+    expect(original).toEqual([
+      { startDate: "2026-08-10", endDate: "2026-08-12" },
+    ]);
+  });
+
+  it("옮긴 뒤에도 leaveCreateSchema를 그대로 통과한다", () => {
+    // 인접·비중첩이 보존되므로 저장 가능한 상태가 유지되어야 한다.
+    const moved = shiftSegments(segments, 40);
+    const parsed = leaveCreateSchema.safeParse({
+      title: "여름 휴가",
+      status: "shared",
+      segments: moved,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("긴 휴가를 옮겨도 전체 기간 상한은 늘어나지 않는다", () => {
+    const long = [{ startDate: "2026-01-01", endDate: "2026-12-01" }];
+    const moved = shiftSegments(long, 100);
+    expect(inclusiveDays(moved[0]!.startDate, moved[0]!.endDate)).toBe(
+      inclusiveDays(long[0]!.startDate, long[0]!.endDate),
+    );
   });
 });

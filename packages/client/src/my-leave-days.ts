@@ -13,11 +13,22 @@ import {
   isConfirmedLeaveStatus,
   segmentBalanceKey,
   type BalanceKey,
+  type LeaveStatus,
 } from "@leave/shared/leave";
 import type { MyLeave } from "./types";
 
 /** 달력 셀 하나가 알아야 하는 "그날 내 휴가"의 전부. */
 export type MyLeaveDay = {
+  /**
+   * 이 칸이 어느 휴가의 것인지. 달력에서 칩을 직접 조작할 때(길게 눌러 다른
+   * 날짜로 옮기기) 어떤 휴가를 고쳐야 하는지 알아야 한다.
+   */
+  leaveId: string;
+  /**
+   * 그 휴가의 상태. 끝난 휴가(복귀 완료·반려·취소)는 손댈 수 없으므로,
+   * 색을 정하는 isConfirmed와 별개로 원본 상태가 필요하다.
+   */
+  status: LeaveStatus;
   /** 그날 쓰는 재원(연가·정기외박 등). 칩 색을 정한다. */
   key: BalanceKey;
   title: string;
@@ -42,6 +53,8 @@ export function buildMyLeaveDayMap(
       const key = segmentBalanceKey(segment);
       for (const date of eachDate(segment.startDate, segment.endDate)) {
         map.set(date, {
+          leaveId: leave.id,
+          status: leave.status,
           key,
           title: leave.title,
           isSegmentStart: date === segment.startDate,

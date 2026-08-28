@@ -22,6 +22,7 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared/regular-overnight";
 import * as Haptics from "expo-haptics";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   forwardRef,
   useCallback,
@@ -40,10 +41,19 @@ import {
   Text,
   View,
 } from "react-native";
+import {
+  Gesture,
+  GestureDetector,
+  type NativeGesture,
+} from "react-native-gesture-handler";
 import type { MyLeaveDay } from "@leave/client";
 import { useCalendar, usePersonalEvents } from "@leave/client";
 import { useWindowSizeClass, type WindowSizeClass } from "@/adaptive";
 import { MonthCalendar } from "@/components/month-calendar";
+import {
+  calendarDragActiveAtom,
+  calendarGridMetricsAtom,
+} from "@/state/calendar-drag";
 import { makeStyles, spacing, useColors } from "@/theme";
 
 const INITIAL_SPAN = 2;
@@ -85,6 +95,8 @@ const CELL_H_MAX = 132;
 /** 이 높이부터 칸 안에 출타자 이니셜 한 줄(16+gap 3)이 들어간다. */
 const CELL_H_ATTENDEES = 112;
 const ROW_GAP = 2; // weekRow marginBottom
+/** 칸 사이 가로 여백 — month-calendar의 weekRow gap과 같아야 한다. */
+const CELL_GAP = 2;
 const ROWS = 6; // 그리드 최대 주 수
 const LABEL_H = 44;
 /**
@@ -171,6 +183,8 @@ export const CalendarScroll = forwardRef<
   // 목록이 실제로 차지한 높이. 헤더가 목록 위에 떠 있으므로 거기서
   // contentTopInset과 아래 탭바 몫을 빼야 "한 달이 보일 높이"가 나온다.
   const [listHeight, setListHeight] = useState(0);
+  // 목록의 가로 폭. 좌우 여백을 빼면 격자 폭이고, 거기서 칸 간격이 나온다.
+  const [listWidth, setListWidth] = useState(0);
   const listRef = useRef<FlatList<string>>(null);
   const prependLock = useRef(false);
   const lastPrependAt = useRef(0);
@@ -191,7 +205,48 @@ export const CalendarScroll = forwardRef<
 
   const onListLayout = useCallback((event: LayoutChangeEvent) => {
     setListHeight(event.nativeEvent.layout.height);
+    setListWidth(event.nativeEvent.layout.width);
   }, []);
+
+  /**
+   * 목록 자신의 스크롤 제스처. 휴가 칩의 드래그가 이걸 막아야 끌기가 시작된 뒤에
+   * 달력이 따라 움직이지 않는다 — ref를 넘기면 RNGH가 조용히 무시하므로 반드시
+   * 제스처 객체여야 하고, 인스턴스가 매 렌더 바뀌면 관계가 다시 맺어지므로 고정한다.
+   */
+  const scrollGesture = useMemo<NativeGesture>(() => Gesture.Native(), []);
+  const dragActive = useAtomValue(calendarDragActiveAtom);
+  const setGridMetrics = useSetAtom(calendarGridMetricsAtom);
+
+  /**
+   * 격자 치수를 드래그 쪽에 넘긴다. 휴가 칩은 이 값만으로 "이만큼 움직였으면 며칠
+   * 옮긴 것"을 계산한다(calendar-drag/lattice.ts).
+   */
+  useEffect(() => {
+    const gridWidth = listWidth - 2 * spacing.lg;
+    if (gridWidth <= 0) return;
+    setGridMetrics({
+      itemHeight,
+      rowPitch: cellHeight + ROW_GAP,
+      colPitch: (gridWidth - 6 * CELL_GAP) / 7 + CELL_GAP,
+      labelHeight: LABEL_H,
+      months,
+    });
+  }, [setGridMetrics, itemHeight, cellHeight, listWidth, months]);
+
+  useEffect(() => () => setGridMetrics(null), [setGridMetrics]);
+
+  /**
+   * 드래그가 시작되면 스크롤 플래그를 내린다.
+   *
+   * 관성 스크롤 도중에 scrollEnabled를 끄면 iOS가 onMomentumScrollEnd를 쏘지 않아
+   * momentumScrolling이 true로 굳는다. 그 상태로 남으면 드래그가 끝난 뒤 첫
+   * onScroll에서 이전 달 이어붙이기가 엉뚱하게 발동한다.
+   */
+  useEffect(() => {
+    if (!dragActive) return;
+    dragging.current = false;
+    momentumScrolling.current = false;
+  }, [dragActive]);
 
   // prepend 후 락 해제 (렌더 커밋 이후). 다시 짠 목록이면 목적지로 옮긴다.
   useEffect(() => {
@@ -341,60 +396,67 @@ export const CalendarScroll = forwardRef<
 
   return (
     <View style={styles.root} onLayout={onListLayout}>
-      <FlatList
-        ref={listRef}
-        data={months}
-        keyExtractor={(m) => m}
-        renderItem={({ item }) => (
-          <MonthBlock
-            unitId={unitId}
-            month={item}
-            height={itemHeight}
-            cellHeight={cellHeight}
-            showAttendees={cellHeight >= CELL_H_ATTENDEES}
-            selectedDate={selectedDate}
-            onSelectDate={onSelectDate}
-            myLeaveDays={myLeaveDays}
-            regularOvernight={regularOvernight}
-            currentCycle={currentCycle}
-            dischargeAt={dischargeAt}
-          />
-        )}
-        getItemLayout={(_, index) => ({
-          length: itemHeight,
-          offset: itemHeight * index,
-          index,
-        })}
-        contentOffset={{ x: 0, y: itemHeight * INITIAL_SPAN }}
-        contentContainerStyle={{
-          paddingTop: contentTopInset,
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xxl,
-        }}
-        contentInsetAdjustmentBehavior="never"
-        initialNumToRender={3}
-        windowSize={7}
-        maxToRenderPerBatch={4}
-        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-        onScroll={onScroll}
-        onScrollBeginDrag={onScrollBeginDrag}
-        onScrollEndDrag={onScrollEndDrag}
-        onMomentumScrollBegin={onMomentumScrollBegin}
-        onScrollToTop={onScrollToTop}
-        // onScroll이 하는 일은 "지금 맨 위 근처인가" 하나뿐이고, 그 판정은
-        // PREPEND_INTERVAL_MS(250ms)로 한 번 더 걸러진다. 매 프레임(16ms) 콜백을
-        // 받을 이유가 없어 30Hz로 낮춘다 — 앱에서 가장 무거운 스크롤 구간의
-        // JS 이벤트를 절반으로 줄이면서 판정은 그대로다.
-        scrollEventThrottle={32}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={1.5}
-        snapToInterval={itemHeight}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        showsVerticalScrollIndicator={false}
-        style={styles.list}
-      />
+      <GestureDetector gesture={scrollGesture}>
+        <FlatList
+          ref={listRef}
+          data={months}
+          keyExtractor={(m) => m}
+          renderItem={({ item }) => (
+            <MonthBlock
+              unitId={unitId}
+              month={item}
+              height={itemHeight}
+              cellHeight={cellHeight}
+              showAttendees={cellHeight >= CELL_H_ATTENDEES}
+              selectedDate={selectedDate}
+              onSelectDate={onSelectDate}
+              myLeaveDays={myLeaveDays}
+              regularOvernight={regularOvernight}
+              currentCycle={currentCycle}
+              dischargeAt={dischargeAt}
+              dragScrollGesture={scrollGesture}
+            />
+          )}
+          getItemLayout={(_, index) => ({
+            length: itemHeight,
+            offset: itemHeight * index,
+            index,
+          })}
+          contentOffset={{ x: 0, y: itemHeight * INITIAL_SPAN }}
+          contentContainerStyle={{
+            paddingTop: contentTopInset,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.xxl,
+          }}
+          contentInsetAdjustmentBehavior="never"
+          initialNumToRender={3}
+          windowSize={7}
+          maxToRenderPerBatch={4}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+          onScroll={onScroll}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onScrollEndDrag={onScrollEndDrag}
+          onMomentumScrollBegin={onMomentumScrollBegin}
+          onScrollToTop={onScrollToTop}
+          // onScroll이 하는 일은 "지금 맨 위 근처인가" 하나뿐이고, 그 판정은
+          // PREPEND_INTERVAL_MS(250ms)로 한 번 더 걸러진다. 매 프레임(16ms) 콜백을
+          // 받을 이유가 없어 30Hz로 낮춘다 — 앱에서 가장 무거운 스크롤 구간의
+          // JS 이벤트를 절반으로 줄이면서 판정은 그대로다.
+          scrollEventThrottle={32}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={1.5}
+          snapToInterval={itemHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          showsVerticalScrollIndicator={false}
+          // 휴가를 끄는 동안에는 달력이 따라 움직이면 안 된다. 손가락 아래 날짜가
+          // 바뀌어 버리고, 이어붙이기가 목록 인덱스를 밀어 드래그가 잡아 둔 격자
+          // 스냅샷과 어긋난다.
+          scrollEnabled={!dragActive}
+          style={styles.list}
+        />
+      </GestureDetector>
     </View>
   );
 });
@@ -411,6 +473,7 @@ function MonthBlock(props: {
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
   dischargeAt: ISODate | null;
+  dragScrollGesture: NativeGesture;
 }) {
   const styles = useStyles();
   const colors = useColors();
@@ -445,6 +508,7 @@ function MonthBlock(props: {
           currentCycle={props.currentCycle}
           dischargeAt={props.dischargeAt}
           personalEvents={personalEvents.data?.events}
+          dragScrollGesture={props.dragScrollGesture}
         />
       )}
     </View>
