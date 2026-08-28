@@ -47,6 +47,15 @@ export class ApiError extends Error {
   }
 }
 
+/** A successful status whose declared JSON response could not be decoded. */
+export class MalformedApiResponseError extends ApiError {
+  constructor(status: number, cause?: unknown) {
+    super("서버 응답을 읽지 못했습니다", status, "MALFORMED_RESPONSE");
+    this.name = "MalformedApiResponseError";
+    this.cause = cause;
+  }
+}
+
 /** fetch/hono 응답과 호환되는 최소 형태. */
 export interface UnwrappableResponse {
   ok: boolean;
@@ -59,7 +68,11 @@ export interface UnwrappableResponse {
  * 성공 시 파싱된 JSON을 T로 반환한다.
  */
 export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
-  const data = await res.json().catch(() => null);
+  let parseError: unknown;
+  const data = await res.json().catch((error: unknown) => {
+    parseError = error;
+    return null;
+  });
   if (!res.ok) {
     const body =
       data && typeof data === "object"
@@ -71,6 +84,9 @@ export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
         : "요청을 처리하지 못했습니다";
     const code = body && typeof body.code === "string" ? body.code : undefined;
     throw new ApiError(message, res.status, code);
+  }
+  if (parseError !== undefined) {
+    throw new MalformedApiResponseError(res.status, parseError);
   }
   return data as T;
 }

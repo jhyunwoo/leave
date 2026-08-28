@@ -1,0 +1,13 @@
+diff --git a/plugin/build/withSentryAndroidGradlePlugin.js b/plugin/build/withSentryAndroidGradlePlugin.js
+index 933ca052aa107890cfa7114c9d7c3f4fd03a8bd2..85e7e35dfa9af442dd2847e0e6a4fedffcd010fa 100644
+--- a/plugin/build/withSentryAndroidGradlePlugin.js
++++ b/plugin/build/withSentryAndroidGradlePlugin.js
+@@ -1,7 +1,7 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.withSentryAndroidGradlePlugin = exports.sentryAndroidGradlePluginVersion = void 0;
+-const config_plugins_1 = require("@expo/config-plugins");
++const config_plugins_1 = require("expo/config-plugins");
+ const utils_1 = require("./utils");
+ exports.sentryAndroidGradlePluginVersion = '5.12.2';
+ /**

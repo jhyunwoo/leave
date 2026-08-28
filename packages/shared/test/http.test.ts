@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, unwrap } from "../src";
+import { ApiError, type MalformedApiResponseError, unwrap } from "../src";
 
 function fakeRes(ok: boolean, status: number, body: unknown) {
   return { ok, status, json: () => Promise.resolve(body) };
@@ -18,6 +18,22 @@ describe("unwrap", () => {
       status: 409,
       message: "이미 가입된 이메일입니다",
     });
+  });
+
+  it("성공 상태의 깨진 JSON 응답을 명시적인 malformed 오류로 구분한다", async () => {
+    const cause = new SyntaxError("Unexpected end of JSON input");
+    const response = {
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(cause),
+    };
+
+    await expect(unwrap(response)).rejects.toMatchObject({
+      name: "MalformedApiResponseError",
+      status: 200,
+      code: "MALFORMED_RESPONSE",
+      cause,
+    } satisfies Partial<MalformedApiResponseError>);
   });
 
   it("error 필드가 없으면 기본 메시지", async () => {

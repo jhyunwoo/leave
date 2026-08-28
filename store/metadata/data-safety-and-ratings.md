@@ -1,6 +1,6 @@
 # 데이터 안전 · App Privacy · 콘텐츠 등급 답변지
 
-> 기준일: 2026-08-22. 이 문서는 현재 저장소의 API 스키마와 Expo 의존성을 기준으로 한 제출 초안입니다. 스토어 콘솔 제출 직전에 프로덕션 빌드, SDK Privacy Report, 서버 로그 필드를 다시 대조해야 합니다.
+> 기준일: 2026-08-28. 이 문서는 현재 저장소의 API 스키마와 Expo 의존성을 기준으로 한 제출 초안입니다. 스토어 콘솔 제출 직전에 프로덕션 빌드, SDK Privacy Report, 서버 로그 필드를 다시 대조해야 합니다.
 
 ## 실제 처리 항목 요약
 
@@ -11,7 +11,7 @@
 - 개인 일정: 제목, 날짜, 선택 로컬 시간·메모(소유자 전용)
 - 알림: 선택적 Expo 푸시 토큰, 인앱 알림, 이 앱 푸시의 발송·수신·열람 기록
 - 자동 로그: 사용자 ID(로그인 시), 요청 시각·메서드·경로·상태, 플랫폼·앱 버전, 응답 시간
-- SDK: Expo Insights가 앱 콜드 스타트와 업데이트 사용량을 측정할 수 있음
+- SDK: Expo Insights가 앱 콜드 스타트와 업데이트 사용량을 측정할 수 있음. Sentry가 오류·충돌 발생 시 내부 사용자 ID, 예외·기호화용 스택, 화면/요청 경로 템플릿, 요청 상태·시간·요청 ID, 앱·빌드·OS·런타임·업데이트 식별자와 앱/네트워크 상태를 처리함. 본문·토큰·연락처·도메인 데이터·IP 이벤트 저장·화면 캡처·세션 리플레이는 제외함
 
 비밀번호 원문은 서버에서 즉시 솔트·해시로 변환하고 원문을 저장하지 않습니다. 앱은 사진·위치·연락처·카메라·마이크 데이터를 수집하지 않습니다.
 
@@ -60,6 +60,7 @@
 | Identifiers — User ID, Device ID        |            예 |   아니요 | App Functionality            |
 | Usage Data — Product Interaction        |            예 |   아니요 | Analytics, App Functionality |
 | Diagnostics — Performance Data          |            예 |   아니요 | Analytics, App Functionality |
+| Diagnostics — Crash Data                |            예 |   아니요 | Analytics, App Functionality |
 | Other Data — 그룹 기준값·휴가 잔여량 등 |            예 |   아니요 | App Functionality            |
 
 - Data Used to Track You: 없음
@@ -84,11 +85,12 @@
 
 ## 처리업체 및 국외 이전 대조
 
-| 업체                        | 역할                            | 관련 데이터                        |
-| --------------------------- | ------------------------------- | ---------------------------------- |
-| Cloudflare, Inc.            | Workers, D1, KV, 운영 로그·보안 | 계정·그룹·일정·접속 메타데이터     |
-| Expo / 650 Industries, Inc. | EAS Update, Insights, Expo Push | 앱 버전·사용 이벤트·푸시 토큰/내용 |
-| Apple Inc.                  | APNs                            | Apple 기기의 푸시 토큰/내용        |
-| Google LLC                  | FCM                             | Android 기기의 푸시 토큰/내용      |
+| 업체                               | 역할                            | 관련 데이터                                                        |
+| ---------------------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| Cloudflare, Inc.                   | Workers, D1, KV, 운영 로그·보안 | 계정·그룹·일정·접속 메타데이터                                     |
+| Expo / 650 Industries, Inc.        | EAS Update, Insights, Expo Push | 앱 버전·사용 이벤트·푸시 토큰/내용                                 |
+| Functional Software, Inc. (Sentry) | 오류·충돌 수집·기호화·알림      | 내부 사용자 ID, 오류·요청·앱·빌드·기기·OS·업데이트 진단 메타데이터 |
+| Apple Inc.                         | APNs                            | Apple 기기의 푸시 토큰/내용                                        |
+| Google LLC                         | FCM                             | Android 기기의 푸시 토큰/내용                                      |
 
 지역·보관 위치는 각 콘솔의 실제 프로젝트 설정 및 업체 최신 하위처리자 목록을 확인해 개인정보 처리방침과 일치시킵니다.

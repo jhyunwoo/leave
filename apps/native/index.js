@@ -9,6 +9,7 @@
 //
 // `@expo/metro-runtime`은 Fast Refresh를 위해 가장 먼저 와야 한다.
 import "@expo/metro-runtime";
+import "./src/lib/observability/bootstrap";
 
 import { registerRootComponent } from "expo";
 import { ExpoRoot } from "expo-router";
@@ -17,9 +18,6 @@ import Head from "expo-router/head";
 import * as SplashScreen from "expo-splash-screen";
 
 import { RootErrorBoundary } from "./src/components/root-error-boundary";
-import { installFatalErrorHandler } from "./src/lib/fatal-error";
-
-installFatalErrorHandler();
 
 // expo-router/entry가 대신 해주던 일. 라우트 모듈이 언제 평가되든 스플래시가 먼저
 // 사라지지 않게 진입점에서 잡아둔다. 내리는 쪽은 _layout과 오류 화면이 맡는다.

@@ -13,6 +13,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { clearPendingProfile } from "@/lib/pending-profile-link";
+import {
+  addObservabilityBreadcrumb,
+  clearObservabilityUser,
+} from "@/lib/observability";
 import { clearPersistedQueryCache } from "@/lib/query-persistence";
 import { setSessionAtom } from "@/state/auth";
 import { api, setUnauthorizedHandler, unwrap } from "./client";
@@ -25,6 +29,12 @@ export function ApiProvider(props: { children: ReactNode }) {
   // 토큰을 비우면 루트 레이아웃의 Stack.Protected가 로그인 화면으로 돌려보낸다.
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      addObservabilityBreadcrumb({
+        category: "app.authentication",
+        message: "authentication session expired",
+        level: "info",
+      });
+      clearObservabilityUser();
       queryClient.clear();
       void clearPersistedQueryCache();
       // 이전 사용자가 눌렀던 프로필 링크를 다음 사용자에게 물려주지 않는다.
@@ -40,7 +50,21 @@ export function ApiProvider(props: { children: ReactNode }) {
       unwrap,
       setSessionToken: async (token) => {
         await clearPersistedQueryCache();
-        if (token === null) clearPendingProfile();
+        if (token === null) {
+          clearPendingProfile();
+          clearObservabilityUser();
+          addObservabilityBreadcrumb({
+            category: "app.authentication",
+            message: "authentication cleared",
+            level: "info",
+          });
+        } else {
+          addObservabilityBreadcrumb({
+            category: "app.authentication",
+            message: "authentication established",
+            level: "info",
+          });
+        }
         await setSession(token);
       },
     }),

@@ -52,7 +52,10 @@ export class RootErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: unknown, info: { componentStack?: string | null }) {
-    reportFatalError(error, info.componentStack);
+    reportFatalError(error, info.componentStack, {
+      source: "root_error_boundary",
+      level: "fatal",
+    });
   }
 
   componentDidMount() {

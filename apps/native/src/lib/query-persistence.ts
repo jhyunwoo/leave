@@ -18,6 +18,7 @@ import type {
 } from "@tanstack/react-query-persist-client";
 import { AppState, type AppStateStatus } from "react-native";
 import { queryCacheStorage } from "./query-cache-storage";
+import { updateNetworkState } from "./observability/http";
 
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 
@@ -143,7 +144,9 @@ export function configureQueryOnlineManager(): void {
   onlineManager.setEventListener((setOnline) =>
     NetInfo.addEventListener((state) => {
       if (state.isConnected === null) return;
-      setOnline(state.isConnected && state.isInternetReachable !== false);
+      const online = state.isConnected && state.isInternetReachable !== false;
+      updateNetworkState(online, state.type);
+      setOnline(online);
     }),
   );
 

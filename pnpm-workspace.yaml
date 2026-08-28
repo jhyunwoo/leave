@@ -30,6 +30,9 @@ overrides:
 # 때문이다. sharp 0.34는 @img/* 플랫폼 패키지가 설치돼 있으면(supportedArchitectures로
 # 보장) install 스크립트 없이도 런타임에 해당 바이너리를 직접 로드한다.
 allowBuilds:
+  # EAS Build/Update source-map uploads invoke the Sentry CLI binary installed
+  # by @sentry/react-native. Its install script selects the platform binary.
+  "@sentry/cli": true
   agent-browser: true
   esbuild: true
   sharp: false
@@ -89,3 +92,6 @@ minimumReleaseAgeExclude:
   - expo-router@57.0.16
   - expo-splash-screen@57.0.8
   - expo-updates@57.0.17
+
+patchedDependencies:
+  "@sentry/react-native@7.11.0": patches/@sentry__react-native@7.11.0.patch

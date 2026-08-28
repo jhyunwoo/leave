@@ -20,6 +20,10 @@ import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { hc } from "hono/client";
 import { Platform } from "react-native";
+import {
+  captureApiResponseError,
+  instrumentedFetch,
+} from "@/lib/observability/http";
 
 // 공용 HTTP 유틸은 @leave/shared에서 재사용 (중복 제거)
 export { ApiError } from "@leave/shared/http";
@@ -96,6 +100,7 @@ export async function persistToken(token: string | null): Promise<void> {
 const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "dev";
 
 export const api = hc<AppType>(API_URL, {
+  fetch: instrumentedFetch,
   headers: (): Record<string, string> => ({
     "X-Client-Platform": Platform.OS,
     "X-Client-Version": CLIENT_VERSION,
@@ -124,7 +129,12 @@ function reportUnauthorized(status: number): void {
  */
 export async function unwrap<T>(res: UnwrappableResponse): Promise<T> {
   reportUnauthorized(res.status);
-  return unwrapResponse<T>(res);
+  try {
+    return await unwrapResponse<T>(res);
+  } catch (error) {
+    captureApiResponseError(error, res);
+    throw error;
+  }
 }
 
 /** 바이너리 업로드처럼 raw fetch를 쓰는 곳에서 401을 같은 방식으로 다룬다. */

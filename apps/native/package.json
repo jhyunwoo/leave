@@ -10,9 +10,10 @@
     "lint": "eslint . --max-warnings 0",
     "eas:build": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build",
     "eas:submit": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas submit",
-    "eas:update:preview": "eas update --channel preview --environment preview",
-    "eas:update:production": "eas update --channel production --environment production",
+    "eas:update:preview": "pnpm --dir ../.. run native:eas:update:preview",
+    "eas:update:production": "pnpm --dir ../.. run native:eas:update:production",
     "check-types": "tsc --noEmit",
+    "test": "vitest run",
     "test:e2e": "maestro test .maestro"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@leave/client": "workspace:*",
     "@leave/shared": "workspace:*",
     "@react-native-community/netinfo": "12.0.1",
+    "@sentry/react-native": "7.11.0",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-query-persist-client": "^5.101.4",
     "expo": "57.0.16",
@@ -62,7 +64,8 @@
     "@types/react": "^19.2.18",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.7"
   },
   "private": true
 }

@@ -15,6 +15,8 @@
  */
 
 import * as SecureStore from "expo-secure-store";
+import { captureException } from "./observability";
+import type { ErrorSource, ObservabilityLevel } from "./observability/types";
 
 const STORE_KEY = "leave.lastFatalError";
 /** SecureStore는 값이 2KB를 넘으면 경고·실패한다. 스택은 앞부분만 남긴다. */
@@ -112,14 +114,31 @@ export function subscribeFatalError(listener: Listener): () => void {
 export function reportFatalError(
   error: unknown,
   componentStack?: string | null,
+  options: {
+    source?: ErrorSource;
+    level?: ObservabilityLevel;
+    notify?: boolean;
+  } = {},
 ): FatalErrorRecord {
   const record = toFatalRecord(error, componentStack);
   persistFatalError(record);
-  for (const listener of listeners) {
-    try {
-      listener(record);
-    } catch {
-      // 통지 실패가 오류 처리를 막지 않는다.
+  captureException(error, {
+    source: options.source ?? "global_error_handler",
+    level: options.level ?? "fatal",
+    handled: false,
+    componentStack,
+    extra: {
+      occurred_at: record.occurredAt,
+      normalized_message: record.message,
+    },
+  });
+  if (options.notify !== false) {
+    for (const listener of listeners) {
+      try {
+        listener(record);
+      } catch {
+        // 통지 실패가 오류 처리를 막지 않는다.
+      }
     }
   }
   return record;
@@ -149,12 +168,20 @@ export function installFatalErrorHandler(): void {
   const previous = errorUtils.getGlobalHandler();
   errorUtils.setGlobalHandler((error, isFatal) => {
     if (!isFatal) {
+      captureException(error, {
+        source: "global_error_handler",
+        level: "error",
+        handled: true,
+      });
       previous(error, isFatal);
       return;
     }
     // 이 안에서 나는 오류는 다시 이 핸들러로 들어와 무한 재귀가 된다.
     try {
-      reportFatalError(error);
+      reportFatalError(error, null, {
+        source: "global_error_handler",
+        level: "fatal",
+      });
     } catch {
       // 기록에 실패해도 아래에서 원래 경로로는 보고한다.
     }

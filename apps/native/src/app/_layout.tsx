@@ -23,7 +23,8 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStoredToken } from "@/api/client";
 import { ApiProvider } from "@/api/provider";
 import { ErrorScreen } from "@/components/error-screen";
-import { persistFatalError, toFatalRecord } from "@/lib/fatal-error";
+import { ObservabilityLifecycle } from "@/components/observability-lifecycle";
+import { reportFatalError, toFatalRecord } from "@/lib/fatal-error";
 import {
   capturePendingProfile,
   takePendingProfile,
@@ -55,8 +56,14 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const record = useMemo(() => toFatalRecord(error), [error]);
   useEffect(() => {
     void SplashScreen.hideAsync();
-    persistFatalError(record);
-  }, [record]);
+    // notify=false is essential: notifying RootErrorBoundary here would place
+    // its overlay on top of Router's own recovery screen and create two UIs.
+    reportFatalError(error, record.componentStack, {
+      source: "router_error_boundary",
+      level: "error",
+      notify: false,
+    });
+  }, [error, record]);
   return (
     <ErrorScreen
       title="문제가 발생했어요"
@@ -149,112 +156,122 @@ function RootNavigator() {
   // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
   usePendingProfileLink(ready, canBrowse);
 
+  const lifecycle = (
+    <ObservabilityLifecycle
+      authenticated={isAuthed}
+      sessionReady={ready && token !== undefined}
+    />
+  );
+
   if (!ready || token === undefined || (isAuthed && onboarding.isPending))
-    return null; // 스플래시 유지
+    return lifecycle; // 스플래시 유지
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.canvasSoft },
-      }}
-    >
-      <Stack.Protected guard={canBrowse}>
-        <Stack.Screen name="(tabs)" />
-        {/* 공유 주소(`https://leave.moveto.kr/u/…`, `leave://u/…`)의 착지점.
+    <>
+      {lifecycle}
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.canvasSoft },
+        }}
+      >
+        <Stack.Protected guard={canBrowse}>
+          <Stack.Screen name="(tabs)" />
+          {/* 공유 주소(`https://leave.moveto.kr/u/…`, `leave://u/…`)의 착지점.
             탭 그룹 밖의 최상위 라우트라 어디서 열려도 같은 카드로 뜬다. */}
-        <Stack.Screen
-          name="u/[username]"
-          options={{
-            headerShown: true,
-            title: "프로필",
-            headerBackTitle: "뒤로",
-            headerTransparent: process.env.EXPO_OS !== "web",
-            headerShadowVisible: false,
-            headerTintColor: colors.brand,
-            headerTitleStyle: { fontWeight: "600", color: colors.ink },
-          }}
-        />
-        <Stack.Screen
-          name="units"
-          options={{
-            presentation: "formSheet",
-            headerShown: true,
-            title: "그룹 참여",
-            headerTransparent: process.env.EXPO_OS !== "web",
-            headerShadowVisible: false,
-            sheetGrabberVisible: true,
-            sheetAllowedDetents: [0.75, 1],
-            contentStyle: {
-              backgroundColor:
-                process.env.EXPO_OS === "web"
-                  ? colors.canvasSoft
-                  : "transparent",
-            },
-            headerTitleStyle: { fontWeight: "600", color: colors.ink },
-          }}
-        />
-        <Stack.Screen
-          name="unit-manage"
-          options={{
-            presentation: "formSheet",
-            headerShown: true,
-            title: "그룹 관리",
-            headerTransparent: process.env.EXPO_OS !== "web",
-            headerShadowVisible: false,
-            sheetGrabberVisible: true,
-            sheetAllowedDetents: [0.75, 1],
-            contentStyle: {
-              backgroundColor:
-                process.env.EXPO_OS === "web"
-                  ? colors.canvasSoft
-                  : "transparent",
-            },
-            headerTitleStyle: { fontWeight: "600", color: colors.ink },
-          }}
-        />
-        {/* 내 휴가 탭에서 들락거리는 목적지라 모달이 아니라 카드로 밀어 뒤로가기를 남긴다. */}
-        <Stack.Screen
-          name="leave-grants"
-          options={{
-            headerShown: true,
-            title: "보유 휴가",
-            // 탭은 헤더를 숨겨 제목이 없으므로, 돌아갈 곳을 뒤로가기에 직접 적는다.
-            headerBackTitle: "내 휴가",
-            // 탭 스택들과 같은 규칙 — headerStyle로 배경을 칠하지 않고 시스템의
-            // 반투명 바를 그대로 쓴다. 불투명하게 칠하면 다크모드에서 본문과
-            // 색이 어긋나 흰 띠처럼 보인다. 웹에는 blur 바가 없어 흐름에 남긴다.
-            headerTransparent: process.env.EXPO_OS !== "web",
-            headerShadowVisible: false,
-            headerTintColor: colors.brand,
-            headerTitleStyle: { fontWeight: "600", color: colors.ink },
-          }}
-        />
-        {/* 알림 탭·내 휴가 탭 양쪽에서 들어오므로 돌아갈 곳을 고정하지 않는다. */}
-        <Stack.Screen
-          name="leave/[leaveId]"
-          options={{
-            headerShown: true,
-            title: "휴가 상세",
-            headerBackTitle: "뒤로",
-            headerTransparent: process.env.EXPO_OS !== "web",
-            headerShadowVisible: false,
-            headerTintColor: colors.brand,
-            headerTitleStyle: { fontWeight: "600", color: colors.ink },
-          }}
-        />
-      </Stack.Protected>
-      <Stack.Protected guard={isAuthed && !onboardingComplete}>
-        <Stack.Screen name="onboarding" />
-      </Stack.Protected>
-      <Stack.Protected guard={isAuthed && onboardingComplete && !hasUsername}>
-        <Stack.Screen name="username-setup" />
-      </Stack.Protected>
-      <Stack.Protected guard={!isAuthed}>
-        <Stack.Screen name="login" />
-        <Stack.Screen name="signup" />
-      </Stack.Protected>
-    </Stack>
+          <Stack.Screen
+            name="u/[username]"
+            options={{
+              headerShown: true,
+              title: "프로필",
+              headerBackTitle: "뒤로",
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          <Stack.Screen
+            name="units"
+            options={{
+              presentation: "formSheet",
+              headerShown: true,
+              title: "그룹 참여",
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: [0.75, 1],
+              contentStyle: {
+                backgroundColor:
+                  process.env.EXPO_OS === "web"
+                    ? colors.canvasSoft
+                    : "transparent",
+              },
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          <Stack.Screen
+            name="unit-manage"
+            options={{
+              presentation: "formSheet",
+              headerShown: true,
+              title: "그룹 관리",
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: [0.75, 1],
+              contentStyle: {
+                backgroundColor:
+                  process.env.EXPO_OS === "web"
+                    ? colors.canvasSoft
+                    : "transparent",
+              },
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          {/* 내 휴가 탭에서 들락거리는 목적지라 모달이 아니라 카드로 밀어 뒤로가기를 남긴다. */}
+          <Stack.Screen
+            name="leave-grants"
+            options={{
+              headerShown: true,
+              title: "보유 휴가",
+              // 탭은 헤더를 숨겨 제목이 없으므로, 돌아갈 곳을 뒤로가기에 직접 적는다.
+              headerBackTitle: "내 휴가",
+              // 탭 스택들과 같은 규칙 — headerStyle로 배경을 칠하지 않고 시스템의
+              // 반투명 바를 그대로 쓴다. 불투명하게 칠하면 다크모드에서 본문과
+              // 색이 어긋나 흰 띠처럼 보인다. 웹에는 blur 바가 없어 흐름에 남긴다.
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          {/* 알림 탭·내 휴가 탭 양쪽에서 들어오므로 돌아갈 곳을 고정하지 않는다. */}
+          <Stack.Screen
+            name="leave/[leaveId]"
+            options={{
+              headerShown: true,
+              title: "휴가 상세",
+              headerBackTitle: "뒤로",
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+        </Stack.Protected>
+        <Stack.Protected guard={isAuthed && !onboardingComplete}>
+          <Stack.Screen name="onboarding" />
+        </Stack.Protected>
+        <Stack.Protected guard={isAuthed && onboardingComplete && !hasUsername}>
+          <Stack.Screen name="username-setup" />
+        </Stack.Protected>
+        <Stack.Protected guard={!isAuthed}>
+          <Stack.Screen name="login" />
+          <Stack.Screen name="signup" />
+        </Stack.Protected>
+      </Stack>
+    </>
   );
 }
 
