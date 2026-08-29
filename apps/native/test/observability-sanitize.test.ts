@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  sanitizeDiagnosticUrl,
   sanitizeEndpoint,
   sanitizeSentryEvent,
   sanitizeText,
@@ -27,6 +28,23 @@ describe("observability sanitization", () => {
         "https://api.leave.moveto.kr/leaves/a-real-sensitive-id",
       ),
     ).toBe("/leaves/[param]");
+  });
+
+  it("removes identifiers and secrets from diagnostic and deep-link URLs", () => {
+    expect(
+      sanitizeDiagnosticUrl(
+        "https://leave.moveto.kr/u/real-user?token=secret#private",
+      ),
+    ).toBe("https://leave.moveto.kr/[param]/[param]");
+
+    const message = sanitizeText(
+      "failed to open https://leave.moveto.kr/u/real-user?token=secret " +
+        "or leave://private-route/verification/654321",
+    );
+    expect(message).not.toContain("real-user");
+    expect(message).not.toContain("secret");
+    expect(message).not.toContain("private-route");
+    expect(message).not.toContain("654321");
   });
 
   it("redacts bearer tokens, JWTs, emails, and secret assignments", () => {

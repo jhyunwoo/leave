@@ -4,6 +4,8 @@
 
 Expo SDK 57이 검증한 네이티브 모듈 버전은 `@sentry/react-native ~7.11.0`이다. 이 저장소는 fingerprint 런타임 정책 때문에 네이티브 의존성을 정확한 `7.11.0`으로 고정한다. Metro 설정은 Expo의 pnpm/모노레포 해석을 그대로 사용하고 Sentry Debug ID와 소스 맵 직렬화만 더한다.
 
+7.11.0의 선택형 Android Gradle plugin은 `@expo/config-plugins`를 import하면서 그 의존성을 선언하지 않는다. pnpm의 격리 설치에서 EAS config 평가가 실패하고, 누락 의존성을 루트에 hoist하면 Expo peer graph가 둘로 갈린다. 저장소의 작은 pnpm patch는 그 한 import를 SDK가 이미 peer로 선언한 `expo/config-plugins` re-export로 바꾼다. 런타임/Gradle 로직은 바꾸지 않으며 SDK를 올릴 때 upstream 수정 여부를 확인하고 patch를 제거하거나 갱신한다.
+
 ## 오류 경로와 핸들러 소유권
 
 초기화 순서는 다음과 같다.
@@ -66,6 +68,8 @@ EAS Dashboard의 네 환경 `development`, `preview`, `closed-test`, `production
 | `EXPO_PUBLIC_OBSERVABILITY_DIAGNOSTICS` | 선택 공개 테스트 설정 | 비프로덕션 진단 명령 노출. preview profile은 이미 `true`            |
 
 정상 로컬 개발은 Sentry를 비활성화해 production noise를 만들지 않는다. 개발에서 실제 전송을 시험할 때만 DSN, `EXPO_PUBLIC_APP_ENV=development`, `EXPO_PUBLIC_SENTRY_ENABLE_DEV=true`, 진단 플래그를 제공한다. `SENTRY_AUTH_TOKEN`은 런타임 번들에 필요하지 않으며 `EXPO_PUBLIC_` 접두사를 절대로 붙이지 않는다. Self-hosted Sentry만 `SENTRY_URL`을 추가한다.
+
+EAS visibility는 DSN·앱 환경·slug를 `Plain text`, `SENTRY_AUTH_TOKEN`을 `Sensitive`로 둔다. OTA wrapper가 로컬 `eas env:exec`에서 token을 사용해야 하므로 server-only `Secret` visibility로 만들면 안 된다. preview EAS environment에도 `EXPO_PUBLIC_OBSERVABILITY_DIAGNOSTICS=true`를 설정해야 preview OTA 번들에서 진단 API가 유지된다. `eas.json`의 같은 값은 build profile용이며 EAS Update의 server environment를 대신하지 않는다.
 
 ## 빌드, 심볼과 OTA
 
@@ -134,7 +138,7 @@ globalThis.__leaveObservabilityDiagnostics("native_crash");
 
 ## 개인정보
 
-`sendDefaultPii: false`를 명시하고 `beforeSend`/`beforeBreadcrumb`에서 이중 정제한다. Authorization, Cookie, bearer/JWT, access/refresh token, password/PIN/OTP/verification code, API key, secret/session/credential 필드와 이메일을 제거한다. request/response body는 수집하지 않으며 request URL은 query/hash를 제거한다. 자동 console breadcrumb와 navigation/deep-link URL은 버리고 안전한 route/API template breadcrumb만 직접 만든다. 사용자 context는 이미 로드된 내부 ID 하나만 사용하며 logout·인증 만료 때 user와 session context를 함께 지운다. 추가 사용자 조회는 하지 않는다.
+`sendDefaultPii: false`를 명시하고 `beforeSend`/`beforeBreadcrumb`에서 이중 정제한다. Authorization, Cookie, bearer/JWT, access/refresh token, password/PIN/OTP/verification code, API key, secret/session/credential 필드와 이메일을 제거한다. request/response body는 수집하지 않으며 request URL은 query/hash를 제거하고 path ID를 route template으로 바꾼다. 자동 console breadcrumb와 navigation/deep-link URL은 버리고 안전한 route/API template breadcrumb만 직접 만든다. 사용자 context는 이미 로드된 내부 ID 하나만 사용하며 logout·인증 만료 때 user와 session context를 함께 지운다. 추가 사용자 조회는 하지 않는다.
 
 화면 캡처, view hierarchy, session replay, app-hang 추적, 성능 tracing은 꺼져 있다. 특히 군 관련 일정 내용 때문에 replay는 sample 0이 아니라 integration 자체를 포함하지 않는다. SDK가 붙이는 기기/OS 진단에는 광고 ID나 임의 device identifier를 추가하지 않는다.
 

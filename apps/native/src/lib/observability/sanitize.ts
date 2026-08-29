@@ -6,7 +6,7 @@ const BEARER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const SECRET_ASSIGNMENT =
   /\b(access.?token|refresh.?token|api.?key|password|passcode|otp|verification.?code|secret)\b\s*[:=]\s*[^\s,;]+/gi;
-const URL_IN_TEXT = /https?:\/\/[^\s)\]}>,]+/gi;
+const URL_IN_TEXT = /[a-z][a-z\d+.-]*:\/\/[^\s)\]}>,]+/gi;
 
 const STATIC_API_SEGMENTS = new Set([
   "accept",
@@ -92,9 +92,27 @@ export function sanitizeEndpoint(raw: string): string {
     .join("/")}`;
 }
 
+/** Keep the origin and a route template, but never a user-controlled path ID. */
+export function sanitizeDiagnosticUrl(raw: string): string {
+  try {
+    const absolute = /^[a-z][a-z\d+.-]*:/i.test(raw);
+    const parsed = new URL(raw, "https://redacted.invalid");
+    const endpoint = sanitizeEndpoint(parsed.pathname);
+    if (!absolute) return endpoint;
+
+    const safeAuthority =
+      parsed.protocol === "https:" || parsed.protocol === "http:"
+        ? parsed.host
+        : "[host]";
+    return `${parsed.protocol}//${safeAuthority}${endpoint}`;
+  } catch {
+    return sanitizeEndpoint(sanitizeUrl(raw));
+  }
+}
+
 export function sanitizeText(raw: string): string {
   return raw
-    .replace(URL_IN_TEXT, (url) => sanitizeUrl(url))
+    .replace(URL_IN_TEXT, (url) => sanitizeDiagnosticUrl(url))
     .replace(BEARER, `Bearer ${FILTERED}`)
     .replace(JWT, FILTERED)
     .replace(SECRET_ASSIGNMENT, (_match, key: string) => `${key}=${FILTERED}`)
@@ -184,7 +202,9 @@ export function sanitizeSentryEvent<T>(event: T): T {
       ...(source.request.method
         ? { method: sanitizeText(source.request.method).slice(0, 20) }
         : {}),
-      ...(source.request.url ? { url: sanitizeUrl(source.request.url) } : {}),
+      ...(source.request.url
+        ? { url: sanitizeDiagnosticUrl(source.request.url) }
+        : {}),
     };
   }
 

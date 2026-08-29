@@ -93,5 +93,8 @@ minimumReleaseAgeExclude:
   - expo-splash-screen@57.0.8
   - expo-updates@57.0.17
 
+# Sentry 7.11's Android plugin imports an undeclared @expo/config-plugins.
+# Resolve through Sentry's declared Expo peer so EAS config works without
+# hoisting a second Expo peer graph. Remove this when upstream fixes the import.
 patchedDependencies:
   "@sentry/react-native@7.11.0": patches/@sentry__react-native@7.11.0.patch

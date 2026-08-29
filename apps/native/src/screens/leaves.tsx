@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import type { MyLeave } from "@leave/client";
 import {
+  nextLeaveCountdown,
   partitionMyLeaves,
   summarizeHoldings,
   useDeleteLeave,
@@ -41,6 +42,7 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveStatusControl } from "@/components/leave-status-control";
 import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
+import { NextLeaveCard } from "@/components/next-leave-card";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
@@ -80,6 +82,7 @@ export function LeavesScreen() {
 
   const myLeaves = leaves.data?.leaves ?? [];
   const sections = partitionMyLeaves(leaves.data?.leaves);
+  const countdown = nextLeaveCountdown(leaves.data?.leaves);
   // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
   const selectedLeave =
     myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;
@@ -113,6 +116,14 @@ export function LeavesScreen() {
 
   const balanceColumn = (
     <View style={styles.stack}>
+      {/* 잔여가 아직 안 왔다고 D-day까지 사라지면 안 된다 — 이 카드가 기대는 것은
+          myLeaves 하나뿐이라 balances 조건 바깥에 둔다. */}
+      {countdown ? (
+        <NextLeaveCard
+          countdown={countdown}
+          onPress={() => openLeave(countdown.leave)}
+        />
+      ) : null}
       {balances.data ? (
         <>
           <Pressable
