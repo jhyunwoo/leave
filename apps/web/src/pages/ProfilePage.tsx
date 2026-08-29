@@ -171,45 +171,55 @@ export function ProfilePage(props: { me: Me }) {
       </header>
 
       {/* 계급/전역 — DESIGN.md의 절제된 제품 UI 패널 */}
-      <section className="card-dark" style={{ padding: "var(--sp-2xl)" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "var(--sp-lg)",
-          }}
-        >
-          <div>
-            <p className="eyebrow">현재 계급</p>
-            <p className="display-md" style={{ marginTop: 6 }}>
-              {user.rankLabel}
-            </p>
-            <p
-              className="body-sm text-body"
-              style={{ marginTop: "var(--sp-md)" }}
-            >
-              {user.branchLabel} · {user.name}
-            </p>
+      <Link
+        to="/service-progress"
+        className="profile-service-progress-link"
+        data-testid="profile-service-progress-card"
+      >
+        <section className="card-dark" style={{ padding: "var(--sp-2xl)" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: "var(--sp-lg)",
+            }}
+          >
+            <div>
+              <p className="eyebrow">현재 계급</p>
+              <p className="display-md" style={{ marginTop: 6 }}>
+                {user.rankLabel}
+              </p>
+              <p
+                className="body-sm text-body"
+                style={{ marginTop: "var(--sp-md)" }}
+              >
+                {user.branchLabel} · {user.name}
+              </p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p className="eyebrow">전역까지</p>
+              <p className="display-md" style={{ marginTop: 6 }}>
+                D-{user.daysUntilDischarge}
+              </p>
+            </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <p className="eyebrow">전역까지</p>
-            <p className="display-md" style={{ marginTop: 6 }}>
-              D-{user.daysUntilDischarge}
-            </p>
-          </div>
-        </div>
 
-        <ServiceProgress
-          enlistedAt={user.enlistedAt}
-          dischargeAt={user.dischargeAt}
-          caption={
-            user.nextPromotionDate
-              ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
-              : "최종 계급"
-          }
-        />
-      </section>
+          <ServiceProgress
+            enlistedAt={user.enlistedAt}
+            dischargeAt={user.dischargeAt}
+            caption={
+              user.nextPromotionDate
+                ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
+                : "최종 계급"
+            }
+          />
+          <div className="profile-service-progress-link__hint">
+            <span>전체 화면으로 보기</span>
+            <span aria-hidden="true">→</span>
+          </div>
+        </section>
+      </Link>
 
       {/* 프로필 정보 */}
       <section

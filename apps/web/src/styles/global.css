@@ -388,6 +388,38 @@ a {
   color: var(--canvas-soft);
 }
 
+.profile-service-progress-link {
+  display: block;
+  border-radius: var(--r-xl);
+  color: inherit;
+  text-decoration: none;
+}
+
+.profile-service-progress-link .card-dark {
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.profile-service-progress-link__hint {
+  display: flex;
+  margin-top: var(--sp-xl);
+  padding-top: var(--sp-md);
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(232, 235, 230, 0.18);
+  color: var(--canvas-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-service-progress-link:hover .card-dark {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
+  }
+}
+
 /* 콘텐츠는 유리 효과를 겹치지 않고 한 표면 안에서 행으로 묶는다. */
 .content-panel,
 .metric-strip {

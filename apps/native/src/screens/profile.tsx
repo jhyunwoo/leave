@@ -25,11 +25,12 @@ import {
   type ProfileUpdateInput,
   type Rank,
 } from "@leave/shared";
-import { Stack, useRouter } from "expo-router";
+import { Link, Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -296,18 +297,34 @@ export function ProfileScreen() {
 
           <UsernameCard username={user.username} />
 
-          <ContentPanel style={styles.card}>
-            <ServiceProgress
-              enlistedAt={user.enlistedAt as ISODate}
-              dischargeAt={user.dischargeAt as ISODate}
-              daysLeft={user.daysUntilDischarge}
-              caption={
-                user.nextPromotionDate
-                  ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`
-                  : "더 이상 예정된 진급이 없어요"
-              }
-            />
-          </ContentPanel>
+          <Link href="/service-progress" asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="복무율 전체 화면으로 보기"
+              accessibilityHint="복무율과 실시간 프로그래스 바를 크게 엽니다"
+              style={({ pressed }) => pressed && styles.progressCardPressed}
+              testID="profile-service-progress-card"
+            >
+              <ContentPanel style={styles.card}>
+                <ServiceProgress
+                  enlistedAt={user.enlistedAt as ISODate}
+                  dischargeAt={user.dischargeAt as ISODate}
+                  daysLeft={user.daysUntilDischarge}
+                  caption={
+                    user.nextPromotionDate
+                      ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`
+                      : "더 이상 예정된 진급이 없어요"
+                  }
+                />
+                <View style={styles.progressDisclosure}>
+                  <Text style={styles.progressDisclosureText}>
+                    전체 화면으로 보기
+                  </Text>
+                  <Text style={styles.progressDisclosureChevron}>›</Text>
+                </View>
+              </ContentPanel>
+            </Pressable>
+          </Link>
 
           <ContentPanel style={styles.card}>
             <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
@@ -671,6 +688,24 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
   card: { padding: spacing.xl, gap: spacing.lg },
+  progressCardPressed: { opacity: 0.65 },
+  progressDisclosure: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: spacing.xs,
+  },
+  progressDisclosureText: {
+    color: colors.brand,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  progressDisclosureChevron: {
+    color: colors.brand,
+    fontSize: 22,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
   sheet: { flex: 1 },
   profileRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   alias: { fontSize: 22, fontWeight: "700", color: colors.ink },

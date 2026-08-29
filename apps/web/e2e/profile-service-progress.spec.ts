@@ -168,3 +168,74 @@ test("프로필 복무율은 열 자리로 흐르고 불필요할 때 멈춘다"
     expect(overlaps).toBeFalsy();
   }
 });
+
+test("복무율 카드는 전체 화면의 실시간 숫자와 두 막대로 이어진다", async ({
+  page,
+  request,
+}) => {
+  const token = await seedProfileUser(request);
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/profile");
+
+  await page.getByTestId("profile-service-progress-card").click();
+  await expect(page).toHaveURL(/\/service-progress$/);
+
+  const detail = page.getByTestId("service-progress-detail");
+  const value = page.getByTestId("service-progress-value");
+  const main = page.getByTestId("service-progress-main");
+  const mainFill = page.getByTestId("service-progress-main-fill");
+  const zoom = page.getByTestId("service-progress-zoom");
+  const zoomFill = page.getByTestId("service-progress-zoom-fill");
+
+  await expect(detail).toBeVisible();
+  await expect(value).toHaveText(/^\d{1,3}\.\d{10}%$/);
+  await expect(main).toHaveAttribute("aria-valuetext", /^\d+\.\d%$/);
+  await expect(zoom).toContainText("실시간 확대");
+  await expect(zoom).toContainText("소수점 5번째 자리");
+
+  const firstValue = await value.textContent();
+  const firstZoomTransform = await zoomFill.getAttribute("style");
+  await expect(mainFill).toHaveAttribute("style", /scaleX\(0\.\d+\)/);
+  await expect.poll(() => value.textContent()).not.toBe(firstValue);
+  await expect
+    .poll(() => zoomFill.getAttribute("style"))
+    .not.toBe(firstZoomTransform);
+
+  const viewportCoverage = await detail.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(viewportCoverage.width).toBeGreaterThanOrEqual(
+    viewportCoverage.viewportWidth,
+  );
+  expect(viewportCoverage.height).toBeGreaterThanOrEqual(
+    viewportCoverage.viewportHeight,
+  );
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(zoom).toContainText("동작 줄이기 설정");
+  const reducedValue = await value.textContent();
+  const reducedZoomTransform = await zoomFill.getAttribute("style");
+  await waitForFrames(page, 8);
+  await expect(value).toHaveText(reducedValue ?? "");
+  await expect(zoomFill).toHaveAttribute("style", reducedZoomTransform ?? "");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(detail).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(hasHorizontalOverflow).toBeFalsy();
+
+  await page.getByTestId("service-progress-close").click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByTestId("profile-service-progress-card")).toBeVisible();
+});

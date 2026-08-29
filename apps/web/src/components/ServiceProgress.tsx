@@ -13,38 +13,17 @@
 
 import { kstMidnight, type ISODate } from "@leave/shared";
 import { useEffect, useRef, useState } from "react";
+import {
+  formatPercent,
+  percentBetween,
+  SERVICE_PERCENT_DECIMALS,
+} from "./service-progress-format";
+import { useReducedMotion } from "./use-reduced-motion";
 
-const LIVE_DECIMALS = 10;
 const STATIC_DECIMALS = 1;
 const MAX_FPS = 120;
 const DRAW_INTERVAL_MS = 1000 / MAX_FPS;
 const SLOW_TICK_MS = 60_000;
-
-function percentBetween(start: number, span: number, now: number): number {
-  if (span <= 0) return 0;
-  const ratio = (now - start) / span;
-  return (ratio < 0 ? 0 : ratio > 1 ? 1 : ratio) * 100;
-}
-
-function formatPercent(percent: number, decimals: number): string {
-  return `${percent.toFixed(decimals)}%`;
-}
-
-/** JS 애니메이션은 전역 CSS의 모션 축소 규칙만으로 멈추지 않아 직접 구독한다. */
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = () => setReduced(query.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-
-  return reduced;
-}
 
 /** 막대와 접근성 값은 보이는 탭에서만 1분에 한 번 갱신한다. */
 function useSlowClock(initialNow: number): {
@@ -108,7 +87,7 @@ function LivePercentReadout(props: {
   const valueRef = useRef<HTMLSpanElement>(null);
   const initial = formatPercent(
     percentBetween(props.start, props.span, props.initialNow),
-    LIVE_DECIMALS,
+    SERVICE_PERCENT_DECIMALS,
   );
 
   useEffect(() => {
@@ -126,7 +105,7 @@ function LivePercentReadout(props: {
 
     const write = (now: number): number => {
       const percent = percentBetween(props.start, props.span, now);
-      const label = formatPercent(percent, LIVE_DECIMALS);
+      const label = formatPercent(percent, SERVICE_PERCENT_DECIMALS);
       if (text.data !== label) text.data = label;
       return percent;
     };

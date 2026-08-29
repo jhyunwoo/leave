@@ -179,6 +179,16 @@ function RootNavigator() {
       >
         <Stack.Protected guard={canBrowse}>
           <Stack.Screen name="(tabs)" />
+          {/* 프로필 위로 밀어 탭바까지 덮는 전체 화면 복무율. 화면 안의 플로팅
+            닫기 버튼만 남기므로 네이티브 헤더는 그리지 않는다. */}
+          <Stack.Screen
+            name="service-progress"
+            options={{
+              headerShown: false,
+              title: "복무율",
+              contentStyle: { backgroundColor: colors.canvasSoft },
+            }}
+          />
           {/* 공유 주소(`https://leave.moveto.kr/u/…`, `leave://u/…`)의 착지점.
             탭 그룹 밖의 최상위 라우트라 어디서 열려도 같은 카드로 뜬다. */}
           <Stack.Screen

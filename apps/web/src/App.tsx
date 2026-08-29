@@ -98,6 +98,11 @@ const NotificationsPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
+const ServiceProgressDetailPage = lazy(() =>
+  import("./pages/ServiceProgressDetailPage").then((m) => ({
+    default: m.ServiceProgressDetailPage,
+  })),
+);
 const SignupPage = lazy(() =>
   import("./pages/SignupPage").then((m) => ({ default: m.SignupPage })),
 );
@@ -160,6 +165,11 @@ function CompletedApp() {
 
   return (
     <Routes>
+      {/* 전체 화면 복무율은 공용 내비게이션 바깥에서 뷰포트를 모두 쓴다. */}
+      <Route
+        path="service-progress"
+        element={<ServiceProgressDetailPage me={me.data} />}
+      />
       <Route element={<AppLayout me={me.data} />}>
         <Route index element={<CalendarPage me={me.data} />} />
         <Route path="units" element={<UnitsPage me={me.data} />} />

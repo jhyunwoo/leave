@@ -98,6 +98,15 @@ env:
 # 인앱 영구 삭제 경로가 실제로 노출되고 확인을 요구하는지 검증한다.
 - tapOn: "프로필"
 - tapOn:
+    id: "profile-service-progress-card"
+- assertVisible:
+    id: "service-progress-main"
+- assertVisible: "실시간 확대"
+- tapOn:
+    id: "service-progress-close"
+- assertVisible:
+    id: "profile-service-progress-card"
+- tapOn:
     id: "delete-account"
 - assertVisible: "계정과 데이터 영구 삭제"
 - tapOn: "영구 삭제"
