@@ -12,6 +12,7 @@ import { UsernameField, useUsernameDraft } from "../components/UsernameField";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { ServiceProgress } from "../components/ServiceProgress";
+import { PasskeyManager } from "../components/PasskeyManager";
 import { fmtDateShort } from "@leave/shared";
 
 /**
@@ -255,6 +256,8 @@ export function ProfilePage(props: { me: Me }) {
       </section>
 
       <UsernameCard username={user.username} />
+
+      <PasskeyManager />
 
       <OfficialDisclaimer />
 

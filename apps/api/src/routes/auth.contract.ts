@@ -17,6 +17,9 @@ import {
   profileUpdateSchema,
   regularOvernightConfigSchema,
   signupSchema,
+  passkeyDeleteSchema,
+  passkeyRegistrationOptionsSchema,
+  passkeyVerificationSchema,
 } from "@leave/shared";
 import {
   activitySchema,
@@ -25,6 +28,9 @@ import {
   jsonContent,
   myJoinRequestSchema,
   okSchema,
+  passkeyListSchema,
+  passkeyOptionsSchema,
+  passkeySchema,
   unitSchema,
   userSchema,
 } from "../lib/responses";
@@ -62,6 +68,103 @@ export const loginRoute = createRoute({
     200: jsonContent(authResponseSchema, "로그인 성공"),
     400: errorResponse("입력값 오류"),
     401: errorResponse("이메일 또는 비밀번호 불일치"),
+  },
+});
+
+export const passkeyListRoute = createRoute({
+  method: "get",
+  path: "/passkeys",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(passkeyListSchema, "등록한 패스키"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+export const passkeyRegistrationOptionsRoute = createRoute({
+  method: "post",
+  path: "/passkeys/registration/options",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: passkeyRegistrationOptionsSchema },
+      },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(passkeyOptionsSchema, "패스키 등록 options"),
+    400: errorResponse("입력 또는 자격증명 오류"),
+    401: errorResponse("인증 실패"),
+    409: errorResponse("등록 한도 초과"),
+  },
+});
+
+export const passkeyRegistrationVerifyRoute = createRoute({
+  method: "post",
+  path: "/passkeys/registration/verify",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: passkeyVerificationSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: jsonContent(z.object({ passkey: passkeySchema }), "등록 성공"),
+    400: errorResponse("검증 실패"),
+    401: errorResponse("인증 실패"),
+    409: errorResponse("이미 등록된 패스키"),
+  },
+});
+
+export const passkeyDeleteRoute = createRoute({
+  method: "delete",
+  path: "/passkeys/{id}",
+  tags: ["인증"],
+  security: [{ Bearer: [] }],
+  request: {
+    params: z.object({ id: z.string().min(1) }),
+    body: {
+      content: { "application/json": { schema: passkeyDeleteSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(okSchema, "삭제 성공"),
+    400: errorResponse("현재 비밀번호 불일치"),
+    401: errorResponse("인증 실패"),
+    404: errorResponse("패스키 없음"),
+  },
+});
+
+export const passkeyAuthenticationOptionsRoute = createRoute({
+  method: "post",
+  path: "/passkeys/authentication/options",
+  tags: ["인증"],
+  responses: {
+    200: jsonContent(passkeyOptionsSchema, "패스키 로그인 options"),
+  },
+});
+
+export const passkeyAuthenticationVerifyRoute = createRoute({
+  method: "post",
+  path: "/passkeys/authentication/verify",
+  tags: ["인증"],
+  request: {
+    body: {
+      content: { "application/json": { schema: passkeyVerificationSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(authResponseSchema, "패스키 로그인 성공"),
+    400: errorResponse("검증 실패"),
+    401: errorResponse("등록되지 않은 패스키"),
   },
 });
 

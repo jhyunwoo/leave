@@ -41,6 +41,9 @@ import {
   useDeleteAccount,
   useLogout,
   useMe,
+  usePasskeys,
+  useRegisterPasskey,
+  useDeletePasskey,
   useSetUsername,
   useUpdateProfile,
   type Me,
@@ -63,6 +66,7 @@ import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction, notify } from "@/lib/dialog";
 import { ResponsiveGrid, useWindowSizeClass } from "@/adaptive";
 import { layout, makeStyles, spacing, useColors } from "@/theme";
+import { createPasskey, passkeysSupported } from "@/lib/passkeys";
 
 /**
  * 공개 사용자 이름 카드 — 지금 이름을 보여주고 그 자리에서 바꾼다.
@@ -174,6 +178,7 @@ export function ProfileScreen() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [managingPasskeys, setManagingPasskeys] = useState(false);
 
   if (me.isPending || !me.data) {
     return (
@@ -350,6 +355,13 @@ export function ProfileScreen() {
               onPress={() => setChangingPassword(true)}
               testID="change-password"
             />
+            <Button
+              title="패스키 관리"
+              variant="secondary"
+              onPress={() => setManagingPasskeys(true)}
+              disabled={!passkeysSupported}
+              testID="manage-passkeys"
+            />
             <LegalLinks />
             <Button
               title={
@@ -375,6 +387,9 @@ export function ProfileScreen() {
       )}
       {changingPassword && (
         <ChangePasswordSheet onClose={() => setChangingPassword(false)} />
+      )}
+      {managingPasskeys && (
+        <PasskeySheet onClose={() => setManagingPasskeys(false)} />
       )}
 
       <Stack.Toolbar placement="right">
@@ -532,6 +547,99 @@ function EditProfileSheet(props: { user: Me["user"]; onClose: () => void }) {
               {error}
             </Text>
           ) : null}
+        </SheetScaffold>
+      </KeyboardAvoidingView>
+    </FormSheet>
+  );
+}
+
+function PasskeySheet(props: { onClose: () => void }) {
+  const styles = useStyles();
+  const passkeys = usePasskeys();
+  const register = useRegisterPasskey();
+  const remove = useDeletePasskey();
+  const [name, setName] = useState("내 패스키");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const add = async () => {
+    setError(null);
+    try {
+      await register.mutateAsync({
+        name,
+        currentPassword,
+        createCredential: createPasskey,
+      });
+      setCurrentPassword("");
+      notify("패스키를 등록했어요", "이제 로그인 화면에서 사용할 수 있어요.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "패스키 등록 실패");
+    }
+  };
+
+  const deleteOne = async (id: string) => {
+    if (!currentPassword) {
+      setError("현재 비밀번호를 입력해주세요");
+      return;
+    }
+    setError(null);
+    try {
+      await remove.mutateAsync({ id, currentPassword });
+      setCurrentPassword("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "패스키 삭제 실패");
+    }
+  };
+
+  return (
+    <FormSheet isPresented onDismiss={props.onClose} testID="passkey-sheet">
+      <KeyboardAvoidingView
+        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        style={styles.sheet}
+      >
+        <SheetScaffold title="패스키" onClose={props.onClose}>
+          <Text selectable style={styles.sectionBody}>
+            기기의 화면 잠금으로 비밀번호 없이 로그인할 수 있어요.
+          </Text>
+          {passkeys.data?.passkeys.map((passkey) => (
+            <ContentPanel key={passkey.id} style={styles.card}>
+              <Text selectable style={styles.sectionTitle}>
+                {passkey.name}
+              </Text>
+              <Text selectable style={styles.sectionBody}>
+                {new Date(passkey.createdAt).toLocaleDateString("ko-KR")} 등록
+              </Text>
+              <Button
+                title="삭제"
+                variant="danger"
+                onPress={() => void deleteOne(passkey.id)}
+                disabled={remove.isPending}
+              />
+            </ContentPanel>
+          ))}
+          <Field label="패스키 이름">
+            <Input value={name} onChangeText={setName} maxLength={50} />
+          </Field>
+          <Field label="현재 비밀번호">
+            <Input
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              textContentType="password"
+            />
+          </Field>
+          {error ? (
+            <Text selectable style={styles.error}>
+              {error}
+            </Text>
+          ) : null}
+          <Button
+            title={register.isPending ? "등록 중…" : "이 기기에 패스키 등록"}
+            onPress={() => void add()}
+            disabled={!name.trim() || !currentPassword}
+            loading={register.isPending}
+          />
         </SheetScaffold>
       </KeyboardAvoidingView>
     </FormSheet>

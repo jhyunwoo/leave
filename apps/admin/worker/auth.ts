@@ -12,14 +12,31 @@
  */
 
 import {
+  ADMIN_PASSKEY_ORIGINS,
   adminAccounts,
+  adminPasskeys,
   adminSessions,
+  finishAuthentication,
+  finishRegistration,
   generateSessionToken,
   hashPassword,
+  makeAuthenticationOptions,
+  makeRegistrationOptions,
+  MAX_PASSKEYS_PER_ACCOUNT,
+  passkeyDto,
   sha256Hex,
   verifyPassword,
   verifyPasswordOrDecoy,
 } from "@leave/api/server";
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
+import {
+  passkeyDeleteSchema,
+  passkeyRegistrationOptionsSchema,
+  passkeyVerificationSchema,
+} from "@leave/shared";
 import { and, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { Context } from "hono";
@@ -221,6 +238,15 @@ export async function loginAdmin(c: Context<AdminAppEnv>) {
   }
 
   await c.env.CACHE.delete(rateKey);
+  return establishAdminSession(c, admin, "login");
+}
+
+async function establishAdminSession(
+  c: Context<AdminAppEnv>,
+  admin: typeof adminAccounts.$inferSelect,
+  action: "login" | "passkey_login",
+) {
+  const db = drizzle(c.env.DB);
   const token = generateSessionToken();
   const now = nowIso();
   const session = {
@@ -237,12 +263,187 @@ export async function loginAdmin(c: Context<AdminAppEnv>) {
   c.set("admin", admin);
   c.set("adminSessionId", session.id);
   await writeAudit(c, {
-    action: "login",
+    action,
     entityType: "admin_session",
     entityId: session.id,
   });
   setCookie(c, ADMIN_SESSION_COOKIE, token, cookieOptions());
   return c.json({ admin: adminDto(admin) }, 200);
+}
+
+export async function listAdminPasskeys(c: Context<AdminAppEnv>) {
+  const rows = await drizzle(c.env.DB)
+    .select()
+    .from(adminPasskeys)
+    .where(eq(adminPasskeys.adminId, c.get("admin").id));
+  return c.json({ passkeys: rows.map(passkeyDto) });
+}
+
+export async function adminPasskeyRegistrationOptions(c: Context<AdminAppEnv>) {
+  const input = passkeyRegistrationOptionsSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!input.success)
+    return c.json({ error: input.error.issues[0]?.message }, 400);
+  const admin = c.get("admin");
+  if (admin.mustChangePassword) {
+    return c.json({ error: "임시 비밀번호를 먼저 변경해주세요" }, 403);
+  }
+  if (
+    !(await verifyPassword(
+      input.data.currentPassword,
+      admin.passwordSalt,
+      admin.passwordHash,
+    ))
+  ) {
+    return c.json({ error: "현재 비밀번호가 올바르지 않습니다" }, 400);
+  }
+  const db = drizzle(c.env.DB);
+  const existing = await db
+    .select()
+    .from(adminPasskeys)
+    .where(eq(adminPasskeys.adminId, admin.id));
+  if (existing.length >= MAX_PASSKEYS_PER_ACCOUNT) {
+    return c.json({ error: "패스키는 최대 10개까지 등록할 수 있습니다" }, 409);
+  }
+  return c.json(
+    await makeRegistrationOptions({
+      db,
+      subjectKind: "admin",
+      subjectId: admin.id,
+      userName: admin.email,
+      userDisplayName: admin.name,
+      name: input.data.name,
+      existing,
+    }),
+  );
+}
+
+export async function adminPasskeyRegistrationVerify(c: Context<AdminAppEnv>) {
+  const input = passkeyVerificationSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!input.success)
+    return c.json({ error: input.error.issues[0]?.message }, 400);
+  const admin = c.get("admin");
+  const db = drizzle(c.env.DB);
+  try {
+    const credential = await finishRegistration({
+      db,
+      ceremonyId: input.data.ceremonyId,
+      subjectKind: "admin",
+      subjectId: admin.id,
+      response: input.data.response as unknown as RegistrationResponseJSON,
+      expectedOrigins: ADMIN_PASSKEY_ORIGINS,
+    });
+    const row = {
+      id: crypto.randomUUID(),
+      adminId: admin.id,
+      ...credential,
+      createdAt: nowIso(),
+      lastUsedAt: null,
+    };
+    await db.insert(adminPasskeys).values(row);
+    await writeAudit(c, {
+      action: "passkey_registered",
+      entityType: "admin_passkey",
+      entityId: row.id,
+      after: passkeyDto(row),
+    });
+    return c.json({ passkey: passkeyDto(row) }, 201);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "패스키 등록 실패" },
+      400,
+    );
+  }
+}
+
+export async function deleteAdminPasskey(c: Context<AdminAppEnv>) {
+  const input = passkeyDeleteSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!input.success)
+    return c.json({ error: input.error.issues[0]?.message }, 400);
+  const admin = c.get("admin");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "패스키를 찾을 수 없습니다" }, 404);
+  if (
+    !(await verifyPassword(
+      input.data.currentPassword,
+      admin.passwordSalt,
+      admin.passwordHash,
+    ))
+  ) {
+    return c.json({ error: "현재 비밀번호가 올바르지 않습니다" }, 400);
+  }
+  const db = drizzle(c.env.DB);
+  const removed = await db
+    .delete(adminPasskeys)
+    .where(and(eq(adminPasskeys.id, id), eq(adminPasskeys.adminId, admin.id)))
+    .returning();
+  if (!removed[0]) return c.json({ error: "패스키를 찾을 수 없습니다" }, 404);
+  await writeAudit(c, {
+    action: "passkey_deleted",
+    entityType: "admin_passkey",
+    entityId: removed[0].id,
+    before: passkeyDto(removed[0]),
+  });
+  return c.json({ ok: true as const });
+}
+
+export async function adminPasskeyAuthenticationOptions(
+  c: Context<AdminAppEnv>,
+) {
+  return c.json(await makeAuthenticationOptions(drizzle(c.env.DB), "admin"));
+}
+
+export async function adminPasskeyAuthenticationVerify(
+  c: Context<AdminAppEnv>,
+) {
+  const input = passkeyVerificationSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!input.success)
+    return c.json({ error: input.error.issues[0]?.message }, 400);
+  const response = input.data.response as unknown as AuthenticationResponseJSON;
+  if (typeof response.id !== "string")
+    return c.json({ error: "잘못된 응답입니다" }, 400);
+  const db = drizzle(c.env.DB);
+  const credential = await db
+    .select()
+    .from(adminPasskeys)
+    .where(eq(adminPasskeys.credentialId, response.id))
+    .get();
+  if (!credential) return c.json({ error: "등록되지 않은 패스키입니다" }, 401);
+  const admin = await db
+    .select()
+    .from(adminAccounts)
+    .where(eq(adminAccounts.id, credential.adminId))
+    .get();
+  if (!admin?.active || admin.mustChangePassword) {
+    return c.json({ error: "패스키 로그인을 사용할 수 없는 계정입니다" }, 401);
+  }
+  try {
+    const info = await finishAuthentication({
+      db,
+      ceremonyId: input.data.ceremonyId,
+      subjectKind: "admin",
+      response,
+      credential,
+      expectedOrigins: ADMIN_PASSKEY_ORIGINS,
+    });
+    await db
+      .update(adminPasskeys)
+      .set({ counter: info.newCounter, lastUsedAt: nowIso() })
+      .where(eq(adminPasskeys.id, credential.id));
+    return await establishAdminSession(c, admin, "passkey_login");
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "패스키 로그인 실패" },
+      400,
+    );
+  }
 }
 
 export async function changeAdminPassword(c: Context<AdminAppEnv>) {

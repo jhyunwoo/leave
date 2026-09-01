@@ -92,6 +92,30 @@ export const sessions = sqliteTable(
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
+/** 사용자 계정에 등록한 WebAuthn 공개 자격증명. 비밀 키는 기기 밖으로 나오지 않는다. */
+export const userPasskeys = sqliteTable(
+  "user_passkeys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    credentialId: text("credential_id").notNull().unique(),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    transportsJson: text("transports_json"),
+    deviceType: text("device_type", {
+      enum: ["singleDevice", "multiDevice"],
+    }).notNull(),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+    aaguid: text("aaguid").notNull(),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+  },
+  (t) => [index("user_passkeys_user_idx").on(t.userId, t.createdAt)],
+);
+
 export const units = sqliteTable("units", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -398,6 +422,48 @@ export const adminSessions = sqliteTable(
   ],
 );
 
+/** 관리자 계정에 등록한 WebAuthn 공개 자격증명. */
+export const adminPasskeys = sqliteTable(
+  "admin_passkeys",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("admin_id")
+      .notNull()
+      .references(() => adminAccounts.id, { onDelete: "cascade" }),
+    credentialId: text("credential_id").notNull().unique(),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    transportsJson: text("transports_json"),
+    deviceType: text("device_type", {
+      enum: ["singleDevice", "multiDevice"],
+    }).notNull(),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+    aaguid: text("aaguid").notNull(),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+  },
+  (t) => [index("admin_passkeys_admin_idx").on(t.adminId, t.createdAt)],
+);
+
+/** 등록·인증 challenge를 서버에서 한 번만 소비하기 위한 짧은 수명의 ceremony. */
+export const passkeyChallenges = sqliteTable(
+  "passkey_challenges",
+  {
+    id: text("id").primaryKey(),
+    challenge: text("challenge").notNull(),
+    ceremony: text("ceremony", {
+      enum: ["registration", "authentication"],
+    }).notNull(),
+    subjectKind: text("subject_kind", { enum: ["user", "admin"] }).notNull(),
+    subjectId: text("subject_id"),
+    name: text("name"),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("passkey_challenges_expires_idx").on(t.expiresAt)],
+);
+
 /**
  * 관리자 감사 로그 — 관리자 계정을 비활성화하거나 삭제해도 운영 이력이 남도록
  * 관리자 이메일 스냅샷을 함께 저장하고 레코드 수정/삭제 API는 제공하지 않는다.
@@ -558,4 +624,7 @@ export type AccessLogRow = typeof accessLogs.$inferSelect;
 export type PushLogRow = typeof pushLogs.$inferSelect;
 export type AdminAccountRow = typeof adminAccounts.$inferSelect;
 export type AdminSessionRow = typeof adminSessions.$inferSelect;
+export type UserPasskeyRow = typeof userPasskeys.$inferSelect;
+export type AdminPasskeyRow = typeof adminPasskeys.$inferSelect;
+export type PasskeyChallengeRow = typeof passkeyChallenges.$inferSelect;
 export type AdminAuditLogRow = typeof adminAuditLogs.$inferSelect;

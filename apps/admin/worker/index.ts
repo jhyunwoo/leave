@@ -16,6 +16,12 @@ import {
   adminAuthMiddleware,
   adminDto,
   changeAdminPassword,
+  adminPasskeyAuthenticationOptions,
+  adminPasskeyAuthenticationVerify,
+  adminPasskeyRegistrationOptions,
+  adminPasskeyRegistrationVerify,
+  deleteAdminPasskey,
+  listAdminPasskeys,
   csrfMiddleware,
   loginAdmin,
   logoutAdmin,
@@ -45,6 +51,14 @@ app.get("/api/health", (c) =>
   c.json({ name: "Leave Admin", status: "ok" as const }),
 );
 app.post("/api/auth/login", loginAdmin);
+app.post(
+  "/api/auth/passkeys/authentication/options",
+  adminPasskeyAuthenticationOptions,
+);
+app.post(
+  "/api/auth/passkeys/authentication/verify",
+  adminPasskeyAuthenticationVerify,
+);
 
 const protectedApi = new Hono<AdminAppEnv>();
 protectedApi.use("*", adminAuthMiddleware);
@@ -53,6 +67,16 @@ protectedApi.get("/auth/me", (c) =>
 );
 protectedApi.post("/auth/logout", logoutAdmin);
 protectedApi.post("/auth/change-password", changeAdminPassword);
+protectedApi.get("/auth/passkeys", listAdminPasskeys);
+protectedApi.post(
+  "/auth/passkeys/registration/options",
+  adminPasskeyRegistrationOptions,
+);
+protectedApi.post(
+  "/auth/passkeys/registration/verify",
+  adminPasskeyRegistrationVerify,
+);
+protectedApi.delete("/auth/passkeys/:id", deleteAdminPasskey);
 
 const operations = new Hono<AdminAppEnv>();
 operations.use("*", passwordChangedMiddleware);

@@ -17,6 +17,7 @@
     "@leave/api": "workspace:*",
     "@leave/client": "workspace:*",
     "@leave/shared": "workspace:*",
+    "@simplewebauthn/browser": "13.3.0",
     "@tanstack/react-query": "^5.101.4",
     "hono": "4.13.2",
     "jotai": "^2.20.2",

@@ -13,6 +13,8 @@ import type {
   ProfileUpdateInput,
   RegularOvernightConfigInput,
   SignupInput,
+  PasskeyDeleteInput,
+  PasskeyRegistrationOptionsInput,
 } from "@leave/shared";
 import { ApiError } from "@leave/shared/http";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +26,8 @@ import type {
   AuthResponse,
   Me,
   OnboardingStatus,
+  PasskeyList,
+  PasskeyOptions,
 } from "../types";
 
 /** 401 응답은 다시 물어봐도 답이 달라지지 않으므로 재시도하지 않는다. */
@@ -187,6 +191,77 @@ export function useLogin() {
   return useSessionStart(async (input: LoginInput) =>
     unwrap<AuthResponse>(await client.auth.login.$post({ json: input })),
   );
+}
+
+type CredentialCeremony = (
+  options: Record<string, unknown>,
+) => Promise<Record<string, unknown>>;
+
+export function usePasskeys() {
+  const { client, unwrap } = useLeaveApi();
+  return useQuery({
+    queryKey: queryKeys.passkeys,
+    queryFn: async () => unwrap<PasskeyList>(await client.auth.passkeys.$get()),
+  });
+}
+
+export function useRegisterPasskey() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: PasskeyRegistrationOptionsInput & {
+        createCredential: CredentialCeremony;
+      },
+    ) => {
+      const begin = unwrap<PasskeyOptions>(
+        await client.auth.passkeys.registration.options.$post({
+          json: { name: input.name, currentPassword: input.currentPassword },
+        }),
+      );
+      const ceremony = await begin;
+      const response = await input.createCredential(ceremony.options);
+      return unwrap(
+        await client.auth.passkeys.registration.verify.$post({
+          json: { ceremonyId: ceremony.ceremonyId, response },
+        }),
+      );
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.passkeys }),
+  });
+}
+
+export function useDeletePasskey() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: PasskeyDeleteInput & { id: string }) =>
+      unwrap(
+        await client.auth.passkeys[":id"].$delete({
+          param: { id: input.id },
+          json: { currentPassword: input.currentPassword },
+        }),
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.passkeys }),
+  });
+}
+
+export function usePasskeyLogin() {
+  const { client, unwrap } = useLeaveApi();
+  return useSessionStart(async (getCredential: CredentialCeremony) => {
+    const ceremony = unwrap<PasskeyOptions>(
+      await client.auth.passkeys.authentication.options.$post(),
+    );
+    const begin = await ceremony;
+    const response = await getCredential(begin.options);
+    return unwrap<AuthResponse>(
+      await client.auth.passkeys.authentication.verify.$post({
+        json: { ceremonyId: begin.ceremonyId, response },
+      }),
+    );
+  });
 }
 
 export function useSignup() {

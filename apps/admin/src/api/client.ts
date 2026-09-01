@@ -90,8 +90,11 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  delete<T>(path: string) {
-    return request<T>(path, { method: "DELETE" });
+  delete<T>(path: string, body?: unknown) {
+    return request<T>(path, {
+      method: "DELETE",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
   },
 };
 

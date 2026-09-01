@@ -18,3 +18,13 @@ export {
 } from "./lib/leave-balances";
 export { buildNotificationPushMessage, sendExpoPush } from "./lib/push";
 export type { PushMessage, PushSendResult } from "./lib/push";
+export {
+  ADMIN_PASSKEY_ORIGINS,
+  finishAuthentication,
+  finishRegistration,
+  makeAuthenticationOptions,
+  makeRegistrationOptions,
+  MAX_PASSKEYS_PER_ACCOUNT,
+  passkeyDto,
+} from "./lib/passkeys";
+export type { StoredPasskey } from "./lib/passkeys";

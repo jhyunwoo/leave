@@ -15,12 +15,17 @@ import type {
   ProfileUpdateInput,
   SignupInput,
 } from "@leave/shared";
-import { desc, eq } from "drizzle-orm";
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
   accessLogs,
   pushLogs,
   sessions,
+  userPasskeys,
   users,
   type UserRow,
 } from "../db/schema";
@@ -45,6 +50,15 @@ import {
 import { serializeUser } from "../lib/serialize";
 import { serializeUnitById } from "../lib/unit-access";
 import { createSession } from "../lib/sessions";
+import {
+  finishAuthentication,
+  finishRegistration,
+  makeAuthenticationOptions,
+  makeRegistrationOptions,
+  MAX_PASSKEYS_PER_ACCOUNT,
+  passkeyDto,
+  USER_PASSKEY_ORIGINS,
+} from "../lib/passkeys";
 import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 import {
@@ -61,6 +75,12 @@ import {
   onboardingStatusRoute,
   signupRoute,
   updateProfileRoute,
+  passkeyAuthenticationOptionsRoute,
+  passkeyAuthenticationVerifyRoute,
+  passkeyDeleteRoute,
+  passkeyListRoute,
+  passkeyRegistrationOptionsRoute,
+  passkeyRegistrationVerifyRoute,
 } from "./auth.contract";
 
 /** 내 기록 열람에서 한 번에 돌려주는 최대 건수(종류별). */
@@ -130,6 +150,13 @@ app.use("/me/password", authMiddleware);
 app.use("/onboarding/*", authMiddleware);
 app.use("/activity", authMiddleware);
 app.use("/account", authMiddleware);
+app.use("/passkeys", authMiddleware);
+app.use("/passkeys/registration/*", authMiddleware);
+app.use("/passkeys/:id", authMiddleware);
+app.use(
+  "/passkeys/authentication/*",
+  rateLimit({ name: "passkey-login", limit: 20, windowSeconds: 600 }),
+);
 
 export const authRoutes = app
   .openapi(signupRoute, async (c) => {
@@ -195,6 +222,167 @@ export const authRoutes = app
       },
       200,
     );
+  })
+  .openapi(passkeyListRoute, async (c) => {
+    const rows = await drizzle(c.env.DB)
+      .select()
+      .from(userPasskeys)
+      .where(eq(userPasskeys.userId, c.get("user").id))
+      .orderBy(desc(userPasskeys.createdAt));
+    return c.json({ passkeys: rows.map(passkeyDto) }, 200);
+  })
+  .openapi(passkeyRegistrationOptionsRoute, async (c) => {
+    const user = c.get("user");
+    const input = c.req.valid("json");
+    if (
+      !(await verifyPassword(
+        input.currentPassword,
+        user.passwordSalt,
+        user.passwordHash,
+      ))
+    ) {
+      return c.json({ error: "현재 비밀번호가 올바르지 않습니다" }, 400);
+    }
+    const db = drizzle(c.env.DB);
+    const existing = await db
+      .select()
+      .from(userPasskeys)
+      .where(eq(userPasskeys.userId, user.id));
+    if (existing.length >= MAX_PASSKEYS_PER_ACCOUNT) {
+      return c.json(
+        { error: "패스키는 최대 10개까지 등록할 수 있습니다" },
+        409,
+      );
+    }
+    return c.json(
+      await makeRegistrationOptions({
+        db,
+        subjectKind: "user",
+        subjectId: user.id,
+        userName: user.email,
+        userDisplayName: user.name,
+        name: input.name,
+        existing,
+      }),
+      200,
+    );
+  })
+  .openapi(passkeyRegistrationVerifyRoute, async (c) => {
+    const user = c.get("user");
+    const input = c.req.valid("json");
+    const db = drizzle(c.env.DB);
+    try {
+      const credential = await finishRegistration({
+        db,
+        ceremonyId: input.ceremonyId,
+        subjectKind: "user",
+        subjectId: user.id,
+        response: input.response as unknown as RegistrationResponseJSON,
+        expectedOrigins: USER_PASSKEY_ORIGINS,
+      });
+      const row = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        ...credential,
+        createdAt: new Date().toISOString(),
+        lastUsedAt: null,
+      };
+      await db.insert(userPasskeys).values(row);
+      return c.json({ passkey: passkeyDto(row) }, 201);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "패스키를 등록하지 못했습니다";
+      const duplicate =
+        message.includes("UNIQUE") || message.includes("unique");
+      return c.json(
+        { error: duplicate ? "이미 등록된 패스키입니다" : message },
+        duplicate ? 409 : 400,
+      );
+    }
+  })
+  .openapi(passkeyDeleteRoute, async (c) => {
+    const user = c.get("user");
+    const input = c.req.valid("json");
+    if (
+      !(await verifyPassword(
+        input.currentPassword,
+        user.passwordSalt,
+        user.passwordHash,
+      ))
+    ) {
+      return c.json({ error: "현재 비밀번호가 올바르지 않습니다" }, 400);
+    }
+    const removed = await drizzle(c.env.DB)
+      .delete(userPasskeys)
+      .where(
+        and(
+          eq(userPasskeys.id, c.req.valid("param").id),
+          eq(userPasskeys.userId, user.id),
+        ),
+      )
+      .returning({ id: userPasskeys.id });
+    if (!removed[0]) return c.json({ error: "패스키를 찾을 수 없습니다" }, 404);
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(passkeyAuthenticationOptionsRoute, async (c) => {
+    return c.json(
+      await makeAuthenticationOptions(drizzle(c.env.DB), "user"),
+      200,
+    );
+  })
+  .openapi(passkeyAuthenticationVerifyRoute, async (c) => {
+    const input = c.req.valid("json");
+    const response = input.response as unknown as AuthenticationResponseJSON;
+    if (typeof response.id !== "string") {
+      return c.json({ error: "패스키 응답이 올바르지 않습니다" }, 400);
+    }
+    const db = drizzle(c.env.DB);
+    const credential = await db
+      .select()
+      .from(userPasskeys)
+      .where(eq(userPasskeys.credentialId, response.id))
+      .get();
+    if (!credential)
+      return c.json({ error: "등록되지 않은 패스키입니다" }, 401);
+    try {
+      const info = await finishAuthentication({
+        db,
+        ceremonyId: input.ceremonyId,
+        subjectKind: "user",
+        response,
+        credential,
+        expectedOrigins: USER_PASSKEY_ORIGINS,
+      });
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, credential.userId))
+        .get();
+      if (!user) return c.json({ error: "등록되지 않은 패스키입니다" }, 401);
+      await db
+        .update(userPasskeys)
+        .set({ counter: info.newCounter, lastUsedAt: new Date().toISOString() })
+        .where(eq(userPasskeys.id, credential.id));
+      const token = await createSession(db, user.id);
+      return c.json(
+        {
+          token,
+          user: user.onboardingCompletedAt ? serializeUser(user) : null,
+          onboardingCompleted: Boolean(user.onboardingCompletedAt),
+        },
+        200,
+      );
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "패스키를 확인하지 못했습니다",
+        },
+        400,
+      );
+    }
   })
   .openapi(logoutRoute, async (c) => {
     const header = c.req.header("Authorization");

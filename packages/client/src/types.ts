@@ -72,6 +72,16 @@ export type AuthResponse = InferResponseType<
   200
 >;
 
+export type PasskeyList = InferResponseType<
+  Client["auth"]["passkeys"]["$get"],
+  200
+>;
+export type Passkey = PasskeyList["passkeys"][number];
+export type PasskeyOptions = InferResponseType<
+  Client["auth"]["passkeys"]["registration"]["options"]["$post"],
+  200
+>;
+
 export type OnboardingStatus = InferResponseType<
   Client["auth"]["onboarding"]["$get"],
   200

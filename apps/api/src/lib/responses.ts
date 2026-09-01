@@ -459,6 +459,24 @@ export const authResponseSchema = z
   })
   .openapi("AuthResponse");
 
+export const passkeySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  deviceType: z.enum(["singleDevice", "multiDevice"]),
+  backedUp: z.boolean(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+});
+
+export const passkeyListSchema = z.object({
+  passkeys: z.array(passkeySchema),
+});
+
+export const passkeyOptionsSchema = z.object({
+  ceremonyId: z.string(),
+  options: z.record(z.string(), z.unknown()),
+});
+
 export const accessLogSchema = z
   .object({
     id: z.string(),

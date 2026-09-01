@@ -6,6 +6,7 @@
 import { LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, type AdminAccount, ApiError } from "../api/client";
+import { getPasskey, passkeysSupported } from "../lib/passkeys";
 
 export function LoginPage({
   onSuccess,
@@ -32,6 +33,31 @@ export function LoginPage({
         caught instanceof ApiError
           ? caught.message
           : "로그인 중 오류가 발생했습니다",
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const submitPasskey = async () => {
+    setError("");
+    setPending(true);
+    try {
+      const begin = await api.post<{
+        ceremonyId: string;
+        options: Record<string, unknown>;
+      }>("/auth/passkeys/authentication/options");
+      const response = await getPasskey(begin.options);
+      const result = await api.post<{ admin: AdminAccount }>(
+        "/auth/passkeys/authentication/verify",
+        { ceremonyId: begin.ceremonyId, response },
+      );
+      onSuccess(result.admin);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : "패스키 로그인에 실패했습니다",
       );
     } finally {
       setPending(false);
@@ -90,6 +116,16 @@ export function LoginPage({
             {pending ? <LoaderCircle className="spin" size={18} /> : null}
             {pending ? "확인 중…" : "로그인"}
           </button>
+          {passkeysSupported ? (
+            <button
+              className="button secondary auth-submit"
+              type="button"
+              disabled={pending}
+              onClick={() => void submitPasskey()}
+            >
+              패스키로 로그인
+            </button>
+          ) : null}
         </form>
         <p className="auth-notice">
           로그인과 모든 데이터 변경은 보안 감사 기록에 남습니다.

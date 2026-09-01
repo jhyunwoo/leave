@@ -8,7 +8,12 @@
  * 실려 나가고 저장되지 않는다.
  */
 
-import { adminAccounts, adminSessions, hashPassword } from "@leave/api/server";
+import {
+  adminAccounts,
+  adminPasskeys,
+  adminSessions,
+  hashPassword,
+} from "@leave/api/server";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
@@ -147,9 +152,10 @@ export const adminAccountRoutes = new Hono<AdminAppEnv>()
     const patch = { ...input.data, updatedAt: nowIso() };
     await db.update(adminAccounts).set(patch).where(eq(adminAccounts.id, id));
     if (input.data.active === false) {
-      await db
-        .delete(adminSessions)
-        .where(eq(adminSessions.adminId, before.id));
+      await db.batch([
+        db.delete(adminSessions).where(eq(adminSessions.adminId, before.id)),
+        db.delete(adminPasskeys).where(eq(adminPasskeys.adminId, before.id)),
+      ]);
     }
     const after = {
       ...before,
@@ -191,7 +197,10 @@ export const adminAccountRoutes = new Hono<AdminAppEnv>()
         updatedAt: nowIso(),
       })
       .where(eq(adminAccounts.id, id));
-    await db.delete(adminSessions).where(eq(adminSessions.adminId, id));
+    await db.batch([
+      db.delete(adminSessions).where(eq(adminSessions.adminId, id)),
+      db.delete(adminPasskeys).where(eq(adminPasskeys.adminId, id)),
+    ]);
     await writeAudit(c, {
       action: "reset_password",
       entityType: "admin_account",

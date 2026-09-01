@@ -136,6 +136,27 @@ export const loginSchema = z.object({
     .max(MAX_SUBMITTED_PASSWORD_LENGTH, "비밀번호가 너무 깁니다"),
 });
 
+/** 패스키 관리·ceremony 입력. 브라우저/네이티브 WebAuthn 응답은 불투명 JSON이다. */
+export const passkeyRegistrationOptionsSchema = z.object({
+  name: z.string().trim().min(1, "패스키 이름을 입력해주세요").max(50),
+  currentPassword: z
+    .string()
+    .min(1, "현재 비밀번호를 입력해주세요")
+    .max(MAX_SUBMITTED_PASSWORD_LENGTH, "비밀번호가 너무 깁니다"),
+});
+
+export const passkeyVerificationSchema = z.object({
+  ceremonyId: z.uuid(),
+  response: z.record(z.string(), z.unknown()),
+});
+
+export const passkeyDeleteSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, "현재 비밀번호를 입력해주세요")
+    .max(MAX_SUBMITTED_PASSWORD_LENGTH, "비밀번호가 너무 깁니다"),
+});
+
 /** 하루 최대 출타 인원. 부대 관리자가 직접 지정한다. */
 const maxLeaveCountSchema = z
   .int("최대 출타 인원을 입력해주세요")
@@ -628,6 +649,13 @@ export type SignupInput = z.infer<typeof signupSchema>;
 export type OnboardingProfileInput = z.infer<typeof onboardingProfileSchema>;
 export type PushEventInput = z.infer<typeof pushEventSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type PasskeyRegistrationOptionsInput = z.infer<
+  typeof passkeyRegistrationOptionsSchema
+>;
+export type PasskeyVerificationInput = z.infer<
+  typeof passkeyVerificationSchema
+>;
+export type PasskeyDeleteInput = z.infer<typeof passkeyDeleteSchema>;
 export type UnitCreateInput = z.infer<typeof unitCreateSchema>;
 export type UnitUpdateInput = z.infer<typeof unitUpdateSchema>;
 export type UnitJoinInput = z.infer<typeof unitJoinSchema>;

@@ -12,6 +12,7 @@ export const queryKeys = {
   /** 로그인한 사용자 + 소속 그룹. */
   me: ["me"] as const,
   onboarding: ["onboarding"] as const,
+  passkeys: ["passkeys"] as const,
 
   /** 모든 그룹의 구성원 목록. */
   allUnitMembers: ["unitMembers"] as const,

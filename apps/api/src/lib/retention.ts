@@ -14,7 +14,12 @@
  */
 
 import { sql } from "drizzle-orm";
-import { accessLogs, pushLogs, sessions } from "../db/schema";
+import {
+  accessLogs,
+  passkeyChallenges,
+  pushLogs,
+  sessions,
+} from "../db/schema";
 import type { Db } from "./db";
 
 /** 접속 기록·푸시 로그 기본 보관 일수. `LOG_RETENTION_DAYS`로 덮어쓸 수 있다. */
@@ -30,6 +35,7 @@ export type RetentionSummary = {
   accessLogs: number;
   pushLogs: number;
   sessions: number;
+  passkeyChallenges: number;
   cutoff: string;
 };
 
@@ -110,10 +116,21 @@ export async function pruneExpiredData(
     return result.meta.changes;
   });
 
+  const removedPasskeyChallenges = await deleteInRounds(db, async (limit) => {
+    const result = await db
+      .delete(passkeyChallenges)
+      .where(
+        sql`${passkeyChallenges.id} in (select ${passkeyChallenges.id} from ${passkeyChallenges} where ${passkeyChallenges.expiresAt} <= ${nowIso} limit ${limit})`,
+      )
+      .run();
+    return result.meta.changes;
+  });
+
   return {
     accessLogs: removedAccessLogs,
     pushLogs: removedPushLogs,
     sessions: removedSessions,
+    passkeyChallenges: removedPasskeyChallenges,
     cutoff,
   };
 }

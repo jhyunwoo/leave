@@ -10,12 +10,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLogin } from "@leave/client";
+import { useLogin, usePasskeyLogin } from "@leave/client";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { Field, Input } from "@/components/field";
 import { LegalLinks } from "@/components/legal-links";
 import { makeStyles, spacing } from "@/theme";
+import { getPasskey, passkeysSupported } from "@/lib/passkeys";
 
 export function LoginScreen() {
   const styles = useStyles();
@@ -23,6 +24,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const login = useLogin();
+  const passkeyLogin = usePasskeyLogin();
   const insets = useSafeAreaInsets();
 
   const submit = async () => {
@@ -32,6 +34,17 @@ export function LoginScreen() {
       // 토큰 설정 → Stack.Protected 가드가 자동으로 탭 화면으로 전환
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인하지 못했습니다");
+    }
+  };
+
+  const submitPasskey = async () => {
+    setError(null);
+    try {
+      await passkeyLogin.mutateAsync(getPasskey);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "패스키 로그인에 실패했습니다",
+      );
     }
   };
 
@@ -116,6 +129,17 @@ export function LoginScreen() {
             loading={login.isPending}
             testID="login-submit"
           />
+          {passkeysSupported ? (
+            <Button
+              title={
+                passkeyLogin.isPending ? "패스키 확인 중…" : "패스키로 로그인"
+              }
+              variant="secondary"
+              onPress={() => void submitPasskey()}
+              loading={passkeyLogin.isPending}
+              testID="passkey-login"
+            />
+          ) : null}
           <Text style={styles.footer}>
             처음이신가요?{" "}
             <Link href="/signup" style={styles.link}>

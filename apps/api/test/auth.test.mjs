@@ -129,6 +129,48 @@ test("로그인: 성공/실패", async () => {
   assert.equal(bad.status, 401);
 });
 
+test("패스키 관리와 로그인 options는 비밀번호 재확인·인증 경계를 지킨다", async () => {
+  const { token } = await signup();
+  const empty = await req("GET", "/auth/passkeys", { token });
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.data.passkeys, []);
+
+  const unauthorized = await req(
+    "POST",
+    "/auth/passkeys/registration/options",
+    { body: { name: "노트북", currentPassword: "password123" } },
+  );
+  assert.equal(unauthorized.status, 401);
+
+  const wrong = await req("POST", "/auth/passkeys/registration/options", {
+    token,
+    body: { name: "노트북", currentPassword: "wrong-password" },
+  });
+  assert.equal(wrong.status, 400);
+
+  const begin = await req("POST", "/auth/passkeys/registration/options", {
+    token,
+    body: { name: "노트북", currentPassword: "password123" },
+  });
+  assert.equal(begin.status, 200);
+  assert.ok(begin.data.ceremonyId);
+  assert.equal(begin.data.options.rp.id, "leave.moveto.kr");
+  assert.equal(
+    begin.data.options.authenticatorSelection.residentKey,
+    "required",
+  );
+
+  const loginBegin = await req("POST", "/auth/passkeys/authentication/options");
+  assert.equal(loginBegin.status, 200);
+  assert.ok(loginBegin.data.options.challenge);
+
+  const missing = await req("DELETE", "/auth/passkeys/not-found", {
+    token,
+    body: { currentPassword: "password123" },
+  });
+  assert.equal(missing.status, 404);
+});
+
 test("/auth/me 는 인증 필요", async () => {
   const noAuth = await req("GET", "/auth/me");
   assert.equal(noAuth.status, 401);

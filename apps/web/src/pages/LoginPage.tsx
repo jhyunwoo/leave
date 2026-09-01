@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { useLogin } from "@leave/client";
+import { useLogin, usePasskeyLogin } from "@leave/client";
 import { safeNext, withNext } from "../state/next-destination";
 import { BrandLockup } from "../components/BrandLockup";
 import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
+import { getPasskey, passkeysSupported } from "../lib/passkeys";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const login = useLogin();
+  const passkeyLogin = usePasskeyLogin();
   const navigate = useNavigate();
   const location = useLocation();
   // 공유된 프로필 링크(/u/{username})로 들어왔다가 로그인으로 튕긴 사람을
@@ -26,6 +28,18 @@ export function LoginPage() {
       void navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인하지 못했습니다");
+    }
+  };
+
+  const submitPasskey = async () => {
+    setError(null);
+    try {
+      await passkeyLogin.mutateAsync(getPasskey);
+      void navigate(next, { replace: true });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "패스키 로그인에 실패했습니다",
+      );
     }
   };
 
@@ -97,6 +111,16 @@ export function LoginPage() {
         >
           {login.isPending ? "로그인 중…" : "로그인"}
         </button>
+        {passkeysSupported ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={passkeyLogin.isPending}
+            onClick={() => void submitPasskey()}
+          >
+            {passkeyLogin.isPending ? "패스키 확인 중…" : "패스키로 로그인"}
+          </button>
+        ) : null}
         <p className="body-sm text-body" style={{ textAlign: "center" }}>
           처음이신가요?{" "}
           <Link

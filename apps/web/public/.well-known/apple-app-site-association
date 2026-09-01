@@ -2,9 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": [
-          "Y4FP7J24AX.app.leave.mobile"
-        ],
+        "appIDs": ["Y4FP7J24AX.app.leave.mobile"],
         "components": [
           {
             "/": "/u/*",
@@ -13,5 +11,8 @@
         ]
       }
     ]
+  },
+  "webcredentials": {
+    "apps": ["Y4FP7J24AX.app.leave.mobile"]
   }
 }
