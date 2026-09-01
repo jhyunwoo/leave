@@ -85,6 +85,22 @@ rm -rf apps/native/dist
 
 `eas build`는 EAS 서버가 직접 번들하므로 이 문제와 무관하다.
 
+### 소스맵은 이 워크플로가 같이 올린다
+
+워크플로 잡은 `environment: production`으로 EAS 환경변수를 받고
+`upload_sentry_sourcemaps: true`로 Sentry 소스맵을 함께 올린다. **업로드가 실패하면 잡도 실패한다.**
+이 값이 없으면 업로드 실패를 경고만 남기고 잡이 성공으로 끝나 고아 소스맵이 생긴다.
+
+`docs/native-observability.md`가 정본으로 지정한 `pnpm native:eas:update:*` wrapper는 같은 일을
+(preflight → update → 업로드) 하지만 위의 hermesc 문제로 **이 머신에서는 못 돌린다.** 워크플로가
+그 대체 경로다. 발행 전에 환경변수가 있는지 먼저 본다:
+
+```bash
+eas env:list --environment production   # DSN·SENTRY_ORG·SENTRY_PROJECT·SENTRY_AUTH_TOKEN
+```
+
+없으면 OTA는 나가도 스택 트레이스가 안 풀린다.
+
 ### 발행 후 확인
 
 ```bash
@@ -114,6 +130,9 @@ pnpm eas:submit --profile production
 - 빌드번호는 `eas.json`의 `appVersionSource: "remote"` + `autoIncrement`로 EAS가 매긴다.
   `app.json`에 `ios.buildNumber`·`android.versionCode`가 없는 건 의도된 것이니 넣지 마라.
 - 제출 대상: iOS는 App Store Connect(`ascAppId: 6792287152`), Android는 Play **`internal`** 트랙.
+- 빌드 로그에서 **Sentry 심볼 업로드가 실제로 돌았는지** 본다: iOS는 `Upload Debug Symbols to
+Sentry` 페이즈, Android는 Sentry Gradle 태스크(mapping/native symbols). 여기서 실패하면 이벤트는
+  올라와도 스택이 안 풀린다. 자격 증명은 EAS 환경변수에서 온다(위 §2의 `eas env:list`).
 
 빌드가 끝나면 새 Runtime Version이 §1의 fingerprint와 같은지 확인한다. 다르면 빌드 사이에
 트리가 바뀐 것이다.
@@ -144,6 +163,8 @@ OTA 6cb16632 · 08-22 12:41 (production)
 - `expo-router`의 `typedRoutes` 생성물(`.expo/types/router.d.ts`)은 gitignore라 낡을 수 있다.
   라우트를 추가한 뒤 `check-types`가 엉뚱한 경로 오류를 내면 `npx expo start`를 잠깐 띄워 재생성한다.
 - 인증은 EAS `jhyunwoo` 계정으로 되어 있다.
+- **`closed-test`는 EAS 커스텀 환경이라 현재 플랜에서 변수를 못 넣는다**(Production/Enterprise 전용).
+  `closed` 프로파일과 `pnpm native:eas:update:closed`는 Sentry 변수 preflight에서 막힌다.
 
 Cloudflare 워커(web·api·admin) 배포는 **`deploy-web`** 을 쓴다. `packages/shared`나
 `packages/client`를 고쳤으면 **양쪽 다** 배포 대상이다.

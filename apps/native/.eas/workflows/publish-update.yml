@@ -5,7 +5,13 @@
 # ("ELF: not found"). 빌드는 EAS 서버가 직접 번들하므로 영향이 없지만 OTA는
 # 로컬 번들을 올리는 구조라 막힌다. 이 워크플로로 같은 일을 EAS에서 돌린다.
 #
+# `environment: production`이 EAS 환경변수(DSN·SENTRY_ORG/PROJECT·SENTRY_AUTH_TOKEN)를
+# 주입하고, `upload_sentry_sourcemaps: true`가 소스맵 업로드를 강제한다. 이 값이
+# 없으면 업로드 실패를 경고만 남기고 잡이 성공으로 끝나 고아 소스맵이 생긴다.
+# 루트의 `pnpm native:eas:update:*` wrapper와 같은 보장을 EAS 쪽에서 제공한다.
+#
 # 실행: cd apps/native && npx eas workflow:run publish-update.yml
+
 name: Publish production update
 
 on:
@@ -19,3 +25,4 @@ jobs:
     params:
       channel: production
       platform: all
+      upload_sentry_sourcemaps: true
