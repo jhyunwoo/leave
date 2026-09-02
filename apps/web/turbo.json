@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // SEO 테스트는 dist/의 HTML·robots.txt·sitemap.xml을 직접 읽는다.
+    // "렌더링된 DOM이 아니라 HTTP 응답 본문을 검사한다"가 이 테스트의 요점이라
+    // 빌드 산출물이 반드시 있어야 한다.
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "test/**", "!**/*.md"],
+      "outputs": []
+    }
+  }
+}

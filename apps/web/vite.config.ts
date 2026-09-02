@@ -24,27 +24,42 @@ function resolveAppVersion(): string {
   }
 }
 
-export default defineConfig({
+/**
+ * 빌드가 두 번 돈다.
+ *
+ *  1) 브라우저 번들 (`vite build`)
+ *  2) 미리 그리기용 Node 번들 (`vite build --ssr src/entry-prerender.tsx`)
+ *
+ * 두 번째 결과는 `scripts/build-seo.mjs`가 불러 공개 페이지를 HTML로 굽는 데만
+ * 쓰이고 곧바로 지워진다. 워크스페이스 패키지(@leave/*)는 소스 TypeScript를
+ * 그대로 내보내므로 Node가 직접 읽을 수 없다 — 그것만 번들에 넣는다.
+ */
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react()],
   define: {
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(resolveAppVersion()),
   },
-  build: {
-    rolldownOptions: {
-      output: {
-        // 화면 코드는 App.tsx의 `lazy()`가 쪼갠다. node_modules 전체를 한
-        // vendor로 묶으면 지연 화면에서만 쓰는 zod까지 첫 화면에 따라오므로,
-        // 앱보다 훨씬 덜 바뀌는 React 런타임만 장기 캐시 경계로 남긴다.
-        codeSplitting: {
-          groups: [
-            {
-              name: "react",
-              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
-              priority: 20,
+  ssr: {
+    noExternal: [/^@leave\//],
+  },
+  build: isSsrBuild
+    ? {}
+    : {
+        rolldownOptions: {
+          output: {
+            // 화면 코드는 App.tsx의 `lazy()`가 쪼갠다. node_modules 전체를 한
+            // vendor로 묶으면 지연 화면에서만 쓰는 zod까지 첫 화면에 따라오므로,
+            // 앱보다 훨씬 덜 바뀌는 React 런타임만 장기 캐시 경계로 남긴다.
+            codeSplitting: {
+              groups: [
+                {
+                  name: "react",
+                  test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                  priority: 20,
+                },
+              ],
             },
-          ],
+          },
         },
       },
-    },
-  },
-});
+}));

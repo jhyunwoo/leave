@@ -129,13 +129,17 @@
   gap: 72px;
 }
 
+/* 최대 크기가 80px인 이유: 히어로 왼쪽 열은 넓은 화면에서도 470px로 고정된다
+   (.lp-wrap 1200px의 5fr). 88px이면 "부대 휴가 일정,"이 그 폭에 들어가지 않아
+   줄이 하나 더 생긴다. keep-all은 한국어 낱말이 음절 사이에서 끊기지 않게 한다. */
 .lp-h1 {
   max-width: 560px;
   font-family: var(--font-display);
-  font-size: clamp(58px, 6.2vw, 88px);
+  font-size: clamp(58px, 6.2vw, 80px);
   font-weight: 900;
   line-height: 0.94;
   letter-spacing: -0.065em;
+  word-break: keep-all;
 }
 
 .lp-h1 em {
@@ -564,31 +568,57 @@
   border-color: var(--ink);
 }
 
+/* 배경이 --ink인데 글자색이 --on-primary(같은 #0e0f0c)라 푸터 워드마크가
+   검은 바탕에 검게 찍히고 있었다. 대비를 위해 밝은 색으로 뒤집는다. */
 .lp-footer {
-  min-height: 180px;
-  color: var(--on-primary);
+  color: var(--canvas);
   background: var(--ink);
 }
 
+/* 링크가 늘어 한 줄에 담기지 않으므로 세로 두 단으로 쌓는다. */
 .lp-footer-in {
   min-height: 180px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 20px;
+  padding: 40px 0;
+}
+
+.lp-footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
 }
 
 .lp-footer-links {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 12px 24px;
   margin-left: auto;
 }
 
 .lp-footer-links a {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
   color: #d4d4d8;
   font-size: 14px;
   text-decoration: none;
 }
 
+.lp-footer-links a:hover {
+  color: var(--canvas);
+  text-decoration: underline;
+}
+
 .lp-footer-fine {
+  max-width: 760px;
   color: #a1a1aa;
   font-size: 13px;
+  line-height: 1.6;
+  word-break: keep-all;
 }
 
 .lp-reveal {
@@ -614,6 +644,89 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 키보드 사용자가 긴 내비게이션을 건너뛴다. 평소에는 화면 밖에 있다가
+   포커스를 받으면 제자리로 들어온다(감춰 둔 본문이 아니라 이동 장치다). */
+.lp-skip {
+  position: absolute;
+  z-index: 100;
+  top: 8px;
+  left: -9999px;
+  padding: 10px 16px;
+  color: var(--on-primary);
+  background: var(--primary);
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-skip:focus-visible {
+  left: 16px;
+}
+
+.lp-hero-note {
+  max-width: 520px;
+  margin-top: 22px;
+  color: var(--mute);
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.lp-steps-more {
+  margin-top: 28px;
+  color: var(--body);
+  font-size: 15px;
+  word-break: keep-all;
+}
+
+/* --brand(#347a1f)는 흰 배경에서는 5.3:1이지만 이 섹션의 --canvas-soft
+   배경에서는 4.42:1로 AA(4.5:1)에 못 미친다(axe 확인). 더 어두운 잉크를 쓴다. */
+.lp-steps-more a {
+  color: var(--ink-deep);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+/* 아이콘 없이 글만 있는 카드(개인 휴가 관리). 아이콘 자리를 비워 두지 않는다. */
+.lp-value--text {
+  min-height: auto;
+  padding-top: 28px;
+}
+
+.lp-faq {
+  padding: var(--sp-section) 0;
+  background: var(--canvas);
+}
+
+.lp-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 48px;
+  margin-top: 40px;
+}
+
+.lp-faq-item {
+  padding: 26px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.lp-faq-item h3 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.lp-faq-item p {
+  margin-top: 10px;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.7;
+  word-break: keep-all;
 }
 
 @media (max-width: 980px) {
@@ -692,10 +805,15 @@
   }
 
   .lp-value-grid,
-  .lp-step-grid {
+  .lp-step-grid,
+  .lp-faq-grid {
     grid-template-columns: 1fr;
     gap: 12px;
     margin-top: 32px;
+  }
+
+  .lp-faq {
+    padding: 72px 0;
   }
 
   .lp-value,
@@ -729,12 +847,6 @@
 
   .lp-cta-card {
     padding: 48px 20px;
-  }
-
-  .lp-footer-in {
-    min-height: 220px;
-    flex-wrap: wrap;
-    align-content: center;
   }
 
   .lp-footer-links {

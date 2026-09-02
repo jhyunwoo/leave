@@ -20,7 +20,8 @@ pnpm quality   # 서식 → lint → 바인딩 타입 → 타입 검사 → 단�
 | `apps/api` 라우트·lib   | `pnpm --filter @leave/api test`                  | 통합 테스트(HTTP). 목으로 대체하지 않는다          |
 | `apps/admin` worker     | `pnpm --filter @leave/admin test`                | `scripts/run-tests.mjs`에 요청 왕복을 추가         |
 | `apps/admin` 화면       | `check-types` + `lint` + 브라우저 확인           | 중요한 흐름이면 `e2e/admin.spec.ts`                |
-| `apps/web` 화면         | `check-types` + `lint` + 브라우저 확인           | 중요한 사용자 여정이면 Playwright                  |
+| `apps/web` 화면         | `pnpm --filter @leave/web test` + 브라우저 확인  | 중요한 사용자 여정이면 Playwright                  |
+| `apps/web` 공개 페이지  | 위 + `docs/seo.md`의 검증 절차                   | 색인 정책이 바뀌면 `test/seo-*.test.ts`에 추가     |
 | `apps/native` 화면      | `check-types` + `lint`                           | 중요한 흐름이면 Maestro                            |
 | `wrangler.jsonc` 바인딩 | `pnpm --filter <앱> types` 후 `pnpm types:check` | —                                                  |
 

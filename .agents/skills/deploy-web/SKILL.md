@@ -99,6 +99,27 @@ grep -ohE '[A-Za-z0-9_-]+-[A-Za-z0-9_-]{8}\.js' /tmp/main.js | sort -u \
 grep -l "찾는문자열" /tmp/c_*.js
 ```
 
+웹은 이제 정적 자산 위에 얇은 워커가 얹혀 있다(`apps/web/worker/index.ts`).
+배포 뒤 **공개 응답의 모양**도 함께 확인한다 — 여기가 깨지면 검색 노출이 조용히 죽는다.
+
+```bash
+# 없는 주소는 404여야 한다(200이면 워커가 안 붙었거나 not_found_handling이 되돌아간 것)
+curl -s -o /dev/null -w "404? %{http_code}\n" https://leave.moveto.kr/__does-not-exist
+
+# 로그인·공개 프로필에 noindex가 붙는가
+curl -sI https://leave.moveto.kr/login     | grep -i x-robots-tag
+curl -sI https://leave.moveto.kr/u/hyunwoo | grep -i x-robots-tag
+
+# robots.txt는 text/plain, sitemap은 xml
+curl -sI https://leave.moveto.kr/robots.txt  | grep -i content-type
+curl -sI https://leave.moveto.kr/sitemap.xml | grep -i content-type
+
+# 홈 HTML에 본문이 실려 있는가(미리 그리기가 돌았는지)
+curl -s https://leave.moveto.kr/ | grep -c "하루 최대 출타 인원"
+```
+
+배경과 색인 정책은 `docs/seo.md`.
+
 ```bash
 # api — 이번에 추가한 경로가 스키마에 있는가
 curl -s https://api.leave.moveto.kr/openapi.json \

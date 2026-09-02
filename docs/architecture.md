@@ -135,6 +135,24 @@ middleware/*.ts             인증·온보딩·rate limit·접속 기록·최소
 **바인딩**: `wrangler.jsonc`가 실제로 주는 바인딩과 코드가 믿는 `AppBindings`가 어긋나면
 `bindings-drift.ts`에서 타입 검사가 깨진다. 생성물은 `pnpm --filter @leave/api types`로 갱신한다.
 
+## 웹 앱의 렌더링 구조
+
+`apps/web`은 한 덩어리가 아니라 두 층이다.
+
+```
+공개 페이지 (/, /guide)   빌드 시 HTML로 구워져 정적 자산으로 나간다
+법적 고지 (/privacy 등)   손으로 쓴 단독 HTML
+그 밖의 모든 주소         worker/index.ts 가 표를 보고 셸(200) 또는 404를 낸다
+```
+
+정적 자산과 일치하는 요청은 **워커를 거치지 않는다**(Cloudflare의 기본 동작).
+그래서 공개 페이지의 응답 경로에는 워커가 없고, 워커는 SPA 경로와 없는 주소에만
+관여한다. 색인 정책·메타데이터·robots.txt·sitemap.xml의 출처는
+`src/seo/routes.ts` 한 표다. 이유와 대안 비교는 [seo.md](seo.md).
+
+라우트를 추가하면 그 표에도 넣어야 한다 — 빠뜨리면 그 주소는 404가 되고,
+`apps/web/test/seo-routes.test.ts`가 그것을 빌드에서 잡는다.
+
 ## 관리자 워커 구조
 
 ```

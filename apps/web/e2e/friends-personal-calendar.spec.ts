@@ -227,7 +227,8 @@ test("로그아웃 공개 프로필은 최소 정보만 보이고 로그인 뒤 
 
   await page.getByPlaceholder("you@example.com").fill(visitor.email);
   await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.getByRole("button", { name: "로그인" }).click();
+  // exact: true 가 필요하다 — 기본 매칭은 부분 일치라 "패스키로 로그인"까지 잡힌다.
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
 
   await expect(page).toHaveURL(new RegExp(`/u/${target.username}$`), {
     timeout: 15_000,

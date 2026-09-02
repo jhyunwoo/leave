@@ -26,6 +26,7 @@
 타입 안정성: `apps/api`가 `AppType`을 export → 웹/앱이 `hc<AppType>()`로 타입 안전 RPC 클라이언트 사용. 디자인은 `DESIGN.md`(Wise 스타일) 토큰을 웹·앱이 공유합니다.
 
 - 무엇이 어디에 사는가·의존 방향: [docs/architecture.md](docs/architecture.md)
+- 공개 웹의 검색 노출·색인 정책: [docs/seo.md](docs/seo.md)
 - 무엇을 고치면 무엇을 테스트하는가: [docs/testing.md](docs/testing.md)
 - 유지보수 규칙: [docs/code-style.md](docs/code-style.md)
 

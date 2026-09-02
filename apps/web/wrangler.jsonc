@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "leave-web",
+  // 정적 자산으로 답할 수 없는 요청만 이 워커가 받는다(SPA 경로와 없는 주소).
+  // 자세한 이유는 worker/index.ts 머리주석.
+  "main": "worker/index.ts",
   "compatibility_date": "2026-07-01",
   // 배포 시 DNS 레코드와 인증서를 wrangler가 자동으로 만든다 (moveto.kr 존이 이 계정에 있어야 함)
   "routes": [
@@ -11,6 +14,14 @@
   ],
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    // 낱개 .html은 끝 슬래시 없이(`/guide`), 폴더 index는 끝 슬래시 있게 서빙한다.
+    // `/guide.html`·`/guide/`로 들어와도 정본 주소로 307을 낸다 — 중복 주소가
+    // 색인되지 않게 하는 기본값이라 명시해 둔다.
+    "html_handling": "auto-trailing-slash",
+    // "single-page-application"을 쓰지 않는다. 그 값은 모르는 주소 전부에
+    // index.html을 200으로 돌려줘 soft 404를 만든다. 여기서는 워커가 표를 보고
+    // 셸(200)과 404를 갈라 낸다.
+    "not_found_handling": "none",
   },
 }

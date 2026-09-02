@@ -19,6 +19,16 @@ If you edited `wrangler.jsonc`, regenerate the binding types first
 Where things live and which tests to add: [docs/architecture.md](docs/architecture.md),
 [docs/testing.md](docs/testing.md), [docs/code-style.md](docs/code-style.md).
 
+## Two rules the web app enforces at build time
+
+- **New route in `apps/web/src/App.tsx` → add it to `apps/web/src/seo/routes.ts`.**
+  The Worker serves a 404 for any path missing from that table, so a forgotten entry
+  makes the screen 404 on reload. `apps/web/test/seo-routes.test.ts` compares the two.
+- **Changed public copy (landing, guide, 404) → run
+  `pnpm --filter @leave/web fonts:generate`.** The local Pretendard subset is built
+  from string literals in the source. New glyphs silently fall back to a third-party
+  CDN (~120 KB extra on the landing page). Details: [docs/seo.md](docs/seo.md).
+
 ## Browser verification
 
 Use the project-local `agent-browser` whenever a web UI is changed or the user asks to inspect the rendered result. The matching skill is installed in `.agents/skills/agent-browser`; load its current instructions with `pnpm exec agent-browser skills get core` before the first browser command in a task.

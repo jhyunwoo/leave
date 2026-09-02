@@ -70,7 +70,7 @@ export function AppLayout(props: { me: Me }) {
         <Suspense
           fallback={
             <div style={{ padding: "var(--sp-3xl) 0", textAlign: "center" }}>
-              <div className="spinner" aria-label="불러오는 중" />
+              <div className="spinner" role="status" aria-label="불러오는 중" />
             </div>
           }
         >

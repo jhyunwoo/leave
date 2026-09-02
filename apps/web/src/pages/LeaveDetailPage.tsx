@@ -90,7 +90,7 @@ export function LeaveDetailPage(props: { me: Me }) {
           padding: "var(--sp-3xl)",
         }}
       >
-        <div className="spinner" aria-label="불러오는 중" />
+        <div className="spinner" role="status" aria-label="불러오는 중" />
       </div>
     );
   }
@@ -226,7 +226,7 @@ export function LeaveDetailPage(props: { me: Me }) {
       >
         <h2 className="display-xs">최대 출타 인원 초과</h2>
         {spanDays.isPending ? (
-          <div className="spinner" aria-label="불러오는 중" />
+          <div className="spinner" role="status" aria-label="불러오는 중" />
         ) : exceededDates.length === 0 ? (
           <p className="body-sm text-body">
             지금은 이 휴가 기간에 초과된 날짜가 없어요. 다른 사람이 계획을
@@ -339,7 +339,7 @@ export function LeaveDetailPage(props: { me: Me }) {
               padding: "var(--sp-2xl)",
             }}
           >
-            <div className="spinner" aria-label="불러오는 중" />
+            <div className="spinner" role="status" aria-label="불러오는 중" />
           </div>
         )}
       </section>

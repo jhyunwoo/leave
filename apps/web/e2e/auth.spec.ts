@@ -17,7 +17,8 @@ test.beforeEach(async ({ page }) => {
 test("로그인 화면 렌더링 + 빈 값이면 제출 버튼 비활성", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
-  const submit = page.getByRole("button", { name: "로그인" });
+  // exact: true 가 필요하다 — 기본 매칭은 부분 일치라 "패스키로 로그인"까지 잡힌다.
+  const submit = page.getByRole("button", { name: "로그인", exact: true });
   await expect(submit).toBeDisabled();
   await page.getByPlaceholder("you@example.com").fill("someone@test.com");
   await page.locator('input[type="password"]').fill("password123");

@@ -334,7 +334,11 @@ function FriendSelector(props: {
       <div style={{ display: "grid", gap: "var(--sp-md)" }}>
         <strong aria-live="polite">{selection.length} / 10 선택</strong>
         {friends.isPending ? (
-          <div className="spinner" aria-label="친구 불러오는 중" />
+          <div
+            className="spinner"
+            role="status"
+            aria-label="친구 불러오는 중"
+          />
         ) : friends.data?.friends.length ? (
           friends.data.friends.map((friend) => {
             const checked = selection.includes(friend.userId);
@@ -752,7 +756,11 @@ export function CalendarPage(props: { me: Me }) {
                 </button>
               </div>
             ) : friendCalendar.isPending ? (
-              <div className="spinner" aria-label="친구 달력 불러오는 중" />
+              <div
+                className="spinner"
+                role="status"
+                aria-label="친구 달력 불러오는 중"
+              />
             ) : friendCalendar.isError ? (
               <p className="field-error" role="alert">
                 친구 달력을 불러오지 못했어요. 친구 관계나 차단 상태가 바뀌었을

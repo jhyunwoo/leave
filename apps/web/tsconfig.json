@@ -4,7 +4,20 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "useDefineForClassFields": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // worker/와 SPA가 한 tsconfig를 쓴다. Workers 전역(Env·Fetcher)은
+    // wrangler가 만든 선언 파일에서 온다 (`pnpm --filter @leave/web types`).
+    "types": ["./worker-configuration.d.ts"]
   },
-  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
+  "include": [
+    "src",
+    "worker",
+    "e2e",
+    "test",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": ["dist", "dist-prerender", "node_modules"]
 }

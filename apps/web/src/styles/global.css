@@ -177,6 +177,15 @@ a {
   border-radius: var(--r-sm);
 }
 
+/* 미리 그려 둔 공개 랜딩은 이미 로그인한 사람에게는 잘못된 화면이다.
+   문서 head의 인라인 스크립트가 첫 페인트 전에 <html data-session>을 남기면
+   여기서 감춰, 로그인 사용자의 화면 전환을 미리 그리기 도입 전과 똑같이 둔다.
+   비로그인 방문자(크롤러 포함)에게는 이 규칙이 걸리지 않는다 — 감춘 본문으로
+   검색엔진을 속이는 장치가 아니다. main.tsx가 React를 붙이면서 이 속성을 뗀다. */
+html[data-session] #root[data-prerendered="/"] {
+  display: none;
+}
+
 /* 드래그 선택 강조는 primary. 예전에는 배경이 --ink였는데 글자색 --on-primary와
    같은 색(#0e0f0c)이라 선택한 글자가 그대로 사라졌다. */
 ::selection {

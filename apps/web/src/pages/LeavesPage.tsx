@@ -201,7 +201,7 @@ export function LeavesPage() {
             padding: "var(--sp-3xl)",
           }}
         >
-          <div className="spinner" aria-label="불러오는 중" />
+          <div className="spinner" role="status" aria-label="불러오는 중" />
         </div>
       ) : !leaves.data || leaves.data.leaves.length === 0 ? (
         <div

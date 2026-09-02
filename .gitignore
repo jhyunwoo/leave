@@ -26,6 +26,8 @@ coverage
 out/
 build
 dist
+# 미리 그리기용 중간 산출물(apps/web). 빌드가 끝나면 지우지만 실패하면 남는다.
+dist-prerender
 
 
 # Debug

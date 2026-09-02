@@ -1,5 +1,6 @@
 # 생성물·산출물은 서식 검사 대상이 아니다.
 dist
+dist-prerender
 build
 coverage
 apps/web/test-results

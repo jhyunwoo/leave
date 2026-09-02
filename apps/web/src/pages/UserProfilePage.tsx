@@ -124,7 +124,7 @@ function SharedSchedule(props: { userId: string }) {
         </button>
       </div>
       {schedule.isPending ? (
-        <div className="spinner" aria-label="일정 불러오는 중" />
+        <div className="spinner" role="status" aria-label="일정 불러오는 중" />
       ) : schedule.isError ? (
         /* 재조회가 403이면 캐시에 남아 있던 본문도 지워진다
            (@leave/client의 watchFriendAccessRevocation). 여기서 data를 먼저
@@ -310,7 +310,11 @@ export function UserProfilePage() {
       </Link>
 
       {profile.isPending ? (
-        <div className="spinner" aria-label="프로필 불러오는 중" />
+        <div
+          className="spinner"
+          role="status"
+          aria-label="프로필 불러오는 중"
+        />
       ) : profile.isError || !profile.data ? (
         <section className="card" style={{ padding: "var(--sp-xl)" }}>
           <h1 className="display-xs">사용자를 찾을 수 없어요</h1>

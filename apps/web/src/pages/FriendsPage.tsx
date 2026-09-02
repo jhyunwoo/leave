@@ -92,7 +92,7 @@ function SearchResults(props: { query: string }) {
     );
   }
   if (search.isPending) {
-    return <div className="spinner" aria-label="검색 중" />;
+    return <div className="spinner" role="status" aria-label="검색 중" />;
   }
   if (search.isError) {
     return (
@@ -299,7 +299,11 @@ export function FriendsPage() {
 
       <Section title="내 친구">
         {friends.isPending ? (
-          <div className="spinner" aria-label="친구 불러오는 중" />
+          <div
+            className="spinner"
+            role="status"
+            aria-label="친구 불러오는 중"
+          />
         ) : friends.isError ? (
           <p role="alert" className="field-error">
             친구 목록을 불러오지 못했어요.

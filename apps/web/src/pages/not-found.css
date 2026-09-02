@@ -1,0 +1,77 @@
+/* 404 화면. 상단바·버튼은 landing.css의 것을 그대로 쓴다. */
+
+.nf-root {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.nf-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding: 64px 0 96px;
+  background: var(--canvas);
+}
+
+/* .lp-wrap이 flex 아이템이 되면 내용 너비로 줄어들어 본문이 화면 가운데로
+   밀린다. 상단바 브랜드와 같은 선에서 시작하도록 너비를 지켜 준다. */
+.nf-main > .lp-wrap {
+  flex: none;
+}
+
+.nf-inner {
+  max-width: 640px;
+}
+
+.nf-code {
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.nf-main h1 {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  word-break: keep-all;
+}
+
+.nf-body {
+  margin-top: 16px;
+  color: var(--body);
+  font-size: 17px;
+  line-height: 1.7;
+  word-break: keep-all;
+}
+
+.nf-actions {
+  margin-top: 28px;
+}
+
+.nf-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline);
+}
+
+.nf-links a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  color: var(--mute);
+  font-size: 14px;
+  text-underline-offset: 3px;
+}
+
+.nf-links a:hover {
+  color: var(--ink);
+}

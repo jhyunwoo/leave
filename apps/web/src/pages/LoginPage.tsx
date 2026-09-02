@@ -44,7 +44,9 @@ export function LoginPage() {
   };
 
   return (
-    <div
+    // 화면 전체가 이 폼 하나이므로 main 랜드마크로 감싼다. 그러지 않으면
+    // 보조기술과 브라우저 에이전트에게 본문의 시작점이 없다(axe: landmark-one-main).
+    <main
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -133,6 +135,6 @@ export function LoginPage() {
         </p>
       </form>
       <LegalLinks />
-    </div>
+    </main>
   );
 }

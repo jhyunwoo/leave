@@ -174,7 +174,7 @@ export function NotificationsPage() {
             padding: "var(--sp-3xl)",
           }}
         >
-          <div className="spinner" aria-label="불러오는 중" />
+          <div className="spinner" role="status" aria-label="불러오는 중" />
         </div>
       ) : !latest ? (
         <div

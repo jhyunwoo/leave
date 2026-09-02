@@ -4,7 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#9fe870" />
-    <title>리브 — 부대 휴가 캘린더</title>
+    <!--seo-head:
+      scripts/build-seo.mjs 가 이 주석 전체를 페이지별 title·description·
+      canonical·robots·소셜 카드·JSON-LD로 바꾼다(`pnpm build`의 마지막 단계).
+      개발 서버에서는 그대로 남고, 문서 제목은 seo/RouteMetadata.tsx가 채운다.
+    -->
     <link
       rel="preload"
       href="/fonts/pretendard-ui-v1.3.9.woff2"
@@ -24,7 +28,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--app-html--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

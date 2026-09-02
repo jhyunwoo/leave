@@ -69,7 +69,11 @@ export function PublicUserProfilePage() {
             }
           />
         ) : profile.isPending ? (
-          <div className="spinner" aria-label="프로필 불러오는 중" />
+          <div
+            className="spinner"
+            role="status"
+            aria-label="프로필 불러오는 중"
+          />
         ) : profile.isError || !profile.data ? (
           <ProfileMessage
             title="프로필을 불러오지 못했어요"

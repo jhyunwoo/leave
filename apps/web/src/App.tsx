@@ -15,13 +15,20 @@
  * 가입이 끝나면 인증 프로필로 돌아온다. 온보딩과 이름 설정은 라우트를 바꾸지 않고
  * 그 위에 덮어 그려, 중간 단계를 지나도 목적지를 잃지 않는다.
  *
- * ## 화면은 전부 `lazy()`로 받는다
+ * ## 앱 화면은 `lazy()`로, 공개 페이지는 정적으로 받는다
  *
  * 로그아웃 방문자가 보는 것(랜딩)과 로그인 사용자가 보는 것(달력·휴가·부대)은
  * 겹치지 않는데, 정적으로 import하면 한 덩어리라 서로의 코드를 다 받는다.
  * 랜딩만 보고 떠나는 사람이 부대 관리 화면까지 내려받을 이유가 없다.
- * 로그인 폼만은 정적으로 둔다 — 크기가 작고, 세션이 끊기면 어느 화면에서든
- * 곧바로 튕겨 오는 곳이라 한 번 더 왕복하면 그만큼 흰 화면이 길어진다.
+ *
+ * 예외가 셋이다.
+ *  - 로그인 폼: 크기가 작고, 세션이 끊기면 어느 화면에서든 곧바로 튕겨 오는
+ *    곳이라 한 번 더 왕복하면 그만큼 흰 화면이 길어진다.
+ *  - 랜딩·가이드: 이 둘은 빌드 시 HTML로 미리 그려져 나가고, 브라우저는 그
+ *    HTML에 곧바로 hydrate한다. `lazy()`로 두면 hydrate 시점에 청크가 아직
+ *    없어 Suspense 대체 화면이 한 번 끼어들고, 미리 그려 둔 본문이 스피너로
+ *    바뀌었다가 되돌아온다. 정적 import는 그 왕복을 없애 오히려 이 두 페이지의
+ *    LCP를 줄인다(청크·CSS 왕복 2회 제거).
  */
 
 import { lazy, Suspense, type ReactNode } from "react";
@@ -34,7 +41,10 @@ import {
   useLocation,
 } from "react-router";
 import { useAuthBootstrap, useMe } from "@leave/client";
+import { GuidePage } from "./pages/GuidePage";
+import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
+import { RouteMetadata } from "./seo/RouteMetadata";
 import { isAuthedAtom } from "./state/auth";
 import { safeNext } from "./state/next-destination";
 
@@ -68,9 +78,6 @@ const UsernameSetupPage = lazy(() =>
   import("./pages/UsernameSetupPage").then((m) => ({
     default: m.UsernameSetupPage,
   })),
-);
-const LandingPage = lazy(() =>
-  import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })),
 );
 const LeaveDetailPage = lazy(() =>
   import("./pages/LeaveDetailPage").then((m) => ({
@@ -121,7 +128,12 @@ const UnitsPage = lazy(() =>
   import("./pages/UnitsPage").then((m) => ({ default: m.UnitsPage })),
 );
 
-/** 화면 코드를 받아오는 동안 자리를 지키는 스피너. */
+/**
+ * 화면 코드를 받아오는 동안 자리를 지키는 스피너.
+ *
+ * `role="status"`가 필요하다 — 역할 없는 <div>에는 aria-label을 붙일 수 없어
+ * (ARIA에서 금지된 조합) 보조기술과 브라우저 에이전트가 이름을 무시한다.
+ */
 function FullPageSpinner() {
   return (
     <div
@@ -132,7 +144,7 @@ function FullPageSpinner() {
         justifyContent: "center",
       }}
     >
-      <div className="spinner" aria-label="불러오는 중" />
+      <div className="spinner" role="status" aria-label="불러오는 중" />
     </div>
   );
 }
@@ -235,16 +247,29 @@ function AuthedRedirect() {
   return <Navigate to={safeNext(location.search)} replace />;
 }
 
-export function App() {
+/**
+ * 라우터 없는 라우트 트리.
+ *
+ * 브라우저에서는 아래 `App`이 BrowserRouter로, 빌드 시 미리 그리는 쪽은
+ * `entry-prerender.tsx`가 MemoryRouter로 감싼다. 두 라우터 모두 DOM을 만들지
+ * 않으므로 같은 마크업이 나오고, 그래서 미리 그린 HTML에 그대로 hydrate된다.
+ */
+export function AppRoutes() {
   const isAuthed = useAtomValue(isAuthedAtom);
 
   return (
-    <BrowserRouter>
+    <>
+      {/* 문서 제목·canonical·robots를 라우트 하나에 맞춰 갱신한다. 화면마다
+          document.title을 쓰지 않기 위한 유일한 자리. */}
+      <RouteMetadata />
       {/* 화면 코드를 나눠 받으므로 라우트 전체를 Suspense로 감싼다. 로그인 뒤
           화면 사이 이동은 AppLayout 안쪽 Suspense가 받아, 내비게이션은 그대로
           두고 본문만 스피너로 바뀐다. */}
       <RouteSuspense>
         <Routes>
+          {/* 공개 안내 문서. 로그인 여부와 무관하게 같은 주소에서 열려야
+              하므로 인증 분기 바깥에 둔다(색인 대상 페이지다). */}
+          <Route path="/guide" element={<GuidePage />} />
           <Route path="/invite" element={<InviteLandingPage />} />
           <Route
             path="/login"
@@ -257,6 +282,14 @@ export function App() {
           <Route path="*" element={isAuthed ? <AuthedApp /> : <PublicApp />} />
         </Routes>
       </RouteSuspense>
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

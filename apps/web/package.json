@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build --ssr src/entry-prerender.tsx --outDir dist-prerender && node scripts/build-seo.mjs",
     "fonts:generate": "node scripts/generate-font-subset.mjs",
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler deploy",
     "check-types": "tsc --noEmit",
+    "og:generate": "node scripts/generate-og-image.mjs",
+    "test": "vitest run",
     "test:e2e": "playwright test",
+    "types": "wrangler types",
+    "types:check": "wrangler types --check",
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
@@ -32,6 +36,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "typescript": "^5.9.2",
     "vite": "^8.2.1",
+    "vitest": "^3.2.7",
     "wrangler": "^4.123.0"
   }
 }
