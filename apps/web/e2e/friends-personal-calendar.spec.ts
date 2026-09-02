@@ -357,7 +357,22 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   await expect(
     page.getByRole("button", { name: "친구", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("grid", { name: /친구 달력/ })).toBeVisible();
+  await expect(
+    page.getByRole("grid", { name: /친구 달력/ }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "이전 달" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "다음 달" })).toHaveCount(0);
+  const friendScroller = page.locator(".cal-scroll");
+  const initialScrollTop = await friendScroller.evaluate(
+    (element) => element.scrollTop,
+  );
+  await friendScroller.evaluate((element) => {
+    element.scrollBy({ top: 700, behavior: "auto" });
+  });
+  await expect
+    .poll(() => friendScroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialScrollTop + 300);
+  await page.getByRole("button", { name: "오늘", exact: true }).click();
   await expect(page.getByLabel(/휴가 친구01/)).toBeVisible();
   await expect(page.getByText("노출되면 안 되는 제목")).toHaveCount(0);
 
@@ -394,5 +409,7 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   await page.getByRole("button", { name: "부대" }).click();
   await expect(page.getByText("소속 그룹이 없어요")).toBeVisible();
   await page.getByRole("button", { name: "친구 달력 보기" }).click();
-  await expect(page.getByRole("grid", { name: /친구 달력/ })).toBeVisible();
+  await expect(
+    page.getByRole("grid", { name: /친구 달력/ }).first(),
+  ).toBeVisible();
 });

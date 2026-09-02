@@ -14,14 +14,12 @@
  * 높이만큼 칸 안에 출타자 미리보기까지 들어간다.
  */
 
-import { shiftMonth, splitMonth } from "@leave/shared/calendar";
 import { monthBounds, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import {
   cyclesInRange,
   type RegularOvernightConfig,
   type RegularOvernightCycle,
 } from "@leave/shared/regular-overnight";
-import * as Haptics from "expo-haptics";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   forwardRef,
@@ -29,15 +27,12 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
   ActivityIndicator,
   FlatList,
   type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   Text,
   View,
 } from "react-native";
@@ -48,93 +43,25 @@ import {
 } from "react-native-gesture-handler";
 import type { MyLeaveDay } from "@leave/client";
 import { useCalendar, usePersonalEvents } from "@leave/client";
-import { useWindowSizeClass, type WindowSizeClass } from "@/adaptive";
+import { useWindowSizeClass } from "@/adaptive";
 import { MonthCalendar } from "@/components/month-calendar";
+import {
+  BOTTOM_ALLOWANCE,
+  CELL_GAP,
+  CELL_H_ATTENDEES,
+  INITIAL_SPAN,
+  LABEL_H,
+  monthBlockHeight,
+  monthLabel,
+  resolveCellHeight,
+  ROW_GAP,
+  useMonthScrollWindow,
+} from "@/components/month-scroll-window";
 import {
   calendarDragActiveAtom,
   calendarGridMetricsAtom,
 } from "@/state/calendar-drag";
 import { makeStyles, spacing, useColors } from "@/theme";
-
-const INITIAL_SPAN = 2;
-const PAGE_SIZE = 6;
-/**
- * 목록에 담아 두는 달의 상한.
- *
- * 이 목록은 위·아래 양쪽으로 계속 자라기만 했다. 한참 훑고 나면 달이 수십 개
- * 쌓이는데, 달 하나마다 (a) `useCalendar` 쿼리 한 벌, (b) 42칸짜리 그리드 —
- * 칸마다 Pressable + 날짜 배지 + 알약 등 6~10개 뷰 — 가 딸린다. 창 밖의 달은
- * FlatList가 언마운트해 주지만, 쿼리와 배열 자체는 남아 세션 내내 자란다.
- *
- * 상한을 두고 스크롤 반대편을 잘라내면 "무한 스크롤"의 감각은 그대로면서
- * 메모리와 요청 수가 창 크기에 묶인다. 잘라낸 달로 되돌아가면 그때 다시 붙는다.
- * 25개월이면 windowSize=7이 요구하는 앞뒤 여유보다 한참 넉넉하다.
- */
-const MAX_MONTHS = 25;
-
-/**
- * 앞에 붙이며 뒤를 자른다.
- *
- * 자르는 쪽을 아래로만 둔 것은 의도적이다. 위쪽(보이는 영역보다 앞)에서 항목을
- * 없애면 모든 인덱스가 밀리고, 그 보정은 maintainVisibleContentPosition에 기대야
- * 하는데 — 항목 추가와 달리 제거 보정은 플랫폼마다 결이 다르다. 실기기에서
- * 확인할 수 없는 변경으로 스크롤이 튈 위험을 만들 이유가 없다.
- *
- * 실제로 폭주하는 쪽도 위쪽이다. 아래로는 한 화면에 한 달씩 사람이 넘기는 만큼만
- * 늘지만, 위로는 끌어 올리는 동안 250ms마다 6개월씩 붙는다.
- */
-function capTail(months: string[]): string[] {
-  return months.length > MAX_MONTHS ? months.slice(0, MAX_MONTHS) : months;
-}
-/** 이전 달을 이어 붙이는 최소 간격(ms). 아래 onScroll 주석 참고. */
-const PREPEND_INTERVAL_MS = 250;
-/** 좁은 창의 칸 높이 — month-calendar가 좁은 창에서 쓰는 최대 구성과 같다. */
-const CELL_H_MIN = 92;
-/** 넓은 창에서도 이보다 커지면 칸이 비어 보인다. 정보량이 늘지 않는 여백일 뿐. */
-const CELL_H_MAX = 132;
-/** 이 높이부터 칸 안에 출타자 이니셜 한 줄(16+gap 3)이 들어간다. */
-const CELL_H_ATTENDEES = 112;
-const ROW_GAP = 2; // weekRow marginBottom
-/** 칸 사이 가로 여백 — month-calendar의 weekRow gap과 같아야 한다. */
-const CELL_GAP = 2;
-const ROWS = 6; // 그리드 최대 주 수
-const LABEL_H = 44;
-/**
- * 목록 아래쪽에서 탭바·홈 인디케이터에 가려지는 만큼. 넉넉히 잡아 한 달이 잘리지
- * 않게 한다 — 덜 잡으면 마지막 주가 탭바에 물리고, 더 잡아 봐야 칸이 조금 작아질
- * 뿐이라 손해가 비대칭이다.
- */
-const BOTTOM_ALLOWANCE = 84;
-
-/** 한 달 블록 높이. getItemLayout·snapToInterval이 이 값에 의존한다. */
-function monthBlockHeight(cellHeight: number): number {
-  return LABEL_H + ROWS * (cellHeight + ROW_GAP);
-}
-
-/**
- * 보이는 높이에 맞춘 칸 높이. 좁은 창에서는 지금 값을 그대로 유지한다 —
- * 휴대폰 달력은 이미 한 화면에 한 달이 들어오고, 여기서 흔들 이유가 없다.
- */
-function resolveCellHeight(
-  sizeClass: WindowSizeClass,
-  visibleHeight: number,
-): number {
-  if (sizeClass === "compact" || visibleHeight <= 0) return CELL_H_MIN;
-  const forGrid = visibleHeight - LABEL_H;
-  const fitted = Math.floor(forGrid / ROWS) - ROW_GAP;
-  return Math.max(CELL_H_MIN, Math.min(CELL_H_MAX, fitted));
-}
-
-function monthRange(center: string, span: number): string[] {
-  const out: string[] = [];
-  for (let i = -span; i <= span; i++) out.push(shiftMonth(center, i));
-  return out;
-}
-
-function monthLabel(month: string): string {
-  const { year, monthNum } = splitMonth(month);
-  return `${year}년 ${monthNum}월`;
-}
 
 export interface CalendarScrollHandle {
   scrollToToday: () => void;
@@ -177,31 +104,33 @@ export const CalendarScroll = forwardRef<
   const styles = useStyles();
   const { sizeClass } = useWindowSizeClass();
   const currentMonth = todayInSeoul().slice(0, 7);
-  const [months, setMonths] = useState(() =>
-    monthRange(currentMonth, INITIAL_SPAN),
-  );
   // 목록이 실제로 차지한 높이. 헤더가 목록 위에 떠 있으므로 거기서
   // contentTopInset과 아래 탭바 몫을 빼야 "한 달이 보일 높이"가 나온다.
   const [listHeight, setListHeight] = useState(0);
   // 목록의 가로 폭. 좌우 여백을 빼면 격자 폭이고, 거기서 칸 간격이 나온다.
   const [listWidth, setListWidth] = useState(0);
-  const listRef = useRef<FlatList<string>>(null);
-  const prependLock = useRef(false);
-  const lastPrependAt = useRef(0);
-  const dragging = useRef(false);
-  const momentumScrolling = useRef(false);
-  // 목록을 다시 짠 뒤에 옮겨갈 달. 아래 scrollToMonth 참고.
-  const pendingMonth = useRef<string | null>(null);
-  const settledMonth = useRef(currentMonth);
 
   const cellHeight = resolveCellHeight(
     sizeClass,
     listHeight - contentTopInset - BOTTOM_ALLOWANCE,
   );
   const itemHeight = monthBlockHeight(cellHeight);
-  // 첫 렌더의 contentOffset이 이 값으로 계산되므로, 이후 값이 바뀌면 아래
-  // useEffect가 보고 있던 달로 다시 맞춘다.
-  const initialItemHeight = useRef(itemHeight);
+
+  // 창·보정·이동은 친구 달력과 같은 상태 기계를 쓴다(month-scroll-window).
+  // 부대 달력은 볼 수 있는 범위를 제한하지 않는다 — 입대 이전 달도 계속 위로
+  // 훑을 수 있어야 한다.
+  const {
+    months,
+    listRef,
+    scrollToMonth,
+    resetScrollFlags,
+    onScroll,
+    onScrollBeginDrag,
+    onScrollEndDrag,
+    onMomentumScrollBegin,
+    onMomentumScrollEnd,
+    onEndReached,
+  } = useMonthScrollWindow({ itemHeight, currentMonth });
 
   const onListLayout = useCallback((event: LayoutChangeEvent) => {
     setListHeight(event.nativeEvent.layout.height);
@@ -244,154 +173,18 @@ export const CalendarScroll = forwardRef<
    */
   useEffect(() => {
     if (!dragActive) return;
-    dragging.current = false;
-    momentumScrolling.current = false;
-  }, [dragActive]);
-
-  // prepend 후 락 해제 (렌더 커밋 이후). 다시 짠 목록이면 목적지로 옮긴다.
-  useEffect(() => {
-    prependLock.current = false;
-    const target = pendingMonth.current;
-    if (target == null) return;
-    const idx = months.indexOf(target);
-    if (idx < 0) return;
-    pendingMonth.current = null;
-    // 셀 마운트가 끝난 다음 프레임에 옮겨야 새 콘텐츠 높이가 반영된 뒤 자리 잡는다.
-    const frame = requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({
-        offset: itemHeight * idx,
-        animated: false,
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [months, itemHeight]);
-
-  /**
-   * 칸 높이가 바뀌면(회전·Split View 크기 조절·첫 측정) 스크롤 위치를 보고 있던
-   * 달에 다시 맞춘다. 오프셋은 픽셀이라, 블록 높이만 바뀌면 같은 오프셋이 엉뚱한
-   * 달을 가리킨다.
-   */
-  useEffect(() => {
-    if (initialItemHeight.current === itemHeight) return;
-    initialItemHeight.current = itemHeight;
-    const idx = months.indexOf(settledMonth.current);
-    if (idx < 0) return;
-    const frame = requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({
-        offset: itemHeight * idx,
-        animated: false,
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-    // months는 의도적으로 제외한다 — 목록이 늘어난 것만으로 스크롤을 옮기면
-    // 위쪽 이어붙이기가 매번 화면을 튀게 한다(그 보정은 위 useEffect의 몫).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemHeight]);
-
-  /**
-   * 원하는 달로 이동한다. 목록에 없는 달이면 그 달을 가운데 둔 목록으로 다시 짜고
-   * 커밋 후에 옮긴다(위 useEffect).
-   */
-  const scrollToMonth = useCallback(
-    (month: string) => {
-      const idx = months.indexOf(month);
-      if (idx >= 0) {
-        settledMonth.current = month;
-        listRef.current?.scrollToOffset({
-          offset: itemHeight * idx,
-          animated: true,
-        });
-        return;
-      }
-      pendingMonth.current = month;
-      settledMonth.current = month;
-      setMonths(monthRange(month, INITIAL_SPAN));
-    },
-    [months, itemHeight],
-  );
-
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      // 손으로 끌어 올릴 때만 이어 붙인다. 상태바 탭처럼 프로그램이 맨 위까지
-      // 끌고 가는 스크롤에서도 붙이면, 애니메이션 한 번에 수십 년치가 쌓여
-      // 1984년 같은 엉뚱한 달에 도착하고 달마다 달력 요청이 나간다.
-      // 시간 간격은 관성 스크롤 중 끌기 표시가 남아 있을 때를 대비한 안전장치.
-      const now = Date.now();
-      if (
-        y < itemHeight &&
-        (dragging.current || momentumScrolling.current) &&
-        !prependLock.current &&
-        now - lastPrependAt.current > PREPEND_INTERVAL_MS
-      ) {
-        prependLock.current = true;
-        lastPrependAt.current = now;
-        setMonths((ms) => {
-          const first = ms[0]!;
-          const older: string[] = [];
-          for (let i = PAGE_SIZE; i >= 1; i--)
-            older.push(shiftMonth(first, -i));
-          // 위로 붙이면서 아래 끝을 잘라 목록을 상한 안에 둔다. 잘라내는 쪽은
-          // 화면 아래(이미 언마운트된 달)라 보이는 인덱스가 밀리지 않는다 —
-          // 그래서 maintainVisibleContentPosition의 보정과 싸우지 않는다.
-          return capTail([...older, ...ms]);
-        });
-      }
-    },
-    [itemHeight],
-  );
-
-  const onScrollBeginDrag = useCallback(() => {
-    dragging.current = true;
-  }, []);
-
-  const onScrollEndDrag = useCallback(() => {
-    dragging.current = false;
-  }, []);
-
-  const onMomentumScrollBegin = useCallback(() => {
-    momentumScrolling.current = true;
-  }, []);
+    resetScrollFlags();
+  }, [dragActive, resetScrollFlags]);
 
   /** iOS 상태바 탭으로 맨 위에 닿았을 때. 입대한 달로 데려간다. */
   const onScrollToTop = useCallback(() => {
     scrollToMonth(enlistedMonth ?? currentMonth);
   }, [scrollToMonth, enlistedMonth, currentMonth]);
 
-  const onEndReached = useCallback(() => {
-    setMonths((ms) => {
-      const last = ms[ms.length - 1]!;
-      const newer: string[] = [];
-      for (let i = 1; i <= PAGE_SIZE; i++) newer.push(shiftMonth(last, i));
-      return [...ms, ...newer];
-    });
-  }, []);
-
   useImperativeHandle(
     ref,
     () => ({ scrollToToday: () => scrollToMonth(currentMonth) }),
     [scrollToMonth, currentMonth],
-  );
-
-  const onMomentumScrollEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      dragging.current = false;
-      momentumScrolling.current = false;
-      const index = Math.max(
-        0,
-        Math.min(
-          months.length - 1,
-          Math.round(event.nativeEvent.contentOffset.y / itemHeight),
-        ),
-      );
-      const month = months[index];
-      if (!month || month === settledMonth.current) return;
-      settledMonth.current = month;
-      if (process.env.EXPO_OS === "ios") {
-        void Haptics.selectionAsync();
-      }
-    },
-    [months, itemHeight],
   );
 
   return (

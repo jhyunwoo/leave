@@ -2,6 +2,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useAuthBootstrap, useMe } from "../src/hooks/auth";
 import { useCalendar } from "../src/hooks/calendar";
+import { useFriendCalendar } from "../src/hooks/friends";
+import { usePersonalEvents } from "../src/hooks/personal-events";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
@@ -45,6 +47,26 @@ function useLargeCalendarRange() {
     useCalendar("unit-1", LARGE_MONTH_RANGE[9]!),
     useCalendar("unit-1", LARGE_MONTH_RANGE[10]!),
     useCalendar("unit-1", LARGE_MONTH_RANGE[11]!),
+  ];
+}
+
+function useInitialFriendCalendarWindow() {
+  return [
+    useFriendCalendar(["friend-1"], MONTHS[0]!),
+    useFriendCalendar(["friend-1"], MONTHS[1]!),
+    useFriendCalendar(["friend-1"], MONTHS[2]!),
+    useFriendCalendar(["friend-1"], MONTHS[3]!),
+    useFriendCalendar(["friend-1"], MONTHS[4]!),
+  ];
+}
+
+function useInitialPersonalEventWindow() {
+  return [
+    usePersonalEvents(MONTHS[0]!),
+    usePersonalEvents(MONTHS[1]!),
+    usePersonalEvents(MONTHS[2]!),
+    usePersonalEvents(MONTHS[3]!),
+    usePersonalEvents(MONTHS[4]!),
   ];
 }
 
@@ -192,5 +214,89 @@ describe("웹 달력 전송 배치", () => {
         lastYear! * 12 + lastMonth! - firstYear! * 12 - firstMonth!,
       ).toBeLessThanOrEqual(8);
     }
+  });
+
+  it("친구 비교의 5개 월별 쿼리를 한 배치 GET으로 채운다", async () => {
+    const calendarGet = vi.fn();
+    const calendarsGet = vi.fn(
+      (input: { query: { friendIds: string; months: string } }) =>
+        Promise.resolve({
+          calendars: input.query.months.split(",").map((month) => ({
+            month,
+            people: [],
+            leaves: [],
+          })),
+        }),
+    );
+    const client = {
+      friends: {
+        calendar: { $get: calendarGet },
+        calendars: { $get: calendarsGet },
+      },
+    };
+    const wrapper = wrapperFor(
+      testQueryClient(),
+      testAdapter({ client, batchCalendarRequests: true }),
+    );
+
+    const { result } = renderHook(() => useInitialFriendCalendarWindow(), {
+      wrapper,
+    });
+    await waitFor(() =>
+      expect(result.current.every((query) => query.isSuccess)).toBe(true),
+    );
+
+    expect(calendarsGet).toHaveBeenCalledTimes(1);
+    expect(calendarGet).not.toHaveBeenCalled();
+    expect(calendarsGet.mock.calls[0]?.[0].query).toEqual({
+      friendIds: "friend-1",
+      months: MONTHS.join(","),
+    });
+  });
+
+  it("개인 일정 배치 응답을 각 월의 기존 쿼리 모양으로 나눈다", async () => {
+    const event = {
+      id: "event-1",
+      title: "월 경계 일정",
+      startDate: "2026-07-31",
+      endDate: "2026-08-01",
+      startTime: null,
+      endTime: null,
+      note: null,
+      createdAt: "now",
+      updatedAt: "now",
+    };
+    const monthGet = vi.fn();
+    const calendarsGet = vi.fn(() => Promise.resolve({ events: [event] }));
+    const client = {
+      "personal-events": {
+        $get: monthGet,
+        calendars: { $get: calendarsGet },
+      },
+    };
+    const queryClient = testQueryClient();
+    const wrapper = wrapperFor(
+      queryClient,
+      testAdapter({ client, batchCalendarRequests: true }),
+    );
+
+    const { result } = renderHook(() => useInitialPersonalEventWindow(), {
+      wrapper,
+    });
+    await waitFor(() =>
+      expect(result.current.every((query) => query.isSuccess)).toBe(true),
+    );
+
+    expect(calendarsGet).toHaveBeenCalledTimes(1);
+    expect(monthGet).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData(queryKeys.personalEventsMonth("2026-06")),
+    ).toEqual({ events: [] });
+    expect(
+      queryClient.getQueryData(queryKeys.personalEventsMonth("2026-07")),
+    ).toEqual({ events: [event] });
+    expect(
+      queryClient.getQueryData(queryKeys.personalEventsMonth("2026-08")),
+    ).toEqual({ events: [event] });
   });
 });

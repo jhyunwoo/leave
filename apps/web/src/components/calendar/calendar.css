@@ -14,11 +14,24 @@
 .cal-scroll-shell {
   display: flex;
   flex-direction: column;
+  --cal-top-h: 0px;
   /* 요일 줄과 달 제목이 이 값만큼 층을 지어 붙는다. */
   --cal-weekday-h: 33px;
   /* 날짜 칸 높이. 불러오는 중 자리표시자가 같은 값으로 높이를 잡아야
      로딩이 끝나는 순간 달 높이가 바뀌면서 화면이 딸려 올라가지 않는다. */
   --cal-cell-h: 92px;
+}
+.cal-scroll-shell.has-top-content {
+  --cal-top-h: 42px;
+}
+.cal-scroll-top {
+  position: relative;
+  z-index: 4;
+  height: var(--cal-top-h);
+  flex: 0 0 var(--cal-top-h);
+  min-width: 0;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
 }
 .cal-weekdays-sticky {
   position: sticky;
@@ -63,10 +76,14 @@
   overscroll-behavior: auto;
 }
 .cal-scroll-shell.is-page-scroll .cal-weekdays-sticky {
-  top: var(--nav-h);
+  top: calc(var(--nav-h) + var(--cal-top-h));
 }
 .cal-scroll-shell.is-page-scroll .cal-month-label {
-  top: calc(var(--nav-h) + var(--cal-weekday-h));
+  top: calc(var(--nav-h) + var(--cal-top-h) + var(--cal-weekday-h));
+}
+.cal-scroll-shell.is-page-scroll .cal-scroll-top {
+  position: sticky;
+  top: var(--nav-h);
 }
 .cal-sentinel {
   height: 1px;
@@ -462,6 +479,56 @@
   background: var(--canvas);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* 친구 비교 달력의 범례는 사람이 10명이어도 달력 폭을 밀어내지 않는다. */
+.friend-calendar-legend {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: var(--sp-md);
+  overflow-x: auto;
+  padding: 0 2px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+.friend-calendar-legend-item {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.friend-calendar-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.friend-calendar-legend-personal {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--brand);
+  transform: rotate(45deg);
+}
+.friend-calendar-people {
+  display: flex;
+  max-height: 36px;
+  flex-wrap: wrap;
+  gap: 3px;
+  overflow: hidden;
+}
+.friend-calendar-person {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 11px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .unit-event-card {

@@ -1,12 +1,17 @@
 import {
+  monthBounds,
   monthsSpanning,
   type PersonalEventCreateInput,
   type PersonalEventUpdateInput,
 } from "@leave/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { queryRequestOptions, useLeaveApi } from "../context";
+import { useLeaveApi } from "../context";
+import { createMonthRequestQueue } from "../month-request-queue";
 import { queryKeys } from "../query-keys";
 import type { PersonalEvent } from "../types";
+
+type PersonalEventsMonth = { events: PersonalEvent[] };
+const enqueuePersonalEvents = createMonthRequestQueue<PersonalEventsMonth>();
 
 async function invalidateEventMonths(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -29,14 +34,43 @@ export function usePersonalEvents(month: string) {
   return useQuery({
     queryKey: queryKeys.personalEventsMonth(month),
     queryFn: (context) =>
-      adapter.client["personal-events"]
-        .$get(
-          { query: { month } },
-          queryRequestOptions(adapter.useRequestAbortSignal, context),
-        )
-        .then((response) =>
-          adapter.unwrap<{ events: PersonalEvent[] }>(response),
-        ),
+      enqueuePersonalEvents({
+        adapter,
+        scope: "personal-events",
+        month,
+        context,
+        loadMonths: async (months, signal) => {
+          const requestOptions = signal ? { init: { signal } } : undefined;
+          if (months.length === 1) {
+            const result = await adapter.unwrap<PersonalEventsMonth>(
+              await adapter.client["personal-events"].$get(
+                { query: { month: months[0]! } },
+                requestOptions,
+              ),
+            );
+            return new Map([[months[0]!, result]]);
+          }
+          const result = await adapter.unwrap<PersonalEventsMonth>(
+            await adapter.client["personal-events"].calendars.$get(
+              { query: { months: months.join(",") } },
+              requestOptions,
+            ),
+          );
+          return new Map(
+            months.map((requestMonth) => {
+              const { start, end } = monthBounds(requestMonth);
+              return [
+                requestMonth,
+                {
+                  events: result.events.filter(
+                    (event) => event.startDate <= end && event.endDate >= start,
+                  ),
+                },
+              ];
+            }),
+          );
+        },
+      }),
   });
 }
 

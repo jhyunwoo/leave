@@ -101,7 +101,10 @@ env:
     id: "profile-service-progress-card"
 - assertVisible:
     id: "service-progress-main"
-- assertVisible: "실시간 확대"
+- assertNotVisible: "실시간 확대"
+- tapOn:
+    id: "service-progress-main"
+- assertVisible: "클릭한다고 복무율이 빠르게 올라가지 않아요"
 - tapOn:
     id: "service-progress-close"
 - assertVisible:

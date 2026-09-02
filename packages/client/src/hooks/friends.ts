@@ -26,6 +26,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
+import { createMonthRequestQueue } from "../month-request-queue";
 import { queryKeys } from "../query-keys";
 import type {
   Friend,
@@ -33,6 +34,8 @@ import type {
   FriendRequest,
   FriendSchedule,
 } from "../types";
+
+const enqueueFriendCalendar = createMonthRequestQueue<FriendCalendar>();
 
 /**
  * 관계가 바뀌면 목록 셋과 사용자 검색·프로필이 함께 낡는다. 검색 결과에는
@@ -227,11 +230,44 @@ export function useFriendCalendar(friendIds: readonly string[], month: string) {
     enabled: normalized.length >= 1 && normalized.length <= 10,
     staleTime: 0,
     queryFn: (context) =>
-      adapter.client.friends.calendar
-        .$get(
-          { query: { friendIds: normalized.join(","), month } },
-          queryRequestOptions(adapter.useRequestAbortSignal, context),
-        )
-        .then((response) => adapter.unwrap<FriendCalendar>(response)),
+      enqueueFriendCalendar({
+        adapter,
+        scope: normalized.join(","),
+        month,
+        context,
+        loadMonths: async (months, signal) => {
+          const requestOptions = signal ? { init: { signal } } : undefined;
+          if (months.length === 1) {
+            const calendar = await adapter.unwrap<FriendCalendar>(
+              await adapter.client.friends.calendar.$get(
+                {
+                  query: {
+                    friendIds: normalized.join(","),
+                    month: months[0]!,
+                  },
+                },
+                requestOptions,
+              ),
+            );
+            return new Map([[calendar.month, calendar]]);
+          }
+          const result = await adapter.unwrap<{
+            calendars: FriendCalendar[];
+          }>(
+            await adapter.client.friends.calendars.$get(
+              {
+                query: {
+                  friendIds: normalized.join(","),
+                  months: months.join(","),
+                },
+              },
+              requestOptions,
+            ),
+          );
+          return new Map(
+            result.calendars.map((calendar) => [calendar.month, calendar]),
+          );
+        },
+      }),
   });
 }

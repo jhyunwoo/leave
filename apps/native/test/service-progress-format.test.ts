@@ -2,15 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   HERO_HEAD_DECIMALS,
   SERVICE_PERCENT_DECIMALS,
-  ZOOM_DECIMAL_PLACE,
   percentBetween,
   splitPercentText,
-  zoomFraction,
-  zoomSweepSeconds,
 } from "../src/lib/service-progress-format";
-
-// 육군 18개월(547.5일)을 밀리초로. 화면의 기본 기준이라 여기서도 이 값으로 잰다.
-const ARMY_SPAN_MS = 547.5 * 24 * 60 * 60 * 1000;
 
 describe("percentBetween", () => {
   it("입대 전은 0, 전역 후는 100으로 자른다", () => {
@@ -62,53 +56,5 @@ describe("splitPercentText", () => {
 
   it("소수점이 없으면 통째로 머리에 둔다", () => {
     expect(splitPercentText("43", 2)).toEqual({ head: "43", tail: "" });
-  });
-});
-
-describe("zoomFraction", () => {
-  it("항상 0 이상 1 미만이다", () => {
-    for (const percent of [0, 0.1, 43.1234567891, 99.9999999999, 100]) {
-      const fraction = zoomFraction(percent, ZOOM_DECIMAL_PLACE);
-      expect(fraction).toBeGreaterThanOrEqual(0);
-      expect(fraction).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it("그 자리가 한 칸 오르면 정확히 한 바퀴 돈다", () => {
-    const step = Math.pow(10, -ZOOM_DECIMAL_PLACE);
-    const before = zoomFraction(43.5, ZOOM_DECIMAL_PLACE);
-    const after = zoomFraction(43.5 + step, ZOOM_DECIMAL_PLACE);
-    expect(after).toBeCloseTo(before, 8);
-  });
-
-  it("한 칸의 절반이면 절반만 찬다", () => {
-    const half = Math.pow(10, -ZOOM_DECIMAL_PLACE) / 2;
-    expect(zoomFraction(43.5 + half, ZOOM_DECIMAL_PLACE)).toBeCloseTo(0.5, 8);
-  });
-
-  it("유한하지 않은 값은 0으로 접는다", () => {
-    expect(zoomFraction(Number.NaN, ZOOM_DECIMAL_PLACE)).toBe(0);
-    expect(zoomFraction(Number.POSITIVE_INFINITY, ZOOM_DECIMAL_PLACE)).toBe(0);
-  });
-});
-
-describe("zoomSweepSeconds", () => {
-  it("육군 18개월이면 한 바퀴가 5초 안쪽이다", () => {
-    const sweep = zoomSweepSeconds(ARMY_SPAN_MS, ZOOM_DECIMAL_PLACE);
-    // 눈으로 따라갈 수 있으면서 잔상이 되지 않는 구간. 이 범위를 벗어나면
-    // ZOOM_DECIMAL_PLACE를 잘못 고른 것이다.
-    expect(sweep).toBeGreaterThan(1);
-    expect(sweep).toBeLessThan(10);
-    expect(sweep).toBeCloseTo(4.73, 2);
-  });
-
-  it("복무 기간이 길수록 느리게 돈다", () => {
-    const army = zoomSweepSeconds(ARMY_SPAN_MS, ZOOM_DECIMAL_PLACE);
-    const navy = zoomSweepSeconds(ARMY_SPAN_MS * 1.1, ZOOM_DECIMAL_PLACE);
-    expect(navy).toBeGreaterThan(army);
-  });
-
-  it("복무 기간이 없으면 0이다", () => {
-    expect(zoomSweepSeconds(0, ZOOM_DECIMAL_PLACE)).toBe(0);
   });
 });

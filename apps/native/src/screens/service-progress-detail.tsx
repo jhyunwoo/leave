@@ -1,18 +1,20 @@
 /**
  * 전체 화면 복무율(네이티브).
  *
- * 프로필 카드의 작은 막대는 전체 복무 위치를 읽는 데 알맞지만, 실제 증가량은
- * 120Hz 화면에서도 한 프레임에 1픽셀의 수억 분의 일뿐이라 눈에는 멈춰 보인다.
- * 이 화면은 같은 퍼센트로 전체 막대와 소수점 5번째 자리 확대 막대를 함께 그린다.
- * 확대 막대가 과장된 별도 수치로 오해되지 않도록 자리와 반복 주기를 바로 적는다.
+ * 전체 복무 위치를 모바일 화면에 맞는 세로 막대 하나로 보여준다. 막대의 채움과
+ * 내부 퍼센트는 같은 Reanimated shared value에서 파생하므로, React state를
+ * 프레임마다 바꾸지 않고 UI 스레드에서 실제 시간에 맞춰 함께 증가한다.
  *
- * 숫자와 두 막대는 하나의 Reanimated shared value에서 파생한다. React state를
- * 프레임마다 바꾸지 않고 UI 스레드에서 TextInput의 text와 transform만 갱신한다.
+ * 막대 높이는 숫자로 계산하지 않는다. 기기·안전영역마다 어긋나므로 안전영역 안에
+ * 남는 세로 공간을 flex로 전부 차지하게 두고, 남은 전역일은 그 옆(막대 오른쪽)
+ * 칸에서 세로 가운데에 선다.
  */
 
 import { useMe } from "@leave/client";
 import { kstMidnight, type ISODate } from "@leave/shared/dates";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -22,7 +24,10 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
+  FadeIn,
+  FadeOut,
   useAnimatedProps,
   useAnimatedStyle,
   useDerivedValue,
@@ -41,18 +46,13 @@ import {
   percentBetween,
   SERVICE_PERCENT_DECIMALS,
   splitPercentText,
-  ZOOM_DECIMAL_PLACE,
-  zoomFraction,
-  zoomSweepSeconds,
 } from "@/lib/service-progress-format";
-import { makeStyles, radius, spacing, useColors } from "@/theme";
+import { makeStyles, motion, radius, spacing, useColors } from "@/theme";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+const TAP_MESSAGE_MS = 3_000;
 
-function percentTextParts(percent: number): {
-  head: string;
-  tail: string;
-} {
+function percentTextParts(percent: number): { head: string; tail: string } {
   "worklet";
   const fixed = percent.toFixed(SERVICE_PERCENT_DECIMALS);
   return splitPercentText(fixed, HERO_HEAD_DECIMALS);
@@ -75,7 +75,7 @@ function AnimatedReadout(props: {
 
   return (
     <View
-      style={styles.valueRow}
+      style={styles.valueStack}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
@@ -112,86 +112,40 @@ function StaticReadout(props: {
 }) {
   const parts = percentTextParts(props.percent);
   return (
-    <View style={styles.valueRow}>
-      <Text selectable style={props.headStyle}>
-        {parts.head}
-      </Text>
-      <Text selectable style={props.tailStyle}>
-        {parts.tail}%
-      </Text>
+    <View
+      style={styles.valueStack}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Text style={props.headStyle}>{parts.head}</Text>
+      <Text style={props.tailStyle}>{parts.tail}%</Text>
     </View>
   );
 }
 
-function LiveMainBar(props: { percent: SharedValue<number> }) {
+function LiveVerticalFill(props: { percent: SharedValue<number> }) {
   const screenStyles = useStyles();
-  const mainFill = useAnimatedStyle(() => ({
-    transform: [{ scaleX: props.percent.value / 100 }],
+  const fill = useAnimatedStyle(() => ({
+    transform: [{ scaleY: props.percent.value / 100 }],
   }));
 
   return (
-    <View style={[styles.mainTrack, screenStyles.mainTrack]}>
-      <Animated.View
-        style={[styles.mainFill, screenStyles.mainFill, mainFill]}
-      />
-    </View>
+    <Animated.View
+      style={[styles.verticalFill, screenStyles.verticalFill, fill]}
+    />
   );
 }
 
-function LiveZoomBar(props: { percent: SharedValue<number> }) {
-  const screenStyles = useStyles();
-  const zoomFill = useAnimatedStyle(() => ({
-    transform: [
-      { scaleX: zoomFraction(props.percent.value, ZOOM_DECIMAL_PLACE) },
-    ],
-  }));
-
-  return (
-    <View
-      style={[styles.zoomTrack, screenStyles.zoomTrack]}
-      accessibilityElementsHidden
-    >
-      <Animated.View
-        style={[styles.zoomFill, screenStyles.zoomFill, zoomFill]}
-      />
-    </View>
-  );
-}
-
-function StaticMainBar(props: { percent: number }) {
-  const screenStyles = useStyles();
-  return (
-    <View style={[styles.mainTrack, screenStyles.mainTrack]}>
-      <View
-        style={[
-          styles.mainFill,
-          screenStyles.mainFill,
-          { transform: [{ scaleX: props.percent / 100 }] },
-        ]}
-      />
-    </View>
-  );
-}
-
-function StaticZoomBar(props: { percent: number }) {
+function StaticVerticalFill(props: { percent: number }) {
   const screenStyles = useStyles();
   return (
     <View
-      style={[styles.zoomTrack, screenStyles.zoomTrack]}
-      accessibilityElementsHidden
-    >
-      <View
-        style={[
-          styles.zoomFill,
-          screenStyles.zoomFill,
-          {
-            transform: [
-              { scaleX: zoomFraction(props.percent, ZOOM_DECIMAL_PLACE) },
-            ],
-          },
-        ]}
-      />
-    </View>
+      style={[
+        styles.verticalFill,
+        screenStyles.verticalFill,
+        { transform: [{ scaleY: props.percent / 100 }] },
+      ]}
+    />
   );
 }
 
@@ -213,117 +167,149 @@ function ProgressContent(props: {
     focused && !reducedMotion && span > 0 && now > start && now < end;
   const percent = useServicePercentClock(start, span, ticking, now);
   const landscape = width > height;
+  const [showTapMessage, setShowTapMessage] = useState(false);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 가장 긴 100.00 + 8자리 꼬리 + %가 한 줄에 들어오도록 창 폭·높이에서 같이 제한한다.
-  const availableValueWidth = landscape ? width * 0.46 : width - spacing.xl * 2;
-  const headFontSize = Math.max(
-    48,
-    Math.min(
-      landscape ? height * 0.2 : width * 0.18,
-      availableValueWidth / 5.45,
-      112,
-    ),
+  useEffect(
+    () => () => {
+      if (messageTimer.current) clearTimeout(messageTimer.current);
+    },
+    [],
   );
-  const tailFontSize = Math.max(16, Math.min(headFontSize * 0.28, 30));
+
+  // 폭만 정한다. 높이는 barRow가 남는 공간을 그대로 넘겨준다.
+  const barWidth = Math.max(
+    112,
+    Math.min(width * (landscape ? 0.2 : 0.4), landscape ? 168 : 190),
+  );
+  const headFontSize = Math.max(28, Math.min(barWidth * 0.27, 38));
+  const tailFontSize = Math.max(12, Math.min(barWidth * 0.105, 15));
+  const valueWidth = barWidth - spacing.lg * 2;
   const headStyle = [
     screenStyles.headValue,
     {
-      width: headFontSize * 3.75,
+      width: valueWidth,
       fontSize: headFontSize,
-      lineHeight: headFontSize * 1.05,
+      lineHeight: headFontSize * 1.08,
     },
   ];
   const tailStyle = [
     screenStyles.tailValue,
     {
-      width: tailFontSize * 5.7,
+      width: valueWidth,
       fontSize: tailFontSize,
-      lineHeight: headFontSize * 0.82,
+      lineHeight: tailFontSize * 1.35,
     },
   ];
-  const sweep = zoomSweepSeconds(span, ZOOM_DECIMAL_PLACE);
   const finished = staticPercent >= 100;
   const notStarted = now <= start;
 
+  function handleProgressPress() {
+    if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+    setShowTapMessage(true);
+    if (messageTimer.current) clearTimeout(messageTimer.current);
+    messageTimer.current = setTimeout(() => {
+      setShowTapMessage(false);
+      messageTimer.current = null;
+    }, TAP_MESSAGE_MS);
+  }
+
   return (
     <View style={[screenStyles.body, landscape && screenStyles.bodyLandscape]}>
-      <View style={screenStyles.hero}>
+      <View style={screenStyles.status}>
         <Text selectable style={screenStyles.eyebrow}>
           복무율
-        </Text>
-        {reducedMotion ? (
-          <StaticReadout
-            percent={staticPercent}
-            headStyle={headStyle}
-            tailStyle={tailStyle}
-          />
-        ) : (
-          <AnimatedReadout
-            percent={percent}
-            headStyle={headStyle}
-            tailStyle={tailStyle}
-          />
-        )}
-        <Text selectable style={screenStyles.remaining}>
-          {finished
-            ? "복무를 마쳤어요"
-            : notStarted
-              ? "입대 전이에요"
-              : `전역까지 ${props.daysLeft}일`}
         </Text>
       </View>
 
       <View style={screenStyles.progressArea}>
-        <View
-          style={screenStyles.mainBarGroup}
-          accessibilityRole="progressbar"
-          accessibilityLabel="전체 복무율"
-          accessibilityValue={{
-            min: 0,
-            max: 100,
-            now: Math.round(staticPercent),
-            text: `${staticPercent.toFixed(1)}%`,
-          }}
-          testID="service-progress-main"
-        >
-          <View style={screenStyles.barHeading}>
-            <Text selectable style={screenStyles.barTitle}>
-              전체 복무
-            </Text>
-            <Text selectable style={screenStyles.barCaption}>
-              0% → 100%
-            </Text>
+        <View style={screenStyles.barRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="전체 복무율"
+            accessibilityHint="누르면 복무율에 대한 안내를 보여줍니다"
+            accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: Math.round(staticPercent),
+              text: `${staticPercent.toFixed(1)}%`,
+            }}
+            onPress={handleProgressPress}
+            style={({ pressed }) => [
+              styles.verticalTrack,
+              screenStyles.verticalTrack,
+              { width: barWidth },
+              pressed &&
+                (reducedMotion
+                  ? screenStyles.verticalTrackPressedReduced
+                  : styles.verticalTrackPressed),
+            ]}
+            testID="service-progress-main"
+          >
+            {reducedMotion ? (
+              <StaticVerticalFill percent={staticPercent} />
+            ) : (
+              <LiveVerticalFill percent={percent} />
+            )}
+            <View style={screenStyles.readoutSurface} pointerEvents="none">
+              {reducedMotion ? (
+                <StaticReadout
+                  percent={staticPercent}
+                  headStyle={headStyle}
+                  tailStyle={tailStyle}
+                />
+              ) : (
+                <AnimatedReadout
+                  percent={percent}
+                  headStyle={headStyle}
+                  tailStyle={tailStyle}
+                />
+              )}
+            </View>
+          </Pressable>
+
+          <View style={screenStyles.daySide}>
+            {finished ? (
+              <Text selectable style={screenStyles.dayState}>
+                복무를 마쳤어요
+              </Text>
+            ) : notStarted ? (
+              <Text selectable style={screenStyles.dayState}>
+                입대 전이에요
+              </Text>
+            ) : (
+              <>
+                <Text selectable style={screenStyles.dayLabel}>
+                  전역까지
+                </Text>
+                <Text selectable style={screenStyles.dayValue}>
+                  {props.daysLeft}
+                </Text>
+                <Text selectable style={screenStyles.dayUnit}>
+                  일
+                </Text>
+              </>
+            )}
           </View>
-          {reducedMotion ? (
-            <StaticMainBar percent={staticPercent} />
-          ) : (
-            <LiveMainBar percent={percent} />
-          )}
         </View>
 
-        <View style={screenStyles.zoomBarGroup} testID="service-progress-zoom">
-          <View style={screenStyles.barHeading}>
-            <Text selectable style={screenStyles.barTitle}>
-              실시간 확대
-            </Text>
-            <Text selectable style={screenStyles.barCaption}>
-              소수점 {ZOOM_DECIMAL_PLACE}번째 자리
-            </Text>
-          </View>
-          <Text selectable style={screenStyles.zoomDescription}>
-            {finished
-              ? "전역 시점에서 멈췄어요."
-              : notStarted
-                ? "입대일부터 움직이기 시작해요."
-                : reducedMotion
-                  ? "동작 줄이기 설정에 따라 현재 위치에 멈춰 있어요."
-                  : `${sweep.toFixed(1)}초마다 한 칸을 실제 속도로 확대해 보여줘요.`}
-          </Text>
-          {reducedMotion ? (
-            <StaticZoomBar percent={staticPercent} />
-          ) : (
-            <LiveZoomBar percent={percent} />
-          )}
+        <View style={screenStyles.messageSlot}>
+          {showTapMessage ? (
+            <Animated.Text
+              entering={
+                reducedMotion ? undefined : FadeIn.duration(motion.standard)
+              }
+              exiting={
+                reducedMotion ? undefined : FadeOut.duration(motion.quick)
+              }
+              selectable
+              accessibilityLiveRegion="polite"
+              style={screenStyles.tapMessage}
+              testID="service-progress-tap-message"
+            >
+              클릭한다고 복무율이 빠르게 올라가지 않아요
+            </Animated.Text>
+          ) : null}
         </View>
       </View>
     </View>
@@ -335,12 +321,22 @@ export function ServiceProgressDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const me = useMe();
+  // 막대가 남는 높이를 전부 먹으므로 안전영역을 iOS의 자동 contentInset에
+  // 맡길 수 없다. 자동값은 프레임 기준이라 꽉 찬 막대의 아래끝이 홈 인디케이터
+  // 밑으로 들어간다. 직접 padding으로 넣어 보이는 영역과 레이아웃을 일치시킨다.
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
       style={screenStyles.root}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={screenStyles.content}
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={[
+        screenStyles.content,
+        {
+          paddingTop: insets.top + spacing.sm,
+          paddingBottom: insets.bottom + spacing.sm,
+        },
+      ]}
     >
       <View style={screenStyles.topRow}>
         <LiquidGlassSurface interactive style={screenStyles.closeSurface}>
@@ -385,37 +381,25 @@ export function ServiceProgressDetailScreen() {
   );
 }
 
-// 정적·애니메이션 막대가 같은 기하를 공유한다. transformOrigin이 왼쪽이라
-// scaleX가 0→1로 변해도 채움의 시작점이 흔들리지 않는다.
+// 정적·애니메이션 막대가 같은 기하를 공유한다. transformOrigin이 아래쪽이라
+// scaleY가 0→1로 변해도 채움은 바닥에서 시작해 위로 자란다.
 const styles = {
-  valueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
+  valueStack: {
+    alignItems: "center",
     justifyContent: "center",
   },
-  mainTrack: {
-    width: "100%",
-    height: 34,
-    borderRadius: radius.pill,
+  verticalTrack: {
+    borderRadius: radius.xl,
     overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  mainFill: {
-    width: "100%",
-    height: "100%",
-    borderRadius: radius.pill,
-    transformOrigin: "left center",
-  },
-  zoomTrack: {
-    width: "100%",
-    height: 18,
-    borderRadius: radius.pill,
-    overflow: "hidden",
-  },
-  zoomFill: {
-    width: "100%",
-    height: "100%",
-    borderRadius: radius.pill,
-    transformOrigin: "left center",
+  verticalTrackPressed: { transform: [{ scale: motion.pressScale }] },
+  verticalFill: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: radius.xl,
+    transformOrigin: "center bottom",
   },
 } as const;
 
@@ -424,8 +408,8 @@ const useStyles = makeStyles(({ colors }) => ({
   content: {
     flexGrow: 1,
     minHeight: "100%",
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
   topRow: {
     width: "100%",
@@ -474,27 +458,93 @@ const useStyles = makeStyles(({ colors }) => ({
     flex: 1,
     width: "100%",
     alignSelf: "center",
-    justifyContent: "space-evenly",
-    gap: spacing.xxxl,
-    paddingVertical: spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   bodyLandscape: {
     flexDirection: "row",
-    alignItems: "stretch",
     gap: spacing.xxxl,
   },
-  hero: {
-    flex: 1,
+  status: {
     minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   eyebrow: {
     color: colors.brand,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 1.2,
+  },
+  // 세로(열)에서는 alignSelf가 폭을, 가로(행)에서는 높이를 채운다. 두 방향
+  // 모두에서 flex:1과 짝지어 "남는 공간 전부"를 막대에 넘긴다.
+  progressArea: {
+    flex: 1,
+    alignSelf: "stretch",
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  barRow: {
+    flex: 1,
+    alignSelf: "stretch",
+    flexDirection: "row",
+    // stretch라 막대의 높이가 이 행의 높이가 된다. 최소 높이는 두지 않는다 —
+    // 조상이 모두 flex:1이라 늘어나지 못하고 넘쳐버린다.
+    alignItems: "stretch",
+    justifyContent: "center",
+    gap: spacing.lg,
+  },
+  daySide: {
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  dayLabel: {
+    color: colors.body,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  dayValue: {
+    color: colors.inkDeep,
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  dayUnit: {
+    color: colors.body,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  dayState: {
+    color: colors.body,
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  verticalTrack: {
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    boxShadow: "0 8px 28px rgba(0, 0, 0, 0.12)",
+  },
+  verticalTrackPressedReduced: { opacity: 0.72 },
+  verticalFill: { backgroundColor: colors.primary },
+  readoutSurface: {
+    maxWidth: "86%",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: colors.canvas,
+    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.14)",
   },
   headValue: {
     color: colors.inkDeep,
@@ -503,7 +553,7 @@ const useStyles = makeStyles(({ colors }) => ({
     padding: 0,
     includeFontPadding: false,
     pointerEvents: "none",
-    textAlign: "right",
+    textAlign: "center",
   },
   tailValue: {
     color: colors.brand,
@@ -512,55 +562,18 @@ const useStyles = makeStyles(({ colors }) => ({
     padding: 0,
     includeFontPadding: false,
     pointerEvents: "none",
-    textAlign: "left",
+    textAlign: "center",
   },
-  remaining: {
-    color: colors.body,
-    fontSize: 16,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
+  messageSlot: {
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "flex-start",
   },
-  progressArea: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: "center",
-    gap: spacing.xl,
-  },
-  mainBarGroup: {
-    gap: spacing.md,
-    padding: spacing.xl,
-    borderRadius: radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: colors.canvas,
-  },
-  zoomBarGroup: {
-    gap: spacing.sm,
-    padding: spacing.xl,
-    borderRadius: radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: colors.primaryPale,
-  },
-  barHeading: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  barTitle: { color: colors.ink, fontSize: 18, fontWeight: "800" },
-  barCaption: {
-    color: colors.body,
-    fontSize: 12,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-  },
-  zoomDescription: {
+  tapMessage: {
     color: colors.body,
     fontSize: 13,
     lineHeight: 19,
+    fontWeight: "600",
+    textAlign: "center",
   },
-  // 아래 네 색은 정적 styles 객체에 테마값을 넘기는 연결점이다.
-  mainTrack: { backgroundColor: colors.hairline },
-  mainFill: { backgroundColor: colors.primary },
-  zoomTrack: { backgroundColor: colors.surfaceStrong },
-  zoomFill: { backgroundColor: colors.brand },
 }));

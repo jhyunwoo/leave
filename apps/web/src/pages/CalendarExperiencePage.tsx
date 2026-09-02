@@ -1,20 +1,15 @@
 import {
-  buildMonthGrid,
   cycleForDisplay,
   cycleUsedDays,
   diffDays,
   firstGrantDate,
   fmtDateShort,
   fmtRangeTiny,
-  getHoliday,
   isConfirmedLeaveStatus,
-  isWeekend,
   maxAllowedOut,
   normalizeFriendIds,
-  shiftMonth,
-  splitMonth,
   todayInSeoul,
-  WEEKDAYS,
+  type ISODate,
 } from "@leave/shared";
 import {
   buildMyLeaveDayMap,
@@ -37,6 +32,10 @@ import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
 import {
+  FriendCalendarScroll,
+  friendPersonColor,
+} from "../components/calendar/FriendCalendarScroll";
+import {
   LazyLeaveFormModal,
   preloadLeaveFormModal,
 } from "../components/LazyLeaveFormModal";
@@ -44,12 +43,6 @@ import { Modal } from "../components/Modal";
 import { PersonalEventModal } from "../components/PersonalEventModal";
 import { UnitEventModal } from "../components/UnitEventModal";
 import "../components/calendar/calendar.css";
-
-function personColor(userId: string): string {
-  let hash = 0;
-  for (const char of userId) hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  return `hsl(${hash} 58% 38%)`;
-}
 
 function PersonalItems(props: {
   events: PersonalEvent[];
@@ -105,6 +98,55 @@ function PersonalItems(props: {
         ))
       ) : (
         <p className="text-body">이 날의 개인 일정이 없어요.</p>
+      )}
+    </section>
+  );
+}
+
+function SharedLeaveItems(props: { calendar?: FriendCalendar; date: string }) {
+  const dayLeaves = useMemo(
+    () =>
+      (props.calendar?.leaves ?? []).filter(
+        (leave) => leave.startDate <= props.date && props.date <= leave.endDate,
+      ),
+    [props.calendar?.leaves, props.date],
+  );
+  const personById = useMemo(
+    () =>
+      new Map(
+        (props.calendar?.people ?? []).map((person) => [person.userId, person]),
+      ),
+    [props.calendar?.people],
+  );
+
+  return (
+    <section
+      className="card"
+      style={{ padding: "var(--sp-lg)", display: "grid", gap: "var(--sp-sm)" }}
+    >
+      <h2 className="display-xs">공유 휴가</h2>
+      {dayLeaves.length ? (
+        dayLeaves.map((leave) => {
+          const person = personById.get(leave.userId);
+          return (
+            <div
+              key={leave.leaveId}
+              style={{
+                borderLeft: `4px solid ${friendPersonColor(leave.userId)}`,
+                padding: "var(--sp-sm) var(--sp-md)",
+              }}
+            >
+              <strong>{person?.isViewer ? "나" : person?.name}</strong>
+              <p className="caption text-mute">
+                {isConfirmedLeaveStatus(leave.status)
+                  ? "확정 휴가"
+                  : "공유 휴가"}
+              </p>
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-body">이 날의 공유 휴가가 없어요.</p>
       )}
     </section>
   );
@@ -184,141 +226,6 @@ function UnitItems(props: {
         <p className="text-body">이 날의 부대 일정이 없어요.</p>
       )}
     </section>
-  );
-}
-
-function ComparisonMonth(props: {
-  month: string;
-  calendar?: FriendCalendar;
-  events: PersonalEvent[];
-  selectedDate: string | null;
-  onSelectDate: (date: string) => void;
-}) {
-  const { year, monthNum } = splitMonth(props.month);
-  const people = props.calendar?.people ?? [];
-  const personById = new Map(people.map((person) => [person.userId, person]));
-  return (
-    <div>
-      <h2 className="display-xs" style={{ marginBottom: "var(--sp-md)" }}>
-        {year}년 {monthNum}월
-      </h2>
-      <div
-        className="cal"
-        role="grid"
-        aria-label={`${year}년 ${monthNum}월 친구 달력`}
-      >
-        <div className="cal-weekdays" role="row">
-          {WEEKDAYS.map((weekday, index) => (
-            <div
-              key={weekday}
-              role="columnheader"
-              className={`cal-weekday ${index === 0 || index === 6 ? "is-red" : ""}`}
-            >
-              {weekday}
-            </div>
-          ))}
-        </div>
-        {buildMonthGrid(props.month).map((week, index) => (
-          <div className="cal-week" role="row" key={index}>
-            {week.map((cell) => {
-              const dayLeaves =
-                props.calendar?.leaves.filter(
-                  (leave) =>
-                    leave.startDate <= cell.date && cell.date <= leave.endDate,
-                ) ?? [];
-              const personal = props.events.filter(
-                (event) =>
-                  event.startDate <= cell.date && cell.date <= event.endDate,
-              );
-              const uniquePeople = [
-                ...new Set(dayLeaves.map((leave) => leave.userId)),
-              ];
-              const holiday = cell.inMonth ? getHoliday(cell.date) : null;
-              return (
-                <button
-                  key={cell.date}
-                  type="button"
-                  role="gridcell"
-                  disabled={!cell.inMonth}
-                  aria-selected={props.selectedDate === cell.date}
-                  aria-label={
-                    cell.inMonth
-                      ? `${Number(cell.date.slice(8))}일, 휴가 ${
-                          uniquePeople
-                            .map((id) => personById.get(id)?.name)
-                            .filter(Boolean)
-                            .join(", ") || "없음"
-                        }, 개인 일정 ${personal.length}개`
-                      : undefined
-                  }
-                  className={[
-                    "cal-cell",
-                    cell.inMonth ? "" : "is-out",
-                    props.selectedDate === cell.date ? "is-selected" : "",
-                  ].join(" ")}
-                  onClick={() => cell.inMonth && props.onSelectDate(cell.date)}
-                >
-                  <span
-                    className={`cal-daynum ${(isWeekend(cell.date) || holiday) && cell.inMonth ? "is-red" : ""}`}
-                  >
-                    {Number(cell.date.slice(8))}
-                  </span>
-                  {holiday ? (
-                    <span className="cal-holiday" title={holiday}>
-                      {holiday}
-                    </span>
-                  ) : null}
-                  <span
-                    style={{
-                      display: "flex",
-                      gap: 3,
-                      flexWrap: "wrap",
-                      overflow: "hidden",
-                      maxHeight: 36,
-                    }}
-                  >
-                    {uniquePeople.slice(0, 4).map((userId) => {
-                      const person = personById.get(userId);
-                      return (
-                        <span
-                          key={userId}
-                          title={person?.name}
-                          style={{
-                            minWidth: 22,
-                            height: 22,
-                            padding: "0 4px",
-                            borderRadius: 11,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "white",
-                            background: personColor(userId),
-                            fontSize: 10,
-                            fontWeight: 800,
-                          }}
-                        >
-                          {person?.isViewer ? "나" : person?.name.slice(0, 1)}
-                        </span>
-                      );
-                    })}
-                    {uniquePeople.length > 4 ? (
-                      <span className="caption">
-                        +{uniquePeople.length - 4}
-                      </span>
-                    ) : null}
-                  </span>
-                  {personal.length ? (
-                    <span className="cal-personal">
-                      개인{personal.length > 1 ? ` ${personal.length}` : ""}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -402,14 +309,14 @@ function FriendSelector(props: {
 
 export function CalendarPage(props: { me: Me }) {
   const today = todayInSeoul();
+  const currentMonth = today.slice(0, 7);
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const mode = params.get("mode") === "friends" ? "friends" : "unit";
   const selectedFriendIds = normalizeFriendIds(
     (params.get("friends") ?? "").split(","),
   );
-  const [month, setMonth] = useState(today.slice(0, 7));
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PersonalEvent>();
@@ -420,10 +327,9 @@ export function CalendarPage(props: { me: Me }) {
   const scrollRef = useRef<CalendarScrollHandle>(null);
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
-  const eventMonth =
-    mode === "friends" ? month : (selectedDate?.slice(0, 7) ?? month);
-  const events = usePersonalEvents(eventMonth);
-  const friendCalendar = useFriendCalendar(selectedFriendIds, month);
+  const selectedMonth = selectedDate?.slice(0, 7) ?? currentMonth;
+  const events = usePersonalEvents(selectedMonth);
+  const friendCalendar = useFriendCalendar(selectedFriendIds, selectedMonth);
   const unit = props.me.unit;
   const isUnitAdmin = unit?.adminId === props.me.user.id;
   const dischargeAt = props.me.user.dischargeAt;
@@ -450,10 +356,9 @@ export function CalendarPage(props: { me: Me }) {
     const first = firstGrantDate(regularOvernight);
     return first && today < first && first <= dischargeAt ? first : null;
   }, [regularOvernight, today, dischargeAt]);
-  const selectedMonth = selectedDate?.slice(0, 7) ?? month;
   const panelCalendar = useCalendar(unit?.id ?? null, selectedMonth);
   const selectDate = useCallback(
-    (date: string) =>
+    (date: ISODate) =>
       setSelectedDate((current) => (current === date ? null : date)),
     [],
   );
@@ -463,12 +368,14 @@ export function CalendarPage(props: { me: Me }) {
     return () => clearTimeout(timer);
   }, [toast]);
   const switchMode = (next: "unit" | "friends") => {
+    setSelectedDate(null);
     const value = new URLSearchParams(params);
     if (next === "friends") value.set("mode", "friends");
     else value.delete("mode");
     setParams(value, { replace: true });
   };
   const saveFriends = (ids: string[]) => {
+    setSelectedDate(null);
     const value = new URLSearchParams(params);
     value.set("mode", "friends");
     value.set("friends", ids.join(","));
@@ -528,12 +435,13 @@ export function CalendarPage(props: { me: Me }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}>
-          {mode === "unit" && unit ? (
+          {(mode === "unit" && unit) ||
+          (mode === "friends" && selectedFriendIds.length > 0) ? (
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={() => {
-                setSelectedDate(today);
+                if (mode === "unit") setSelectedDate(today);
                 scrollRef.current?.scrollToToday();
               }}
             >
@@ -706,133 +614,61 @@ export function CalendarPage(props: { me: Me }) {
             </div>
           </div>
         )
-      ) : (
-        <div style={{ display: "grid", gap: "var(--sp-lg)" }}>
-          <div className="card" style={{ padding: "var(--sp-lg)" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "var(--sp-md)",
-                marginBottom: "var(--sp-lg)",
-              }}
+      ) : selectedFriendIds.length === 0 ? (
+        <div className="card" style={{ padding: "var(--sp-lg)" }}>
+          <div style={{ padding: "var(--sp-2xl)", textAlign: "center" }}>
+            <h2 className="display-xs">비교할 친구를 선택해주세요</h2>
+            <p
+              className="text-body"
+              style={{ margin: "var(--sp-sm) 0 var(--sp-lg)" }}
             >
-              <button
-                className="btn btn-secondary btn-sm"
-                aria-label="이전 달"
-                onClick={() => setMonth((value) => shiftMonth(value, -1))}
-              >
-                ←
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setMonth(today.slice(0, 7))}
-              >
-                오늘
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                aria-label="다음 달"
-                onClick={() => setMonth((value) => shiftMonth(value, 1))}
-              >
-                →
-              </button>
-            </div>
-            {selectedFriendIds.length === 0 ? (
-              <div style={{ padding: "var(--sp-2xl)", textAlign: "center" }}>
-                <h2 className="display-xs">비교할 친구를 선택해주세요</h2>
-                <p
-                  className="text-body"
-                  style={{ margin: "var(--sp-sm) 0 var(--sp-lg)" }}
-                >
-                  나의 공유 휴가와 개인 일정도 함께 표시돼요.
-                </p>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setSelectorOpen(true)}
-                >
-                  친구 선택
-                </button>
-              </div>
-            ) : friendCalendar.isPending ? (
-              <div
-                className="spinner"
-                role="status"
-                aria-label="친구 달력 불러오는 중"
-              />
-            ) : friendCalendar.isError ? (
-              <p className="field-error" role="alert">
-                친구 달력을 불러오지 못했어요. 친구 관계나 차단 상태가 바뀌었을
-                수 있어요.
-              </p>
-            ) : (
-              <ComparisonMonth
-                month={month}
-                calendar={friendCalendar.data}
-                events={events.data?.events ?? []}
-                selectedDate={selectedDate}
-                onSelectDate={selectDate}
-              />
-            )}
+              나의 공유 휴가와 개인 일정도 함께 표시돼요.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => setSelectorOpen(true)}
+            >
+              친구 선택
+            </button>
           </div>
-          {friendCalendar.data ? (
-            <div
-              className="card"
-              style={{
-                padding: "var(--sp-lg)",
-                display: "flex",
-                gap: "var(--sp-md)",
-                flexWrap: "wrap",
-              }}
-              aria-label="사람 구분"
-            >
-              {friendCalendar.data.people.map((person) => (
-                <span
-                  key={person.userId}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <i
-                    aria-hidden="true"
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      background: personColor(person.userId),
-                    }}
-                  />
-                  <strong>{person.isViewer ? "나" : person.name}</strong>
-                </span>
-              ))}
-              <span
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                <i
-                  aria-hidden="true"
-                  style={{
-                    width: 12,
-                    height: 12,
-                    border: "2px solid var(--brand)",
-                    transform: "rotate(45deg)",
-                  }}
-                />
-                <strong>개인 일정</strong>
-              </span>
-            </div>
-          ) : null}
+        </div>
+      ) : friendCalendar.isError && !friendCalendar.data ? (
+        <div className="card" style={{ padding: "var(--sp-lg)" }}>
+          <p className="field-error" role="alert">
+            친구 달력을 불러오지 못했어요. 친구 관계나 차단 상태가 바뀌었을 수
+            있어요.
+          </p>
+        </div>
+      ) : (
+        <div
+          className="cal-layout"
+          style={{
+            display: "grid",
+            gridTemplateColumns: selectedDate
+              ? "minmax(0, 1fr) 340px"
+              : "minmax(0, 1fr)",
+            gap: "var(--sp-lg)",
+            alignItems: "start",
+          }}
+        >
+          <div
+            className="card"
+            style={{ padding: "var(--sp-md)", minWidth: 0 }}
+          >
+            <FriendCalendarScroll
+              ref={scrollRef}
+              friendIds={selectedFriendIds}
+              people={friendCalendar.data?.people ?? []}
+              selectedDate={selectedDate}
+              onSelectDate={selectDate}
+            />
+          </div>
           {selectedDate ? (
-            <div
-              className="cal-layout"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: "var(--sp-lg)",
-              }}
-            >
+            <div style={{ display: "grid", gap: "var(--sp-md)" }}>
+              <SharedLeaveItems
+                calendar={friendCalendar.data}
+                date={selectedDate}
+              />
               <PersonalItems
                 events={events.data?.events ?? []}
                 date={selectedDate}
@@ -842,50 +678,6 @@ export function CalendarPage(props: { me: Me }) {
                   setEventOpen(true);
                 }}
               />
-              <section
-                className="card"
-                style={{
-                  padding: "var(--sp-lg)",
-                  display: "grid",
-                  gap: "var(--sp-sm)",
-                }}
-              >
-                <h2 className="display-xs">공유 휴가</h2>
-                {(() => {
-                  const dayLeaves = (friendCalendar.data?.leaves ?? []).filter(
-                    (leave) =>
-                      leave.startDate <= selectedDate &&
-                      selectedDate <= leave.endDate,
-                  );
-                  if (dayLeaves.length === 0)
-                    return (
-                      <p className="text-body">이 날의 공유 휴가가 없어요.</p>
-                    );
-                  return dayLeaves.map((leave) => {
-                    const person = friendCalendar.data?.people.find(
-                      (entry) => entry.userId === leave.userId,
-                    );
-                    return (
-                      <div
-                        key={leave.leaveId}
-                        style={{
-                          borderLeft: `4px solid ${personColor(leave.userId)}`,
-                          padding: "var(--sp-sm) var(--sp-md)",
-                        }}
-                      >
-                        <strong>
-                          {person?.isViewer ? "나" : person?.name}
-                        </strong>
-                        <p className="caption text-mute">
-                          {isConfirmedLeaveStatus(leave.status)
-                            ? "확정 휴가"
-                            : "공유 휴가"}
-                        </p>
-                      </div>
-                    );
-                  });
-                })()}
-              </section>
             </div>
           ) : null}
         </div>
@@ -905,7 +697,7 @@ export function CalendarPage(props: { me: Me }) {
       ) : null}
       {eventOpen ? (
         <PersonalEventModal
-          initialDate={selectedDate ?? `${month}-01`}
+          initialDate={selectedDate ?? `${currentMonth}-01`}
           event={editingEvent}
           onClose={() => {
             setEventOpen(false);
@@ -916,7 +708,7 @@ export function CalendarPage(props: { me: Me }) {
       {unitEventOpen && unit && isUnitAdmin ? (
         <UnitEventModal
           unitId={unit.id}
-          initialDate={selectedDate ?? `${month}-01`}
+          initialDate={selectedDate ?? `${currentMonth}-01`}
           event={editingUnitEvent}
           onClose={() => {
             setUnitEventOpen(false);

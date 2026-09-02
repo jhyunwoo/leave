@@ -23,6 +23,13 @@ env:
 - tapOn: "친구.*"
 - tapOn: "선택한 친구와 달력 보기"
 - assertVisible: "친구 달력"
+- swipe:
+    start: 50%, 80%
+    end: 50%, 25%
+    duration: 600
+- tapOn: ".*일, 휴가 [0-9]+명.*"
+- assertVisible: "날짜 상세"
+- tapOn: "닫기"
 
 - tapOn: "달력"
 - tapOn: "개인 일정"

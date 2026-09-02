@@ -306,7 +306,7 @@ export function ProfileScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="복무율 전체 화면으로 보기"
-              accessibilityHint="복무율과 실시간 프로그래스 바를 크게 엽니다"
+              accessibilityHint="실시간 세로 복무율 프로그래스 바를 엽니다"
               style={({ pressed }) => pressed && styles.progressCardPressed}
               testID="profile-service-progress-card"
             >
