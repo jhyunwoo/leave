@@ -305,7 +305,10 @@ export const regularOvernightConfigs = sqliteTable(
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
     // 주기 시작일. 1주기가 시작하는 날이며, 첫 적립은 한 주기 뒤에 이뤄진다.
     startDate: text("start_date"),
+    // 주기는 일 또는 개월 중 하나로만 채운다(regularOvernightConfigSchema).
+    // 육군의 "분기(3개월)"는 달의 길이가 달라 일수로 옮기면 어긋나므로 달 단위다.
     intervalDays: integer("interval_days"),
+    intervalMonths: integer("interval_months"),
     daysPerGrant: integer("days_per_grant"),
     updatedAt: text("updated_at").notNull(),
   },

@@ -192,16 +192,16 @@ export function LeaveGrantsPage(props: { me: Me }) {
         </section>
       )}
 
-      {props.me.user.branch !== "army" && (
-        <>
-          <RegularOvernightSettings config={regularOvernight} />
-          <CycleList
-            cycles={regularOvernight.cycles}
-            expanded={showPastCycles}
-            onToggle={() => setShowPastCycles((open) => !open)}
-          />
-        </>
-      )}
+      {/* 육군도 분기마다 정기외박을 운영한다 — 군종으로 가리지 않는다. */}
+      <RegularOvernightSettings
+        branch={props.me.user.branch}
+        config={regularOvernight}
+      />
+      <CycleList
+        cycles={regularOvernight.cycles}
+        expanded={showPastCycles}
+        onToggle={() => setShowPastCycles((open) => !open)}
+      />
 
       {editing && (
         <LeaveGrantModal

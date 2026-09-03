@@ -119,8 +119,7 @@ export function ServiceHero(props: {
     overnightStartDate: props.overnightStartDate,
   });
 
-  const layer = (name: HeroLayer) =>
-    heroLayerState(props.branch, props.step, name);
+  const layer = (name: HeroLayer) => heroLayerState(props.step, name);
 
   const daysLeft = useRolling(geo.daysLeft, geo.resolved);
   const permille = useRolling(Math.round(geo.progress * 1000), geo.resolved);

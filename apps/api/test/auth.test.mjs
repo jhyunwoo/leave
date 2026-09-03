@@ -304,3 +304,88 @@ test("계정 삭제: 나를 차단한 사람의 목록이 깨지지 않는다", 
     [admin.data.user.id],
   );
 });
+
+test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력에 맞춰 계산한다", async () => {
+  const email = `${uniq("army-overnight-")}@test.com`;
+  const created = await req("POST", "/auth/signup", {
+    body: { email, password: "password123", dataConsent: true },
+  });
+  assert.equal(created.status, 201);
+  const token = created.data.token;
+
+  assert.equal(
+    (
+      await req("PUT", "/auth/onboarding/profile", {
+        token,
+        body: {
+          name: "분기외박",
+          branch: "army",
+          enlistedAt: "2026-01-05",
+          dischargeAt: "2027-07-04",
+          rank: "private",
+        },
+      })
+    ).status,
+    200,
+  );
+
+  // 육군은 분기(3개월)마다 1박 2일 — 주기가 달 단위다.
+  const regular = await req("PUT", "/auth/onboarding/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: "2026-01-31",
+      intervalMonths: 3,
+      daysPerGrant: 2,
+    },
+  });
+  assert.equal(regular.status, 200);
+
+  const status = await req("GET", "/auth/onboarding", { token });
+  assert.equal(status.data.regularOvernight.intervalMonths, 3);
+  assert.equal(status.data.regularOvernight.intervalDays, null);
+
+  assert.equal((await setUsername(token, uniq("army"))).status, 200);
+  assert.equal(
+    (await req("POST", "/auth/onboarding/complete", { token })).status,
+    200,
+  );
+
+  // 적립일이 달력의 같은 날에 떨어진다. 1/31 기준이라 없는 날은 말일로 접힌다
+  // (4/30 → 7/31): 일수로 근사하면 여기서부터 어긋난다.
+  const grants = await req("GET", "/leaves/grants", { token });
+  assert.equal(grants.status, 200);
+  assert.equal(grants.data.regularOvernight.intervalMonths, 3);
+  const cycles = grants.data.regularOvernight.cycles;
+  assert.deepEqual(
+    cycles
+      .slice(0, 3)
+      .map((cycle) => [cycle.start, cycle.end, cycle.grantDays]),
+    [
+      ["2026-04-30", "2026-07-30", 2],
+      ["2026-07-31", "2026-10-30", 2],
+      ["2026-10-31", "2027-01-30", 2],
+    ],
+  );
+
+  // 주기 단위가 군마다 다르므로, 군종을 바꾸면 앞 군의 설정을 지우고 다시 묻는다.
+  assert.equal(
+    (
+      await req("PUT", "/auth/onboarding/profile", {
+        token,
+        body: {
+          name: "분기외박",
+          branch: "navy",
+          enlistedAt: "2026-01-05",
+          dischargeAt: "2027-09-04",
+          rank: "private",
+        },
+      })
+    ).status,
+    200,
+  );
+  const cleared = await req("GET", "/auth/onboarding", { token });
+  assert.equal(cleared.data.regularOvernight.enabled, false);
+  assert.equal(cleared.data.regularOvernight.intervalMonths, null);
+  assert.equal(cleared.data.regularOvernight.intervalDays, null);
+});

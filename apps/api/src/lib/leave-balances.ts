@@ -193,6 +193,7 @@ export async function getLeaveBalanceSummary(
           enabled: config.enabled,
           startDate: config.startDate,
           intervalDays: config.intervalDays,
+          intervalMonths: config.intervalMonths,
           daysPerGrant: config.daysPerGrant,
           // 설정에서 파생하는 표시용 값 — 저장하지 않는다.
           nextGrantDate: nextGrantDateAfter(config, todayInSeoul()),
@@ -201,6 +202,7 @@ export async function getLeaveBalanceSummary(
           enabled: false,
           startDate: null,
           intervalDays: null,
+          intervalMonths: null,
           daysPerGrant: null,
           nextGrantDate: null,
         },
@@ -303,18 +305,18 @@ export async function saveRegularOvernightConfig(
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   input: RegularOvernightConfigInput,
 ) {
-  if (user.branch === "army" && input.enabled) {
-    throw new LeaveRuleError(
-      "정기외박 자동 적립은 해군과 공군에서 설정할 수 있습니다",
-    );
-  }
+  // 군종별 제한은 두지 않는다. 육군도 분기마다 정기외박을 운영하고(2012.12 개정),
+  // 주기 길이와 회당 일수는 어차피 부대마다 달라 사용자가 고치는 값이다.
   const now = new Date().toISOString();
   const values: typeof regularOvernightConfigs.$inferInsert = input.enabled
     ? {
         userId: user.id,
         enabled: true,
         startDate: input.startDate,
-        intervalDays: input.intervalDays,
+        // 스키마가 둘 중 하나만 통과시키므로 나머지 한쪽은 반드시 비워 둔다 —
+        // 남겨 두면 다음 저장에서 두 단위가 섞인 행이 된다.
+        intervalDays: input.intervalDays ?? null,
+        intervalMonths: input.intervalMonths ?? null,
         daysPerGrant: input.daysPerGrant,
         updatedAt: now,
       }
@@ -323,6 +325,7 @@ export async function saveRegularOvernightConfig(
         enabled: false,
         startDate: null,
         intervalDays: null,
+        intervalMonths: null,
         daysPerGrant: null,
         updatedAt: now,
       };

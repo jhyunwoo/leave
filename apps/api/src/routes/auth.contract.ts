@@ -188,7 +188,9 @@ const onboardingStatusSchema = z.object({
     .object({
       enabled: z.boolean(),
       startDate: z.string().nullable(),
+      /** 주기 길이. 일·개월 중 채워진 한쪽이 그 사용자의 주기 단위다. */
       intervalDays: z.number().nullable(),
+      intervalMonths: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
     })
     .nullable(),

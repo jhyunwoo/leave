@@ -370,15 +370,33 @@ export const leaveGrantUpdateSchema = z
   })
   .superRefine(grantDateOrder);
 
+/**
+ * 정기외박 자동 적립 설정.
+ *
+ * 주기는 일 또는 개월 중 **하나로만** 정한다. 둘 다 오면 어느 쪽이 이기는지가
+ * 저장 계층과 계산 계층의 약속이 되어 버리므로, 애초에 들어오지 못하게 막는다.
+ * 달 단위가 필요한 이유는 regular-overnight.ts 머리말에 있다.
+ */
 export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   z.object({ enabled: z.literal(false) }),
-  z.object({
-    enabled: z.literal(true),
-    // 주기 시작일 — 1주기가 시작하는 날. 첫 적립은 한 주기 뒤에 이뤄진다.
-    startDate: isoDateSchema,
-    intervalDays: z.int().min(1).max(365),
-    daysPerGrant: z.int().min(1).max(30),
-  }),
+  z
+    .object({
+      enabled: z.literal(true),
+      // 주기 시작일 — 1주기가 시작하는 날. 첫 적립은 한 주기 뒤에 이뤄진다.
+      startDate: isoDateSchema,
+      intervalDays: z.int().min(1).max(365).nullish(),
+      intervalMonths: z.int().min(1).max(12).nullish(),
+      daysPerGrant: z.int().min(1).max(30),
+    })
+    .superRefine((value, ctx) => {
+      if (Boolean(value.intervalDays) === Boolean(value.intervalMonths)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["intervalDays"],
+          message: "주기는 일 또는 개월 중 하나로만 정할 수 있습니다",
+        });
+      }
+    }),
 ]);
 
 /**

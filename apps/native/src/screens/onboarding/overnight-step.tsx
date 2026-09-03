@@ -1,7 +1,10 @@
 /**
- * 정기외박 기준일 단계 (해군·공군만, 네이티브).
+ * 정기외박 기준일 단계 (네이티브).
  *
  * 사용처: `screens/onboarding/index.tsx`.
+ *
+ * 주기의 단위는 군종이 정한다 — 해·공군은 6주라 일 단위, 육군은 분기라 달 단위다.
+ * 입력칸은 하나뿐이고 라벨과 허용 범위만 단위를 따라간다.
  *
  * 예전에는 규정 근거 패널을 늘 펼쳐 뒀는데, 질문 하나짜리 화면에 본문보다 긴
  * 각주가 붙는 꼴이었다. 접어두되 없애지는 않는다 — 공식 일정이 아니라는 고지와
@@ -9,13 +12,16 @@
  */
 
 import {
+  REGULAR_OVERNIGHT_INTERVAL_LIMITS,
   REGULAR_OVERNIGHT_SOURCES,
   REGULAR_OVERNIGHT_VERIFIED_AT,
-  addDays,
+  isRegularOvernightIntervalValid,
   isValidISODate,
+  regularOvernightFirstGrantPreview,
   regularOvernightGuidance,
   type Branch,
   type ISODate,
+  type RegularOvernightIntervalForm,
 } from "@leave/shared";
 import * as Linking from "expo-linking";
 import { useState } from "react";
@@ -32,9 +38,11 @@ export function OvernightStep(props: {
   branch: Branch;
   value: string;
   onChange: (value: string) => void;
+  /** 주기의 단위. 군종에서 정해져 화면에서는 바꾸지 않는다. */
+  intervalUnit: RegularOvernightIntervalForm["unit"];
   /** 주기·회당은 문자열로 들고 있는다 — 아래 주석 참고. */
-  intervalDays: string;
-  onIntervalDaysChange: (value: string) => void;
+  interval: string;
+  onIntervalChange: (value: string) => void;
   daysPerGrant: string;
   onDaysPerGrantChange: (value: string) => void;
   error: string | null;
@@ -45,16 +53,18 @@ export function OvernightStep(props: {
   const styles = useStyles();
   const [open, setOpen] = useState(false);
   const guidance = regularOvernightGuidance(props.branch);
-  if (!guidance) return null;
-
-  const interval = Number(props.intervalDays);
+  const limits = REGULAR_OVERNIGHT_INTERVAL_LIMITS[props.intervalUnit];
+  const form = {
+    unit: props.intervalUnit,
+    value: Number(props.interval),
+  } satisfies RegularOvernightIntervalForm;
   const perGrant = Number(props.daysPerGrant);
   // 서버 스키마(regularOvernightConfigSchema)와 같은 범위를 미리 막아 준다.
-  const intervalOk =
-    Number.isInteger(interval) && interval >= 1 && interval <= 365;
+  const intervalOk = isRegularOvernightIntervalValid(form);
   const perGrantOk =
     Number.isInteger(perGrant) && perGrant >= 1 && perGrant <= 30;
   const ready = isValidISODate(props.value) && intervalOk && perGrantOk;
+  const firstGrant = regularOvernightFirstGrantPreview(props.value, form);
 
   return (
     <StepShell step="overnight" lead={guidance.summary}>
@@ -65,19 +75,19 @@ export function OvernightStep(props: {
         testID="onboarding-overnight-start"
       />
 
-      {/* 기본값은 해군·공군의 통상 운영(6주마다 2박 3일)이지만 부대마다 다르다.
-          예전에는 읽기 전용 타일이라 온보딩을 끝내고 보유 휴가 화면까지 들어가야
-          고칠 수 있었다.
+      {/* 기본값은 군별 통상 운영(육군 3개월 1박 2일, 해·공군 6주 2박 3일)이지만
+          부대마다 다르다. 예전에는 읽기 전용 타일이라 온보딩을 끝내고 보유 휴가
+          화면까지 들어가야 고칠 수 있었다.
           값을 문자열로 들고 있는 건 지우는 중간 상태를 허용하기 위해서다.
           숫자로 강제하면 마지막 한 자를 지우는 순간 1로 튀어 되고쳐야 한다. */}
       <View style={styles.metrics}>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>주기 (일)</Text>
+          <Text style={styles.metricLabel}>{limits.label}</Text>
           <Input
-            value={props.intervalDays}
-            onChangeText={props.onIntervalDaysChange}
+            value={props.interval}
+            onChangeText={props.onIntervalChange}
             keyboardType="number-pad"
-            accessibilityLabel="정기외박 주기 일수"
+            accessibilityLabel={`정기외박 주기 ${limits.unitLabel}`}
             testID="onboarding-overnight-interval"
           />
         </View>
@@ -93,12 +103,10 @@ export function OvernightStep(props: {
         </View>
       </View>
 
-      {isValidISODate(props.value) && intervalOk ? (
+      {firstGrant ? (
         <Animated.Text entering={FadeIn.duration(240)} style={styles.live}>
           첫 사용 가능 주기는{" "}
-          <Text style={styles.liveStrong}>
-            {addDays(props.value as ISODate, interval)}
-          </Text>
+          <Text style={styles.liveStrong}>{firstGrant}</Text>
           부터예요.
         </Animated.Text>
       ) : null}

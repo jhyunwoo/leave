@@ -209,20 +209,23 @@ export function LeaveGrantsScreen() {
     </ResponsiveGrid>
   );
 
-  const overnight =
-    me.data && me.data.user.branch !== "army" ? (
-      <ResponsiveGrid
-        sizeClass={sizeClass}
-        columns={{ compact: 1, medium: 1, expanded: 2 }}
-      >
-        <RegularOvernightSettings config={regularOvernight} />
-        <CycleList
-          cycles={regularOvernight.cycles}
-          expanded={showPastCycles}
-          onToggle={() => setShowPastCycles((open) => !open)}
-        />
-      </ResponsiveGrid>
-    ) : null;
+  // 육군도 분기마다 정기외박을 운영한다 — 군종으로 가리지 않는다.
+  const overnight = me.data ? (
+    <ResponsiveGrid
+      sizeClass={sizeClass}
+      columns={{ compact: 1, medium: 1, expanded: 2 }}
+    >
+      <RegularOvernightSettings
+        branch={me.data.user.branch}
+        config={regularOvernight}
+      />
+      <CycleList
+        cycles={regularOvernight.cycles}
+        expanded={showPastCycles}
+        onToggle={() => setShowPastCycles((open) => !open)}
+      />
+    </ResponsiveGrid>
+  ) : null;
 
   return (
     <>
