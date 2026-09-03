@@ -9,6 +9,7 @@ import {
   MAX_DATE_RANGE_DAYS,
   passwordChangeSchema,
   personalEventCreateSchema,
+  regularOvernightConfigSchema,
   pushEventSchema,
   signupSchema,
   unitCreateSchema,
@@ -429,5 +430,54 @@ describe("비밀번호 길이 상한", () => {
         newPassword: "password123",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("정기외박 자동 적립 설정", () => {
+  const base = {
+    enabled: true as const,
+    startDate: "2026-03-01",
+    daysPerGrant: 2,
+  };
+
+  it("주기는 일 또는 개월 중 하나로만 받는다", () => {
+    expect(
+      regularOvernightConfigSchema.safeParse({ ...base, intervalDays: 42 })
+        .success,
+    ).toBe(true);
+    expect(
+      regularOvernightConfigSchema.safeParse({ ...base, intervalMonths: 3 })
+        .success,
+    ).toBe(true);
+    // 둘 다 오면 어느 쪽이 이기는지가 암묵적 약속이 되므로 막는다.
+    expect(
+      regularOvernightConfigSchema.safeParse({
+        ...base,
+        intervalDays: 42,
+        intervalMonths: 3,
+      }).success,
+    ).toBe(false);
+    expect(regularOvernightConfigSchema.safeParse(base).success).toBe(false);
+  });
+
+  it("단위마다 허용 범위가 다르다", () => {
+    expect(
+      regularOvernightConfigSchema.safeParse({ ...base, intervalMonths: 12 })
+        .success,
+    ).toBe(true);
+    expect(
+      regularOvernightConfigSchema.safeParse({ ...base, intervalMonths: 13 })
+        .success,
+    ).toBe(false);
+    expect(
+      regularOvernightConfigSchema.safeParse({ ...base, intervalDays: 366 })
+        .success,
+    ).toBe(false);
+  });
+
+  it("꺼진 설정은 주기를 요구하지 않는다", () => {
+    expect(
+      regularOvernightConfigSchema.safeParse({ enabled: false }).success,
+    ).toBe(true);
   });
 });

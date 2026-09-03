@@ -6,12 +6,12 @@
  */
 
 import {
-  addDays,
   allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
   clipSegmentsTo,
   cycleColor,
+  cycleDateAfter,
   cycleState,
   cycleUsedDays,
   cyclesInRange,
@@ -316,6 +316,7 @@ export async function buildGrantsPage(db: Db, user: User) {
       enabled: config?.enabled ?? false,
       startDate: config?.startDate ?? null,
       intervalDays: config?.intervalDays ?? null,
+      intervalMonths: config?.intervalMonths ?? null,
       daysPerGrant: config?.daysPerGrant ?? null,
       nextGrantDate: nextGrantDateAfter(config, today),
       cycles: cycles.list,
@@ -379,7 +380,8 @@ function buildCycleList(
 ) {
   if (!config?.startDate || !isRegularOvernightCycleBased(config)) return [];
   // 전역일이 지났거나 첫 적립보다 일러도 1·2주기는 보이게 한다(첫 적립 = 시작일 + 1주기).
-  const floor = addDays(config.startDate, 2 * (config.intervalDays ?? 1));
+  // 주기 단위가 일일 수도 달일 수도 있어 직접 더하지 않고 주기 계산에 맡긴다.
+  const floor = cycleDateAfter(config, 2) ?? config.startDate;
   const end = [dischargeAt, today, floor].reduce((a, b) => (a > b ? a : b));
 
   return cyclesInRange(config, config.startDate, end)

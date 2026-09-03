@@ -428,7 +428,9 @@ export const leaveGrantsPageSchema = z
     regularOvernight: z.object({
       enabled: z.boolean(),
       startDate: z.string().nullable(),
+      /** 주기 길이. 일·개월 중 채워진 한쪽이 그 사용자의 주기 단위다. */
       intervalDays: z.number().nullable(),
+      intervalMonths: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
       nextGrantDate: z.string().nullable(),
       /** 주기 시작일부터 전역일까지의 모든 주기. 설정이 없으면 빈 배열. */
@@ -443,7 +445,9 @@ export const leaveBalanceSummarySchema = z
     regularOvernight: z.object({
       enabled: z.boolean(),
       startDate: z.string().nullable(),
+      /** 주기 길이. 일·개월 중 채워진 한쪽이 그 사용자의 주기 단위다. */
       intervalDays: z.number().nullable(),
+      intervalMonths: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
       /** 설정에서 파생한 다음 적립 예정일 (읽기 전용). */
       nextGrantDate: z.string().nullable(),

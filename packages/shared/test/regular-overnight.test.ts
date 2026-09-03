@@ -610,3 +610,143 @@ describe("구간 범위 기준 정기외박 잔여", () => {
     ).toBe(0);
   });
 });
+
+/**
+ * 육군의 통상 운영: 분기(3개월)마다 1박 2일.
+ * 기준일을 말일로 잡아 달 산술의 클램핑까지 함께 본다.
+ */
+const armyConfig: RegularOvernightConfig = {
+  enabled: true,
+  startDate: "2026-01-31",
+  intervalDays: null,
+  intervalMonths: 3,
+  daysPerGrant: 2,
+};
+
+describe("달 단위 주기 (육군 분기)", () => {
+  it("적립일이 달력의 같은 날에 떨어진다 — 일수로 세면 밀리는 자리", () => {
+    // 3개월 주기를 91일로 근사하면 네 주기(364일)마다 하루씩 앞당겨진다.
+    // 2/10 기준 4주기: 달 단위는 2027-02-10, 91일이면 2027-02-09.
+    const config: RegularOvernightConfig = {
+      ...armyConfig,
+      startDate: "2026-02-10",
+    };
+    expect(grantDatesThrough(config, "2027-03-01")).toEqual([
+      "2026-05-10",
+      "2026-08-10",
+      "2026-11-10",
+      "2027-02-10",
+    ]);
+    expect(
+      grantDatesThrough(
+        { ...config, intervalDays: 91, intervalMonths: null },
+        "2027-03-01",
+      ),
+    ).toEqual(["2026-05-12", "2026-08-11", "2026-11-10", "2027-02-09"]);
+  });
+
+  it("주기는 늘 시작일에서 한 번에 더한다 — 말일이 끌려가지 않는다", () => {
+    // 1/31에서 3개월씩 이어 붙이면 4/30 → 7/30이 되지만, 6개월을 한 번에
+    // 더하면 7/31이다. 규정이 말하는 것은 후자다.
+    expect(grantDatesThrough(armyConfig, "2026-11-01")).toEqual([
+      "2026-04-30",
+      "2026-07-31",
+      "2026-10-31",
+    ]);
+  });
+
+  it("주기 끝은 다음 적립 전날이라 주기마다 길이가 다르다", () => {
+    expect(cycleFor(armyConfig, "2026-04-30")).toEqual({
+      index: 1,
+      start: "2026-04-30",
+      end: "2026-07-30",
+      grantDays: 2,
+    });
+    expect(cycleFor(armyConfig, "2026-07-31")).toEqual({
+      index: 2,
+      start: "2026-07-31",
+      end: "2026-10-30",
+      grantDays: 2,
+    });
+  });
+
+  it("첫 적립 전에는 주기가 없다 — 기준일 당일도, 대기 구간 내내도", () => {
+    expect(firstGrantDate(armyConfig)).toBe("2026-04-30");
+    expect(cycleFor(armyConfig, "2026-01-31")).toBe(null);
+    expect(cycleFor(armyConfig, "2026-04-29")).toBe(null);
+    expect(cycleFor(armyConfig, "2025-12-01")).toBe(null);
+    expect(cyclesInRange(armyConfig, "2026-01-01", "2026-04-29")).toEqual([]);
+  });
+
+  it("범위에 걸친 주기를 빠짐없이 준다", () => {
+    expect(
+      cyclesInRange(armyConfig, "2026-07-01", "2026-11-01").map((c) => c.index),
+    ).toEqual([1, 2, 3]);
+    expect(cyclesInRange(armyConfig, "2026-08-01", "2026-08-31")).toEqual([
+      { index: 2, start: "2026-07-31", end: "2026-10-30", grantDays: 2 },
+    ]);
+  });
+
+  it("다음 적립일 — 적립일 당일에 물으면 그다음 주기를 준다", () => {
+    expect(nextGrantDateAfter(armyConfig, "2026-01-01")).toBe("2026-04-30");
+    expect(nextGrantDateAfter(armyConfig, "2026-04-29")).toBe("2026-04-30");
+    expect(nextGrantDateAfter(armyConfig, "2026-04-30")).toBe("2026-07-31");
+  });
+
+  it("주기 몫 1박 2일을 넘기면 막고, 주기가 바뀌면 다시 쓸 수 있다", () => {
+    const used: SegmentLike[] = [
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        startDate: "2026-05-01",
+        endDate: "2026-05-02",
+      },
+    ];
+    // 1주기(4/30~7/30) 몫 2일을 이미 다 썼다.
+    expect(
+      checkRegularOvernight({
+        config: armyConfig,
+        existing: used,
+        requested: [
+          {
+            category: "overnight",
+            overnightKind: "regular",
+            startDate: "2026-06-01",
+            endDate: "2026-06-01",
+          },
+        ],
+        dischargeAt: "2027-06-30",
+      }),
+    ).toMatchObject({ kind: "over_cycle", usedDays: 3 });
+
+    // 2주기(7/31~)는 새 몫이라 통과한다 — 이월이 아니라 주기별 적립이다.
+    expect(
+      checkRegularOvernight({
+        config: armyConfig,
+        existing: used,
+        requested: [
+          {
+            category: "overnight",
+            overnightKind: "regular",
+            startDate: "2026-08-01",
+            endDate: "2026-08-02",
+          },
+        ],
+        dischargeAt: "2027-06-30",
+      }),
+    ).toBe(null);
+  });
+
+  it("일수 주기가 함께 저장돼 있어도 달 단위를 따른다", () => {
+    // 군종을 바꾸다 앞 군의 값이 남아도 답이 흔들리지 않아야 한다.
+    expect(firstGrantDate({ ...armyConfig, intervalDays: 42 })).toBe(
+      "2026-04-30",
+    );
+  });
+
+  it("두 주기 값이 모두 비면 주기가 없다", () => {
+    expect(
+      cycleFor({ ...armyConfig, intervalMonths: null }, "2026-05-01"),
+    ).toBe(null);
+  });
+});

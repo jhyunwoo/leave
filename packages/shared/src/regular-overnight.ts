@@ -3,19 +3,32 @@
  *
  * 정기외박은 주기 시작일을 기준으로 주기마다 반복해서 적립된다(입대일과 무관).
  * 주기 정보를 따로 저장하지는 않고, 프로필의 자동 적립 설정
- * (주기 시작일 startDate, 주기 intervalDays, 회당 daysPerGrant)에서 파생한다.
+ * (주기 시작일 startDate, 주기 intervalDays·intervalMonths, 회당 daysPerGrant)에서
+ * 파생한다.
+ *
+ * 주기의 단위가 둘인 것은 군마다 규정이 다른 단위로 쓰여 있기 때문이다. 해·공군의
+ * "6주마다"는 일수로 정확히 떨어지지만(42일), 육군의 "분기(3개월)마다"는 달의 길이가
+ * 달라 일수로 옮기는 순간 어긋난다 — 91일로 잡으면 네 주기(364일)마다 하루씩 앞당겨져
+ * 몇 주기만 지나도 달력의 분기와 다른 날에 적립된다. 그래서 달 단위 주기는 일수로
+ * 바꾸지 않고 달 산술(addMonthsClamped)로 그대로 센다.
  *
  * 적립은 한 주기를 다 채워야 이뤄진다. 주기 시작일을 S, 주기를 I라 하면 첫 적립일은
  * S가 아니라 S + I이고, 이후 S + 2·I, S + 3·I … 로 이어진다.
  *
- * 주기는 그 적립일부터 센다. k번째(1부터) 주기는 [S + k·I, S + (k+1)·I - 1]이고,
+ * 주기는 그 적립일부터 센다. k번째(1부터) 주기는 [S + k·I, S + (k+1)·I - 1일]이고,
  * 주기 첫날에 회당 적립 일수를 받아 다음 적립 전날(= 그 주기 마지막 날)까지 쓴다.
  * 이월은 없다. S부터 첫 적립 전날까지의 한 주기는 아직 받은 정기외박이 없는 대기
  * 구간이라 어떤 주기에도 속하지 않고, 그 사이에는 쓸 수 있는 정기외박도 없다.
  */
 
 import { fmtDateShort, fmtRangeTiny } from "./calendar";
-import { addDays, diffDays, type ISODate } from "./dates";
+import {
+  addDays,
+  addMonthsClamped,
+  diffDays,
+  fullMonthsBetween,
+  type ISODate,
+} from "./dates";
 import { segmentBalanceKey, type LeaveSegment } from "./leave";
 
 /** 아무리 긴 범위를 물어봐도 폭주하지 않도록 두는 주기 수 상한. */
@@ -25,13 +38,20 @@ export type RegularOvernightConfig = {
   enabled: boolean;
   /** 주기를 세기 시작하는 날. 첫 적립은 한 주기 뒤(S + I)이고 그때 1주기가 시작한다. */
   startDate: string | null;
+  /** 일 단위 주기. 달 단위와 둘 중 하나만 값을 갖는다(해·공군의 42일). */
   intervalDays: number | null;
+  /** 달 단위 주기. 달력의 분기에 맞춰 돌아야 하는 주기에 쓴다(육군의 3개월). */
+  intervalMonths?: number | null;
   daysPerGrant: number | null;
 };
 
+/** 주기의 길이. 단위가 다르면 더하는 방법도 다르므로 숫자만으로는 부족하다. */
+export type RegularOvernightInterval =
+  { unit: "day"; value: number } | { unit: "month"; value: number };
+
 type ActiveConfig = {
   startDate: ISODate;
-  intervalDays: number;
+  interval: RegularOvernightInterval;
   daysPerGrant: number;
 };
 
@@ -46,48 +66,78 @@ export type RegularOvernightCycle = {
   grantDays: number;
 };
 
+/**
+ * 저장된 두 컬럼 중 실제로 쓸 주기.
+ *
+ * 달 단위를 먼저 본다. 한 행에 둘 다 들어가는 일은 스키마가 막지만(schemas.ts),
+ * 군종을 바꾸다 남은 값이 섞여 들어와도 규정에 가까운 쪽으로 답이 정해지게 둔다.
+ */
+export function regularOvernightInterval(
+  config: RegularOvernightConfig | null | undefined,
+): RegularOvernightInterval | null {
+  const months = config?.intervalMonths;
+  if (months && months >= 1) return { unit: "month", value: months };
+  const days = config?.intervalDays;
+  if (days && days >= 1) return { unit: "day", value: days };
+  return null;
+}
+
 /** 설정이 켜져 있고 값이 모두 채워졌을 때만 주기를 계산할 수 있다. */
 function activeConfig(config: RegularOvernightConfig | null | undefined) {
+  const interval = regularOvernightInterval(config);
   if (
     !config?.enabled ||
     !config.startDate ||
-    !config.intervalDays ||
     !config.daysPerGrant ||
-    config.intervalDays < 1
+    !interval
   ) {
     return null;
   }
   return {
     startDate: config.startDate,
-    intervalDays: config.intervalDays,
+    interval,
     daysPerGrant: config.daysPerGrant,
   } satisfies ActiveConfig;
 }
 
-/** 첫 적립일. 한 주기를 다 채운 뒤이므로 주기 시작일이 아니라 그 한 주기 뒤다. */
-function firstGrantOf(config: ActiveConfig): ISODate {
-  return addDays(config.startDate, config.intervalDays);
+/**
+ * 주기 시작일에서 k주기 뒤 날짜. k=1이 첫 적립일이다.
+ *
+ * 언제나 시작일에서 한 번에 더한다. 달 단위에서 한 주기씩 이어 붙이면 말일이
+ * 끌려간다 — 1/31에서 3개월씩 두 번은 4/30 → 7/30이지만, 6개월을 한 번에 더하면
+ * 7/31이다. 규정이 말하는 것은 후자다.
+ */
+function cycleDateAt(config: ActiveConfig, k: number): ISODate {
+  return config.interval.unit === "month"
+    ? addMonthsClamped(config.startDate, k * config.interval.value)
+    : addDays(config.startDate, k * config.interval.value);
 }
 
-/** date가 속한 주기의 시작일. 첫 적립 전이면 아직 주기가 없어 null. */
-function cycleStartOf(config: ActiveConfig, date: ISODate): ISODate | null {
-  const first = firstGrantOf(config);
-  const offset = diffDays(first, date);
-  if (offset < 0) return null;
-  const k = Math.floor(offset / config.intervalDays);
-  return addDays(first, k * config.intervalDays);
+/**
+ * date가 주기 시작일에서 몇 주기 지났는지(내림). 시작일 이전이면 1보다 작은 값이
+ * 나와 "아직 주기가 없다"로 읽힌다.
+ */
+function cyclesElapsed(config: ActiveConfig, date: ISODate): number {
+  const { interval, startDate } = config;
+  return interval.unit === "month"
+    ? Math.floor(fullMonthsBetween(startDate, date) / interval.value)
+    : Math.floor(diffDays(startDate, date) / interval.value);
+}
+
+/** 첫 적립일. 한 주기를 다 채운 뒤이므로 주기 시작일이 아니라 그 한 주기 뒤다. */
+function firstGrantOf(config: ActiveConfig): ISODate {
+  return cycleDateAt(config, 1);
 }
 
 function buildCycle(
   config: ActiveConfig,
-  start: ISODate,
+  index: number,
 ): RegularOvernightCycle {
-  const index =
-    Math.floor(diffDays(firstGrantOf(config), start) / config.intervalDays) + 1;
   return {
     index,
-    start,
-    end: addDays(start, config.intervalDays - 1),
+    start: cycleDateAt(config, index),
+    // 다음 적립 전날. 달 단위 주기는 주기마다 길이가 달라 일수로 셀 수 없다.
+    end: addDays(cycleDateAt(config, index + 1), -1),
     // 주기는 적립일부터 세므로 모든 주기가 회당 적립 일수를 쥐고 시작한다.
     grantDays: config.daysPerGrant,
   };
@@ -100,8 +150,21 @@ export function cycleFor(
 ): RegularOvernightCycle | null {
   const active = activeConfig(config);
   if (!active) return null;
-  const start = cycleStartOf(active, date);
-  return start ? buildCycle(active, start) : null;
+  const index = cyclesElapsed(active, date);
+  return index < 1 ? null : buildCycle(active, index);
+}
+
+/**
+ * 주기 시작일에서 n주기 뒤 날짜. 설정이 없으면 null.
+ * 주기 목록을 어디까지 펼칠지 정하는 것처럼, 주기 하나를 만들 것도 아니면서
+ * "몇 주기 뒤"를 알아야 하는 자리에 쓴다.
+ */
+export function cycleDateAfter(
+  config: RegularOvernightConfig | null | undefined,
+  cycles: number,
+): ISODate | null {
+  const active = activeConfig(config);
+  return active ? cycleDateAt(active, cycles) : null;
 }
 
 /**
@@ -141,10 +204,12 @@ export function cyclesInRange(
   if (from > rangeEnd) return [];
 
   const cycles: RegularOvernightCycle[] = [];
-  let start = cycleStartOf(active, from)!;
-  for (let guard = 0; start <= rangeEnd && guard < MAX_CYCLES; guard += 1) {
-    cycles.push(buildCycle(active, start));
-    start = addDays(start, active.intervalDays);
+  let index = Math.max(cyclesElapsed(active, from), 1);
+  for (let guard = 0; guard < MAX_CYCLES; guard += 1) {
+    const cycle = buildCycle(active, index);
+    if (cycle.start > rangeEnd) break;
+    cycles.push(cycle);
+    index += 1;
   }
   return cycles;
 }
@@ -165,11 +230,9 @@ export function grantDatesThrough(
   const active = activeConfig(config);
   if (!active) return [];
   const dates: ISODate[] = [];
-  for (
-    let date = firstGrantOf(active);
-    date <= on && dates.length < MAX_CYCLES;
-    date = addDays(date, active.intervalDays)
-  ) {
+  for (let index = 1; index <= MAX_CYCLES; index += 1) {
+    const date = cycleDateAt(active, index);
+    if (date > on) break;
     dates.push(date);
   }
   return dates;
@@ -182,11 +245,8 @@ export function nextGrantDateAfter(
 ): ISODate | null {
   const active = activeConfig(config);
   if (!active) return null;
-  const first = firstGrantOf(active);
-  if (on < first) return first;
-  const k =
-    Math.floor(diffDays(active.startDate, on) / active.intervalDays) + 1;
-  return addDays(active.startDate, k * active.intervalDays);
+  // 시작일보다 이른 날을 물으면 경과 주기가 0 이하라 첫 적립일로 접힌다.
+  return cycleDateAt(active, Math.max(cyclesElapsed(active, on) + 1, 1));
 }
 
 /**

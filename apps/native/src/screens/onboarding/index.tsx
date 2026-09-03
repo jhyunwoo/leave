@@ -19,6 +19,8 @@
 
 import {
   REGULAR_OVERNIGHT_DEFAULTS,
+  regularOvernightIntervalForm,
+  regularOvernightIntervalPayload,
   isValidISODate,
   onboardingProfileSchema,
   onboardingResumeStep,
@@ -86,17 +88,19 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
   );
   // 주기·회당은 통상 운영값을 깔아 두되 고칠 수 있게 한다. 이어하기를 위해
   // 저장된 값이 있으면 그쪽을 먼저 쓴다(startDate와 같은 규칙).
-  // 문자열로 드는 이유는 OvernightStep의 주석 참고.
-  const [intervalDays, setIntervalDays] = useState(
-    String(
-      status.regularOvernight?.intervalDays ??
-        REGULAR_OVERNIGHT_DEFAULTS.intervalDays,
-    ),
+  // 주기의 단위(일/개월)도 함께 든다 — 군종이 정하지만 군종을 바꿔도 저장된
+  // 값을 되살릴 수 있어야 해서 파생값이 아니라 상태다.
+  // 문자열로 드는 이유는 overnight-step.tsx의 주석 참고.
+  const initialInterval = regularOvernightIntervalForm(
+    profile?.branch ?? "army",
+    status.regularOvernight,
   );
+  const [intervalUnit, setIntervalUnit] = useState(initialInterval.unit);
+  const [interval, setInterval] = useState(String(initialInterval.value));
   const [daysPerGrant, setDaysPerGrant] = useState(
     String(
       status.regularOvernight?.daysPerGrant ??
-        REGULAR_OVERNIGHT_DEFAULTS.daysPerGrant,
+        REGULAR_OVERNIGHT_DEFAULTS[profile?.branch ?? "army"].daysPerGrant,
     ),
   );
   const [inGroup, setInGroup] = useState(Boolean(status.unitId));
@@ -109,27 +113,21 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
   const saveRegular = useSaveOnboardingRegularOvernight();
   const complete = useCompleteOnboarding();
 
-  const order = onboardingSteps(branch);
-  // 목록에 없는 단계(-1)라도 진행바가 범위를 벗어나지 않게 0으로 접는다.
-  const index = Math.max(onboardingStepIndex(branch, step), 0);
+  const order = onboardingSteps();
+  const index = onboardingStepIndex(step);
 
   const go = (next: OnboardingStepId) => {
     setError(null);
     setStep(next);
   };
 
-  // 군종을 바꾸면 단계 목록이 달라진다(육군은 정기외박이 빠진다). 현재 단계가
-  // 목록에서 사라진 경우 indexOf가 -1이 되어 "다음"이 첫 화면으로 되감기므로,
-  // 그럴 때는 목록의 처음이 아니라 마지막 단계 쪽으로 흐르게 한다.
   const advance = () => {
-    const at = order.indexOf(step);
-    const next = at === -1 ? "group" : order[at + 1];
+    const next = order[index + 1];
     if (next) go(next);
   };
 
   const back = () => {
-    const at = order.indexOf(step);
-    const previous = at === -1 ? "rank" : order[at - 1];
+    const previous = order[index - 1];
     if (previous) go(previous);
   };
 
@@ -166,7 +164,10 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
           : {
               enabled: true,
               startDate,
-              intervalDays: Number(intervalDays),
+              ...regularOvernightIntervalPayload({
+                unit: intervalUnit,
+                value: Number(interval),
+              }),
               daysPerGrant: Number(daysPerGrant),
             },
       );
@@ -270,6 +271,14 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
                   setDischargeAt(
                     standardDischargeDate(enlistedAt as ISODate, next),
                   );
+                // 주기는 단위까지 군마다 다르다(육군 3개월, 해·공군 42일).
+                // 앞 군종의 값을 그대로 두면 다음 화면이 틀린 기본값으로 열린다.
+                const form = regularOvernightIntervalForm(next);
+                setIntervalUnit(form.unit);
+                setInterval(String(form.value));
+                setDaysPerGrant(
+                  String(REGULAR_OVERNIGHT_DEFAULTS[next].daysPerGrant),
+                );
               }}
               onNext={advance}
             />
@@ -310,8 +319,9 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
               branch={branch}
               value={startDate}
               onChange={setStartDate}
-              intervalDays={intervalDays}
-              onIntervalDaysChange={setIntervalDays}
+              intervalUnit={intervalUnit}
+              interval={interval}
+              onIntervalChange={setInterval}
               daysPerGrant={daysPerGrant}
               onDaysPerGrantChange={setDaysPerGrant}
               error={error}

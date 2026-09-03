@@ -116,6 +116,7 @@ export function serializeOnboardingStatus(
           enabled: config.enabled,
           startDate: config.startDate,
           intervalDays: config.intervalDays,
+          intervalMonths: config.intervalMonths,
           daysPerGrant: config.daysPerGrant,
         }
       : null,
@@ -126,9 +127,13 @@ export function serializeOnboardingStatus(
 /**
  * 복무 정보를 저장한다.
  *
- * 육군을 고르면 정기외박 자동 적립 설정을 꺼진 상태로 되돌린다 — 해·공군에서만
- * 쓰는 기능이라(saveRegularOvernightConfig), 군종을 바꾸고 돌아왔을 때 이전 군종의
- * 설정이 남아 있으면 계산에 섞인다.
+ * **군종이 바뀌면** 정기외박 자동 적립 설정을 꺼진 상태로 되돌린다. 주기는 군마다
+ * 다르고(육군 3개월 1박 2일, 해·공군 42일 2박 3일) 단위까지 다르므로, 앞 군종에서
+ * 넣은 값이 남으면 새 군종의 주기를 그 값으로 계산하게 된다. 지운 자리는 온보딩
+ * 이어하기가 `overnight` 단계로 되돌려 다시 묻는다(`onboardingResumeStep`).
+ *
+ * 군종이 그대로면 손대지 않는다 — 이름이나 입대일만 고치려고 돌아온 사람의
+ * 주기 설정을 지울 이유가 없다.
  */
 export async function saveOnboardingProfile(
   db: Db,
@@ -146,11 +151,12 @@ export async function saveOnboardingProfile(
     })
     .where(eq(users.id, user.id));
 
-  if (input.branch === "army") {
+  if (user.branch !== input.branch) {
     const cleared = {
       enabled: false,
       startDate: null,
       intervalDays: null,
+      intervalMonths: null,
       daysPerGrant: null,
       updatedAt: new Date().toISOString(),
     };

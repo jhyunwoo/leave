@@ -11,7 +11,13 @@
  * <svg>와 네이티브의 react-native-svg가 같은 패스를 그대로 받아 그린다.
  */
 
-import { addDays, diffDays, isValidISODate, type ISODate } from "./dates";
+import {
+  addDays,
+  addMonthsClamped,
+  diffDays,
+  isValidISODate,
+  type ISODate,
+} from "./dates";
 import {
   RANKS,
   RANK_LABELS,
@@ -49,19 +55,21 @@ export const ONBOARDING_STEP_IDS = [
 
 export type OnboardingStepId = (typeof ONBOARDING_STEP_IDS)[number];
 
-/** 육군은 정기외박 주기 운영 대상이 아니라 그 단계를 건너뛴다. */
-export function onboardingSteps(branch: Branch): OnboardingStepId[] {
-  return ONBOARDING_STEP_IDS.filter(
-    (id) => id !== "overnight" || branch !== "army",
-  );
+/**
+ * 화면 순서. 군종과 무관하게 모두 같은 단계를 밟는다.
+ *
+ * 한때 육군만 `overnight`를 건너뛰었다. 육군에는 정기외박 주기가 없다고 봤기
+ * 때문인데, 실제로는 분기마다 1박 2일을 운영한다(regular-overnight-guidance.ts).
+ * 군종마다 단계 수가 다르면 "지금 단계가 목록에 없다"는 상태가 생겨 진행바와
+ * 이어하기가 각자 그 예외를 다시 처리해야 했다 — 그 갈래를 전부 없앤다.
+ */
+export function onboardingSteps(): OnboardingStepId[] {
+  return [...ONBOARDING_STEP_IDS];
 }
 
-/** 진행바에 쓰는 위치. 목록에 없는 단계(육군의 overnight)는 -1. */
-export function onboardingStepIndex(
-  branch: Branch,
-  step: OnboardingStepId,
-): number {
-  return onboardingSteps(branch).indexOf(step);
+/** 진행바에 쓰는 위치. */
+export function onboardingStepIndex(step: OnboardingStepId): number {
+  return ONBOARDING_STEP_IDS.indexOf(step);
 }
 
 /**
@@ -80,13 +88,7 @@ export function onboardingResumeStep(status: {
   // 사용자 이름은 저장되는 순간 유일성을 얻는다 — 있으면 다시 묻지 않는다.
   if (!status.username) return "username";
   if (status.unitId) return "done";
-  const next: OnboardingStepId = status.regularOvernight
-    ? "group"
-    : "overnight";
-  // 육군에는 overnight 단계가 없다. 목록에 없는 단계로 복귀하면 진행바 위치가
-  // -1이 되고 "다음"이 첫 화면으로 되감긴다. 서버가 육군 프로필 저장 때
-  // 비활성 주기 설정을 함께 심어주긴 하지만, 그 한 줄에 기대지는 않는다.
-  return onboardingSteps(status.profile.branch).includes(next) ? next : "group";
+  return status.regularOvernight ? "group" : "overnight";
 }
 
 export interface OnboardingCopy {
@@ -107,7 +109,7 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
   },
   branch: {
     title: "어느 군에 계신가요?",
-    lead: "복무 기간과 정기외박 규정이 군마다 달라요.",
+    lead: "복무 기간과 정기외박 주기가 군마다 달라요.",
   },
   dates: {
     title: "언제 입대하셨나요?",
@@ -379,9 +381,14 @@ export function heroGeometry(input: {
   const cyclePoints: HeroCyclePoint[] = [];
   if (isValidISODate(input.overnightStartDate ?? "")) {
     const start = input.overnightStartDate as ISODate;
-    const { intervalDays } = REGULAR_OVERNIGHT_DEFAULTS;
+    // 주기 점은 군별 통상 운영값으로 찍는다. 달 단위 주기(육군의 분기)는 달
+    // 산술로 더해야 실제 적립일과 같은 자리에 온다.
+    const { intervalDays, intervalMonths } =
+      REGULAR_OVERNIGHT_DEFAULTS[input.branch];
     for (let i = 1; i <= 24; i++) {
-      const date = addDays(start, intervalDays * i);
+      const date = intervalMonths
+        ? addMonthsClamped(start, intervalMonths * i)
+        : addDays(start, (intervalDays ?? 1) * i);
       if (date > dischargeAt) break;
       if (date < enlistedAt) continue;
       const ratio = clamp01(diffDays(enlistedAt, date) / totalDays);
@@ -449,16 +456,12 @@ const LAYER_RULES: Record<
  * 마지막 `done` 단계에서는 모든 레이어를 present로 켜 완성된 그림 한 장을 보여준다.
  */
 export function heroLayerState(
-  branch: Branch,
   step: OnboardingStepId,
   layer: HeroLayer,
 ): HeroLayerState {
   const rule = LAYER_RULES[layer];
-  const order = onboardingSteps(branch);
-  const at = order.indexOf(step);
-  const from = order.indexOf(rule.from);
-  // 육군에는 overnight 단계가 없어 cycle 레이어가 등장할 자리가 없다.
-  if (from === -1) return "hidden";
+  const at = onboardingStepIndex(step);
+  const from = onboardingStepIndex(rule.from);
   if (at < from) return "hidden";
   if (step === "done") return "present";
   return step === rule.active ? "active" : "present";
