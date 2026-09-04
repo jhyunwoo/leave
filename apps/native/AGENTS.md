@@ -19,6 +19,23 @@ prebuild 결과를 바꾸는 config plugin(`expo-build-properties`)이다. 즉 `
 JS만 있어서 OTA로 안전하게 바뀐다. `react`·`react-dom`·`hono`는 루트 `pnpm-workspace.yaml`의
 `overrides`가 이미 워크스페이스 전체를 한 버전으로 묶는다.
 
+## `@expo/ui`를 올리면 `expo`도 같이 올려야 한다
+
+`@expo/ui`의 peer는 `expo: "*"`다. **그래서 짝이 맞지 않아도 설치 단계에서 아무 경고가 없고,
+빌드 서버의 Swift 컴파일러가 처음이자 유일한 검출 지점이다.** 실제로 났던 것:
+`@expo/ui@57.0.15`(위젯이 요구하는 버전)가 `expo-modules-core@57.0.14`에서 생긴
+`ContentOriginRegistry`·`ShadowNodeProxy.setContentOrigin`을 쓰는데, 그때 고정돼 있던
+`expo@57.0.16`은 `expo-modules-core@~57.0.13`을 끌어와 iOS 빌드가 컴파일에서 죽었다.
+
+올릴 일이 생기면 `@expo/ui`의 `ios/*.swift`가 쓰는 심볼이 지금 링크되는
+`expo-modules-core`에 있는지 먼저 본다 — EAS에 15분짜리 빌드를 던져 알아내는 것보다 싸다.
+
+```bash
+CORE=$(readlink -f node_modules/expo)/../expo-modules-core
+grep -rn "ContentOriginRegistry\|setContentOrigin" node_modules/@expo/ui/ios | head
+ls "$CORE/ios/Fabric/"   # 참조되는 타입이 실제로 있는가
+```
+
 **올릴 때**는 `npx expo install --check`가 알려주는 버전으로 올리고,
 `pnpm-workspace.yaml`의 `overrides`도 같이 맞춘다. 그리고 **반드시 새 EAS 빌드로 배포한다** —
 OTA로는 안 된다.
