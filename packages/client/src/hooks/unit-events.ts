@@ -20,6 +20,10 @@ function invalidateUnitEventMonths(
   const months = new Set(
     ranges.flatMap((range) => monthsSpanning(range.startDate, range.endDate)),
   );
+  // 부대 휴일은 남은 일과일에서 빠지는 날이다. 여기서 휴일 여부까지 따지지 않고
+  // 늘 버린다 — 일정 하나를 고칠 때 숫자 하나를 다시 받는 값싼 요청이고,
+  // 반대로 빠뜨리면 달력과 프로필의 숫자가 조용히 어긋난다.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.dutyDays });
   return queryClient.invalidateQueries({
     queryKey: queryKeys.calendars,
     predicate: (query) =>

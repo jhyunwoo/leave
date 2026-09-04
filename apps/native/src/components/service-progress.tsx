@@ -86,6 +86,11 @@ export function ServiceProgress(props: {
   dischargeAt: ISODate;
   /** 전역까지 남은 일수. 서버가 계산한 값을 그대로 받아 위쪽 D-day와 어긋나지 않게 한다. */
   daysLeft: number;
+  /**
+   * 남은 일과일(평일 − 부대 휴일 · 공휴일 · 개인 휴가). 별도 요청이라 아직
+   * 도착하지 않았으면 null이고, 그 동안에는 전역일수만 보인다.
+   */
+  dutyDays: number | null;
   /** 오른쪽 아래에 덧붙일 설명(예: "다음 진급 12월 1일"). */
   caption: string;
 }) {
@@ -146,6 +151,7 @@ export function ServiceProgress(props: {
       <View style={styles.metaRow}>
         <Text selectable style={styles.days}>
           전역까지 {props.daysLeft}일
+          {props.dutyDays === null ? "" : ` · 일과 ${props.dutyDays}일`}
         </Text>
         <Text style={styles.caption}>{props.caption}</Text>
       </View>
@@ -188,6 +194,9 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "600",
     color: colors.ink,
     fontVariant: ["tabular-nums"],
+    // 일과일이 붙으면 이 줄이 길어진다. 좁은 기기에서 오른쪽 설명을 밀어내지
+    // 않도록 둘 다 줄어들 수 있게 둔다.
+    flexShrink: 1,
   },
   caption: {
     fontSize: 12,

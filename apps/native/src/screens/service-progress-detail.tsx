@@ -10,7 +10,7 @@
  * 칸에서 세로 가운데에 선다.
  */
 
-import { useMe } from "@leave/client";
+import { useMe, useMyDutyDays } from "@leave/client";
 import { kstMidnight, type ISODate } from "@leave/shared/dates";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -153,6 +153,8 @@ function ProgressContent(props: {
   enlistedAt: ISODate;
   dischargeAt: ISODate;
   daysLeft: number;
+  /** 남은 일과일. 별도 요청이라 아직 오지 않았으면 null이고 그 줄은 그리지 않는다. */
+  dutyDays: number | null;
 }) {
   const screenStyles = useStyles();
   const { width, height } = useWindowDimensions();
@@ -288,6 +290,11 @@ function ProgressContent(props: {
                 <Text selectable style={screenStyles.dayUnit}>
                   일
                 </Text>
+                {props.dutyDays === null ? null : (
+                  <Text selectable style={screenStyles.dayDuty}>
+                    남은 일과 {props.dutyDays}일
+                  </Text>
+                )}
               </>
             )}
           </View>
@@ -321,6 +328,7 @@ export function ServiceProgressDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const me = useMe();
+  const dutyDays = useMyDutyDays();
   // 막대가 남는 높이를 전부 먹으므로 안전영역을 iOS의 자동 contentInset에
   // 맡길 수 없다. 자동값은 프레임 기준이라 꽉 찬 막대의 아래끝이 홈 인디케이터
   // 밑으로 들어간다. 직접 padding으로 넣어 보이는 영역과 레이아웃을 일치시킨다.
@@ -375,6 +383,7 @@ export function ServiceProgressDetailScreen() {
           enlistedAt={me.data.user.enlistedAt as ISODate}
           dischargeAt={me.data.user.dischargeAt as ISODate}
           daysLeft={me.data.user.daysUntilDischarge}
+          dutyDays={dutyDays.data?.dutyDays ?? null}
         />
       )}
     </ScrollView>
@@ -522,6 +531,14 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.body,
     fontSize: 18,
     fontWeight: "700",
+  },
+  dayDuty: {
+    color: colors.mute,
+    fontSize: 13,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
+    marginTop: spacing.xs,
   },
   dayState: {
     color: colors.body,

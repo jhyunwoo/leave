@@ -305,6 +305,37 @@ export const meRoute = createRoute({
   },
 });
 
+/**
+ * 남은 일과일. `/me`와 달리 두 표를 더 읽으므로 별도 라우트로 둔다 —
+ * `/me`는 웹이 페이지를 열 때마다 `/bootstrap`을 통해 부르는 가장 뜨거운 읽기라
+ * 이 화면들만 필요한 계산을 얹을 자리가 아니다.
+ */
+const dutyDaysSchema = z
+  .object({
+    /** 오늘부터 전역 전날까지 중 평일에서 부대 휴일·공휴일·개인 휴가를 뺀 날 수. */
+    dutyDays: z.number(),
+    /** 세기 시작한 날(한국 시간 기준 오늘). */
+    from: z.string(),
+    /** 마지막으로 센 날 = 전역 전날. from보다 이르면 남은 일과일이 없다. */
+    through: z.string(),
+  })
+  .openapi("DutyDays");
+
+export const dutyDaysRoute = createRoute({
+  method: "get",
+  path: "/me/duty-days",
+  tags: ["인증"],
+  summary: "남은 일과일 (평일 − 부대 휴일 · 공휴일 · 개인 휴가)",
+  description:
+    "전역일 당일은 세지 않습니다. 외출은 같은 날 복귀하므로 일과일에서 빼지 않고, 초안(나만 보기) 휴가도 빼지 않습니다.",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(dutyDaysSchema, "남은 일과일"),
+    401: errorResponse("인증 실패"),
+    428: errorResponse("온보딩 미완료"),
+  },
+});
+
 export const activityRoute = createRoute({
   method: "get",
   path: "/activity",

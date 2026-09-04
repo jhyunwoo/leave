@@ -5,7 +5,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Me } from "@leave/client";
-import { useDeleteAccount, useLogout, useSetUsername } from "@leave/client";
+import {
+  useDeleteAccount,
+  useLogout,
+  useMyDutyDays,
+  useSetUsername,
+} from "@leave/client";
 import { formatUsername } from "@leave/shared";
 import { Avatar } from "../components/Avatar";
 import { UsernameField, useUsernameDraft } from "../components/UsernameField";
@@ -136,6 +141,7 @@ export function ProfilePage(props: { me: Me }) {
   const logout = useLogout();
   const deleteAccount = useDeleteAccount();
   const navigate = useNavigate();
+  const dutyDays = useMyDutyDays();
 
   const onDeleteAccount = () => {
     const ok = window.confirm(
@@ -203,6 +209,17 @@ export function ProfilePage(props: { me: Me }) {
               <p className="display-md" style={{ marginTop: 6 }}>
                 D-{user.daysUntilDischarge}
               </p>
+              {/* 서버가 세는 값이라 D-day보다 한 박자 늦게 도착한다. 자리를
+                  비워 두면 카드가 흔들리므로 도착하기 전에는 아예 그리지 않는다. */}
+              {dutyDays.data ? (
+                <p
+                  className="body-sm text-body"
+                  style={{ marginTop: "var(--sp-xs)" }}
+                  data-testid="profile-duty-days"
+                >
+                  일과 {dutyDays.data.dutyDays}일
+                </p>
+              ) : null}
             </div>
           </div>
 

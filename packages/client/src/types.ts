@@ -15,6 +15,12 @@ type Client = LeaveApiClient;
 /** 로그인한 사용자 + 소속 그룹. 앱 전역에서 "나"를 가리키는 기준 타입. */
 export type Me = InferResponseType<Client["auth"]["me"]["$get"], 200>;
 
+/** 남은 일과일과 그 값을 센 구간. */
+export type DutyDays = InferResponseType<
+  Client["auth"]["me"]["duty-days"]["$get"],
+  200
+>;
+
 /** 그룹(부대) 한 개. */
 export type Unit = InferResponseType<
   Client["units"][":id"]["$get"],

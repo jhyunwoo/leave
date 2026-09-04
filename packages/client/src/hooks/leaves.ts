@@ -184,6 +184,8 @@ export function useUpdateLeaveStatus() {
     onSuccess: (data, _variables, context) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leaveBalances });
       void queryClient.invalidateQueries({ queryKey: queryKeys.leaveGrants });
+      // 집계 대상 상태로 드나들면 그만큼 남은 일과일이 늘거나 준다.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dutyDays });
       invalidateCalendarMonths(
         queryClient,
         context?.previousLeave

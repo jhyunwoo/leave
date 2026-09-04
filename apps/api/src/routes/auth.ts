@@ -38,6 +38,7 @@ import {
   verifyPasswordOrDecoy,
 } from "../lib/crypto";
 import { deleteAccount } from "../lib/delete-account";
+import { readRemainingDutyDays } from "../lib/duty-days";
 import { leaveRuleMessage } from "../lib/errors";
 import { saveRegularOvernightConfig } from "../lib/leave-balances";
 import {
@@ -66,6 +67,7 @@ import {
   authBootstrapRoute,
   changePasswordRoute,
   deleteAccountRoute,
+  dutyDaysRoute,
   loginRoute,
   logoutRoute,
   meRoute,
@@ -145,6 +147,7 @@ app.use("/logout", authMiddleware);
 app.use("/bootstrap", authMiddleware);
 app.use("/me", authMiddleware);
 app.use("/me/password", authMiddleware);
+app.use("/me/duty-days", authMiddleware);
 // `/onboarding/*`만으로 `/onboarding` 자신까지 매치된다. 두 줄을 다 두면
 // 인증 미들웨어가 한 요청에서 두 번 돌아 세션 조회(D1 왕복 + SHA-256)가 그대로 두 배가 된다.
 app.use("/onboarding/*", authMiddleware);
@@ -411,6 +414,12 @@ export const authRoutes = app
     // 초대코드 가입은 즉시 완료되므로 대기 상태는 더 이상 만들지 않는다.
     const joinRequest = null;
     return c.json({ user: serializeUser(user), unit, joinRequest }, 200);
+  })
+  .openapi(dutyDaysRoute, async (c) => {
+    const user = c.get("user");
+    if (!user.onboardingCompletedAt)
+      return c.json({ error: "온보딩을 먼저 완료해주세요" }, 428);
+    return c.json(await readRemainingDutyDays(drizzle(c.env.DB), user), 200);
   })
   .openapi(onboardingStatusRoute, async (c) => {
     const db = drizzle(c.env.DB);

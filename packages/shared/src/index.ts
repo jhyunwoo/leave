@@ -11,6 +11,7 @@
  *  - rank           : 군 종류별 복무 기간과 자동 진급
  *  - onboarding     : 가입 직후 단계 구성과 히어로 일러스트 기하
  *  - leave          : 휴가 종류·상태·구간의 정의
+ *  - duty-days      : 전역까지 남은 일과일(평일 − 휴일 − 휴가)
  *  - leave-title    : 자동 제목과 사람이 지은 이름의 구분
  *  - leave-merge    : 붙어 있는 휴가를 한 건으로 합치는 규칙
  *  - leave-grants   : 적립분(언제 얼마가 부여됐고 언제 만료되는가)
@@ -27,6 +28,7 @@ export * from "./overage";
 export * from "./schemas";
 export * from "./calendar";
 export * from "./holidays";
+export * from "./duty-days";
 export * from "./http";
 export * from "./leave";
 export * from "./leave-draft";

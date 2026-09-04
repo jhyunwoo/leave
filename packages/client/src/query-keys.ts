@@ -12,6 +12,11 @@ export const queryKeys = {
   /** 로그인한 사용자 + 소속 그룹. */
   me: ["me"] as const,
   onboarding: ["onboarding"] as const,
+  /**
+   * 남은 일과일. `me`와 나누는 이유는 무효화 범위다 — 휴가나 부대 휴일이 바뀌면
+   * 이 숫자만 낡고, 반대로 이름을 바꿔도 이 숫자는 그대로다.
+   */
+  dutyDays: ["dutyDays"] as const,
   passkeys: ["passkeys"] as const,
 
   /** 모든 그룹의 구성원 목록. */

@@ -24,6 +24,7 @@ import { queryKeys } from "../query-keys";
 import type {
   AuthBootstrap,
   AuthResponse,
+  DutyDays,
   Me,
   OnboardingStatus,
   PasskeyList,
@@ -45,6 +46,27 @@ export function useMe() {
     queryFn: async (context) =>
       unwrap<Me>(
         await client.auth.me.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
+  });
+}
+
+/**
+ * 남은 일과일 — 오늘부터 전역 전날까지의 평일에서 부대 휴일·공휴일·개인 휴가를 뺀 수.
+ *
+ * 서버가 센다. 부대 휴일은 달 단위 달력 응답으로만 읽을 수 있어서, 클라이언트가
+ * 세려면 남은 복무 기간만큼 무거운 달력을 반복해 받아야 한다.
+ */
+export function useMyDutyDays() {
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  return useQuery({
+    queryKey: queryKeys.dutyDays,
+    retry: retryUnlessUnauthorized,
+    queryFn: async (context) =>
+      unwrap<DutyDays>(
+        await client.auth.me["duty-days"].$get(
           undefined,
           queryRequestOptions(useRequestAbortSignal, context),
         ),
@@ -126,6 +148,7 @@ export function useCompleteOnboarding() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.onboarding });
       void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dutyDays });
     },
   });
 }
@@ -134,11 +157,13 @@ export function useCompleteOnboarding() {
  * 내 정보 수정(별칭·군 종류·입대일·전역예정일·계급).
  *
  * 달력 응답에는 별칭과 계급 라벨이 함께 실려 나가므로 달력 캐시도 같이 버린다.
+ * 전역 예정일이 바뀌면 남은 일과일의 세는 구간이 통째로 달라진다.
  */
 export function useUpdateProfile() {
   const { client, unwrap } = useLeaveApi();
   const invalidate = useInvalidateKeys([
     queryKeys.me,
+    queryKeys.dutyDays,
     queryKeys.calendars,
     queryKeys.allUnitMembers,
   ]);

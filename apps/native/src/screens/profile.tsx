@@ -41,6 +41,7 @@ import {
   useDeleteAccount,
   useLogout,
   useMe,
+  useMyDutyDays,
   usePasskeys,
   useRegisterPasskey,
   useDeletePasskey,
@@ -173,6 +174,7 @@ export function ProfileScreen() {
   const colors = useColors();
   const { sizeClass, isCompact } = useWindowSizeClass();
   const me = useMe();
+  const dutyDays = useMyDutyDays();
   const logout = useLogout();
   const deleteAccount = useDeleteAccount();
   const router = useRouter();
@@ -289,7 +291,13 @@ export function ProfileScreen() {
               <InfoItem
                 label="전역 예정일"
                 value={fmtDateK(user.dischargeAt)}
-                caption={`D-${user.daysUntilDischarge}`}
+                // 남은 일과일은 별도 요청이라 한 박자 늦게 붙는다. 자리를 미리
+                // 비워 두지 않고 도착한 뒤에만 덧붙여 칸이 흔들리지 않게 한다.
+                caption={
+                  dutyDays.data
+                    ? `D-${user.daysUntilDischarge} · 일과 ${dutyDays.data.dutyDays}일`
+                    : `D-${user.daysUntilDischarge}`
+                }
               />
             </View>
             <Button
@@ -315,6 +323,7 @@ export function ProfileScreen() {
                   enlistedAt={user.enlistedAt as ISODate}
                   dischargeAt={user.dischargeAt as ISODate}
                   daysLeft={user.daysUntilDischarge}
+                  dutyDays={dutyDays.data?.dutyDays ?? null}
                   caption={
                     user.nextPromotionDate
                       ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`

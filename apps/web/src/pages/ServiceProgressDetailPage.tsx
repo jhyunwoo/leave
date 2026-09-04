@@ -7,6 +7,7 @@
  */
 
 import type { Me } from "@leave/client";
+import { useMyDutyDays } from "@leave/client";
 import { kstMidnight } from "@leave/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -34,6 +35,7 @@ function textParts(percent: number) {
 
 export function ServiceProgressDetailPage(props: { me: Me }) {
   const { user } = props.me;
+  const dutyDays = useMyDutyDays();
   const [initialNow] = useState(() => Date.now());
   const reducedMotion = useReducedMotion();
   const rootRef = useRef<HTMLElement>(null);
@@ -152,11 +154,16 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
     };
   }, [end, reducedMotion, span, start]);
 
+  // 남은 일과일은 서버에서 따로 오므로 도착한 뒤에만 덧붙인다. 복무를 마쳤거나
+  // 입대 전이면 셀 일과가 없어 붙일 자리도 없다.
+  const dutyDaysSuffix = dutyDays.data
+    ? ` · 남은 일과 ${dutyDays.data.dutyDays}일`
+    : "";
   const status = finished
     ? "복무를 마쳤어요"
     : notStarted
       ? "입대 전이에요"
-      : `전역까지 ${user.daysUntilDischarge}일`;
+      : `전역까지 ${user.daysUntilDischarge}일${dutyDaysSuffix}`;
   const zoomDescription = finished
     ? "전역 시점에서 멈췄어요."
     : notStarted
