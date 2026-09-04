@@ -56,8 +56,12 @@ export type MetricValue = {
   value: string;
   /** 값 위의 짧은 이름. "전역", "다음 휴가". */
   label: string;
-  /** 값 아래 한 줄. 자리가 없으면 위젯이 생략한다. */
-  caption: string | null;
+  /**
+   * 값 아래 한 줄. 자리가 없으면 위젯이 생략한다.
+   *
+   * `null`을 쓰지 않는 이유는 아래 "저장 가능한 값" 주석에 있다.
+   */
+  caption?: string;
   /**
    * 스크린리더가 읽을 문장. "D-421"을 그대로 읽으면 뜻이 사라진다.
    * (`components/next-leave-card.tsx`가 같은 이유로 같은 일을 한다.)
@@ -65,10 +69,26 @@ export type MetricValue = {
   spoken: string;
   /** 잠금화면 인라인처럼 한 줄뿐인 자리에 쓰는 표기. "전역 D-421". */
   compact: string;
-  /** 0~1. 원형 게이지를 그릴 수 있는 지표만 채운다. */
-  gauge: number | null;
+  /** 0~1. 원형 게이지를 그릴 수 있는 지표만 **키를 넣는다**. */
+  gauge?: number;
 };
 
+/**
+ * 위젯에 넘기는 값 전부.
+ *
+ * ## 여기에 `null`을 넣지 마라
+ *
+ * iOS는 이 객체를 App Group UserDefaults에 **그대로** 넣는다
+ * (`WidgetsStorage.set` → `UserDefaults.set`). `null`과 `undefined`는
+ * property-list 타입이 아니라서 **그 write 전체가 거부되고**,
+ * `updateTimeline`이 네이티브에서 던진다("Exception in HostFunction").
+ * 앱에는 아무 증상이 없다 — 위젯만 마지막으로 성공한 값에 머문 채 조용히 낡는다.
+ *
+ * 1.1.0(build 42)이 실제로 그랬다. `gauge: null` 하나 때문에 홈 화면 위젯이
+ * "복무정보를 입력하세요"에서 움직이지 않았고, Sentry(`source: home_widget`)로만
+ * 드러났다. **없는 값은 키를 넣지 않는다.**
+ * `test/widget-payload.test.ts`가 이 불변식을 지킨다.
+ */
 export type LeaveWidgetProps = {
   state: WidgetState;
   /** 스냅샷 지표(잔여 휴가·출타 여유)를 받은 시각. ISO 8601. */
@@ -162,7 +182,6 @@ function discharge(
     caption: dischargeAt,
     spoken: days === 0 ? "오늘 전역이에요" : `전역까지 ${days}일 남았어요`,
     compact: `전역 ${dday(days)}`,
-    gauge: null,
   };
 }
 
@@ -208,7 +227,6 @@ function dutyDays(
     caption: "남은 일과일",
     spoken: `남은 일과일 ${days}일이에요`,
     compact: `일과 ${days}일`,
-    gauge: null,
   };
 }
 
@@ -233,7 +251,6 @@ function nextLeave(
         ? `휴가 종료까지 ${days}일 남았어요`
         : `다음 휴가까지 ${days}일 남았어요`,
     compact: `${onLeave ? "복귀" : "휴가"} ${lastDay ? "D-DAY" : dday(days)}`,
-    gauge: null,
   };
 }
 
@@ -253,7 +270,6 @@ function promotion(
     caption: at,
     spoken: days === 0 ? "오늘 진급해요" : `진급까지 ${days}일 남았어요`,
     compact: `진급 ${dday(days)}`,
-    gauge: null,
   };
 }
 
@@ -269,7 +285,6 @@ function balance(holdings: LeaveHoldings | null): MetricValue | undefined {
         ? `남은 휴가 ${remaining}일, 그중 ${planned}일은 이미 계획했어요`
         : `남은 휴가 ${remaining}일이에요`,
     compact: `휴가 ${remaining}일`,
-    gauge: null,
   };
 }
 
@@ -291,7 +306,8 @@ function headroom(
       ? `그날은 제한 기간이에요. ${source.allowed}명 중 ${source.count}명이 나가요`
       : `그날은 ${room}명 더 나갈 수 있어요`,
     compact: `여유 ${room}명`,
-    gauge: signal.percent === null ? null : Math.min(signal.percent / 100, 1),
+    // `unknown`은 위에서 걸러졌으므로 percent는 항상 숫자다.
+    gauge: Math.min((signal.percent ?? 0) / 100, 1),
   };
 }
 

@@ -247,3 +247,77 @@ describe("위젯 타임라인", () => {
     );
   });
 });
+
+describe("위젯 props는 property list 로 저장할 수 있어야 한다", () => {
+  /**
+   * iOS는 위젯 props를 App Group UserDefaults에 그대로 넣는다
+   * (`WidgetsStorage.set` → `UserDefaults.set`). **`null`과 `undefined`는
+   * property-list 타입이 아니라 그 write 전체가 거부된다** — 그러면
+   * `updateTimeline`이 네이티브에서 던지고, 위젯은 마지막으로 성공한 값에
+   * 머문 채 조용히 낡는다.
+   *
+   * 1.1.0(build 42)에서 실제로 났던 일이다. `gauge: null` 하나 때문에 홈 화면
+   * 위젯이 "복무정보를 입력하세요"에서 움직이지 않았고, 앱에는 아무 증상이
+   * 없어 Sentry(`source: home_widget`)로만 드러났다.
+   */
+  function nullishPaths(value: unknown, path = "props"): string[] {
+    if (value === null) return [`${path} = null`];
+    if (value === undefined) return [`${path} = undefined`];
+    if (Array.isArray(value)) {
+      return value.flatMap((item, i) => nullishPaths(item, `${path}[${i}]`));
+    }
+    if (typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>).flatMap(
+        ([key, item]) => nullishPaths(item, `${path}.${key}`),
+      );
+    }
+    return [];
+  }
+
+  it("모든 엔트리에 null·undefined가 없다", () => {
+    const entries = buildWidgetTimeline(source(), NOW);
+    const offenders = entries.flatMap((entry, i) =>
+      nullishPaths(entry.props, `entries[${i}].props`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("값이 없는 지표·비어 있는 상태에서도 없다", () => {
+    for (const built of [
+      buildWidgetTimeline(source({ state: "signedOut" }), NOW),
+      buildWidgetTimeline(source({ state: "needsOnboarding" }), NOW),
+      buildWidgetTimeline(
+        source({
+          profile: null,
+          dutyDaysToday: null,
+          leaves: [],
+          snapshot: { holdings: null, headroom: null },
+        }),
+        NOW,
+      ),
+    ]) {
+      const offenders = built.flatMap((entry, i) =>
+        nullishPaths(entry.props, `entries[${i}].props`),
+      );
+      expect(offenders).toEqual([]);
+    }
+  });
+
+  it("저장 가능한 값만 남는다 (문자열·숫자·불리언·배열·객체)", () => {
+    function badTypes(value: unknown, path = "props"): string[] {
+      if (Array.isArray(value)) {
+        return value.flatMap((item, i) => badTypes(item, `${path}[${i}]`));
+      }
+      if (value !== null && typeof value === "object") {
+        return Object.entries(value as Record<string, unknown>).flatMap(
+          ([key, item]) => badTypes(item, `${path}.${key}`),
+        );
+      }
+      return ["string", "number", "boolean"].includes(typeof value)
+        ? []
+        : [`${path} = ${typeof value}`];
+    }
+    const entries = buildWidgetTimeline(source(), NOW);
+    expect(entries.flatMap((e) => badTypes(e.props))).toEqual([]);
+  });
+});

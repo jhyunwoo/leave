@@ -186,7 +186,8 @@ function LeaveMetricLayout(
 
   if (family === "accessoryCircular") {
     // 게이지를 그릴 수 있는 지표(복무율·출타 여유)는 원형이 훨씬 잘 읽힌다.
-    if (metric.gauge !== null) {
+    // 나머지 지표는 `gauge` 키 자체가 없다 — payload.ts의 "여기에 null을 넣지 마라" 참고.
+    if (typeof metric.gauge === "number") {
       return (
         <Gauge
           value={metric.gauge}

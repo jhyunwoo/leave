@@ -164,9 +164,13 @@ function RootNavigator() {
 
   /**
    * 홈 화면 위젯이 지금 무엇을 말해야 하는가.
-   * 세션을 복원하는 중에는 판단하지 않는다 — 그 사이에 "로그인하세요"를 밀어
-   * 넣으면 멀쩡한 위젯이 앱을 켤 때마다 한 번씩 깜빡인다.
+   *
+   * **모르는 동안에는 건드리지 않는다.** 세션을 복원하는 중이거나 온보딩 상태를
+   * 아직 받지 못한 동안 판단하면 `canBrowse`가 거짓이라 "복무정보를 입력하세요"가
+   * 밀려 나가고, 멀쩡한 위젯이 **앱을 켤 때마다** 그 문구로 한 번씩 깜빡인다.
+   * 온보딩 응답은 디스크 캐시 대상이 아니라 켤 때마다 pending을 지난다.
    */
+  const widgetStateKnown = sessionReady && !(isAuthed && onboarding.isPending);
   const widgetState: WidgetState = !isAuthed
     ? "signedOut"
     : canBrowse
@@ -179,7 +183,7 @@ function RootNavigator() {
         authenticated={isAuthed}
         sessionReady={sessionReady}
       />
-      {sessionReady ? <WidgetSync state={widgetState} /> : null}
+      {widgetStateKnown ? <WidgetSync state={widgetState} /> : null}
     </>
   );
 
