@@ -351,6 +351,22 @@ export function ProfileScreen() {
 
           <ContentPanel style={styles.card}>
             <Text selectable style={styles.sectionTitle}>
+              홈 화면 위젯
+            </Text>
+            <Text selectable style={styles.sectionBody}>
+              전역일 D-Day·다음 휴가·남은 휴가를 홈 화면과 잠금화면에서 바로 볼
+              수 있어요. 어떤 지표를 보여줄지 여기서 고릅니다.
+            </Text>
+            <Button
+              title="위젯 설정"
+              variant="secondary"
+              onPress={() => router.push("/widget-settings")}
+              testID="open-widget-settings"
+            />
+          </ContentPanel>
+
+          <ContentPanel style={styles.card}>
+            <Text selectable style={styles.sectionTitle}>
               개인정보와 계정
             </Text>
             <Text selectable style={styles.sectionBody}>

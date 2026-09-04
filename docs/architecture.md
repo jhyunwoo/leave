@@ -47,6 +47,9 @@ Date 객체를 밖으로 내보내지 않는 것이 이 패키지의 규칙이�
 
 **플랫폼 차이**(토큰 저장소, 인증 실패 시 정리) → `LeaveApiAdapter`. 앱 루트에서 한 번 주입한다.
 
+**홈 화면 위젯** → `apps/native/src/widgets`. 위젯은 새로고침할 때 JS를 돌릴 수 없어
+앱이 앞으로 14일치 값을 미리 밀어 넣는다. 그 구조와 플랫폼별 제약은 [widgets.md](widgets.md)에 있다.
+
 **서버 상태 vs 화면 상태** → TanStack Query가 서버 상태를, Jotai/`useState`가 화면 상태를 가진다.
 지금 Jotai가 들고 있는 것은 세션 토큰 하나뿐이다.
 

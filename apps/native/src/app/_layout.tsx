@@ -37,6 +37,8 @@ import {
   queryPersistenceOptions,
 } from "@/lib/query-persistence";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
+import type { WidgetState } from "@/widgets/payload";
+import { WidgetSync } from "@/widgets/widget-sync";
 import { tokenAtom } from "@/state/auth";
 import {
   useOnboardingStatus,
@@ -158,11 +160,27 @@ function RootNavigator() {
   // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
   usePendingProfileLink(ready, canBrowse);
 
+  const sessionReady = ready && token !== undefined;
+
+  /**
+   * 홈 화면 위젯이 지금 무엇을 말해야 하는가.
+   * 세션을 복원하는 중에는 판단하지 않는다 — 그 사이에 "로그인하세요"를 밀어
+   * 넣으면 멀쩡한 위젯이 앱을 켤 때마다 한 번씩 깜빡인다.
+   */
+  const widgetState: WidgetState = !isAuthed
+    ? "signedOut"
+    : canBrowse
+      ? "ready"
+      : "needsOnboarding";
+
   const lifecycle = (
-    <ObservabilityLifecycle
-      authenticated={isAuthed}
-      sessionReady={ready && token !== undefined}
-    />
+    <>
+      <ObservabilityLifecycle
+        authenticated={isAuthed}
+        sessionReady={sessionReady}
+      />
+      {sessionReady ? <WidgetSync state={widgetState} /> : null}
+    </>
   );
 
   if (!ready || token === undefined || (isAuthed && onboarding.isPending))
@@ -252,6 +270,18 @@ function RootNavigator() {
               // 탭 스택들과 같은 규칙 — headerStyle로 배경을 칠하지 않고 시스템의
               // 반투명 바를 그대로 쓴다. 불투명하게 칠하면 다크모드에서 본문과
               // 색이 어긋나 흰 띠처럼 보인다. 웹에는 blur 바가 없어 흐름에 남긴다.
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          <Stack.Screen
+            name="widget-settings"
+            options={{
+              headerShown: true,
+              title: "위젯 설정",
+              headerBackTitle: "프로필",
               headerTransparent: process.env.EXPO_OS !== "web",
               headerShadowVisible: false,
               headerTintColor: colors.brand,

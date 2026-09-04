@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { lastDutyDayCandidate, remainingDutyDays } from "../src";
+import {
+  dutyDaysBetween,
+  lastDutyDayCandidate,
+  remainingDutyDays,
+} from "../src";
 
 /** 공휴일이 없는 2026년 6월의 두 주. 월요일 6/15 ~ 금요일 6/26. */
 const plainWeeks = {
@@ -100,5 +104,60 @@ describe("남은 일과일", () => {
   it("마지막으로 세는 날은 전역 전날이다", () => {
     expect(lastDutyDayCandidate("2026-06-19")).toBe("2026-06-18");
     expect(lastDutyDayCandidate("2026-01-01")).toBe("2025-12-31");
+  });
+});
+
+describe("구간 일과일", () => {
+  function between(
+    from: string,
+    through: string,
+    extra: {
+      unitHolidays?: { startDate: string; endDate: string }[];
+      leaves?: { startDate: string; endDate: string }[];
+    } = {},
+  ) {
+    return dutyDaysBetween({
+      from,
+      through,
+      unitHolidays: extra.unitHolidays ?? [],
+      leaves: extra.leaves ?? [],
+    });
+  }
+
+  it("끝나는 날을 포함해서 센다", () => {
+    // 6/15(월)~6/19(금) 다섯 날 전부. `remainingDutyDays`와 달리 끝을 빼지 않는다.
+    expect(between(plainWeeks.monday, plainWeeks.friday)).toBe(5);
+    expect(between(plainWeeks.monday, plainWeeks.monday)).toBe(1);
+  });
+
+  it("끝이 시작보다 이르면 0", () => {
+    expect(between(plainWeeks.nextMonday, plainWeeks.monday)).toBe(0);
+  });
+
+  it("남은 일과일과 같은 규칙으로 뺀다", () => {
+    // 주말·공휴일·부대 휴일·휴가 — 네 가지를 한 번에.
+    expect(
+      between("2026-06-15", "2026-06-26", {
+        unitHolidays: [{ startDate: "2026-06-17", endDate: "2026-06-18" }],
+        leaves: [{ startDate: "2026-06-22", endDate: "2026-06-23" }],
+      }),
+    ).toBe(6);
+    // 2026-03-02는 삼일절 대체공휴일이다.
+    expect(between("2026-03-02", "2026-03-02")).toBe(0);
+  });
+
+  it("남은 일과일 = 오늘부터 전역 전날까지의 구간 일과일", () => {
+    // 위젯이 미래 날짜의 일과일을 이 항등식에서 뺄셈으로 끌어낸다.
+    const args = {
+      unitHolidays: [{ startDate: "2026-06-17", endDate: "2026-06-18" }],
+      leaves: [{ startDate: "2026-06-22", endDate: "2026-06-23" }],
+    };
+    expect(count(plainWeeks.monday, plainWeeks.nextSaturday, args)).toBe(
+      between(
+        plainWeeks.monday,
+        lastDutyDayCandidate(plainWeeks.nextSaturday),
+        args,
+      ),
+    );
   });
 });

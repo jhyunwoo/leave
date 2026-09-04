@@ -1,7 +1,8 @@
 /**
  * 남은 일과일 — 전역까지 실제로 부대에서 일과를 보낼 날의 수.
  *
- * 사용처: 서버의 GET /auth/me/duty-days, 그 값을 그리는 프로필·복무율 화면.
+ * 사용처: 서버의 GET /auth/me/duty-days, 그 값을 그리는 프로필·복무율 화면,
+ * 그리고 홈 화면 위젯(apps/native/src/widgets)이 미래 날짜의 일과일을 뺄셈으로 구할 때.
  *
  * "전역까지 D-450"은 달력을 그대로 센 값이라 체감과 멀다. 그중 실제로 일과가
  * 있는 날만 남기면 훨씬 작은 수가 나온다. 세는 규칙은 하나뿐이다 —
@@ -65,21 +66,46 @@ function datesCovered(
   return dates;
 }
 
-/** 남은 일과일. 이미 전역했거나 셀 날이 없으면 0. */
-export function remainingDutyDays(input: RemainingDutyDaysInput): number {
-  const through = lastDutyDayCandidate(input.dischargeAt);
-  if (through < input.from) return 0;
+export interface DutyDaysBetweenInput {
+  /** 세기 시작하는 날. 포함한다. */
+  from: ISODate;
+  /** 마지막으로 세는 날. **포함한다** — `from`보다 이르면 0. */
+  through: ISODate;
+  unitHolidays: readonly DateRange[];
+  leaves: readonly DateRange[];
+}
+
+/**
+ * 닫힌 구간 `[from, through]`의 일과일.
+ *
+ * "남은 일과일"과 규칙이 같고 끝을 어디로 잡느냐만 다르다. 홈 화면 위젯이
+ * 미래 날짜 d의 일과일을 `오늘값 − dutyDaysBetween(오늘, d-1)`로 구하는데,
+ * 그 셈을 위해 같은 루프를 한 번 더 적으면 규칙이 두 곳에 남는다. 세는 규칙은
+ * 이 함수 하나에만 있고 `remainingDutyDays`도 여기를 지난다.
+ */
+export function dutyDaysBetween(input: DutyDaysBetweenInput): number {
+  if (input.through < input.from) return 0;
 
   const off = datesCovered(
     [input.unitHolidays, input.leaves],
     input.from,
-    through,
+    input.through,
   );
 
   let count = 0;
-  for (let date = input.from; date <= through; date = addDays(date, 1)) {
+  for (let date = input.from; date <= input.through; date = addDays(date, 1)) {
     if (isWeekend(date) || isHoliday(date) || off.has(date)) continue;
     count += 1;
   }
   return count;
+}
+
+/** 남은 일과일. 이미 전역했거나 셀 날이 없으면 0. */
+export function remainingDutyDays(input: RemainingDutyDaysInput): number {
+  return dutyDaysBetween({
+    from: input.from,
+    through: lastDutyDayCandidate(input.dischargeAt),
+    unitHolidays: input.unitHolidays,
+    leaves: input.leaves,
+  });
 }

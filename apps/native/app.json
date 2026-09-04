@@ -2,7 +2,7 @@
   "expo": {
     "name": "리브",
     "slug": "leave",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.leave.mobile",
+      "appleTeamId": "Y4FP7J24AX",
       "icon": "./assets/images/leave-icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -199,6 +200,85 @@
             "compileSdkVersion": 36,
             "targetSdkVersion": 36
           }
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.app.leave.mobile",
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "LeaveMetric",
+              "displayName": "리브 지표",
+              "description": "전역일 D-Day·남은 휴가처럼 원하는 지표 하나를 크게 봅니다.",
+              "contentMarginsDisabled": false,
+              "supportedFamilies": [
+                "systemSmall",
+                "accessoryCircular",
+                "accessoryRectangular",
+                "accessoryInline"
+              ],
+              "configuration": {
+                "title": "표시할 지표",
+                "description": "위젯을 길게 눌러 언제든 바꿀 수 있어요.",
+                "parameters": {
+                  "metric": {
+                    "title": "지표",
+                    "type": "enum",
+                    "default": "discharge",
+                    "values": [
+                      {
+                        "name": "전역일 D-Day",
+                        "value": "discharge"
+                      },
+                      {
+                        "name": "남은 일과일",
+                        "value": "dutyDays"
+                      },
+                      {
+                        "name": "복무율",
+                        "value": "progress"
+                      },
+                      {
+                        "name": "다음 휴가 D-Day",
+                        "value": "nextLeave"
+                      },
+                      {
+                        "name": "다음 휴가일 출타 여유",
+                        "value": "headroom"
+                      },
+                      {
+                        "name": "남은 총 휴가일수",
+                        "value": "balance"
+                      },
+                      {
+                        "name": "진급까지 남은 날",
+                        "value": "promotion"
+                      }
+                    ]
+                  }
+                }
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "resizeMode": "none"
+              }
+            },
+            {
+              "name": "LeaveSummary",
+              "displayName": "리브 요약",
+              "description": "전역·다음 휴가·남은 휴가를 한 화면에서 봅니다.",
+              "contentMarginsDisabled": false,
+              "supportedFamilies": ["systemMedium", "systemLarge"],
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 2,
+                "resizeMode": "horizontal"
+              }
+            }
+          ]
         }
       ],
       [

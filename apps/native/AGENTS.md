@@ -29,6 +29,11 @@ OTA로는 안 된다.
 (`build/sourcer/Bare.js`의 `normalizePackageJsonScriptSources`). **스크립트를 한 줄 추가하는 것만으로
 runtimeVersion이 바뀌어 OTA가 끊긴다.** 배포·도구용 스크립트는 루트 `package.json`이나 `scripts/`에 둔다.
 
+`expo prebuild`는 이 블록을 **말없이 고친다** — `android`/`ios` 스크립트를
+`expo start --*`에서 `expo run:*`으로 바꿔 놓는다. 프리빌드로 산출물을 확인한 뒤에는
+`git diff -- apps/native/package.json`으로 되돌려 놓을 것. 그러지 않으면 이 변경과 상관없는
+fingerprint 변화가 함께 커밋된다.
+
 바꾸기 전후로 확인하는 법:
 
 ```bash

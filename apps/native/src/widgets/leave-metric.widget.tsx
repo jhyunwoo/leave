@@ -1,0 +1,294 @@
+/**
+ * 지표 하나를 크게 보여주는 위젯. 홈 화면 소형과 잠금화면 세 종류를 함께 그린다.
+ *
+ * ## 이 파일의 함수는 보통 함수가 아니다
+ *
+ * `'widget'` 지시어가 붙은 함수는 babel이 **함수 소스 문자열로 통째로 바꾼다**
+ * (`babel-preset-expo`의 `widgets-plugin`). 그 문자열은 위젯 익스텐션 안의 별도
+ * JS 번들에서 평가되는데, 그 번들에는 `@expo/ui/swift-ui`의 컴포넌트·모디파이어와
+ * React/JSX 스텁만 전역으로 들어 있다.
+ *
+ * 그래서 **레이아웃 함수는 바깥 스코프를 참조할 수 없다.** 모듈 상수도, 다른 파일에서
+ * import한 헬퍼도, 이 파일 위쪽에 선언한 함수도 안 된다 — 문자열에는 그 이름만 남고
+ * 정의는 따라가지 않아, 위젯이 조용히 그려지지 않는다. 필요한 값은 전부 함수 안에 적는다.
+ * (`@expo/ui`에서 가져온 이름만 예외다. 그 번들에 같은 이름의 전역으로 들어 있다.)
+ *
+ * 그 제약이 부담스럽지 않은 이유는 `payload.ts`가 이미 그릴 문자열까지 다 만들어
+ * 두기 때문이다. 여기서 하는 일은 "어느 지표를 고를지"와 "어디에 놓을지"뿐이다.
+ */
+
+import {
+  AccessoryWidgetBackground,
+  Gauge,
+  Spacer,
+  Text,
+  VStack,
+} from "@expo/ui/swift-ui";
+import {
+  accessibilityLabel,
+  containerBackground,
+  font,
+  foregroundStyle,
+  gaugeStyle,
+  lineLimit,
+  minimumScaleFactor,
+  padding,
+  widgetURL,
+} from "@expo/ui/swift-ui/modifiers";
+import { createWidget, type WidgetEnvironment } from "expo-widgets";
+import type { LeaveWidgetProps } from "./payload";
+
+/** iOS 17+ 위젯 편집에서 고른 값. app.json의 `parameters.metric`과 짝이다. */
+export type LeaveMetricConfiguration = { metric?: string };
+
+function LeaveMetricLayout(
+  props: LeaveWidgetProps,
+  environment: WidgetEnvironment<LeaveMetricConfiguration>,
+) {
+  "widget";
+
+  const dark = environment.colorScheme === "dark";
+  const ink = dark ? "#f2f4f0" : "#0e0f0c";
+  const mute = dark ? "#8e918c" : "#868685";
+  const accent = dark ? "#79d553" : "#347a1f";
+  const canvas = dark ? "#1c1c1e" : "#ffffff";
+
+  const family = environment.widgetFamily;
+  const accessory =
+    family === "accessoryCircular" ||
+    family === "accessoryRectangular" ||
+    family === "accessoryInline";
+
+  // 잠금화면은 시스템이 색을 입힌다(vibrant). 여기서 칠하면 대비만 나빠진다.
+  const strong = accessory ? undefined : accent;
+  const soft = accessory ? undefined : mute;
+  const body = accessory ? undefined : ink;
+
+  const tint = (color: string | undefined) =>
+    color ? [foregroundStyle(color)] : [];
+
+  if (props.state !== "ready") {
+    const message =
+      props.state === "signedOut"
+        ? "로그인하고 확인하세요"
+        : "복무정보를 입력하세요";
+    if (family === "accessoryInline") {
+      return <Text modifiers={[widgetURL("leave:///")]}>리브</Text>;
+    }
+    return (
+      <VStack
+        spacing={4}
+        modifiers={[
+          padding({ top: 12, leading: 12, bottom: 12, trailing: 12 }),
+          ...(accessory ? [] : [containerBackground(canvas, "widget")]),
+          widgetURL("leave:///"),
+          accessibilityLabel(`리브. ${message}`),
+        ]}
+      >
+        <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+          리브
+        </Text>
+        <Text
+          modifiers={[
+            font({ size: 13 }),
+            ...tint(soft),
+            lineLimit(2),
+            minimumScaleFactor(0.7),
+          ]}
+        >
+          {message}
+        </Text>
+      </VStack>
+    );
+  }
+
+  // 위젯을 길게 눌러 고른 지표 → 인앱 설정의 기본 지표 → 값이 있는 첫 지표.
+  // Android에는 위젯별 편집이 없어 두 번째 단계가 늘 쓰이고, iOS에서도 고른 지표에
+  // 보여줄 값이 없을 때(그룹 미가입, 병장) 여기로 떨어진다.
+  const order = [
+    "discharge",
+    "dutyDays",
+    "progress",
+    "nextLeave",
+    "headroom",
+    "balance",
+    "promotion",
+  ];
+  const chosen = environment.configuration?.metric;
+  const metrics = props.metrics as Record<
+    string,
+    LeaveWidgetProps["metrics"][keyof LeaveWidgetProps["metrics"]]
+  >;
+  let key: string | null = null;
+  if (chosen && metrics[chosen]) key = chosen;
+  else if (metrics[props.defaultMetric]) key = props.defaultMetric;
+  else {
+    for (const candidate of order) {
+      if (metrics[candidate]) {
+        key = candidate;
+        break;
+      }
+    }
+  }
+
+  const links: Record<string, string> = {
+    discharge: "leave:///service-progress",
+    dutyDays: "leave:///service-progress",
+    progress: "leave:///service-progress",
+    nextLeave: "leave:///leaves",
+    headroom: "leave:///",
+    balance: "leave:///leave-grants",
+    promotion: "leave:///service-progress",
+  };
+  const link = key ? (links[key] ?? "leave:///") : "leave:///";
+  const metric = key ? metrics[key] : undefined;
+
+  if (!metric) {
+    // 고른 지표에 값이 없다(그룹 미가입, 예정된 휴가 없음, 병장). 빈 칸을
+    // 보여주느니 왜 없는지 말한다.
+    if (family === "accessoryInline") {
+      return <Text modifiers={[widgetURL(link)]}>리브</Text>;
+    }
+    return (
+      <VStack
+        spacing={4}
+        modifiers={[
+          padding({ top: 12, leading: 12, bottom: 12, trailing: 12 }),
+          ...(accessory ? [] : [containerBackground(canvas, "widget")]),
+          widgetURL(link),
+          accessibilityLabel("리브. 아직 보여줄 값이 없어요"),
+        ]}
+      >
+        <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+          리브
+        </Text>
+        <Text
+          modifiers={[
+            font({ size: 13 }),
+            ...tint(soft),
+            lineLimit(2),
+            minimumScaleFactor(0.7),
+          ]}
+        >
+          아직 보여줄 값이 없어요
+        </Text>
+      </VStack>
+    );
+  }
+
+  if (family === "accessoryInline") {
+    return (
+      <Text modifiers={[widgetURL(link), accessibilityLabel(metric.spoken)]}>
+        {metric.compact}
+      </Text>
+    );
+  }
+
+  if (family === "accessoryCircular") {
+    // 게이지를 그릴 수 있는 지표(복무율·출타 여유)는 원형이 훨씬 잘 읽힌다.
+    if (metric.gauge !== null) {
+      return (
+        <Gauge
+          value={metric.gauge}
+          min={0}
+          max={1}
+          currentValueLabel={
+            <Text modifiers={[font({ size: 13, weight: "semibold" })]}>
+              {metric.value}
+            </Text>
+          }
+          modifiers={[
+            gaugeStyle("circular"),
+            widgetURL(link),
+            accessibilityLabel(metric.spoken),
+          ]}
+        />
+      );
+    }
+    return (
+      <VStack
+        spacing={0}
+        modifiers={[widgetURL(link), accessibilityLabel(metric.spoken)]}
+      >
+        <AccessoryWidgetBackground />
+        <Text modifiers={[font({ size: 10 })]}>{metric.label}</Text>
+        <Text
+          modifiers={[
+            font({ size: 15, weight: "bold" }),
+            minimumScaleFactor(0.6),
+          ]}
+        >
+          {metric.value}
+        </Text>
+      </VStack>
+    );
+  }
+
+  if (family === "accessoryRectangular") {
+    return (
+      <VStack
+        alignment="leading"
+        spacing={1}
+        modifiers={[widgetURL(link), accessibilityLabel(metric.spoken)]}
+      >
+        <Text modifiers={[font({ size: 12, weight: "semibold" })]}>
+          {metric.label}
+        </Text>
+        <Text modifiers={[font({ size: 20, weight: "bold" })]}>
+          {metric.value}
+        </Text>
+        {metric.caption ? (
+          <Text modifiers={[font({ size: 11 }), lineLimit(1)]}>
+            {metric.caption}
+          </Text>
+        ) : null}
+      </VStack>
+    );
+  }
+
+  // systemSmall — 홈 화면.
+  return (
+    <VStack
+      alignment="leading"
+      spacing={2}
+      modifiers={[
+        padding({ top: 14, leading: 14, bottom: 14, trailing: 14 }),
+        containerBackground(canvas, "widget"),
+        widgetURL(link),
+        accessibilityLabel(`${metric.label}. ${metric.spoken}`),
+      ]}
+    >
+      <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+        {metric.label}
+      </Text>
+      <Text
+        modifiers={[
+          font({ size: 34, weight: "heavy" }),
+          ...tint(strong),
+          lineLimit(1),
+          minimumScaleFactor(0.5),
+        ]}
+      >
+        {metric.value}
+      </Text>
+      {metric.caption ? (
+        <Text
+          modifiers={[
+            font({ size: 12 }),
+            ...tint(body),
+            lineLimit(2),
+            minimumScaleFactor(0.8),
+          ]}
+        >
+          {metric.caption}
+        </Text>
+      ) : null}
+      <Spacer />
+    </VStack>
+  );
+}
+
+export const LeaveMetricWidget = createWidget<
+  LeaveWidgetProps,
+  LeaveMetricConfiguration
+>("LeaveMetric", LeaveMetricLayout);

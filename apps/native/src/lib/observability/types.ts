@@ -5,6 +5,7 @@ export type ErrorSource =
   | "api_server_error"
   | "global_error_handler"
   | "handled_exception"
+  | "home_widget"
   | "network_failure"
   | "ota_update"
   | "root_error_boundary"

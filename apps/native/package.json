@@ -17,7 +17,7 @@
     "test:e2e": "maestro test .maestro"
   },
   "dependencies": {
-    "@expo/ui": "57.0.13",
+    "@expo/ui": "57.0.15",
     "@leave/api": "workspace:*",
     "@leave/client": "workspace:*",
     "@leave/shared": "workspace:*",
@@ -47,6 +47,7 @@
     "expo-system-ui": "57.0.2",
     "expo-updates": "57.0.17",
     "expo-web-browser": "57.0.2",
+    "expo-widgets": "57.0.16",
     "hono": "4.13.2",
     "jotai": "^2.20.2",
     "react": "19.2.3",
