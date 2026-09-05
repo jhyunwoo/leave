@@ -131,7 +131,13 @@ const updatePrefsRoute = createRoute({
 });
 
 /** 행이 없으면 전부 켜진 것으로 본다 — 기존 사용자의 동작을 바꾸지 않는다. */
-const DEFAULT_PREFS = { overage: true, blackout: true, unitNotice: true };
+const DEFAULT_PREFS = {
+  overage: true,
+  blackout: true,
+  unitNotice: true,
+  friendRequest: true,
+  friendLeave: true,
+};
 
 function parseDates(row: Pick<NotificationRow, "datesJson">): string[] {
   if (!row.datesJson) return [];
@@ -273,6 +279,8 @@ export const notificationRoutes = app
               overage: row.overage,
               blackout: row.blackout,
               unitNotice: row.unitNotice,
+              friendRequest: row.friendRequest,
+              friendLeave: row.friendLeave,
             }
           : DEFAULT_PREFS,
       },
@@ -294,6 +302,12 @@ export const notificationRoutes = app
       blackout: input.blackout ?? existing?.blackout ?? DEFAULT_PREFS.blackout,
       unitNotice:
         input.unitNotice ?? existing?.unitNotice ?? DEFAULT_PREFS.unitNotice,
+      friendRequest:
+        input.friendRequest ??
+        existing?.friendRequest ??
+        DEFAULT_PREFS.friendRequest,
+      friendLeave:
+        input.friendLeave ?? existing?.friendLeave ?? DEFAULT_PREFS.friendLeave,
     };
     await db
       .insert(userNotificationPrefs)

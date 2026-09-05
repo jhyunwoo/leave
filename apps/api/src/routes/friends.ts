@@ -23,6 +23,7 @@ import { friendships, leaves, userBlocks, users } from "../db/schema";
 import { createApp } from "../lib/app";
 import type { Db } from "../lib/db";
 import { codedError } from "../lib/responses";
+import { notifyFriendRequest } from "../lib/social-notify";
 import {
   acceptFriendRequest,
   areBlocked,
@@ -314,6 +315,15 @@ export const friendRoutes = app
         ),
         409,
       );
+    }
+    // 새로 만들어진 요청만 알린다. `unchanged`(같은 요청 재전송)까지 알리면
+    // 보낸 쪽이 버튼을 여러 번 눌러 받는 쪽 알림함을 채울 수 있다.
+    if (outcome === "created") {
+      await notifyFriendRequest(db, {
+        requester: { name: user.name },
+        recipientId: target.id,
+        waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+      });
     }
     return c.json({ ok: true as const }, 200);
   })

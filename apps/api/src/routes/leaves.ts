@@ -39,6 +39,7 @@ import {
 } from "../lib/leave-grants";
 import { saveLeaveWithMerge } from "../lib/leave-merge";
 import { checkOverageAndNotify } from "../lib/overage";
+import { notifyFriendsOfLeave } from "../lib/social-notify";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
 import {
@@ -206,6 +207,18 @@ export const leaveRoutes = app
       changedLeave: saved.row,
       waitUntil: (p) => c.executionCtx.waitUntil(p),
     });
+
+    // 초안은 나만 보는 비공개 계획이라 존재 자체를 알리지 않는다.
+    // 날짜는 저장 결과에서 읽는다 — 붙어 있는 휴가에 흡수되면 요청한 기간보다
+    // 넓어지고, 친구가 보게 될 것은 흡수된 뒤의 기간이다(lib/leave-merge.ts).
+    if (saved.row.status !== "draft") {
+      await notifyFriendsOfLeave(db, {
+        actor: { id: user.id, name: user.name },
+        leave: { startDate: saved.row.startDate, endDate: saved.row.endDate },
+        waitUntil: (p) => c.executionCtx.waitUntil(p),
+      });
+    }
+
     return c.json(
       {
         leave: serializeLeave(

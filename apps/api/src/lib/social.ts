@@ -104,7 +104,7 @@ export async function createFriendRequest(
 
   const now = new Date().toISOString();
   const [userAId, userBId] = canonicalFriendPair(requesterId, targetId);
-  await db
+  const inserted = await db
     .insert(friendships)
     .values({
       userAId,
@@ -115,7 +115,14 @@ export async function createFriendRequest(
       updatedAt: now,
       acceptedAt: null,
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .run();
+
+  // 이 요청이 실제로 행을 만들었는가. 알림은 여기에만 매달린다 — 같은 요청을
+  // 다시 보낸 것까지 알리면 보낸 쪽이 버튼을 반복해 눌러 받는 쪽 알림함을
+  // 채울 수 있다. 넣은 행을 다시 읽어 판정할 수는 없다: 방금 만든 행은
+  // `requestedByUserId === requesterId`라 아래 classify가 "unchanged"로 읽는다.
+  if (changedRows(inserted) > 0) return "created";
 
   // 경합에서 졌다면 지금 남아 있는 행은 상대의 요청이다. 다시 읽어 그 상태를
   // 그대로 돌려준다 — 여기서 수락으로 수렴시키면 위 주석의 사고가 되돌아온다.

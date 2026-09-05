@@ -68,6 +68,22 @@ export function NotificationSettingsPage() {
           testId="notification-pref-unit-notice"
           label="그룹 설정·관리자 변경 안내"
         />
+        <PrefToggle
+          checked={prefs.data?.preferences.friendRequest ?? true}
+          onChange={(friendRequest) =>
+            void updatePrefs.mutateAsync({ friendRequest })
+          }
+          testId="notification-pref-friend-request"
+          label="새 친구 요청이 왔을 때"
+        />
+        <PrefToggle
+          checked={prefs.data?.preferences.friendLeave ?? true}
+          onChange={(friendLeave) =>
+            void updatePrefs.mutateAsync({ friendLeave })
+          }
+          testId="notification-pref-friend-leave"
+          label="친구가 새 휴가를 등록했을 때"
+        />
       </section>
 
       <p className="caption text-mute">

@@ -308,6 +308,10 @@ export const notificationPrefsResponseSchema = z
     blackout: z.boolean(),
     // 그룹 설정·관리자 변경 안내
     unitNotice: z.boolean(),
+    // 나에게 친구 요청이 왔을 때
+    friendRequest: z.boolean(),
+    // 친구가 새 휴가를 등록했을 때
+    friendLeave: z.boolean(),
   })
   .openapi("NotificationPreferences");
 

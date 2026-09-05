@@ -10,14 +10,19 @@ export interface PushMessage {
 }
 
 /**
- * 잠금화면에 그룹명·그룹 id·휴가 날짜가 노출되지 않도록 하는 최소 푸시 payload.
+ * 잠금화면에 그룹명·그룹 id·휴가 날짜·친구 이름이 노출되지 않도록 하는 최소 푸시 payload.
  * 상세 내용은 인증 후 notificationId로 인앱 알림을 조회한다.
+ *
+ * 문구가 종류를 가리지 않는 이유는 이 payload가 Expo·APNs·FCM을 지나기 때문이다.
+ * 종류마다 다른 제목을 쓰면 그 제목 자체가 "이 사람에게 친구 요청이 왔다"는
+ * 정보가 되어, 담지 않기로 한 것을 문구로 흘리게 된다. 앱 이름과 아이콘은 OS가
+ * 이미 보여주므로 제목이 서비스명을 다시 말할 필요도 없다.
  */
 export function buildNotificationPushMessage(
   notificationId: string,
 ): PushMessage {
   return {
-    title: "휴가 일정 알림",
+    title: "새 알림",
     body: "앱에서 새로운 알림을 확인해주세요.",
     data: { notificationId },
   };

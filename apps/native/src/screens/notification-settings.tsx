@@ -114,6 +114,22 @@ export function NotificationSettingsScreen() {
             label="그룹 설정·관리자 변경 안내"
             testID="notification-pref-unit-notice"
           />
+          <NativeCheckbox
+            value={prefs.data?.preferences.friendRequest ?? true}
+            onValueChange={(friendRequest) =>
+              void updatePrefs.mutateAsync({ friendRequest })
+            }
+            label="새 친구 요청이 왔을 때"
+            testID="notification-pref-friend-request"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.friendLeave ?? true}
+            onValueChange={(friendLeave) =>
+              void updatePrefs.mutateAsync({ friendLeave })
+            }
+            label="친구가 새 휴가를 등록했을 때"
+            testID="notification-pref-friend-leave"
+          />
         </ContentPanel>
       </ResponsiveGrid>
     </ScrollView>

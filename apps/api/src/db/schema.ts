@@ -503,6 +503,13 @@ export const userNotificationPrefs = sqliteTable("user_notification_prefs", {
   unitNotice: integer("unit_notice", { mode: "boolean" })
     .notNull()
     .default(true),
+  friendRequest: integer("friend_request", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  // 친구 수만큼 곱해지는 유일한 종류다 — 끌 수 있어야 한다(0027).
+  friendLeave: integer("friend_leave", { mode: "boolean" })
+    .notNull()
+    .default(true),
   updatedAt: text("updated_at").notNull(),
 });
 

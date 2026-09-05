@@ -24,7 +24,8 @@ test("푸시 payload는 generic 문구와 notificationId만 포함한다", async
       buildNotificationPushMessage(notificationId),
     );
     assert.equal(sent.length, 1);
-    assert.equal(sent[0].title, "휴가 일정 알림");
+    // 종류를 가리지 않는 문구다 — 제목 자체가 알림 종류를 흘리면 안 된다.
+    assert.equal(sent[0].title, "새 알림");
     assert.equal(sent[0].body, "앱에서 새로운 알림을 확인해주세요.");
     assert.deepEqual(sent[0].data, { notificationId });
     assert.deepEqual(Object.keys(sent[0].data), ["notificationId"]);
