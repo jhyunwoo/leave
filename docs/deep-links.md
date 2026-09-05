@@ -1,13 +1,16 @@
-# 공개 프로필과 딥링크
+# 공개 프로필·초대 링크와 딥링크
 
-사용자 이름(@아이디)과 그것으로 만들어지는 프로필 링크가 어디에 살고, 어떤 경로로
-앱까지 이어지는지를 정리한다. 규칙 자체는 [`packages/shared/src/username.ts`](../packages/shared/src/username.ts)
+앱 밖에서 앱 안으로 이어지는 두 종류의 주소를 정리한다 — 사용자 이름(@아이디)으로
+만들어지는 **프로필 링크**와, 그룹 관리자가 발급하는 **초대 링크**다. 규칙 자체는
+[`packages/shared/src/username.ts`](../packages/shared/src/username.ts)와
+[`packages/shared/src/invite-code.ts`](../packages/shared/src/invite-code.ts)
 머리주석에, 저장 계층의 판단은 [`apps/api/migrations/0023_usernames.sql`](../apps/api/migrations/0023_usernames.sql)에 있다.
 
 ## 정본 주소는 하나다
 
 ```
-https://leave.moveto.kr/u/{username}
+https://leave.moveto.kr/u/{username}       프로필
+https://leave.moveto.kr/invite/{code}      그룹 초대
 ```
 
 공유 버튼은 언제나 이 HTTPS 주소를 먼저 클립보드에 복사한 뒤 시스템 공유 시트를
@@ -27,11 +30,14 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
 
 ## 경로별 착지점
 
-| 진입                               | 웹                     | 네이티브                                   |
-| ---------------------------------- | ---------------------- | ------------------------------------------ |
-| `https://leave.moveto.kr/u/{name}` | `/u/:username` 라우트  | Universal Link / App Link → `u/[username]` |
-| `leave://u/{name}`                 | —                      | 커스텀 스킴 → `u/[username]`               |
-| 로그아웃 상태                      | 별칭·@아이디 공개 화면 | 로그인·온보딩·이름 설정을 마친 뒤 복귀     |
+| 진입                                    | 웹                                    | 네이티브                                    |
+| --------------------------------------- | ------------------------------------- | ------------------------------------------- |
+| `https://leave.moveto.kr/u/{name}`      | `/u/:username` 라우트                 | Universal Link / App Link → `u/[username]`  |
+| `leave://u/{name}`                      | —                                     | 커스텀 스킴 → `u/[username]`                |
+| `https://leave.moveto.kr/invite/{코드}` | `/invite/:code` 라우트                | Universal Link / App Link → `invite/[code]` |
+| `leave://invite/{코드}`                 | —                                     | 커스텀 스킴 → `invite/[code]`               |
+| `https://leave.moveto.kr/invite#{코드}` | `/invite` (옛 링크 호환)              | —                                           |
+| 로그아웃 상태                           | 별칭·@아이디 공개 화면 / 가입 뒤 복귀 | 로그인·온보딩·이름 설정을 마친 뒤 복귀      |
 
 로그아웃 상태의 동작은 두 앱이 다르다.
 
@@ -40,12 +46,14 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
   누른 경우에만 `?next=`에 현재 경로를 실어 보내고, 로그인·가입이 끝나면 그 자리로
   돌린다. `?next=`는 [`state/next-destination.ts`](../apps/web/src/state/next-destination.ts)에서
   **내부 경로로만** 해석한다(오픈 리다이렉트 방지).
-- 네이티브: `/u/{username}`이 `Stack.Protected` 안에 있어 인증 전에는 트리에 없다.
-  그대로 두면 목적지가 사라지므로, 인증되지 않은 동안 도착한 링크만 모듈에 담아
-  두었다가 인증·온보딩·이름 설정이 모두 끝난 순간 한 번 꺼내 이동한다
-  ([`lib/pending-profile-link.ts`](../apps/native/src/lib/pending-profile-link.ts)).
+- 네이티브: `/u/{username}`과 `/invite/{code}`가 `Stack.Protected` 안에 있어 인증
+  전에는 트리에 없다. 그대로 두면 목적지가 사라지므로, 인증되지 않은 동안 도착한
+  링크만 모듈에 담아 두었다가 인증·온보딩·이름 설정이 모두 끝난 순간 한 번 꺼내
+  이동한다 ([`lib/pending-profile-link.ts`](../apps/native/src/lib/pending-profile-link.ts),
+  [`lib/pending-invite-link.ts`](../apps/native/src/lib/pending-invite-link.ts)).
   이미 인증된 상태의 링크는 담지 않는다 — expo-router가 알아서 가고, 여기서 또
-  이동시키면 같은 화면이 두 장 쌓인다.
+  이동시키면 같은 화면이 두 장 쌓인다. 초대가 프로필보다 먼저다 — 프로필은 언제든
+  다시 열 수 있지만 초대는 만료된다.
 
 익명 요청에는 조회자 관계가 없으므로 차단 여부를 판정하지 않는다. 차단·친구 관계와
 일정 권한은 로그인한 뒤 기존 인증 프로필 API에서 그대로 적용한다. 로그아웃 화면에서
@@ -59,11 +67,24 @@ HTTPS 주소는 앱이 있으면 앱에서 열리고(Universal Link / App Link),
 `application/json`으로 못 박는다.
 
 - `apple-app-site-association` — `appIDs: ["Y4FP7J24AX.app.leave.mobile"]`,
-  `components`는 `/u/*`만. 팀 ID는 EAS에 등록된 배포 인증서에서 확인한 값이다.
+  `components`는 `/u/*`와 `/invite/*`. 팀 ID는 EAS에 등록된 배포 인증서에서 확인한 값이다.
+  iOS의 `associatedDomains`는 도메인 단위(`applinks:leave.moveto.kr`)라 경로를 늘릴 때
+  앱 설정은 건드리지 않는다. 다만 이미 깔린 앱이 새 `components`를 언제 집어갈지는
+  보장되지 않으므로(설치·업데이트 시점에 애플 CDN에서 받아 둔다), 경로를 늘렸으면
+  안드로이드와 함께 새 빌드로 확실히 맞추는 편이 낫다.
 - `assetlinks.json` — `package_name: app.leave.mobile`과 서명 인증서 SHA-256.
+  호스트 단위 선언이라 경로를 늘려도 바뀌지 않는다.
 
-Android 앱의 intent filter도 `/u/` 접두어만 받는다. `/u`로 끝 슬래시 없이
-두면 `/units` 같은 앱 내부 페이지까지 프로필 링크로 오인해 브라우저에서 가로챈다.
+Android 앱의 intent filter는 `/u/`와 `/invite/` 접두어만 받는다. 끝 슬래시가 중요하다 —
+`/u`로 두면 `/units` 같은 앱 내부 페이지까지 프로필 링크로 오인해 브라우저에서 가로챈다.
+
+## 메신저 인앱 브라우저에서는 OS가 가로채지 않는다
+
+초대 링크는 카카오톡·문자로 오간다. **메신저의 인앱 브라우저는 Universal Link /
+App Link를 가로채지 않으므로**, 그 자리에서는 OS 딥링크만으로 앱이 열리지 않는다.
+그래서 웹 착지 화면([`pages/InviteJoinPage.tsx`](../apps/web/src/pages/InviteJoinPage.tsx))이
+마운트 직후 `leave://invite/{코드}`로 한 번 이동을 시도하고, 1.2초 뒤에도 페이지가
+살아 있으면 웹 참여 화면을 그린다. 앱이 없으면 그 시도는 아무 일도 하지 않는다.
 
 ### 안드로이드 서명 인증서에 대한 주의
 

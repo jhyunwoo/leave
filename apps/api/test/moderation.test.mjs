@@ -8,7 +8,7 @@ test("초대코드 무차별 대입은 rate limit에 걸린다", async () => {
   const code = "X".repeat(40);
 
   const statuses = [];
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     const res = await req("POST", "/units/join", {
       token: attacker.token,
       body: { code },
@@ -16,9 +16,11 @@ test("초대코드 무차별 대입은 rate limit에 걸린다", async () => {
     statuses.push(res.status);
   }
 
-  // 상한 5회: 앞의 5번은 "유효하지 않은 코드"(400), 6번째부터 429.
-  assert.deepEqual(statuses.slice(0, 5), [400, 400, 400, 400, 400]);
-  assert.equal(statuses[5], 429);
+  // 상한 3회/15분: 앞의 3번은 "유효하지 않은 코드"(400), 4번째부터 429.
+  // 코드가 6자로 짧아진 뒤로 이 숫자가 실제로 안전을 떠받친다 — 느슨하게
+  // 바꾸려면 코드 길이·유효기간과 함께 다시 계산할 것(routes/units.ts).
+  assert.deepEqual(statuses.slice(0, 3), [400, 400, 400]);
+  assert.equal(statuses[3], 429);
 
   const blocked = await req("POST", "/units/join", {
     token: attacker.token,
@@ -160,6 +162,8 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     overage: true,
     blackout: true,
     unitNotice: true,
+    friendRequest: true,
+    friendLeave: true,
   });
 
   // 초과 알림만 끄고 나머지는 그대로 둔다.
@@ -172,6 +176,8 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     overage: false,
     blackout: true,
     unitNotice: true,
+    friendRequest: true,
+    friendLeave: true,
   });
 
   await req("POST", "/leaves", {

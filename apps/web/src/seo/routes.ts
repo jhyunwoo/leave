@@ -142,6 +142,7 @@ export const SPA_ROUTES: readonly SpaRoute[] = [
   { pattern: "/login", title: "로그인", robots: "noindex, follow" },
   { pattern: "/signup", title: "회원가입", robots: "noindex, follow" },
   { pattern: "/invite", title: "그룹 초대", robots: "noindex, follow" },
+  { pattern: "/invite/:code", title: "그룹 초대", robots: "noindex, follow" },
   { pattern: "/u/:username", title: "공개 프로필", robots: "noindex, follow" },
   { pattern: "/units", title: "내 그룹", robots: "noindex, follow" },
   { pattern: "/units/manage", title: "그룹 관리", robots: "noindex, follow" },

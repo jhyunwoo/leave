@@ -12,6 +12,7 @@ import { LeaveApiProvider, type LeaveApiAdapter } from "@leave/client/context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { useEffect, useMemo, type ReactNode } from "react";
+import { clearPendingInvite } from "@/lib/pending-invite-link";
 import { clearPendingProfile } from "@/lib/pending-profile-link";
 import {
   addObservabilityBreadcrumb,
@@ -37,8 +38,9 @@ export function ApiProvider(props: { children: ReactNode }) {
       clearObservabilityUser();
       queryClient.clear();
       void clearPersistedQueryCache();
-      // 이전 사용자가 눌렀던 프로필 링크를 다음 사용자에게 물려주지 않는다.
+      // 이전 사용자가 눌렀던 링크를 다음 사용자에게 물려주지 않는다.
       clearPendingProfile();
+      clearPendingInvite();
       void setSession(null);
     });
     return () => setUnauthorizedHandler(null);
@@ -52,6 +54,7 @@ export function ApiProvider(props: { children: ReactNode }) {
         await clearPersistedQueryCache();
         if (token === null) {
           clearPendingProfile();
+          clearPendingInvite();
           clearObservabilityUser();
           addObservabilityBreadcrumb({
             category: "app.authentication",

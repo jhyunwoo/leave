@@ -88,22 +88,22 @@ sitemap·robots·메타·JSON-LD는 자동으로 따라온다.
 
 ## 3. 주소별 색인 정책
 
-| 주소                                              | 응답 | 색인            | 근거                                                                  |
-| ------------------------------------------------- | ---- | --------------- | --------------------------------------------------------------------- |
-| `/`                                               | 200  | index, follow   | 유일한 마케팅 진입점. 미리 그린 HTML.                                 |
-| `/guide`                                          | 200  | index, follow   | 계산 기준을 설명하는 공개 안내 문서.                                  |
-| `/privacy` `/terms` `/support` `/delete-account`  | 200  | index, follow   | 스토어·개인정보 열람권이 걸린 주소. 브랜드 질의에 정확히 답해야 한다. |
-| `/login` `/signup` `/invite`                      | 200  | noindex, follow | 인증 흐름. 색인돼도 사용자가 빈 폼에 떨어질 뿐이다.                   |
-| `/units` `/units/manage`                          | 200  | noindex, follow | 인증 필요. 크롤러에겐 빈 껍데기(soft 404)이고 주소가 구조를 드러낸다. |
-| `/leaves` `/leaves/grants` `/leaves/{id}`         | 200  | noindex, follow | 〃                                                                    |
-| `/friends` `/friends/{id}`                        | 200  | noindex, follow | 〃                                                                    |
-| `/notifications` `/notifications/settings`        | 200  | noindex, follow | 〃                                                                    |
-| `/profile` `/service-progress`                    | 200  | noindex, follow | 〃                                                                    |
-| `/u/{username}`                                   | 200  | noindex, follow | **아래 4절**                                                          |
-| `/app` `/404` (셸·404 문서 자체)                  | 200  | noindex         | 워커가 다른 주소에 실어 보내는 몸통. 자기 이름으로도 열려서 막는다.   |
-| 그 밖의 모든 주소                                 | 404  | noindex         | 없는 주소는 없다고 답한다.                                            |
-| `/guide/` `/guide.html` `/index.html` `/privacy/` | 307  | —               | Cloudflare `html_handling: auto-trailing-slash`가 정본으로 넘긴다.    |
-| `*.workers.dev` 의 모든 주소                      | 200  | noindex         | 미리보기 도메인이 운영 도메인과 색인 경쟁하지 않게.                   |
+| 주소                                              | 응답 | 색인            | 근거                                                                                                 |
+| ------------------------------------------------- | ---- | --------------- | ---------------------------------------------------------------------------------------------------- |
+| `/`                                               | 200  | index, follow   | 유일한 마케팅 진입점. 미리 그린 HTML.                                                                |
+| `/guide`                                          | 200  | index, follow   | 계산 기준을 설명하는 공개 안내 문서.                                                                 |
+| `/privacy` `/terms` `/support` `/delete-account`  | 200  | index, follow   | 스토어·개인정보 열람권이 걸린 주소. 브랜드 질의에 정확히 답해야 한다.                                |
+| `/login` `/signup` `/invite` `/invite/{코드}`     | 200  | noindex, follow | 인증 흐름과 초대 착지. 색인돼도 사용자가 빈 폼에 떨어질 뿐이고, 초대 코드가 색인에 남아서는 안 된다. |
+| `/units` `/units/manage`                          | 200  | noindex, follow | 인증 필요. 크롤러에겐 빈 껍데기(soft 404)이고 주소가 구조를 드러낸다.                                |
+| `/leaves` `/leaves/grants` `/leaves/{id}`         | 200  | noindex, follow | 〃                                                                                                   |
+| `/friends` `/friends/{id}`                        | 200  | noindex, follow | 〃                                                                                                   |
+| `/notifications` `/notifications/settings`        | 200  | noindex, follow | 〃                                                                                                   |
+| `/profile` `/service-progress`                    | 200  | noindex, follow | 〃                                                                                                   |
+| `/u/{username}`                                   | 200  | noindex, follow | **아래 4절**                                                                                         |
+| `/app` `/404` (셸·404 문서 자체)                  | 200  | noindex         | 워커가 다른 주소에 실어 보내는 몸통. 자기 이름으로도 열려서 막는다.                                  |
+| 그 밖의 모든 주소                                 | 404  | noindex         | 없는 주소는 없다고 답한다.                                                                           |
+| `/guide/` `/guide.html` `/index.html` `/privacy/` | 307  | —               | Cloudflare `html_handling: auto-trailing-slash`가 정본으로 넘긴다.                                   |
+| `*.workers.dev` 의 모든 주소                      | 200  | noindex         | 미리보기 도메인이 운영 도메인과 색인 경쟁하지 않게.                                                  |
 
 `Disallow`는 robots.txt에 **하나도 없다**. `noindex`를 읽으려면 크롤러가 그 페이지를
 가져갈 수 있어야 하기 때문이다. robots.txt로 막으면 오히려 "내용 없이 주소만
@@ -367,6 +367,7 @@ pnpm quality                         # 서식 → lint → 바인딩 타입 → 
 /guide                   200  text/html
 /guide/ /guide.html      307  → /guide
 /login /signup /invite   200  X-Robots-Tag: noindex, follow
+/invite/A2C4D5           200  X-Robots-Tag: noindex, follow
 /u/hyunwoo               200  X-Robots-Tag: noindex, follow
 /units /leaves/abc …     200  X-Robots-Tag: noindex, follow
 /privacy /terms …        200  (색인 허용)

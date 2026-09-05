@@ -3,8 +3,8 @@
  *
  * 사용처: `pages/OnboardingPage.tsx`.
  *
- * 초대 링크(`/invite#코드`)를 타고 온 사람은 sessionStorage에 코드가 담겨 있어
- * 곧장 참여 모드로 연다. 여기서 되묻는 건 이미 답한 걸 다시 묻는 셈이다.
+ * 초대 링크를 타고 온 사람은 코드가 미리 채워져 있어 곧장 참여 모드로 연다.
+ * 여기서 되묻는 건 이미 답한 걸 다시 묻는 셈이다.
  *
  * 그룹 만들기는 이름과 최대 인원 두 가지를 받는다. 둘을 다시 쪼개면 아직
  * 존재하지도 않는 그룹의 정원을 먼저 정하게 돼 오히려 헷갈린다.
@@ -12,6 +12,7 @@
 
 import {
   fmtDateTimeFull,
+  inviteLink,
   unitCreateSchema,
   unitJoinSchema,
 } from "@leave/shared";
@@ -84,7 +85,7 @@ export function GroupStep(props: {
 
   const share = async () => {
     if (!invite) return;
-    const text = `리브에서 함께 휴가를 관리해요.\n${window.location.origin}/invite#${invite.code}\n초대코드: ${invite.code}`;
+    const text = `리브에서 함께 휴가를 관리해요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`;
     if (navigator.share)
       await navigator.share({ title: "리브 공유 그룹 초대", text });
     else await navigator.clipboard.writeText(text);

@@ -11,6 +11,8 @@
 
 import {
   fmtDateTimeFull,
+  inviteLink,
+  LEGACY_INVITE_CODE_MIN_LENGTH,
   unitCreateSchema,
   unitJoinSchema,
   type UnitCreateInput,
@@ -41,12 +43,20 @@ import { SheetScaffold } from "@/components/sheet-scaffold";
 import { confirmAction, notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing } from "@/theme";
 
+/**
+ * 초대 링크를 먼저 주고 코드를 함께 적는다.
+ *
+ * 링크는 앱이 깔려 있으면 앱으로, 아니면 웹으로 떨어진다 — 받는 사람이 앱을
+ * 깔았는지 보낸 사람이 알 수 없으므로 이쪽이 기본이다. 코드를 함께 적는 이유는
+ * 링크를 열 수 없는 자리(구두 전달, 링크가 잘리는 메신저)가 남아 있어서다.
+ */
 async function shareInvite(invite: IssuedUnitInvite) {
   await Share.share({
     title: "리브 공유 그룹 초대",
     message: [
-      "리브 앱에서 아래 초대코드를 입력하세요.",
-      invite.code,
+      "리브에서 함께 휴가를 관리해요. 아래 링크로 참여할 수 있어요.",
+      inviteLink(invite.code),
+      `앱에서 코드로 참여하려면: ${invite.code}`,
       `만료: ${fmtDateTimeFull(invite.expiresAt)}`,
       "실제 부대명·부대번호·주소·병력 현황은 입력하지 마세요.",
     ].join("\n\n"),
@@ -165,15 +175,20 @@ export function UnitsScreen() {
           <ContentPanel style={styles.card}>
             <Text style={styles.sectionTitle}>초대코드로 참여</Text>
             <Field
-              label="초대코드"
+              label="초대코드 6자리"
               hint="코드는 만료되거나 사용 횟수가 소진되면 사용할 수 없습니다."
             >
               <Input
                 value={inviteCode}
                 onChangeText={setInviteCode}
-                autoCapitalize="none"
+                // 코드는 대문자 사전이고, 소문자·공백·혼동 글자는 서버로 보내기
+                // 전에 정규화가 흡수한다(`normalizeInviteCode`).
+                autoCapitalize="characters"
                 autoCorrect={false}
-                placeholder="관리자에게 받은 긴 초대코드"
+                autoComplete="off"
+                // 옛 32자 코드가 아직 유효할 수 있어 6으로 자르지 않는다.
+                maxLength={LEGACY_INVITE_CODE_MIN_LENGTH + 8}
+                placeholder="예: A2C4D5"
                 accessibilityLabel="공유 그룹 초대코드"
                 testID="unit-invite-code"
               />

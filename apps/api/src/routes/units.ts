@@ -73,10 +73,15 @@ app.use("*", async (c, next) => {
   return onboardingMiddleware(c, next);
 });
 // 초대코드를 무차별 대입으로 찾아내지 못하게 막는 마지막 방어선.
-// (코드 자체가 192비트라 현실적으로 불가능하지만, 시도 비용을 0으로 두지 않는다.)
+//
+// 예전에는 코드가 192비트라 이 제한이 형식적이었다. 지금은 6자(32⁶ ≈ 10.7억)라
+// **이 값이 실제로 안전을 떠받친다.** 15분에 3회면 한 버킷이 하루에 288번
+// 시도할 수 있고, 살아 있는 초대가 1만 건이어도 하루 성공 확률이 100만분의 3이다.
+// 코드 길이·유효기간(24시간)·사용 횟수(20회)와 한 묶음이니 함께 다시 계산할 것
+// (`packages/shared/src/invite-code.ts`).
 app.use(
   "/join",
-  rateLimit({ name: "unit-join", limit: 5, windowSeconds: 600 }),
+  rateLimit({ name: "unit-join", limit: 3, windowSeconds: 900 }),
 );
 // 넓은 날짜 범위를 훑어 그룹 시계열을 통째로 긁어가는 것을 막는다.
 app.use(

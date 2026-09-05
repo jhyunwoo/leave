@@ -6,7 +6,7 @@
  */
 
 import {
-  fmtDateTimeFull,
+  LEGACY_INVITE_CODE_MIN_LENGTH,
   unitCreateSchema,
   unitJoinSchema,
   type UnitCreateInput,
@@ -16,6 +16,7 @@ import { useNavigate } from "react-router";
 import type { IssuedUnitInvite, Me } from "@leave/client";
 import { useCreateUnit, useJoinUnit, useLeaveUnit } from "@leave/client";
 import { Field } from "../components/Field";
+import { InviteShare } from "../components/InviteShare";
 import { LeaveLimitFields } from "../components/LeaveLimitFields";
 import { Modal } from "../components/Modal";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
@@ -177,7 +178,7 @@ export function UnitsPage(props: { me: Me }) {
           >
             <h2 className="display-xs">초대코드로 참여</h2>
             <Field
-              label="초대코드"
+              label="초대코드 6자리"
               hint="코드는 만료되거나 사용 횟수가 소진되면 사용할 수 없습니다."
             >
               <input
@@ -185,9 +186,12 @@ export function UnitsPage(props: { me: Me }) {
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 autoComplete="off"
-                autoCapitalize="none"
+                // 소문자·공백·혼동 글자는 서버로 보내기 전에 정규화가 흡수한다.
+                autoCapitalize="characters"
                 spellCheck={false}
-                placeholder="관리자에게 받은 긴 초대코드"
+                // 옛 32자 코드가 아직 유효할 수 있어 6으로 자르지 않는다.
+                maxLength={LEGACY_INVITE_CODE_MIN_LENGTH + 8}
+                placeholder="예: A2C4D5"
                 aria-label="공유 그룹 초대코드"
                 data-testid="unit-invite-code"
               />
@@ -259,22 +263,7 @@ function InvitePanel(props: { invite: IssuedUnitInvite }) {
       <p className="body-sm text-body">
         원문은 서버에 저장되지 않아 이 화면을 떠나면 다시 볼 수 없습니다.
       </p>
-      <code
-        aria-label="발급된 초대코드"
-        style={{
-          padding: "var(--sp-md)",
-          borderRadius: "var(--r-md)",
-          background: "var(--canvas-soft)",
-          wordBreak: "break-all",
-          fontWeight: 600,
-        }}
-      >
-        {props.invite.code}
-      </code>
-      <p className="caption text-body">
-        {fmtDateTimeFull(props.invite.expiresAt)}까지 · 최대{" "}
-        {props.invite.maxUses}회
-      </p>
+      <InviteShare invite={props.invite} />
     </div>
   );
 }

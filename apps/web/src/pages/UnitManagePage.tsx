@@ -30,6 +30,7 @@ import {
   useUpdateUnit,
 } from "@leave/client";
 import { Field } from "../components/Field";
+import { InviteShare } from "../components/InviteShare";
 import { LeaveLimitFields } from "../components/LeaveLimitFields";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 
@@ -263,25 +264,7 @@ function InviteSection({ unit }: { unit: Unit }) {
         사람에게만 전달하세요.
       </p>
 
-      {invite && (
-        <>
-          <code
-            aria-label="발급된 초대코드"
-            style={{
-              padding: "var(--sp-md)",
-              borderRadius: "var(--r-md)",
-              background: "var(--canvas-soft)",
-              wordBreak: "break-all",
-              fontWeight: 600,
-            }}
-          >
-            {invite.code}
-          </code>
-          <p className="caption text-mute">
-            {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회
-          </p>
-        </>
-      )}
+      {invite && <InviteShare invite={invite} />}
 
       {error && (
         <p className="field-error" role="alert">

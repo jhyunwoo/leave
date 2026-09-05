@@ -29,7 +29,8 @@ test("그룹 생성 → 생성자는 자동 가입·관리자이고 초대코드
   assert.equal(created.data.unit.memberCount, 1);
   assert.equal(created.data.unit.referenceMemberTotal, 60);
   assert.ok(created.data.unit.lastTotalUpdatedAt);
-  assert.match(created.data.invite.code, /^[A-Za-z0-9_-]{32,}$/);
+  // Crockford Base32 6자. 사람이 받아 적을 수 있는 길이라야 초대 링크 없이도 쓴다.
+  assert.match(created.data.invite.code, /^[0-9A-HJKMNP-TV-Z]{6}$/);
 
   const me = await req("GET", "/auth/me", { token });
   assert.equal(me.data.unit.id, created.data.unit.id);
@@ -53,6 +54,44 @@ test("초대코드 가입은 즉시 부대원 편입되고 멤버 목록에 반�
   });
   assert.equal(members.status, 200);
   assert.equal(members.data.members.length, 2);
+});
+
+test("받아 적은 초대코드는 대소문자·공백·혼동 글자를 흡수해 같은 그룹으로 간다", async () => {
+  const owner = await signup();
+  const created = await createUnit(owner.token);
+  const code = created.data.invite.code;
+
+  // 사람이 옮겨 적으면 이렇게 온다: 소문자, 가운데 공백, 0을 O로.
+  const typed = `${code.slice(0, 3).toLowerCase()} ${code
+    .slice(3)
+    .toLowerCase()
+    .replaceAll("0", "o")
+    .replaceAll("1", "l")}`;
+
+  const member = await signup();
+  const joined = await req("POST", "/units/join", {
+    token: member.token,
+    body: { code: typed },
+  });
+  assert.equal(joined.status, 200);
+  assert.equal(joined.data.unit.id, created.data.unit.id);
+});
+
+test("여섯 자가 아닌 값은 옛 32자 코드 형식일 때만 서버까지 간다", async () => {
+  const user = await signup();
+  // 다섯 자 — 형식 검증에서 걸린다.
+  const short = await req("POST", "/units/join", {
+    token: user.token,
+    body: { code: "A2C4D" },
+  });
+  assert.equal(short.status, 400);
+
+  // 옛 형식 길이지만 존재하지 않는 코드 — 형식은 통과하고 조회에서 걸린다.
+  const legacyShaped = await req("POST", "/units/join", {
+    token: user.token,
+    body: { code: "a".repeat(32) },
+  });
+  assert.equal(legacyShaped.status, 400);
 });
 
 test("관리자가 계정을 지우면 남은 부대원에게 관리자 권한이 이관된다", async () => {

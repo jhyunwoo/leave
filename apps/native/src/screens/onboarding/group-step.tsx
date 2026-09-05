@@ -9,6 +9,8 @@
 
 import {
   fmtDateTimeFull,
+  inviteLink,
+  LEGACY_INVITE_CODE_MIN_LENGTH,
   unitCreateSchema,
   unitJoinSchema,
 } from "@leave/shared";
@@ -20,6 +22,10 @@ import {
 import { useState } from "react";
 import { Share, Text } from "react-native";
 import { ContentPanel } from "@/components/content-panel";
+import {
+  clearPendingInvite,
+  peekPendingInvite,
+} from "@/lib/pending-invite-link";
 import { Field, Input } from "@/components/field";
 import { makeStyles, spacing } from "@/theme";
 import { ChoiceCard } from "./choice-card";
@@ -35,8 +41,11 @@ export function GroupStep(props: {
   onDone: (joined: boolean) => void;
 }) {
   const styles = useStyles();
-  const [mode, setMode] = useState<Mode>("choice");
-  const [code, setCode] = useState("");
+  // 초대 링크를 타고 들어온 사람은 이미 "참여하겠다"고 답했다. 코드를 미리 채우고
+  // 참여 모드로 열어 같은 것을 다시 묻지 않는다(웹 GroupStep과 같은 판단).
+  const pendingInvite = peekPendingInvite();
+  const [mode, setMode] = useState<Mode>(pendingInvite ? "join" : "choice");
+  const [code, setCode] = useState(pendingInvite ?? "");
   const [groupName, setGroupName] = useState("");
   const [maxCount, setMaxCount] = useState("1");
   const [invite, setInvite] = useState<IssuedUnitInvite | null>(null);
@@ -51,6 +60,9 @@ export function GroupStep(props: {
     setError(null);
     try {
       await join.mutateAsync(parsed.data);
+      // 참여했으므로 담아 둔 초대는 끝났다. 비우지 않으면 온보딩이 끝난 뒤
+      // 루트 레이아웃이 초대 화면으로 한 번 더 보낸다.
+      clearPendingInvite();
       props.onDone(true);
     } catch (caught) {
       setError(
@@ -85,7 +97,7 @@ export function GroupStep(props: {
     if (!invite) return;
     void Share.share({
       title: "리브 공유 그룹 초대",
-      message: `리브에서 함께 휴가를 관리해요.\nhttps://leave.moveto.kr/invite#${invite.code}\n초대코드: ${invite.code}`,
+      message: `리브에서 함께 휴가를 관리해요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`,
     });
   };
 
@@ -160,11 +172,15 @@ export function GroupStep(props: {
         </>
       ) : mode === "join" ? (
         <>
-          <Field label="초대코드">
+          <Field label="초대코드 6자리">
             <Input
               value={code}
               onChangeText={setCode}
-              autoCapitalize="none"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              maxLength={LEGACY_INVITE_CODE_MIN_LENGTH + 8}
+              placeholder="예: A2C4D5"
               autoFocus
               testID="onboarding-group-code"
             />

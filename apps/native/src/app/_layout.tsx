@@ -28,6 +28,10 @@ import { ErrorScreen } from "@/components/error-screen";
 import { ObservabilityLifecycle } from "@/components/observability-lifecycle";
 import { reportFatalError, toFatalRecord } from "@/lib/fatal-error";
 import {
+  capturePendingInvite,
+  takePendingInvite,
+} from "@/lib/pending-invite-link";
+import {
   capturePendingProfile,
   takePendingProfile,
 } from "@/lib/pending-profile-link";
@@ -96,23 +100,29 @@ const queryClient = new QueryClient({
 watchFriendAccessRevocation(queryClient);
 
 /**
- * 로그인 전에 도착한 프로필 딥링크를 기억했다가, 갈 수 있게 된 순간 보낸다.
+ * 로그인 전에 도착한 딥링크를 기억했다가, 갈 수 있게 된 순간 보낸다.
  *
- * 인증·온보딩·이름 설정이 모두 끝나기 전에는 `/u/{username}`이 라우트 트리에
- * 없어 목적지가 사라진다. 자세한 배경은 lib/pending-profile-link.ts에 있다.
+ * 인증·온보딩·이름 설정이 모두 끝나기 전에는 `/u/{username}`과 `/invite/{code}`가
+ * 라우트 트리에 없어 목적지가 사라진다. 자세한 배경은 lib/pending-profile-link.ts와
+ * lib/pending-invite-link.ts에 있다. 링크 종류를 갈라 담는 것은 그 모듈들의 몫이라
+ * 여기서는 도착한 주소를 둘 다에게 보여 주기만 한다.
  */
-function usePendingProfileLink(ready: boolean, canNavigate: boolean) {
+function usePendingDeepLink(ready: boolean, canNavigate: boolean) {
   const router = useRouter();
   useEffect(() => {
     // `ready`가 되기 전에는 인증 상태를 모르므로 판단을 미룬다. 그 전에 도착한
     // 링크도 getInitialURL로 다시 읽을 수 있어 놓치지 않는다.
     if (!ready) return;
     let cancelled = false;
+    const capture = (url: string) => {
+      capturePendingProfile(url);
+      capturePendingInvite(url);
+    };
     void Linking.getInitialURL().then((url) => {
-      if (!cancelled && url) capturePendingProfile(url);
+      if (!cancelled && url) capture(url);
     });
     const subscription = Linking.addEventListener("url", (event) => {
-      capturePendingProfile(event.url);
+      capture(event.url);
     });
     return () => {
       cancelled = true;
@@ -120,10 +130,18 @@ function usePendingProfileLink(ready: boolean, canNavigate: boolean) {
     };
   }, [ready]);
 
-  // 갈 수 있게 된 순간 한 번만 꺼낸다. `takePendingProfile`이 값을 비우므로
-  // 이 effect가 다시 돌아도 같은 곳으로 두 번 이동하지 않는다.
+  // 갈 수 있게 된 순간 한 번만 꺼낸다. take*가 값을 비우므로 이 effect가 다시
+  // 돌아도 같은 곳으로 두 번 이동하지 않는다.
+  //
+  // 초대를 먼저 본다. 둘 다 담겨 있는 경우는 사실상 없지만, 있다면 그룹 참여가
+  // 먼저다 — 프로필은 언제든 다시 열 수 있고 초대는 만료된다.
   useEffect(() => {
     if (!canNavigate) return;
+    const code = takePendingInvite();
+    if (code) {
+      router.push({ pathname: "/invite/[code]", params: { code } });
+      return;
+    }
     const username = takePendingProfile();
     if (username) {
       router.push({ pathname: "/u/[username]", params: { username } });
@@ -158,7 +176,7 @@ function RootNavigator() {
   const canBrowse = isAuthed && onboardingComplete && hasUsername;
 
   // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
-  usePendingProfileLink(ready, canBrowse);
+  usePendingDeepLink(ready, canBrowse);
 
   const sessionReady = ready && token !== undefined;
 
@@ -218,6 +236,20 @@ function RootNavigator() {
             options={{
               headerShown: true,
               title: "프로필",
+              headerBackTitle: "뒤로",
+              headerTransparent: process.env.EXPO_OS !== "web",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
+          {/* 초대 링크(`https://leave.moveto.kr/invite/…`, `leave://invite/…`)의
+            착지점. 프로필과 같은 이유로 탭 그룹 밖의 최상위 라우트다. */}
+          <Stack.Screen
+            name="invite/[code]"
+            options={{
+              headerShown: true,
+              title: "그룹 초대",
               headerBackTitle: "뒤로",
               headerTransparent: process.env.EXPO_OS !== "web",
               headerShadowVisible: false,

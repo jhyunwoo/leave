@@ -118,6 +118,11 @@ const InviteLandingPage = lazy(() =>
     default: m.InviteLandingPage,
   })),
 );
+const InviteJoinPage = lazy(() =>
+  import("./pages/InviteJoinPage").then((m) => ({
+    default: m.InviteJoinPage,
+  })),
+);
 const OnboardingPage = lazy(() =>
   import("./pages/OnboardingPage").then((m) => ({ default: m.OnboardingPage })),
 );
@@ -270,7 +275,11 @@ export function AppRoutes() {
           {/* 공개 안내 문서. 로그인 여부와 무관하게 같은 주소에서 열려야
               하므로 인증 분기 바깥에 둔다(색인 대상 페이지다). */}
           <Route path="/guide" element={<GuidePage />} />
+          {/* 초대 링크 두 형태 모두 인증 분기 바깥이다 — 로그아웃 상태로 열려야
+              한다. `/invite/:code`가 지금 발급되는 형태이고, `/invite`(+#코드)는
+              이미 뿌려진 옛 링크를 위해 남겨 둔다. */}
           <Route path="/invite" element={<InviteLandingPage />} />
+          <Route path="/invite/:code" element={<InviteJoinPage />} />
           <Route
             path="/login"
             element={isAuthed ? <AuthedRedirect /> : <LoginPage />}

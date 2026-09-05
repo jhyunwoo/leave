@@ -43,6 +43,11 @@ import {
 } from "@leave/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "../components/BrandLockup";
+import {
+  clearPendingInvite,
+  readPendingInvite,
+  rememberPendingInvite,
+} from "../state/pending-invite";
 import { DoneStep } from "./onboarding/DoneStep";
 import { GroupStep } from "./onboarding/GroupStep";
 import { OvernightStep } from "./onboarding/OvernightStep";
@@ -56,8 +61,6 @@ import {
 import { ServiceHero } from "./onboarding/ServiceHero";
 import { UsernameStep } from "./onboarding/UsernameStep";
 import "./onboarding.css";
-
-const PENDING_INVITE_KEY = "leave.pendingInvite";
 
 export function OnboardingPage(props: { status: OnboardingStatus }) {
   const initial = props.status.profile;
@@ -182,7 +185,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
   const finish = async () => {
     setError(null);
     try {
-      sessionStorage.removeItem(PENDING_INVITE_KEY);
+      clearPendingInvite();
       await complete.mutateAsync();
     } catch (caught) {
       setError(
@@ -326,7 +329,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
             />
           ) : step === "group" ? (
             <GroupStep
-              pendingCode={sessionStorage.getItem(PENDING_INVITE_KEY) ?? ""}
+              pendingCode={readPendingInvite()}
               inGroup={inGroup}
               onDone={(joined) => {
                 setInGroup(joined);
@@ -355,13 +358,17 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
 }
 
 /**
- * 초대 링크 착지점. 코드를 세션에 옮겨 담고 가입으로 보낸다.
+ * 옛 초대 링크(`/invite#코드`) 착지점. 코드를 세션에 옮겨 담고 가입으로 보낸다.
  * 주소창에 코드가 남으면 방문 기록·공유 링크로 새어나갈 수 있어 즉시 지운다.
+ *
+ * 지금 발급되는 링크는 `/invite/{코드}`이고 `InviteJoinPage`가 받는다.
+ * 이 화면은 이미 뿌려진 옛 링크가 죽지 않도록 남겨 둔다 — 프래그먼트는 서버로
+ * 가지 않으므로 이쪽 코드는 클라이언트에서만 읽을 수 있다.
  */
 export function InviteLandingPage() {
   useEffect(() => {
     const code = window.location.hash.slice(1);
-    if (code) sessionStorage.setItem(PENDING_INVITE_KEY, code);
+    if (code) rememberPendingInvite(code);
     window.history.replaceState(null, "", "/signup");
     window.location.replace("/signup");
   }, []);

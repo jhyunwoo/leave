@@ -9,7 +9,8 @@
  * 그 의도가 HTTP 응답 코드를 고르는 코드와 섞이면 읽다가 놓치기 쉽다.
  */
 
-import { and, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { normalizeInviteCode } from "@leave/shared";
+import { and, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { unitInvites, units, users } from "../db/schema";
 import { sha256Hex } from "./crypto";
 import type { Db } from "./db";
@@ -20,6 +21,19 @@ export type JoinFailure =
   | { ok: false; reason: "already-in-unit" };
 
 export type JoinResult = { ok: true; unitId: string } | JoinFailure;
+
+/**
+ * 이 입력이 가리킬 수 있는 코드 해시들.
+ *
+ * 새 형식(6자)은 정규화한 값으로 저장돼 있고, 아직 만료되지 않은 옛 32자
+ * base64url 코드는 대소문자를 구분하는 원문 그대로 저장돼 있다. 정규화가 옛
+ * 코드를 건드리지 않도록 만들어 두었지만(`normalizeInviteCode`), 두 값이 같아도
+ * 중복 없이 한 번의 `inArray` 조회로 끝나므로 왕복은 그대로 하나다.
+ */
+async function candidateHashes(code: string): Promise<string[]> {
+  const candidates = new Set([normalizeInviteCode(code), code.trim()]);
+  return Promise.all([...candidates].map(sha256Hex));
+}
 
 /**
  * 초대코드로 그룹에 즉시 편입한다.
@@ -41,7 +55,7 @@ export async function joinUnitByInviteCode(
   const invite = await db
     .select()
     .from(unitInvites)
-    .where(eq(unitInvites.codeHash, await sha256Hex(code)))
+    .where(inArray(unitInvites.codeHash, await candidateHashes(code)))
     .get();
   if (
     !invite ||

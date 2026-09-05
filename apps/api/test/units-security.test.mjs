@@ -80,12 +80,13 @@ test("그룹 표시명은 중복 가능하고 기준 인원 갱신 시각을 보
   assert.equal(first.data.unit.lastTotalUpdatedAt, lastTotalUpdatedAt);
 });
 
-test("고엔트로피 초대코드만 즉시 가입시키고 원문은 저장하지 않는다", async () => {
+test("초대코드는 사전 안의 6자이고 원문은 저장하지 않는다", async () => {
   const owner = await signup();
   const created = await createUnit(owner.token, { inviteMaxUses: 2 });
   assert.equal(created.status, 201);
   const { unit, invite } = created.data;
-  assert.match(invite.code, /^[A-Za-z0-9_-]{32,}$/);
+  // Crockford Base32 — I·L·O·U가 없어야 잘못 적은 글자를 되돌릴 수 있다.
+  assert.match(invite.code, /^[0-9A-HJKMNP-TV-Z]{6}$/);
   assert.equal(invite.usedCount, 0);
   assert.equal(invite.maxUses, 2);
 
