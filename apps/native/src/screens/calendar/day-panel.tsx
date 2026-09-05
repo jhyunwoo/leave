@@ -48,6 +48,14 @@ export function DayPanel(props: {
   personalEvents?: readonly PersonalEvent[];
   /** 개인 일정 줄을 눌러 그 일정으로 갈 수 있게 한다. */
   onOpenPersonalEvent?: (eventId: string) => void;
+  /**
+   * 개인 일정 목록 화면으로 간다.
+   *
+   * 예전에는 달력 툴바에 "개인 일정" 버튼이 있었는데, 툴바를 둘로 줄이면서
+   * 그 자리가 "일정 추가" 메뉴로 바뀌었다. 목록으로 가는 길이 여기 없으면
+   * 그룹에 속한 사용자는 자기 개인 일정 전체를 볼 방법이 사라진다.
+   */
+  onOpenPersonalEvents?: () => void;
   /** 부대 관리자라면 부대 일정 줄을 눌러 수정 화면으로 간다. */
   onOpenUnitEvent?: (eventId: string) => void;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
@@ -174,6 +182,13 @@ export function DayPanel(props: {
             title="이 날에 부대 일정 추가"
             variant="secondary"
             onPress={props.onAddUnitEvent}
+          />
+        ) : null}
+        {props.onOpenPersonalEvents ? (
+          <Button
+            title="개인 일정 전체 보기"
+            variant="ghost"
+            onPress={props.onOpenPersonalEvents}
           />
         ) : null}
       </View>

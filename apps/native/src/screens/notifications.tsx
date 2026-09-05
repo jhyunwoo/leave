@@ -22,6 +22,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  RefreshControl,
   Text,
   View,
 } from "react-native";
@@ -38,6 +39,7 @@ import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { notify } from "@/lib/dialog";
+import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 type Notification = NotificationList["notifications"][number];
@@ -47,6 +49,15 @@ export function NotificationsScreen() {
   const colors = useColors();
   const { sizeClass, isCompact } = useWindowSizeClass();
   const list = useNotifications();
+  const refresh = useRefresh(list);
+  // 열이 여럿인 레이아웃에서는 어디를 당겨도 되도록 각 열에 같은 컨트롤을 단다.
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refresh.refreshing}
+      onRefresh={refresh.onRefresh}
+      tintColor={colors.mute}
+    />
+  );
   const markRead = useMarkNotificationsRead();
   const del = useDeleteNotification();
   const myLeaves = useMyLeaves();
@@ -214,6 +225,7 @@ export function NotificationsScreen() {
           style={styles.root}
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
+          refreshControl={refreshControl}
         >
           {webHeader}
           {!latest ? (
@@ -293,6 +305,7 @@ export function NotificationsScreen() {
               <ScrollView
                 contentInsetAdjustmentBehavior="automatic"
                 contentContainerStyle={styles.columnContent}
+                refreshControl={refreshControl}
               >
                 {webHeader}
                 {!latest ? (

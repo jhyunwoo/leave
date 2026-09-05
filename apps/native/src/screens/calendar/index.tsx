@@ -101,6 +101,17 @@ const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
+/**
+ * 달력에서 시작할 수 있는 이동. 좁은 창에서는 넷 다 날짜 시트가 닫히기를 기다려야
+ * 하므로(iOS 단일 모달 규칙), 한 타입으로 묶어 대기·수행을 한 자리에서 다룬다.
+ */
+type CalendarIntent =
+  | { kind: "form"; date: ISODate }
+  | { kind: "leave"; leaveId: string }
+  | { kind: "personalEvent"; date: ISODate }
+  | { kind: "personalEvents" }
+  | { kind: "unitEvent"; date: ISODate };
+
 export function CalendarScreen() {
   const styles = useStyles();
   const colors = useColors();
@@ -115,15 +126,13 @@ export function CalendarScreen() {
   // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
   const [formDate, setFormDate] = useState<ISODate | null>(null);
   /**
-   * 시트가 닫히기를 기다리는 다음 행동. 아래 openForm 주석 참고.
+   * 시트가 닫히기를 기다리는 다음 행동. 아래 openAfterSheet 주석 참고.
    *
    * 폼과 상세를 각각 다른 ref에 두면 둘이 동시에 차 있을 수 있고, 그러면 onClosed가
    * 무엇을 해야 하는지가 "누가 먼저 지웠나"에 달린다. 한 값으로 두면 애초에 둘이
    * 동시에 존재할 수 없다 — 새 의도가 이전 의도를 덮어쓴다.
    */
-  const pendingAfterSheet = useRef<
-    { kind: "form"; date: ISODate } | { kind: "leave"; leaveId: string } | null
-  >(null);
+  const pendingAfterSheet = useRef<CalendarIntent | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
@@ -312,28 +321,56 @@ export function CalendarScreen() {
    * 넓은 창에는 시트가 아예 없으므로 선택을 지우지 않고 바로 연다 — 폼을 닫으면
    * 인스펙터가 고르던 날짜를 그대로 들고 있다.
    */
-  const openForm = (date: ISODate) => {
-    if (isCompact && selectedDate != null) {
-      // 시트가 닫혔다고 알려오는 onClosed에서 이어서 연다.
-      pendingAfterSheet.current = { kind: "form", date };
-      setSelectedDate(null);
-      return;
+  /** 의도를 실제로 수행한다. 시트가 닫힌 뒤에도 같은 함수가 다시 부른다. */
+  const runIntent = (intent: CalendarIntent) => {
+    switch (intent.kind) {
+      case "form":
+        setFormDate(intent.date);
+        return;
+      case "leave":
+        router.push({
+          pathname: "/leave/[leaveId]",
+          params: { leaveId: intent.leaveId },
+        });
+        return;
+      case "personalEvent":
+        router.push({
+          pathname: "/(tabs)/(calendar)/personal-event",
+          params: { date: intent.date },
+        });
+        return;
+      case "personalEvents":
+        router.push("/(tabs)/(calendar)/personal-events");
+        return;
+      case "unitEvent":
+        router.push({
+          pathname: "/(tabs)/(calendar)/unit-event",
+          params: { date: intent.date, month: intent.date.slice(0, 7) },
+        });
+        return;
     }
-    setFormDate(date);
   };
 
   /**
-   * 명단에서 고른 내 휴가의 상세로 간다. 좁은 창에서는 폼과 같은 이유로 시트를 먼저
-   * 닫는다 — 시트가 떠 있는 채로 화면을 밀면 시트가 새 화면 위에 그대로 남는다.
+   * 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 사라진 뒤에 수행한다.
+   *
+   * iOS는 모달을 하나만 띄운다 — 시트가 떠 있는 채로 다른 모달을 띄우거나 화면을
+   * 밀면, 새 화면 위에 시트가 그대로 남거나 화면이 굳는다. 여기 오는 네 가지
+   * 행동이 모두 같은 제약을 받으므로 한 문으로 모아 둔다.
    */
-  const openLeave = (leaveId: string) => {
+  const openAfterSheet = (intent: CalendarIntent) => {
     if (isCompact && selectedDate != null) {
-      pendingAfterSheet.current = { kind: "leave", leaveId };
+      // 시트가 닫혔다고 알려오는 onClosed에서 이어서 수행한다.
+      pendingAfterSheet.current = intent;
       setSelectedDate(null);
       return;
     }
-    router.push({ pathname: "/leave/[leaveId]", params: { leaveId } });
+    runIntent(intent);
   };
+
+  const openForm = (date: ISODate) => openAfterSheet({ kind: "form", date });
+  const openLeave = (leaveId: string) =>
+    openAfterSheet({ kind: "leave", leaveId });
 
   const selectDate = (date: ISODate) => {
     // 새 날짜를 고르면 대기 중이던 요청은 무효로 본다.
@@ -469,6 +506,9 @@ export function CalendarScreen() {
                     : undefined
                 }
                 personalEvents={panelPersonalEvents.data?.events}
+                onOpenPersonalEvents={() =>
+                  openAfterSheet({ kind: "personalEvents" })
+                }
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",
@@ -524,40 +564,62 @@ export function CalendarScreen() {
         style={styles.root}
       />
 
+      {/*
+        툴바에는 두 개만 둔다 — "오늘"과 "일정 추가".
+        예전에는 개인 일정·부대 일정·오늘·＋가 나란히 있었는데, 네 개가 되면
+        어느 것이 주 행동인지 사라지고 좁은 화면에서는 글자가 잘렸다.
+        추가할 수 있는 세 가지는 서로 배타적인 선택이므로 메뉴가 맞는 자리다.
+
+        `Stack.Toolbar.Menu`의 루트 아이콘은 안드로이드에서 SF Symbol이 조용히
+        버려진다. 그래서 아이콘 대신 라벨로 둔다 — 두 플랫폼에서 같은 것이 보인다.
+      */}
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          onPress={() => router.push("/(tabs)/(calendar)/personal-events")}
-        >
-          개인 일정
-        </Stack.Toolbar.Button>
-        {isUnitAdmin ? (
-          <Stack.Toolbar.Button
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/(calendar)/unit-event",
-                params: {
-                  date: selectedDate ?? today,
-                  month: (selectedDate ?? today).slice(0, 7),
-                },
-              })
-            }
-          >
-            부대 일정
-          </Stack.Toolbar.Button>
-        ) : null}
         <Stack.Toolbar.Button
           onPress={() => scrollRef.current?.scrollToToday()}
         >
           오늘
         </Stack.Toolbar.Button>
-        <Stack.Toolbar.Button
-          icon="plus"
+        <Stack.Toolbar.Menu
           variant="prominent"
           tintColor={colors.brand}
-          onPress={() => openForm(selectedDate ?? today)}
+          accessibilityLabel="일정 추가"
+          title="무엇을 추가할까요"
         >
-          휴가 등록
-        </Stack.Toolbar.Button>
+          <Stack.Toolbar.Label>일정 추가</Stack.Toolbar.Label>
+          <Stack.Toolbar.MenuAction
+            icon="calendar.badge.plus"
+            onPress={() =>
+              openAfterSheet({ kind: "form", date: selectedDate ?? today })
+            }
+          >
+            휴가
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="person.crop.circle.badge.plus"
+            onPress={() =>
+              openAfterSheet({
+                kind: "personalEvent",
+                date: selectedDate ?? today,
+              })
+            }
+          >
+            개인 일정
+          </Stack.Toolbar.MenuAction>
+          {/* 부대 일정은 예전과 같이 그룹 관리자에게만 보인다. */}
+          {isUnitAdmin ? (
+            <Stack.Toolbar.MenuAction
+              icon="building.2"
+              onPress={() =>
+                openAfterSheet({
+                  kind: "unitEvent",
+                  date: selectedDate ?? today,
+                })
+              }
+            >
+              부대 일정
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+        </Stack.Toolbar.Menu>
       </Stack.Toolbar>
 
       {/* 좁은 창의 선택 날짜 상세: SwiftUI / Material 네이티브 바텀시트 */}
@@ -576,19 +638,12 @@ export function CalendarScreen() {
           pendingAfterSheet.current = null;
           if (isCompact && !formDate) setSelectedDate(null);
         }}
-        // 시트가 화면에서 사라진 뒤. 이제 폼 모달을 띄워도 된다.
+        // 시트가 화면에서 사라진 뒤. 이제 모달을 띄우거나 화면을 밀어도 된다.
         onClosed={() => {
           const pending = pendingAfterSheet.current;
           if (!pending) return;
           pendingAfterSheet.current = null;
-          if (pending.kind === "form") {
-            setFormDate(pending.date);
-            return;
-          }
-          router.push({
-            pathname: "/leave/[leaveId]",
-            params: { leaveId: pending.leaveId },
-          });
+          runIntent(pending);
         }}
       >
         <SheetScaffold
@@ -638,6 +693,9 @@ export function CalendarScreen() {
                     : undefined
                 }
                 personalEvents={panelPersonalEvents.data?.events}
+                onOpenPersonalEvents={() =>
+                  openAfterSheet({ kind: "personalEvents" })
+                }
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",

@@ -23,6 +23,7 @@ export default function ProfileStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "프로필" }} />
+      <Stack.Screen name="edit" options={{ title: "내 정보" }} />
     </Stack>
   );
 }

@@ -24,6 +24,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  RefreshControl,
   Text,
   View,
 } from "react-native";
@@ -46,6 +47,7 @@ import { NextLeaveCard } from "@/components/next-leave-card";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
+import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 import { LeaveDetailContent } from "./leave-detail-content";
 
@@ -55,6 +57,15 @@ export function LeavesScreen() {
   const { sizeClass, isCompact, isExpanded } = useWindowSizeClass();
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
+  const refresh = useRefresh(leaves, balances);
+  // 열이 여럿인 레이아웃에서는 어디를 당겨도 되도록 각 열에 같은 컨트롤을 단다.
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refresh.refreshing}
+      onRefresh={refresh.onRefresh}
+      tintColor={colors.mute}
+    />
+  );
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
@@ -324,6 +335,7 @@ export function LeavesScreen() {
           style={styles.root}
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
+          refreshControl={refreshControl}
         >
           <WebHeader onCreate={() => setCreating(true)} />
           {balanceColumn}
@@ -345,6 +357,7 @@ export function LeavesScreen() {
                 contentInsetAdjustmentBehavior="automatic"
                 contentContainerStyle={styles.columnContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={refreshControl}
               >
                 <WebHeader onCreate={() => setCreating(true)} />
                 {balanceColumn}
@@ -355,6 +368,7 @@ export function LeavesScreen() {
               <ScrollView
                 contentInsetAdjustmentBehavior="automatic"
                 contentContainerStyle={styles.columnContent}
+                refreshControl={refreshControl}
               >
                 {leaveList}
               </ScrollView>

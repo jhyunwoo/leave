@@ -27,6 +27,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -36,6 +37,7 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
+import { useRefresh } from "@/lib/use-refresh";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function FriendsScreen() {
@@ -45,6 +47,7 @@ export function FriendsScreen() {
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
   const outgoing = useOutgoingFriendRequests();
+  const refresh = useRefresh(friends, incoming, outgoing);
   const accept = useAcceptFriendRequest();
   const decline = useDeclineFriendRequest();
   const remove = useRemoveFriend();
@@ -88,6 +91,13 @@ export function FriendsScreen() {
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refresh.refreshing}
+          onRefresh={refresh.onRefresh}
+          tintColor={colors.mute}
+        />
+      }
     >
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
