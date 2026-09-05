@@ -12,11 +12,13 @@
  */
 import {
   addDays,
+  appendDraft,
   balanceKeyToCategory,
   checkRegularOvernight,
   draftDaysByKey,
+  draftsEndDate,
   draftsToSegments,
-  fitDrafts,
+  fitDraftsToTotal,
   inclusiveDays,
   isCountedLeaveStatus,
   isRegularOvernightCycleBased,
@@ -25,11 +27,17 @@ import {
   recommendDateRanges,
   regularOvernightAvailableIn,
   regularOvernightBlockMessage,
+  removeDraft,
+  reorderDrafts,
   resolveDrafts,
   segmentBalanceKey,
   segmentsToDrafts,
+  setDraftDays,
+  totalDraftDays,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  MAX_DATE_RANGE_DAYS,
+  MAX_LEAVE_SEGMENTS,
   type BalanceKey,
   type LeaveCreateInput,
   type LeaveStatus,
@@ -102,19 +110,16 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const [startDate, setStartDate] = useState(
     editing?.startDate ?? fallbackDate,
   );
-  const [endDate, setEndDate] = useState(editing?.endDate ?? fallbackDate);
   // 새 계획의 기본은 "희망"(그룹에 공개). 초안은 나만 보고 집계·명단에서 빠진다.
   const [status, setStatus] = useState<LeaveStatus>(
     editing?.status ?? "shared",
   );
+  // 종료일은 상태가 아니라 개수의 합에서 나온다. 상태를 둘로 두면 어긋날 수 있고,
+  // 실제로 "기간을 바꾸면 구간을 다시 맞춘다"는 보정이 그것 때문에 필요했다.
   const [drafts, setDraftState] = useState<SegmentDraft[]>(() =>
     editing?.segments.length
       ? segmentsToDrafts(editing.segments)
-      : fitDrafts(
-          [],
-          editing?.startDate ?? fallbackDate,
-          editing?.endDate ?? fallbackDate,
-        ),
+      : [{ key: "annual", days: 1 }],
   );
   const [error, setError] = useState<string | null>(null);
   // 잔여 조회는 폼보다 늦게 끝날 수 있고, 취소 직후에는 이전 캐시가 먼저 보일 수도 있다.
@@ -128,8 +133,10 @@ export function useLeaveForm(options: LeaveFormOptions) {
   };
 
   const pending = create.isPending || update.isPending;
-  const validRange = Boolean(startDate && endDate && startDate <= endDate);
-  const duration = validRange ? inclusiveDays(startDate, endDate) : 0;
+  const duration = totalDraftDays(drafts);
+  // 시작일만 고르면 나머지는 전부 파생된다 — 종료일이 시작일보다 앞설 수 없다.
+  const validRange = Boolean(startDate) && duration > 0;
+  const endDate = validRange ? draftsEndDate(startDate, drafts) : "";
 
   /* --- 달력(혼잡도·추천의 근거) --------------------------------------- */
   // 추천은 선택 구간 밖 ±RECOMMENDATION_RADIUS_DAYS까지 살펴보므로, 그 범위가
@@ -280,14 +287,42 @@ export function useLeaveForm(options: LeaveFormOptions) {
     );
   }, [preferredBalanceKey]);
 
-  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
+  /**
+   * 달력에서 기간을 직접 고르면 총 일수를 그 길이에 맞춘다.
+   * 개수 ↔ 달력은 양방향이라야 "8/9까지"와 "8개"가 같은 말이 된다.
+   */
   const applyRange = (nextStart: string, nextEnd: string) => {
     setStartDate(nextStart);
-    setEndDate(nextEnd);
+    if (!nextStart || !nextEnd || nextEnd < nextStart) return;
     setDraftState((current) =>
-      fitDrafts(current, nextStart, nextEnd, preferredBalanceKey),
+      fitDraftsToTotal(
+        current,
+        inclusiveDays(nextStart, nextEnd),
+        preferredBalanceKey,
+      ),
     );
   };
+
+  /** 시작일만 옮긴다. 종류와 개수는 그대로 따라간다(추천 날짜가 쓴다). */
+  const moveToStart = (nextStart: string) => setStartDate(nextStart);
+
+  /* --- 구간 편집 (화면은 이 넷만 부른다) ------------------------------- */
+  const setDraftDaysAt = (index: number, days: number) =>
+    setDrafts((current) => setDraftDays(current, index, days));
+
+  const addDraft = (key: BalanceKey) =>
+    setDrafts((current) =>
+      current.length >= MAX_LEAVE_SEGMENTS
+        ? current
+        : appendDraft(current, key),
+    );
+
+  const removeDraftAt = (index: number) =>
+    setDrafts((current) => removeDraft(current, index));
+
+  /** 꾹 눌러 드래그한 결과. 개수는 그대로고 날짜만 다시 배치된다. */
+  const moveDraft = (from: number, to: number) =>
+    setDrafts((current) => reorderDrafts(current, from, to));
 
   // 폼이 이번에 정기외박으로 잡아둔 구간.
   const draftRegular = useMemo<SegmentLike[]>(
@@ -315,9 +350,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
 
   /** 폼에서 이미 배정한 몫까지 뺀 실제 남은 일수. */
   const availableByKey = useMemo(() => {
-    const used = validRange
-      ? draftDaysByKey(startDate, drafts)
-      : new Map<BalanceKey, number>();
+    const used = draftDaysByKey(drafts);
     const result = new Map(remainingByKey);
     for (const [key, days] of used) {
       result.set(key, (result.get(key) ?? 0) - days);
@@ -326,7 +359,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
     // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
     if (cycleBased) result.delete("regular_overnight");
     return result;
-  }, [remainingByKey, validRange, startDate, drafts, cycleBased]);
+  }, [remainingByKey, drafts, cycleBased]);
 
   /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
   const rowAvailable = (from: string, to: string): Map<BalanceKey, number> => {
@@ -357,24 +390,37 @@ export function useLeaveForm(options: LeaveFormOptions) {
   ].join(", ");
 
   const needsTitle = !options.deriveTitle;
-  /** 저장을 막는 이유. null이면 저장할 수 있다. */
-  const submitBlocker: string | null = !validRange
-    ? "시작일과 종료일을 확인해주세요."
+  /**
+   * 저장을 막는 이유. null이면 저장할 수 있다.
+   *
+   * 구간 수·총 기간 상한은 `leaveCreateSchema`가 거절하는 값과 같아야 한다.
+   * 개수 스테퍼로는 한 번에 한 칸씩 넘길 수 있어서, 서버까지 갔다가 400을 받는
+   * 대신 여기서 이유를 말한다.
+   */
+  const submitBlocker: string | null = !startDate
+    ? "휴가 시작일을 선택해주세요."
     : drafts.length === 0
       ? "휴가 종류를 선택해주세요."
-      : needsTitle && title.trim().length === 0
-        ? "휴가 제목을 입력해주세요."
-        : balanceBlockMessage || null;
+      : duration > MAX_DATE_RANGE_DAYS
+        ? `휴가는 최대 ${MAX_DATE_RANGE_DAYS}일까지 등록할 수 있어요.`
+        : drafts.length > MAX_LEAVE_SEGMENTS
+          ? `휴가 종류는 최대 ${MAX_LEAVE_SEGMENTS}개까지 이어 쓸 수 있어요.`
+          : needsTitle && title.trim().length === 0
+            ? "휴가 제목을 입력해주세요."
+            : balanceBlockMessage || null;
   const canSubmit = submitBlocker === null;
 
-  /* --- 구간 나누기 도우미 ---------------------------------------------- */
+  /* --- 종류 더하기 도우미 ---------------------------------------------- */
   const lastDraft = resolved[resolved.length - 1];
   /**
    * "다른 종류를 이어 쓰기"를 눌렀을 때 새 구간에 넣을 재원.
    * 잔여가 하루라도 남은 다른 재원이 없으면 버튼 자체를 숨긴다.
+   *
+   * 새 구간은 하루로 붙고 휴가가 그만큼 길어진다 — 예전처럼 마지막 구간을 반으로
+   * 쪼개지 않는다. 개수 모델에서는 총 기간이 파생값이라 나눌 이유가 없다.
    */
-  const suggestedSplitKey =
-    lastDraft && lastDraft.days > 1
+  const suggestedAddKey =
+    lastDraft && drafts.length < MAX_LEAVE_SEGMENTS
       ? (() => {
           const available = rowAvailable(
             lastDraft.startDate,
@@ -430,20 +476,34 @@ export function useLeaveForm(options: LeaveFormOptions) {
     status,
     setStatus,
     startDate,
+    /** 개수의 합에서 파생된 휴가 종료일. 고를 수 있는 값이 아니다. */
     endDate,
-    /** 시작·종료일을 함께 바꾼다. 구간이 자동으로 다시 맞춰진다. */
+    /** 달력에서 기간을 고르면 총 일수를 그 길이에 맞춘다. */
     applyRange,
+    /** 길이는 그대로 두고 시작일만 옮긴다. */
+    moveToStart,
     drafts,
     setDrafts,
-    /** 화면에 그릴 구간 목록(실제 날짜·일수가 채워진 상태). */
+    /** 화면에 그릴 구간 목록(실제 날짜가 채워진 상태). */
     resolved,
+    /** 구간 편집 — 화면은 이 넷만 부르면 된다. */
+    setDraftDays: setDraftDaysAt,
+    addDraft,
+    removeDraftAt,
+    moveDraft,
     duration,
     validRange,
     selectedSimulation,
     blackoutWarning,
+    /**
+     * 선택 기간 주변의 부대 일정. 날짜를 고르는 달력이 그린다 — 검열·훈련·행사를
+     * 확인하러 달력 화면으로 나갔다 오게 만들지 않기 위한 것이다. 혼잡도 계산이
+     * 이미 같은 달들을 받아 두므로 추가 요청은 없다.
+     */
+    unitEvents: calendar.events,
     recommendations,
     rowAvailable,
-    suggestedSplitKey,
+    suggestedAddKey,
     balanceBlockMessage,
     submitBlocker,
     canSubmit,

@@ -102,7 +102,7 @@ async function renderForm(
   const view = renderHook(() => useLeaveForm({ initialDate }), { wrapper });
   await waitFor(() =>
     expect(view.result.current.submitBlocker).not.toBe(
-      "시작일과 종료일을 확인해주세요.",
+      "휴가 시작일을 선택해주세요.",
     ),
   );
   return view;
@@ -305,6 +305,96 @@ describe("기간 변경", () => {
     expect(resolved[0]?.startDate).toBe("2026-09-01");
     expect(resolved[resolved.length - 1]?.endDate).toBe("2026-09-04");
     expect(resolved.reduce((sum, draft) => sum + draft.days, 0)).toBe(4);
+  });
+});
+
+describe("종류별 개수", () => {
+  it("개수를 올리면 종료일이 따라 늘어난다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    // "연가 4개" = 9/1~9/4. 종료일을 고르는 것이 아니라 개수에서 나온다.
+    act(() => result.current.setDraftDays(0, 4));
+
+    await waitFor(() => expect(result.current.duration).toBe(4));
+    expect(result.current.endDate).toBe("2026-09-04");
+    expect(result.current.resolved).toMatchObject([
+      { key: "annual", days: 4, startDate: "2026-09-01" },
+    ]);
+  });
+
+  it("종류를 더하면 하루가 붙고 휴가가 그만큼 길어진다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDraftDays(0, 4));
+    act(() => result.current.addDraft("award"));
+
+    await waitFor(() => expect(result.current.duration).toBe(5));
+    expect(result.current.endDate).toBe("2026-09-05");
+    expect(result.current.resolved).toMatchObject([
+      { key: "annual", startDate: "2026-09-01", endDate: "2026-09-04" },
+      { key: "award", startDate: "2026-09-05", endDate: "2026-09-05" },
+    ]);
+  });
+
+  it("순서를 바꾸면 총 기간은 그대로고 날짜만 다시 배치된다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDraftDays(0, 3));
+    act(() => result.current.addDraft("award"));
+    await waitFor(() => expect(result.current.duration).toBe(4));
+
+    act(() => result.current.moveDraft(1, 0));
+
+    await waitFor(() =>
+      expect(result.current.resolved).toMatchObject([
+        { key: "award", startDate: "2026-09-01", endDate: "2026-09-01" },
+        { key: "annual", startDate: "2026-09-02", endDate: "2026-09-04" },
+      ]),
+    );
+    expect(result.current.duration).toBe(4);
+  });
+
+  it("구간을 지우면 그 개수만큼 휴가가 짧아진다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDraftDays(0, 3));
+    act(() => result.current.addDraft("award"));
+    await waitFor(() => expect(result.current.duration).toBe(4));
+
+    act(() => result.current.removeDraftAt(0));
+
+    await waitFor(() => expect(result.current.duration).toBe(1));
+    expect(result.current.resolved).toMatchObject([{ key: "award", days: 1 }]);
+  });
+
+  it("달력에서 기간을 좁히면 넘치는 뒤 구간이 떨어져 나간다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDraftDays(0, 3));
+    act(() => result.current.addDraft("award"));
+    await waitFor(() => expect(result.current.duration).toBe(4));
+
+    act(() => result.current.applyRange("2026-09-01", "2026-09-02"));
+
+    await waitFor(() => expect(result.current.duration).toBe(2));
+    expect(result.current.resolved).toMatchObject([{ key: "annual", days: 2 }]);
+  });
+
+  it("366일을 넘기면 저장을 막는다 — 서버가 거절하는 값과 같은 상한이다", async () => {
+    const { wrapper } = setup();
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDraftDays(0, 367));
+
+    await waitFor(() =>
+      expect(result.current.submitBlocker).toContain("366일"),
+    );
+    expect(result.current.canSubmit).toBe(false);
   });
 });
 

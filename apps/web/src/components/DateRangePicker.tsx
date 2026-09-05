@@ -171,6 +171,14 @@ export function DateRangePicker(props: {
   startDate: string;
   endDate: string;
   onChange: (startDate: string, endDate: string) => void;
+  /**
+   * 시작일만 옮겼을 때 부를 것. 주면 시작일 선택이 종료일을 건드리지 않는다.
+   *
+   * 휴가 폼이 이걸 준다 — 거기서는 길이를 종류별 개수가 정하므로, 시작일을
+   * 옮기는 것은 휴가를 통째로 미는 일이지 기간을 다시 그리는 일이 아니다.
+   * 주지 않으면 기존대로 종료일을 함께 보정한다(제한 기간 등록).
+   */
+  onChangeStart?: (startDate: string) => void;
   testId?: string;
 }) {
   const [active, setActive] = useState<"start" | "end" | null>(null);
@@ -270,6 +278,13 @@ export function DateRangePicker(props: {
           onChangeMonth={setMonth}
           onSelect={(date) => {
             if (active === "start") {
+              if (props.onChangeStart) {
+                // 길이가 이미 정해져 있으므로 고를 것이 남지 않는다.
+                props.onChangeStart(date);
+                setMonth(date.slice(0, 7));
+                setActive(null);
+                return;
+              }
               // 시작일이 종료일을 넘어서면 종료일을 함께 끌고 간다.
               const nextEnd =
                 !props.endDate || props.endDate < date ? date : props.endDate;

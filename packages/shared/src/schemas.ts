@@ -12,10 +12,12 @@
 
 import { z } from "zod";
 import { addDays, diffDays, isValidISODate } from "./dates";
+import { isAcceptableInviteCode, normalizeInviteCode } from "./invite-code";
 import {
   BALANCE_KEYS,
   LEAVE_CATEGORIES,
   LEAVE_STATUSES,
+  MAX_LEAVE_SEGMENTS,
   OVERNIGHT_KINDS,
   sortSegments,
   USER_EDITABLE_LEAVE_STATUSES,
@@ -213,9 +215,23 @@ export const unitUpdateSchema = z.object({
   lastTotalUpdatedAt: inviteExpiresAtSchema.nullable().optional(),
 });
 
-/** 초대코드는 검색 가능한 그룹 식별자 대신 사용하는 고엔트로피 비밀값이다. */
+/**
+ * 초대코드는 검색 가능한 그룹 식별자 대신 사용하는 비밀값이다.
+ *
+ * 사용자가 친 값을 먼저 정규형으로 접는다 — 대소문자·공백·하이픈과 사람이 흔히
+ * 헷갈리는 글자(O/0, I·L/1, U/V)를 여기서 흡수해야, 받아 적은 코드가 한 글자
+ * 때문에 거절되지 않는다. 규칙은 `invite-code.ts` 한 곳에 있다.
+ *
+ * 아직 만료되지 않은 옛 32자 코드도 받는다.
+ */
 export const unitJoinSchema = z.object({
-  code: z.string().trim().min(32, "올바른 초대코드를 입력해주세요").max(200),
+  code: z
+    .string()
+    .trim()
+    .min(1, "초대코드를 입력해주세요")
+    .max(200)
+    .transform(normalizeInviteCode)
+    .refine(isAcceptableInviteCode, "올바른 초대코드를 입력해주세요"),
 });
 
 /** 관리자가 현재 코드를 폐기하고 새 코드를 발급할 때 지정하는 제한. */
@@ -287,7 +303,7 @@ export const leaveCreateSchema = z
     segments: z
       .array(leaveSegmentSchema)
       .min(1, "휴가 구간을 하나 이상 입력해주세요")
-      .max(30),
+      .max(MAX_LEAVE_SEGMENTS),
   })
   .superRefine((value, ctx) => {
     const sorted = sortSegments(value.segments);
@@ -646,6 +662,8 @@ export const notificationPrefsSchema = z.object({
   overage: z.boolean().optional(),
   blackout: z.boolean().optional(),
   unitNotice: z.boolean().optional(),
+  friendRequest: z.boolean().optional(),
+  friendLeave: z.boolean().optional(),
 });
 
 export const leaveStatusSchema = z.enum(LEAVE_STATUSES);

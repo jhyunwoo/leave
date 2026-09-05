@@ -19,6 +19,7 @@
 import { addDays, rangesOverlap, type ISODate } from "./dates";
 import {
   inclusiveDays,
+  MAX_LEAVE_SEGMENTS,
   segmentBalanceKey,
   segmentsRange,
   sortSegments,
@@ -27,8 +28,6 @@ import {
 } from "./leave";
 import { isDerivedTitle, titleFromSegments } from "./leave-title";
 
-/** `leaveCreateSchema`의 상한과 같아야 한다 — 넘기면 저장 자체가 거절된다. */
-export const MAX_LEAVE_SEGMENTS = 30;
 export const MAX_LEAVE_REASON = 500;
 
 /** 병합 판정에 필요한 만큼의 휴가 한 건. 서버가 DB 행에서 만들어 넘긴다. */

@@ -70,6 +70,15 @@ export function SheetScaffold(props: {
    * 같은 여백을 잡으므로 본문에는 더하지 않는다.
    */
   extendsUnderBottomInset?: boolean;
+  /**
+   * 본문 스크롤 허용 여부. 기본은 허용이다.
+   *
+   * 본문 안에서 꾹 눌러 드래그하는 목록(휴가 종류 순서 바꾸기)이 있을 때 끈다.
+   * RNGH의 팬이 활성화되면 스크롤이 취소되긴 하지만, 그 사이 한두 프레임 동안
+   * 목록과 시트가 같이 움직인다. 달력 탭도 같은 이유로 드래그 중 FlatList
+   * 스크롤을 끈다(`calendar-scroll.tsx`).
+   */
+  scrollEnabled?: boolean;
 }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -115,6 +124,7 @@ export function SheetScaffold(props: {
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        scrollEnabled={props.scrollEnabled ?? true}
       >
         {props.children}
       </ScrollView>

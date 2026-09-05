@@ -177,11 +177,36 @@ describe("unitCreateSchema", () => {
 });
 
 describe("unitJoinSchema / unitInviteCreateSchema", () => {
-  it("짧은 추측 가능 코드는 거부한다", () => {
-    expect(unitJoinSchema.safeParse({ code: "123456" }).success).toBe(false);
-    expect(unitJoinSchema.safeParse({ code: "A".repeat(32) }).success).toBe(
-      true,
+  it("6자 코드를 정규형으로 접어서 받는다", () => {
+    // 받아 적은 값은 대소문자·공백·혼동 글자가 섞여 온다. 그 흡수는 검증이 아니라
+    // 정규화의 몫이고, 저장·조회는 언제나 접힌 값으로 이뤄진다.
+    const parsed = unitJoinSchema.safeParse({ code: " a2-c4 d5 " });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.code).toBe("A2C4D5");
+
+    expect(
+      unitJoinSchema.safeParse({ code: "oil23u" }).success &&
+        unitJoinSchema.parse({ code: "oil23u" }).code,
+    ).toBe("01123V");
+  });
+
+  it("형식에 맞지 않는 값은 거부한다", () => {
+    expect(unitJoinSchema.safeParse({ code: "" }).success).toBe(false);
+    expect(unitJoinSchema.safeParse({ code: "A2C4D" }).success).toBe(false);
+    expect(unitJoinSchema.safeParse({ code: "A2C4D5X" }).success).toBe(false);
+    expect(unitJoinSchema.safeParse({ code: "A".repeat(201) }).success).toBe(
+      false,
     );
+  });
+
+  it("아직 만료되지 않은 옛 32자 코드도 그대로 받는다", () => {
+    const legacy = "abcDEF-123_ghiJKL456mnoPQR789st";
+    expect(unitJoinSchema.safeParse({ code: legacy }).success).toBe(false);
+    const valid = `${legacy}u`;
+    const parsed = unitJoinSchema.safeParse({ code: valid });
+    expect(parsed.success).toBe(true);
+    // 옛 코드는 대소문자를 구분한다 — 접으면 이미 나눠 준 초대가 전부 죽는다.
+    expect(parsed.success && parsed.data.code).toBe(valid);
   });
 
   it("재발급 제한은 양의 사용 횟수와 ISO 시각만 받는다", () => {

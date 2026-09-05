@@ -40,6 +40,17 @@ function selectionFeedback() {
   if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
 }
 
+/**
+ * 이 달력이 표시할 부대 일정. 달력 응답의 `events`를 그대로 받는다.
+ * 필요한 필드만 좁혀 두면 휴가 폼이 아닌 곳(제한 기간)에서 빈 배열로 둘 수 있다.
+ */
+export type CalendarDayEvent = {
+  id: string;
+  title: string;
+  startDate: ISODate;
+  endDate: ISODate;
+};
+
 function CalendarPanel(props: {
   month: string;
   value: ISODate | "";
@@ -48,6 +59,12 @@ function CalendarPanel(props: {
   rangeStart?: ISODate | "";
   rangeEnd?: ISODate | "";
   instruction?: string;
+  /**
+   * 이 기간에 걸친 부대 일정. 휴가를 잡는 자리에서 검열·훈련·행사를 확인하러
+   * 달력 탭으로 나갔다 오게 만들지 않기 위한 것이다 — 공휴일을 여기 그리는 것과
+   * 같은 이유다.
+   */
+  unitEvents?: readonly CalendarDayEvent[];
   onChangeMonth: (month: string) => void;
   onSelect: (date: ISODate) => void;
   testID?: string;
@@ -142,13 +159,25 @@ function CalendarPanel(props: {
             // 달력 탭과 같은 규칙 — 주말과 공휴일을 한 가지 "빨간 날"로 묶는다.
             const red =
               cell.inMonth && (isWeekend(cell.date) || holiday != null);
+            // 표기 규칙도 달력 탭(month-calendar.tsx)과 같다: 첫 제목 + 나머지 개수.
+            const dayEvents = cell.inMonth
+              ? (props.unitEvents ?? []).filter(
+                  (event) =>
+                    event.startDate <= cell.date && cell.date <= event.endDate,
+                )
+              : [];
+            const eventLabel = dayEvents.length
+              ? `${dayEvents[0]!.title}${dayEvents.length > 1 ? ` +${dayEvents.length - 1}` : ""}`
+              : null;
+            // 한 줄뿐이라 공휴일과 부대 일정이 겹치면 둘을 이어 붙인다.
+            const noteLabel = [holiday, eventLabel].filter(Boolean).join(" · ");
 
             return (
               <Pressable
                 key={cell.date}
                 accessible={cell.inMonth}
                 accessibilityRole="button"
-                accessibilityLabel={`${fmtDateK(cell.date)}${holiday ? `, ${holiday}` : ""}${isToday ? ", 오늘" : ""}`}
+                accessibilityLabel={`${fmtDateK(cell.date)}${holiday ? `, ${holiday}` : ""}${eventLabel ? `, ${eventLabel}` : ""}${isToday ? ", 오늘" : ""}`}
                 accessibilityState={{
                   disabled,
                   selected: selected || rangeEdge,
@@ -182,18 +211,20 @@ function CalendarPanel(props: {
                 >
                   {Number(cell.date.slice(8))}
                 </Text>
-                {/* 공휴일이 없는 날도 빈 줄로 자리를 남긴다 — 이름 있는 날만 키우면
+                {/* 적을 것이 없는 날도 빈 줄로 자리를 남긴다 — 이름 있는 날만 키우면
                     그 주만 날짜 숫자가 위로 밀려 한 줄 안에서 높이가 어긋난다. */}
                 <Text
                   style={[
                     styles.dayHoliday,
+                    // 부대 일정만 있는 날은 빨간 날이 아니다. 공휴일 색과 구분한다.
+                    !holiday && eventLabel ? styles.dayEvent : null,
                     disabled && cell.inMonth && styles.dayDisabled,
                     (selected || rangeEdge) && styles.dayHolidaySelected,
                   ]}
                   numberOfLines={1}
                   ellipsizeMode="clip"
                 >
-                  {holiday ?? ""}
+                  {noteLabel}
                 </Text>
               </Pressable>
             );
@@ -281,6 +312,16 @@ export function DateRangePicker(props: {
   startDate: ISODate | "";
   endDate: ISODate | "";
   onChange: (startDate: ISODate, endDate: ISODate) => void;
+  /**
+   * 시작일만 옮겼을 때 부를 것. 주면 시작일 선택이 종료일을 건드리지 않는다.
+   *
+   * 휴가 폼이 이걸 준다 — 거기서는 길이를 종류별 개수가 정하므로, 시작일을
+   * 옮기는 것은 휴가를 통째로 미는 일이지 기간을 다시 그리는 일이 아니다.
+   * 주지 않으면 기존대로 종료일을 함께 보정한다(제한 기간 등록).
+   */
+  onChangeStart?: (startDate: ISODate) => void;
+  /** 달력에 함께 표시할 부대 일정. 없으면 공휴일만 그린다. */
+  unitEvents?: readonly CalendarDayEvent[];
   testID?: string;
 }) {
   const styles = useStyles();
@@ -394,6 +435,7 @@ export function DateRangePicker(props: {
           min={active === "end" ? props.startDate || undefined : undefined}
           rangeStart={props.startDate}
           rangeEnd={props.endDate}
+          unitEvents={props.unitEvents}
           instruction={
             active === "start"
               ? "휴가가 시작하는 날을 선택해주세요."
@@ -402,6 +444,13 @@ export function DateRangePicker(props: {
           onChangeMonth={setMonth}
           onSelect={(date) => {
             if (active === "start") {
+              if (props.onChangeStart) {
+                // 길이가 이미 정해져 있으므로 고를 것이 남지 않는다.
+                props.onChangeStart(date);
+                setMonth(date.slice(0, 7));
+                setActive(null);
+                return;
+              }
               const nextEnd =
                 !props.endDate || props.endDate < date ? date : props.endDate;
               props.onChange(date, nextEnd);
@@ -592,5 +641,7 @@ const useStyles = makeStyles(({ colors }) => ({
     textAlign: "center",
     color: colors.negative,
   },
+  // 부대 일정만 있는 날. 쉬는 날이 아니므로 빨강을 쓰지 않는다.
+  dayEvent: { color: colors.body },
   dayHolidaySelected: { color: colors.onPrimary },
 }));

@@ -14,9 +14,12 @@
  */
 
 import {
-  fitDrafts,
+  draftsEndDate,
+  fitDraftsToTotal,
+  inclusiveDays,
   resolveDrafts,
   segmentsToDrafts,
+  totalDraftDays,
   type LeaveSegment,
   type SegmentDraft,
 } from "@leave/shared";
@@ -76,32 +79,30 @@ export function RecordForm({
   const [leaveStart, setLeaveStart] = useState(() =>
     initialString(initial, "startDate"),
   );
-  const [leaveEnd, setLeaveEnd] = useState(() =>
-    initialString(initial, "endDate"),
-  );
   const [drafts, setDrafts] = useState<SegmentDraft[]>(() => {
     const segments = initialSegments(initial);
-    return segments.length
-      ? segmentsToDrafts(segments)
-      : fitDrafts(
-          [],
-          initialString(initial, "startDate"),
-          initialString(initial, "endDate"),
-        );
+    if (segments.length) return segmentsToDrafts(segments);
+    const start = initialString(initial, "startDate");
+    const end = initialString(initial, "endDate");
+    return start && end && start <= end
+      ? fitDraftsToTotal([], inclusiveDays(start, end))
+      : [{ key: "annual", days: 1 }];
   });
 
-  const leaveRangeValid = Boolean(
-    leaveStart && leaveEnd && leaveStart <= leaveEnd,
-  );
+  // 종료일은 구간 개수의 합에서 나온다 — 앱·웹과 같은 모델이다.
+  const leaveRangeValid = Boolean(leaveStart) && totalDraftDays(drafts) > 0;
+  const leaveEnd = leaveRangeValid ? draftsEndDate(leaveStart, drafts) : "";
   const resolvedDrafts = leaveRangeValid
     ? resolveDrafts(leaveStart, drafts)
     : [];
 
-  /** 기간이 바뀌면 구간을 다시 맞춰 항상 전체를 덮게 한다. */
+  /** 달력에서 기간을 직접 고르면 총 일수를 그 길이에 맞춘다. */
   const applyLeaveRange = (nextStart: string, nextEnd: string) => {
     setLeaveStart(nextStart);
-    setLeaveEnd(nextEnd);
-    setDrafts((current) => fitDrafts(current, nextStart, nextEnd));
+    if (!nextStart || !nextEnd || nextEnd < nextStart) return;
+    setDrafts((current) =>
+      fitDraftsToTotal(current, inclusiveDays(nextStart, nextEnd)),
+    );
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {

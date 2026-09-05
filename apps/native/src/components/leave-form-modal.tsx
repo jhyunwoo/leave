@@ -23,15 +23,11 @@
  */
 import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
-  addDays,
   fmtDateShort,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
   isDerivedTitle,
   LEAVE_STATUS_LABELS,
-  removeDraft,
-  setDraftEnd,
-  splitLastDraft,
   titleFromDrafts,
   todayInSeoul,
   USER_EDITABLE_LEAVE_STATUSES,
@@ -47,6 +43,7 @@ import { DateRangePicker } from "./date-picker";
 import { Field, Input } from "./field";
 import { FormSheet } from "./form-sheet";
 import { OfficialDisclaimer } from "./official-disclaimer";
+import { SegmentReorderList } from "./segment-reorder-list";
 import { SegmentRow } from "./segment-row";
 import { NativeSegmentedControl } from "./segmented-control";
 import { SheetScaffold } from "./sheet-scaffold";
@@ -72,6 +69,8 @@ export function LeaveFormModal(props: {
 }) {
   const styles = useStyles();
   const sheet = useMeasuredSizeClass();
+  // 구간을 끌고 있는 동안에는 시트 본문이 같이 스크롤되면 안 된다.
+  const [reordering, setReordering] = useState(false);
   // 이미 손으로 지은 이름을 가진 휴가(웹에서 만든 것 등)는 처음부터 직접 입력으로 연다.
   const [renamed, setRenamed] = useState(
     () => !!props.editing && !isDerivedTitle(props.editing.title),
@@ -117,6 +116,7 @@ export function LeaveFormModal(props: {
           title={editing ? "휴가 수정" : "휴가 등록"}
           onClose={props.onClose}
           closeTestID="leave-form-close"
+          scrollEnabled={!reordering}
           // 두 열을 펴려면 폼 한 벌 기준(560)보다는 넓어야 한다.
           contentMaxWidth={layout.readableContent}
           footer={
@@ -185,6 +185,8 @@ export function LeaveFormModal(props: {
             startDate={startDate}
             endDate={endDate}
             onChange={form.applyRange}
+            onChangeStart={form.moveToStart}
+            unitEvents={form.unitEvents}
             testID="leave-date-range"
           />
 
@@ -256,8 +258,8 @@ export function LeaveFormModal(props: {
                   휴가 종류
                 </Text>
                 <Text style={styles.segmentHint} selectable>
-                  기본은 기간 전체에 한 종류를 사용해요. 여러 종류를 이어서
-                  사용한다면 구간을 나눌 수 있어요.
+                  종류마다 며칠 쓸지 고르면 날짜가 자동으로 정해져요. 순서를
+                  바꾸려면 길게 눌러 끌어주세요.
                 </Text>
               </View>
               <Text style={styles.segmentTotal} selectable>
@@ -266,75 +268,46 @@ export function LeaveFormModal(props: {
             </View>
 
             {validRange ? (
-              resolved.map((draft, index) => (
-                <SegmentRow
-                  key={index}
-                  draft={draft}
-                  isLast={index === resolved.length - 1}
-                  removable={resolved.length > 1}
-                  // 뒤에 남은 구간 수만큼 최소 하루씩 남겨둬야 한다.
-                  maxEnd={addDays(endDate, -(resolved.length - 1 - index))}
-                  remainingByKey={form.rowAvailable(
-                    draft.startDate,
-                    draft.endDate,
-                  )}
-                  onChangeKey={(key) =>
-                    form.setDrafts((current) =>
-                      current.map((item, i) =>
-                        i === index ? { ...item, key } : item,
-                      ),
-                    )
-                  }
-                  onChangeEnd={(date) =>
-                    form.setDrafts((current) =>
-                      setDraftEnd(current, index, date, startDate, endDate),
-                    )
-                  }
-                  onRemove={() =>
-                    form.setDrafts((current) =>
-                      removeDraft(current, index, startDate, endDate),
-                    )
-                  }
-                />
-              ))
+              <SegmentReorderList
+                onReorder={form.moveDraft}
+                onDragActiveChange={setReordering}
+                testID="segment-list"
+                items={resolved.map((draft, index) => (
+                  <SegmentRow
+                    key={index}
+                    draft={draft}
+                    removable={resolved.length > 1}
+                    remainingByKey={form.rowAvailable(
+                      draft.startDate,
+                      draft.endDate,
+                    )}
+                    onChangeKey={(key) =>
+                      form.setDrafts((current) =>
+                        current.map((item, i) =>
+                          i === index ? { ...item, key } : item,
+                        ),
+                      )
+                    }
+                    onChangeDays={(days) => form.setDraftDays(index, days)}
+                    onRemove={() => form.removeDraftAt(index)}
+                  />
+                ))}
+              />
             ) : (
-              <Text style={styles.segmentHint}>
-                시작일과 종료일을 먼저 골라주세요.
-              </Text>
+              <Text style={styles.segmentHint}>시작일을 먼저 골라주세요.</Text>
             )}
 
-            {validRange &&
-            duration > form.drafts.length &&
-            form.suggestedSplitKey ? (
+            {validRange && form.suggestedAddKey ? (
               <View style={styles.splitActions}>
                 <Button
                   title="다른 휴가 종류 이어 쓰기"
                   variant="secondary"
                   size="sm"
-                  onPress={() =>
-                    form.setDrafts((current) => {
-                      const next = splitLastDraft(
-                        current,
-                        startDate,
-                        endDate,
-                        form.suggestedSplitKey!,
-                      );
-                      // 새 종류는 1일부터 시작한다. 잔여가 적어도 추가할 수 있고,
-                      // 사용자는 앞 구간의 마지막 날을 바꿔 원하는 만큼 늘릴 수 있다.
-                      return next
-                        ? setDraftEnd(
-                            next,
-                            next.length - 2,
-                            addDays(endDate, -1),
-                            startDate,
-                            endDate,
-                          )
-                        : current;
-                    })
-                  }
+                  onPress={() => form.addDraft(form.suggestedAddKey!)}
+                  testID="leave-add-segment"
                 />
                 <Text style={styles.splitHint} selectable>
-                  추가한 뒤 각 종류의 마지막 날을 조정할 수 있어요.
+                  하루로 붙어요. 추가한 뒤 개수를 조정하세요.
                 </Text>
               </View>
             ) : null}

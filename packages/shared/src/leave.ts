@@ -142,6 +142,15 @@ export type LeaveSegment = {
   days: number;
 };
 
+/**
+ * 휴가 하나에 담을 수 있는 구간 수.
+ *
+ * 세 곳이 같은 수를 알아야 한다 — `leaveCreateSchema`가 거절하고, 폼이 "종류 더하기"를
+ * 여기서 멈추고(서버에서 400을 받고 나서야 알게 되는 상한이면 안 된다),
+ * 병합(`leave-merge.ts`)이 이 수를 넘기면 합치기를 포기한다. 그래서 낱개로 적지 않는다.
+ */
+export const MAX_LEAVE_SEGMENTS = 30;
+
 export function segmentBalanceKey(
   segment: Pick<LeaveSegment, "category" | "overnightKind">,
 ): BalanceKey {

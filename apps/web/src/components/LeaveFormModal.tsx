@@ -9,16 +9,13 @@
  */
 import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
-  addDays,
   BALANCE_KEYS,
   BALANCE_LABELS,
   fmtDateShort,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
   LEAVE_STATUS_LABELS,
-  removeDraft,
-  setDraftEnd,
-  splitLastDraft,
+  MAX_DATE_RANGE_DAYS,
   type BalanceKey,
   type LeaveStatus,
 } from "@leave/shared";
@@ -105,6 +102,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
           startDate={startDate}
           endDate={endDate}
           onChange={form.applyRange}
+          onChangeStart={form.moveToStart}
           testId="leave-date-range"
         />
 
@@ -189,7 +187,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
             <div>
               <p className="body-sm strong">휴가 구간</p>
               <p className="caption text-mute">
-                언제부터 언제까지가 어떤 휴가인지 나눠서 지정하세요.
+                종류마다 며칠 쓸지 고르면 날짜가 자동으로 정해져요.
               </p>
             </div>
             <p className="body-sm strong" style={{ whiteSpace: "nowrap" }}>
@@ -200,9 +198,6 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
           {validRange ? (
             <div style={{ display: "grid", gap: "var(--sp-sm)" }}>
               {resolved.map((draft, index) => {
-                const isLast = index === resolved.length - 1;
-                // 뒤에 남은 구간 수만큼 최소 하루씩 남겨둬야 한다.
-                const maxEnd = addDays(endDate, -(resolved.length - 1 - index));
                 const available = form.rowAvailable(
                   draft.startDate,
                   draft.endDate,
@@ -213,7 +208,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                     style={{
                       display: "grid",
                       gridTemplateColumns:
-                        "minmax(0, 1fr) minmax(0, 1fr) auto auto",
+                        "minmax(0, 1fr) auto minmax(0, 1fr) auto auto",
                       alignItems: "center",
                       gap: "var(--sp-sm)",
                     }}
@@ -243,39 +238,47 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                       ))}
                     </select>
 
-                    {/* 마지막 구간의 종료일은 전체 종료일에 묶여 있어 고칠 수 없다. */}
-                    {isLast ? (
-                      <span className="caption text-mute">
-                        {fmtDateShort(draft.startDate)} –{" "}
-                        {fmtDateShort(draft.endDate)}
-                      </span>
-                    ) : (
-                      <input
-                        className="input"
-                        type="date"
-                        value={draft.endDate}
-                        min={draft.startDate}
-                        max={maxEnd}
-                        aria-label={`${index + 1}번째 구간 종료일`}
-                        onChange={(event) =>
-                          form.setDrafts((current) =>
-                            setDraftEnd(
-                              current,
-                              index,
-                              event.target.value,
-                              startDate,
-                              endDate,
-                            ),
-                          )
-                        }
-                      />
-                    )}
+                    {/* 날짜가 아니라 개수를 고른다. 시작·종료일은 여기서 파생된다. */}
+                    <input
+                      className="input"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_DATE_RANGE_DAYS}
+                      step={1}
+                      value={draft.days}
+                      style={{ width: "5.5rem" }}
+                      aria-label={`${index + 1}번째 구간 사용 일수`}
+                      onChange={(event) =>
+                        form.setDraftDays(index, Number(event.target.value))
+                      }
+                    />
 
-                    <span
-                      className="body-sm strong"
-                      style={{ whiteSpace: "nowrap" }}
-                    >
-                      {draft.days}일
+                    <span className="caption text-mute">
+                      {fmtDateShort(draft.startDate)} –{" "}
+                      {fmtDateShort(draft.endDate)}
+                    </span>
+
+                    {/* 웹에서는 드래그 대신 위/아래 버튼으로 순서를 바꾼다. */}
+                    <span style={{ display: "flex", gap: "var(--sp-xs)" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={index === 0}
+                        aria-label={`${index + 1}번째 구간 위로`}
+                        onClick={() => form.moveDraft(index, index - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={index === resolved.length - 1}
+                        aria-label={`${index + 1}번째 구간 아래로`}
+                        onClick={() => form.moveDraft(index, index + 1)}
+                      >
+                        ↓
+                      </button>
                     </span>
 
                     <button
@@ -283,11 +286,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                       className="btn btn-secondary"
                       disabled={resolved.length <= 1}
                       aria-label={`${index + 1}번째 구간 삭제`}
-                      onClick={() =>
-                        form.setDrafts((current) =>
-                          removeDraft(current, index, startDate, endDate),
-                        )
-                      }
+                      onClick={() => form.removeDraftAt(index)}
                     >
                       ✕
                     </button>
@@ -298,26 +297,16 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={duration <= form.drafts.length}
+                disabled={!form.suggestedAddKey}
                 onClick={() =>
-                  form.setDrafts(
-                    (current) =>
-                      splitLastDraft(
-                        current,
-                        startDate,
-                        endDate,
-                        "regular_overnight",
-                      ) ?? current,
-                  )
+                  form.suggestedAddKey && form.addDraft(form.suggestedAddKey)
                 }
               >
                 구간 추가
               </button>
             </div>
           ) : (
-            <p className="caption text-mute">
-              시작일과 종료일을 먼저 골라주세요.
-            </p>
+            <p className="caption text-mute">시작일을 먼저 골라주세요.</p>
           )}
 
           {form.balanceBlockMessage && (

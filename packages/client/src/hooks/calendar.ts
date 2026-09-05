@@ -10,7 +10,7 @@ import {
   type LeaveApiAdapter,
 } from "../context";
 import { queryKeys } from "../query-keys";
-import type { Calendar, CalendarBatch, CalendarDay } from "../types";
+import type { Calendar, CalendarBatch, CalendarDay, UnitEvent } from "../types";
 
 type PendingCalendar = {
   month: string;
@@ -280,11 +280,18 @@ export function useCalendarDays(unitId: string | null, months: string[]) {
     // 바깥에서 useMemo로 감싸면 매 렌더 새 배열이 들어와 메모가 무력화된다.
     combine: (results) => {
       const byDate = new Map<string, CalendarDay>();
+      // 여러 달에 걸친 일정은 그 달마다 응답에 실려 오므로 id로 한 번만 담는다.
+      const byEventId = new Map<string, UnitEvent>();
       for (const result of results) {
         for (const day of result.data?.days ?? []) byDate.set(day.date, day);
+        for (const event of result.data?.events ?? []) {
+          byEventId.set(event.id, event);
+        }
       }
       return {
         days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+        /** 이 달들에 걸친 부대 일정. 휴가 폼의 날짜 선택 달력이 그린다. */
+        events: [...byEventId.values()],
         isPending: results.some((result) => result.isPending),
       };
     },

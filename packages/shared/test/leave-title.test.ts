@@ -17,9 +17,9 @@ import {
   type SegmentDraft,
 } from "../src/index";
 
-/** 첫 구간만 제목을 정하므로 종료일은 아무 날이나 좋다. */
+/** 첫 구간만 제목을 정하므로 개수는 아무 값이나 좋다. */
 function draft(key: SegmentDraft["key"]): SegmentDraft {
-  return { key, endDate: "2026-08-20" };
+  return { key, days: 3 };
 }
 
 function segment(
