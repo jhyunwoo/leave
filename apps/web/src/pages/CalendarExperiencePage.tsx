@@ -8,6 +8,7 @@ import {
   isConfirmedLeaveStatus,
   maxAllowedOut,
   normalizeFriendIds,
+  regularOvernightPooledRemaining,
   todayInSeoul,
   type ISODate,
 } from "@leave/shared";
@@ -352,6 +353,22 @@ export function CalendarPage(props: { me: Me }) {
         : 0,
     [currentCycle, myLeaves.data],
   );
+  // 이월 중에는 마감이라는 것이 없고, 쓸 수 있는 몫도 이번 주기가 아니라 누적이다.
+  const carryOver = regularOvernight?.carryOver ?? false;
+  const pooledRemaining = useMemo(
+    () =>
+      carryOver
+        ? regularOvernightPooledRemaining({
+            config: regularOvernight,
+            used: (myLeaves.data?.leaves ?? []).flatMap(
+              (leave) => leave.segments,
+            ),
+            dischargeAt,
+            on: today,
+          })
+        : 0,
+    [carryOver, regularOvernight, myLeaves.data, dischargeAt, today],
+  );
   const pendingFirstGrant = useMemo(() => {
     const first = firstGrantDate(regularOvernight);
     return first && today < first && first <= dischargeAt ? first : null;
@@ -498,9 +515,15 @@ export function CalendarPage(props: { me: Me }) {
                 <p className="cal-cycle-banner">
                   정기외박 {currentCycle.index}주기{" "}
                   {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
-                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 · 잔여{" "}
-                  {Math.max(currentCycle.grantDays - cycleUsage, 0)}일 · 마감 D-
-                  {Math.max(diffDays(today, currentCycle.end), 0)}
+                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 ·{" "}
+                  {carryOver ? (
+                    <>누적 잔여 {Math.max(pooledRemaining, 0)}일</>
+                  ) : (
+                    <>
+                      잔여 {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
+                      · 마감 D-{Math.max(diffDays(today, currentCycle.end), 0)}
+                    </>
+                  )}
                 </p>
               ) : pendingFirstGrant ? (
                 <p className="cal-cycle-banner is-pending">

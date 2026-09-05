@@ -437,6 +437,8 @@ export const leaveGrantsPageSchema = z
       intervalMonths: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
       nextGrantDate: z.string().nullable(),
+      /** 켜면 주기가 끝나도 남은 몫이 사라지지 않고 하나의 누적 잔여로 쌓인다. */
+      carryOver: z.boolean(),
       /** 주기 시작일부터 전역일까지의 모든 주기. 설정이 없으면 빈 배열. */
       cycles: z.array(regularOvernightCycleSchema),
     }),
@@ -455,6 +457,8 @@ export const leaveBalanceSummarySchema = z
       daysPerGrant: z.number().nullable(),
       /** 설정에서 파생한 다음 적립 예정일 (읽기 전용). */
       nextGrantDate: z.string().nullable(),
+      /** 켜면 주기가 끝나도 남은 몫이 사라지지 않고 하나의 누적 잔여로 쌓인다. */
+      carryOver: z.boolean(),
     }),
   })
   .openapi("LeaveBalanceSummary");

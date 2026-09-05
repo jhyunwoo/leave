@@ -319,6 +319,7 @@ export async function buildGrantsPage(db: Db, user: User) {
       intervalMonths: config?.intervalMonths ?? null,
       daysPerGrant: config?.daysPerGrant ?? null,
       nextGrantDate: nextGrantDateAfter(config, today),
+      carryOver: config?.carryOver ?? false,
       cycles: cycles.list,
     },
   };
@@ -327,9 +328,13 @@ export async function buildGrantsPage(db: Db, user: User) {
 /**
  * 주기 목록과 그 합계.
  *
- * 주기 몫은 이월되지 않아 재원 하나의 총량이라는 개념이 없다. 그래도 화면에 펼치는
- * 주기를 그대로 합산하면 대시보드 숫자와 아래 주기 목록이 어긋나지 않는다.
+ * 주기 몫은 (이월을 끄면) 이월되지 않아 재원 하나의 총량이라는 개념이 없다. 그래도
+ * 화면에 펼치는 주기를 그대로 합산하면 대시보드 숫자와 아래 주기 목록이 어긋나지 않는다.
  * 지난 주기의 미사용분은 그 주기와 함께 사라지므로 소멸로 센다.
+ *
+ * 이월을 켜면 **소멸로 세던 몫이 잔여로 옮겨갈 뿐** 나머지 셈은 그대로다. 주기별
+ * 잔여의 합이 곧 누적 잔여이기 때문이다(cycleRemainingDays 주석). 덕분에
+ * `총량 = 사용 + 잔여 + 소멸 + 적립예정` 항등식이 두 모드에서 똑같이 성립한다.
  */
 export function regularOvernightSummary(
   config: RegularOvernightConfigRow | undefined,
@@ -354,17 +359,19 @@ export function regularOvernightSummary(
     /** 지난 주기에서 못 쓰고 날린 몫. */
     expiredDays: 0,
   };
+  const carryOver = Boolean(config?.carryOver);
   for (const cycle of list) {
     totals.totalDays += cycle.grantDays;
     totals.usedDays += cycle.usedDays;
     totals.usedToDateDays += cycle.usedToDateDays;
-    if (cycle.state === "past") {
-      // 지난 주기는 이미 끝나 계획이 남을 수 없다 — 두 셈이 같다.
-      totals.expiredDays += cycle.remainingDays;
-    } else if (cycle.state === "future") {
+    if (cycle.state === "future") {
       totals.upcomingDays += cycle.remainingDays;
       totals.upcomingAsOfTodayDays += cycle.remainingAsOfTodayDays;
+    } else if (cycle.state === "past" && !carryOver) {
+      // 지난 주기는 이미 끝나 계획이 남을 수 없다 — 두 셈이 같다.
+      totals.expiredDays += cycle.remainingDays;
     } else {
+      // 이번 주기, 그리고 이월 중이라면 지난 주기의 남은 몫까지 지금 쓸 수 있는 잔여다.
       totals.remainingDays += cycle.remainingDays;
       totals.remainingAsOfTodayDays += cycle.remainingAsOfTodayDays;
     }

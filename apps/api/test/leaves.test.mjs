@@ -360,6 +360,162 @@ test("해군·공군 정기외박은 주기 안에서만 쓰이고 이월되지 
   );
 });
 
+test("이월을 켜면 지난 주기 몫이 쌓여 한 주기 몫보다 길게 쓸 수 있다", async () => {
+  const owner = await signup({ branch: "navy" });
+  await createUnit(owner.token, { name: uniq("이월부대-") });
+  const token = owner.token;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const shift = (from, days) => {
+    const d = new Date(`${from}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const daysAgo = (n) => shift(today, -n);
+  const regular = (data) =>
+    data.balances.find((item) => item.key === "regular_overnight");
+  const overnight = (startDate, endDate) => ({
+    category: "overnight",
+    overnightKind: "regular",
+    startDate,
+    endDate,
+  });
+
+  // 주기 시작일이 126일 전이면 1주기 daysAgo(84)~daysAgo(43),
+  // 2주기 daysAgo(42)~daysAgo(1), 3주기가 오늘 시작한다. 앞의 두 주기는 쓰지 않았다.
+  const saved = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: daysAgo(126),
+      intervalDays: 42,
+      daysPerGrant: 3,
+      carryOver: true,
+    },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.regularOvernight.carryOver, true);
+
+  // 이월이 꺼져 있으면 여기서 3일이던 값이(위 "이월되지 않는다" 테스트) 세 주기 몫이 된다.
+  assert.deepEqual(
+    {
+      total: regular(saved.data).totalDays,
+      remaining: regular(saved.data).remainingDays,
+      used: regular(saved.data).usedDays,
+      cycleScoped: regular(saved.data).cycleScoped,
+    },
+    { total: 9, remaining: 9, used: 0, cycleScoped: true },
+  );
+
+  // 한 주기 몫(3일)보다 긴 5일을 쌓인 몫에서 쓴다.
+  const long = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "쌓아둔 정기외박",
+      segments: [overnight(today, shift(today, 4))],
+    },
+  });
+  assert.equal(long.status, 201, "쌓인 몫 안이면 통과해야 함");
+  const afterUse = await req("GET", "/leaves/balances", { token });
+  assert.equal(regular(afterUse.data).usedDays, 5);
+  assert.equal(regular(afterUse.data).remainingDays, 4);
+
+  // 누적 9일을 넘기면 견준 기준일과 함께 막는다.
+  const over = await req("POST", "/leaves", {
+    token,
+    body: {
+      title: "누적 초과",
+      segments: [overnight(shift(today, 6), shift(today, 10))],
+    },
+  });
+  assert.equal(over.status, 400);
+  assert.match(over.data.error, /쌓이는 정기외박 9일을 1일 초과/);
+
+  // 보유 휴가: 소멸이 사라지고 대신 잔여로 옮겨간다. 막대와 부제가 어긋나지 않도록
+  // 총량 항등식은 두 모드에서 똑같이 성립해야 한다.
+  const page = await req("GET", "/leaves/grants", { token });
+  const { totals, regularOvernight } = page.data;
+  assert.equal(regularOvernight.carryOver, true);
+  assert.equal(totals.expiredDays, 0, "이월 중에는 소멸이 없어야 함");
+  assert.equal(totals.unattributedDays, 0);
+  assert.equal(
+    totals.totalDays,
+    totals.usedDays +
+      totals.remainingDays +
+      totals.expiredDays +
+      totals.upcomingDays,
+  );
+
+  // 이월을 끄면 곧바로 주기별 셈으로 돌아온다 — 저장된 파생값이 없다는 보장.
+  const off = await req("PUT", "/leaves/regular-overnight", {
+    token,
+    body: {
+      enabled: true,
+      startDate: daysAgo(126),
+      intervalDays: 42,
+      daysPerGrant: 3,
+      carryOver: false,
+    },
+  });
+  assert.equal(off.data.regularOvernight.carryOver, false);
+  assert.equal(regular(off.data).totalDays, 3, "이번 주기 몫으로 돌아와야 함");
+  // 이미 등록해 둔 5일은 이번 주기 몫 3일을 넘어 잔여가 음수로 드러난다.
+  assert.equal(regular(off.data).remainingDays, -2);
+});
+
+test("이월을 켜도 적립일이 전역 뒤인 주기 몫은 받지 못한다", async () => {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const shift = (from, days) => {
+    const d = new Date(`${from}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // 전역이 30일 뒤. 주기 시작일을 오늘로 두면 첫 적립은 42일 뒤라 전역 다음이다.
+  const owner = await signup({
+    branch: "navy",
+    enlistedAt: shift(today, -600),
+    dischargeAt: shift(today, 30),
+  });
+  await createUnit(owner.token, { name: uniq("전역이월부대-") });
+  await req("PUT", "/leaves/regular-overnight", {
+    token: owner.token,
+    body: {
+      enabled: true,
+      startDate: today,
+      intervalDays: 42,
+      daysPerGrant: 3,
+      carryOver: true,
+    },
+  });
+
+  const res = await req("POST", "/leaves", {
+    token: owner.token,
+    body: {
+      title: "받지 못할 주기",
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: shift(today, 43),
+          endDate: shift(today, 44),
+        },
+      ],
+    },
+  });
+  assert.equal(res.status, 400);
+  assert.match(res.data.error, /전역일 뒤/);
+});
+
 test("아직 오지 않은 정기외박 주기도 그 몫 안에서 미리 쓸 수 있다", async () => {
   const owner = await signup({ branch: "navy" });
   await createUnit(owner.token, { name: uniq("미래주기부대-") });

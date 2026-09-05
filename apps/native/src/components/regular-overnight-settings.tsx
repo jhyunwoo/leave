@@ -37,6 +37,7 @@ export function RegularOvernightSettings(props: {
   const colors = useColors();
   const update = useUpdateRegularOvernight();
   const [enabled, setEnabled] = useState(props.config.enabled);
+  const [carryOver, setCarryOver] = useState(props.config.carryOver);
   const [startDate, setStartDate] = useState(props.config.startDate ?? "");
   // 주기·회당은 숫자가 아니라 문자열로 들고 있다가 저장할 때 바꾼다. 숫자로
   // 강제하면 마지막 한 자를 지우는 순간 Number("")가 0이 되고 폴백이 걸려 1로
@@ -83,6 +84,7 @@ export function RegularOvernightSettings(props: {
               startDate,
               ...regularOvernightIntervalPayload(intervalForm),
               daysPerGrant: perGrant,
+              carryOver,
             }
           : { enabled: false },
       );
@@ -115,6 +117,22 @@ export function RegularOvernightSettings(props: {
 
       {enabled && (
         <>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title} selectable>
+                주기가 끝나도 이월하기
+              </Text>
+              <Text style={styles.hint} selectable>
+                부대가 정기외박을 쌓아두면 켜세요. 안 쓴 몫이 사라지지 않고 계속
+                모여요.
+              </Text>
+            </View>
+            <Switch
+              value={carryOver}
+              onValueChange={setCarryOver}
+              trackColor={{ true: colors.primary, false: colors.hairline }}
+            />
+          </View>
           <DatePickerRow
             label="주기 시작일"
             value={startDate}
@@ -130,8 +148,10 @@ export function RegularOvernightSettings(props: {
             <Text style={styles.hint} selectable>
               이 날부터 {interval}
               {limits.unitLabel}이 지난 {firstGrant}에 {perGrant}일이 처음
-              적립되면서 1주기가 시작돼요. 한 주기 몫은 다음 적립 전날까지 쓰고
-              남으면 사라져요.
+              적립되면서 1주기가 시작돼요.{" "}
+              {carryOver
+                ? "안 쓴 몫은 사라지지 않고 계속 쌓여요."
+                : "한 주기 몫은 다음 적립 전날까지 쓰고 남으면 사라져요."}
               {props.config.nextGrantDate
                 ? ` 다음 적립일은 ${props.config.nextGrantDate}이에요.`
                 : ""}

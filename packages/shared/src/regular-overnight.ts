@@ -17,8 +17,17 @@
  *
  * 주기는 그 적립일부터 센다. k번째(1부터) 주기는 [S + k·I, S + (k+1)·I - 1일]이고,
  * 주기 첫날에 회당 적립 일수를 받아 다음 적립 전날(= 그 주기 마지막 날)까지 쓴다.
- * 이월은 없다. S부터 첫 적립 전날까지의 한 주기는 아직 받은 정기외박이 없는 대기
- * 구간이라 어떤 주기에도 속하지 않고, 그 사이에는 쓸 수 있는 정기외박도 없다.
+ * S부터 첫 적립 전날까지의 한 주기는 아직 받은 정기외박이 없는 대기 구간이라 어떤
+ * 주기에도 속하지 않고, 그 사이에는 쓸 수 있는 정기외박도 없다.
+ *
+ * 이월(carryOver)은 기본적으로 없다 — 주기가 끝나면 남은 몫이 사라진다. 다만 정기외박을
+ * 쌓아두는 부대가 있고, 공개 규정은 그 부분을 정하지 않아(regular-overnight-guidance.ts)
+ * 사용자가 켤 수 있게 뒀다. 켜면 첫 적립일부터의 모든 주기가 하나의 누적 잔여로 합쳐진다.
+ *
+ * 이월에서도 주기라는 단위는 사라지지 않는다. k주기까지 받은 몫은 `회당 × k`이고,
+ * 판정은 "주기 경계마다 그때까지 쓴 일수가 그때까지 받은 몫을 넘지 않는가"다.
+ * 받은 몫은 적립일에만 계단처럼 오르고 사용량은 단조 증가하므로, 주기 경계만 보면
+ * 그 사이의 모든 날이 함께 지켜진다.
  */
 
 import { fmtDateShort, fmtRangeTiny } from "./calendar";
@@ -43,6 +52,15 @@ export type RegularOvernightConfig = {
   /** 달 단위 주기. 달력의 분기에 맞춰 돌아야 하는 주기에 쓴다(육군의 3개월). */
   intervalMonths?: number | null;
   daysPerGrant: number | null;
+  /**
+   * 주기가 끝나도 안 쓴 몫을 남길지.
+   *
+   * 언제 켰는지를 저장하지 않는 것이 이 설계의 요점이다. 저장하는 순간 같은 설정이
+   * "켠 시점"에 따라 다른 잔여를 내는 상태가 생기고, 그 시점은 되돌릴 수도 고칠 수도
+   * 없다. 지금은 첫 적립일부터 전부 소급되고, 끄면 곧바로 주기별 셈으로 돌아온다 —
+   * 잔여가 전부 설정에서 파생하므로 되돌릴 것이 남지 않는다.
+   */
+  carryOver?: boolean | null;
 };
 
 /** 주기의 길이. 단위가 다르면 더하는 방법도 다르므로 숫자만으로는 부족하다. */
@@ -53,6 +71,7 @@ type ActiveConfig = {
   startDate: ISODate;
   interval: RegularOvernightInterval;
   daysPerGrant: number;
+  carryOver: boolean;
 };
 
 export type RegularOvernightCycle = {
@@ -97,6 +116,7 @@ function activeConfig(config: RegularOvernightConfig | null | undefined) {
     startDate: config.startDate,
     interval,
     daysPerGrant: config.daysPerGrant,
+    carryOver: Boolean(config.carryOver),
   } satisfies ActiveConfig;
 }
 
@@ -285,12 +305,75 @@ export function cycleUsedDays(
   return used;
 }
 
-/** 주기 몫에서 아직 쓰지 않고 남은 일수. 주기가 끝나면 이월 없이 사라진다. */
+/**
+ * 주기 몫에서 아직 쓰지 않고 남은 일수.
+ *
+ * 이월이 꺼져 있으면 이 값은 주기가 끝나는 순간 사라진다. 켜져 있으면 사라지지 않고
+ * 다음 주기로 넘어가므로, **주기별 이 값을 그대로 더한 것이 곧 누적 잔여**가 된다
+ * (이월분까지 당겨 쓴 주기는 음수가 되어 앞선 주기의 남은 몫을 정확히 상쇄한다).
+ * 그래서 이월을 켜도 주기 행의 뜻은 바뀌지 않고, 합계를 어느 칸에 넣느냐만 달라진다.
+ */
 export function cycleRemainingDays(
   cycle: RegularOvernightCycle,
   segments: readonly SegmentLike[],
 ): number {
   return cycle.grantDays - cycleUsedDays(cycle, segments);
+}
+
+/**
+ * 첫 적립일부터 k주기 마지막 날까지 쓴 정기외박 일수.
+ *
+ * 주기가 첫 적립일 뒤를 빈틈없이 덮으므로 주기별 사용량의 합이 곧 그 구간의 사용량이다.
+ * 첫 적립 전에 쓴 날은 어느 주기의 몫도 아니라 여기 들어오지 않는다 — 그 날들은
+ * `before_first_grant`가 따로 막는 몫이고, 누적 판정에 섞으면 이미 어긋나 있는 과거가
+ * 새 등록을 막는 이유가 된다.
+ */
+function usedThroughCycle(
+  active: ActiveConfig,
+  segments: readonly SegmentLike[],
+  index: number,
+): number {
+  let used = 0;
+  for (let k = 1; k <= index; k += 1) {
+    used += cycleUsedDays(buildCycle(active, k), segments);
+  }
+  return used;
+}
+
+/** k주기까지 실제로 받은 몫. 적립일이 전역 뒤인 주기는 애초에 받지 못한다. */
+function grantedThroughCycle(active: ActiveConfig, index: number): number {
+  return active.daysPerGrant * index;
+}
+
+/**
+ * on까지 적립된 정기외박 중 아직 쓰지 않은 일수 — 이월을 켠 사용자의 "누적 잔여".
+ *
+ * 달력 배너와 보유 휴가 주기 목록이 같은 숫자를 말하도록 여기 한 벌만 둔다.
+ * 전역일 뒤의 적립은 받지 못하므로 상한을 전역일로 자른다 — 전역일을 아직 모르는
+ * 화면도 있어(달력) 없으면 자르지 않는다. 이월이 꺼져 있으면 이 값에 뜻이 없으므로
+ * 부르는 쪽이 설정을 보고 고른다.
+ */
+export function regularOvernightPooledRemaining(input: {
+  config: RegularOvernightConfig | null | undefined;
+  used: readonly SegmentLike[];
+  dischargeAt: ISODate | null | undefined;
+  on: ISODate;
+}): number {
+  const active = activeConfig(input.config);
+  if (!active) return 0;
+  const limit =
+    input.dischargeAt && input.dischargeAt < input.on
+      ? input.dischargeAt
+      : input.on;
+  let remaining = 0;
+  for (const cycle of cyclesInRange(
+    input.config,
+    firstGrantOf(active),
+    limit,
+  )) {
+    remaining += cycle.grantDays - cycleUsedDays(cycle, input.used);
+  }
+  return remaining;
 }
 
 /** 자동 적립 설정이 살아 있어 정기외박을 주기 단위로 다뤄야 하는지. */
@@ -380,7 +463,17 @@ export type RegularOvernightBlock =
   /** 적립일이 전역일 뒤라 그 주기 몫을 애초에 받지 못한다. */
   | { kind: "after_discharge"; cycle: RegularOvernightCycle }
   /** 그 주기 몫보다 많이 쓴다. usedDays는 이미 쓴 것까지 더한 값. */
-  | { kind: "over_cycle"; cycle: RegularOvernightCycle; usedDays: number };
+  | { kind: "over_cycle"; cycle: RegularOvernightCycle; usedDays: number }
+  /**
+   * 이월 중 — 그 주기가 끝나는 시점까지 쌓인 몫보다 많이 쓴다.
+   * `over_cycle`과 달리 주기 하나가 아니라 첫 적립일부터의 누적을 견준다.
+   */
+  | {
+      kind: "over_pool";
+      cycle: RegularOvernightCycle;
+      grantedDays: number;
+      usedDays: number;
+    };
 
 /**
  * 요청한 구간을 정기외박으로 쓸 수 있는지 본다. 막을 이유가 있으면 첫 번째 이유를,
@@ -418,11 +511,24 @@ export function checkRegularOvernight(input: {
     }
   }
 
+  const all = [...input.existing, ...input.requested];
+
+  // 이월 중에는 주기별 상한이 없다. 대신 요청이 건드린 주기의 경계마다 "그때까지 받은
+  // 몫"과 "그때까지 쓴 일수"를 견준다. 앞선 주기에서 남긴 몫이 그대로 살아 있으므로
+  // 한 주기 몫을 넘겨 쓰는 것 자체는 막지 않는다.
+  if (active.carryOver) {
+    for (const { cycle } of requestedUsage.cycles) {
+      const grantedDays = grantedThroughCycle(active, cycle.index);
+      const usedDays = usedThroughCycle(active, all, cycle.index);
+      if (usedDays > grantedDays) {
+        return { kind: "over_pool", cycle, grantedDays, usedDays };
+      }
+    }
+    return null;
+  }
+
   // 이미 저장된 구간에 이번 요청을 더해 주기별 사용량을 다시 센다.
-  const after = regularOvernightUsageByCycle(input.config, [
-    ...input.existing,
-    ...input.requested,
-  ]);
+  const after = regularOvernightUsageByCycle(input.config, all);
   const usedByCycleStart = new Map(
     after.cycles.map((entry) => [entry.cycle.start, entry.usedDays]),
   );
@@ -446,6 +552,10 @@ export function regularOvernightBlockMessage(
   const label = `정기외박 ${cycle.index}주기(${fmtRangeTiny(cycle.start, cycle.end)})`;
   if (block.kind === "after_discharge") {
     return `${label}는 적립일이 전역일 뒤라 쓸 수 없어요`;
+  }
+  // 이월 중에는 "이 주기 몫"이 아니라 그날까지 쌓인 몫이 상한이라, 견준 기준일을 밝힌다.
+  if (block.kind === "over_pool") {
+    return `${fmtDateShort(cycle.end)}까지 쌓이는 정기외박 ${block.grantedDays}일을 ${block.usedDays - block.grantedDays}일 초과했어요`;
   }
   return `${label} 몫 ${cycle.grantDays}일을 ${block.usedDays - cycle.grantDays}일 초과했어요`;
 }
@@ -477,7 +587,12 @@ export function regularOvernightAvailableIn(input: {
   let available = Infinity;
   for (const cycle of cycles) {
     if (cycle.start > input.dischargeAt) return 0;
-    const remaining = cycleRemainingDays(cycle, input.used);
+    // 이월이면 이 주기 몫이 아니라 이 주기가 끝나는 시점까지의 누적이 상한이다.
+    // 여러 주기에 걸치면 여기서도 가장 빡빡한 주기를 따른다(그 주기가 먼저 막힌다).
+    const remaining = active.carryOver
+      ? grantedThroughCycle(active, cycle.index) -
+        usedThroughCycle(active, input.used, cycle.index)
+      : cycleRemainingDays(cycle, input.used);
     if (remaining < available) available = remaining;
   }
   return available;

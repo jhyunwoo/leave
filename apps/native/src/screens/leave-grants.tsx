@@ -221,6 +221,7 @@ export function LeaveGrantsScreen() {
       />
       <CycleList
         cycles={regularOvernight.cycles}
+        carryOver={regularOvernight.carryOver}
         expanded={showPastCycles}
         onToggle={() => setShowPastCycles((open) => !open)}
       />
@@ -429,6 +430,8 @@ function CycleList(props: {
     state: "past" | "current" | "future";
     color: string;
   }[];
+  /** 켜면 지난 주기의 남은 몫이 사라지지 않고 누적 잔여로 합쳐진다. */
+  carryOver: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -444,11 +447,22 @@ function CycleList(props: {
     ? props.cycles
     : [...past.slice(-RECENT_PAST_CYCLES), ...rest];
 
+  // 이월 중에는 주기별 잔여의 합이 곧 지금 쓸 수 있는 몫이다(cycleRemainingDays 주석).
+  // 아직 오지 않은 주기 몫은 "앞으로 받을" 것이라 여기서 뺀다.
+  const pooled = props.cycles
+    .filter((cycle) => cycle.state !== "future")
+    .reduce((total, cycle) => total + cycle.remainingDays, 0);
+
   return (
     <ContentPanel style={styles.fundCard}>
       <Text style={styles.addTitle} selectable>
         정기외박 주기
       </Text>
+      {props.carryOver && (
+        <Text style={styles.cycleDates} selectable>
+          누적 잔여 {pooled}일
+        </Text>
+      )}
 
       {hidden > 0 && (
         <Pressable accessibilityRole="button" onPress={props.onToggle}>
@@ -487,13 +501,25 @@ function CycleList(props: {
             <Text style={styles.cycleCount} selectable>
               {cycle.usedDays}/{cycle.grantDays}일
             </Text>
-            {cycle.state === "past" && cycle.remainingDays > 0 ? (
-              <Text style={styles.cycleLost} selectable>
-                소멸 {cycle.remainingDays}일
+            {cycle.state === "past" && !props.carryOver ? (
+              cycle.remainingDays > 0 ? (
+                <Text style={styles.cycleLost} selectable>
+                  소멸 {cycle.remainingDays}일
+                </Text>
+              ) : (
+                <Text style={styles.cycleRemaining} selectable>
+                  잔여 {cycle.remainingDays}일
+                </Text>
+              )
+            ) : props.carryOver && cycle.remainingDays < 0 ? (
+              // 이월분까지 당겨 쓴 주기. 음수를 그대로 보여주면 읽히지 않는다.
+              <Text style={styles.cycleRemaining} selectable>
+                이월분 {-cycle.remainingDays}일 사용
               </Text>
             ) : (
               <Text style={styles.cycleRemaining} selectable>
-                잔여 {cycle.remainingDays}일
+                {props.carryOver && cycle.state === "past" ? "이월" : "잔여"}{" "}
+                {cycle.remainingDays}일
               </Text>
             )}
           </View>

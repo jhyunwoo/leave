@@ -403,6 +403,8 @@ export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
       intervalDays: z.int().min(1).max(365).nullish(),
       intervalMonths: z.int().min(1).max(12).nullish(),
       daysPerGrant: z.int().min(1).max(30),
+      // 주기가 끝나도 남길지. 구버전 앱은 보내지 않으므로 optional이고, 그때는 꺼진다.
+      carryOver: z.boolean().optional(),
     })
     .superRefine((value, ctx) => {
       if (Boolean(value.intervalDays) === Boolean(value.intervalMonths)) {

@@ -75,9 +75,13 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
       startDate: "2026-05-11",
       intervalDays: 42,
       daysPerGrant: 3,
+      carryOver: true,
     },
   });
   assert.equal(regular.status, 200);
+  // 온보딩에서 정한 이월 여부가 이어하기 상태에 그대로 실려야 화면이 되살릴 수 있다.
+  const savedOvernight = await req("GET", "/auth/onboarding", { token });
+  assert.equal(savedOvernight.data.regularOvernight.carryOver, true);
 
   // 공개 사용자 이름이 없으면 온보딩을 마칠 수 없다 — 활성 사용자에게는 항상
   // 이름이 있다는 불변식을 애플리케이션 경계가 지킨다(0023).
@@ -344,6 +348,8 @@ test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력�
   const status = await req("GET", "/auth/onboarding", { token });
   assert.equal(status.data.regularOvernight.intervalMonths, 3);
   assert.equal(status.data.regularOvernight.intervalDays, null);
+  // 보내지 않으면 꺼진 채로 저장된다 — 구버전 앱이 스위치 없이 저장하는 경우다.
+  assert.equal(status.data.regularOvernight.carryOver, false);
 
   assert.equal((await setUsername(token, uniq("army"))).status, 200);
   assert.equal(
@@ -368,6 +374,23 @@ test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력�
     ],
   );
 
+  // 이월까지 켜 둔 상태에서 군종을 바꾼다 — 지울 때 함께 꺼져야 한다.
+  assert.equal(
+    (
+      await req("PUT", "/auth/onboarding/regular-overnight", {
+        token,
+        body: {
+          enabled: true,
+          startDate: "2026-01-31",
+          intervalMonths: 3,
+          daysPerGrant: 2,
+          carryOver: true,
+        },
+      })
+    ).status,
+    200,
+  );
+
   // 주기 단위가 군마다 다르므로, 군종을 바꾸면 앞 군의 설정을 지우고 다시 묻는다.
   assert.equal(
     (
@@ -388,4 +411,5 @@ test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력�
   assert.equal(cleared.data.regularOvernight.enabled, false);
   assert.equal(cleared.data.regularOvernight.intervalMonths, null);
   assert.equal(cleared.data.regularOvernight.intervalDays, null);
+  assert.equal(cleared.data.regularOvernight.carryOver, false);
 });

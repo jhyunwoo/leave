@@ -31,6 +31,7 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Input } from "@/components/field";
+import { NativeCheckbox } from "@/components/native-checkbox";
 import { makeStyles, radius, spacing } from "@/theme";
 import { StepError, StepNext, StepShell, StepSkip } from "./step-shell";
 
@@ -45,6 +46,9 @@ export function OvernightStep(props: {
   onIntervalChange: (value: string) => void;
   daysPerGrant: string;
   onDaysPerGrantChange: (value: string) => void;
+  /** 주기가 끝나도 남길지. 부대마다 달라 기준일과 함께 여기서 묻는다. */
+  carryOver: boolean;
+  onCarryOverChange: (value: boolean) => void;
   error: string | null;
   pending: boolean;
   onNext: () => void;
@@ -103,11 +107,26 @@ export function OvernightStep(props: {
         </View>
       </View>
 
+      {/* 이월 여부도 "우리 부대 정기외박이 어떻게 도는가"의 일부라 기준일·주기와
+          같은 화면에 둔다. 나중에 보유 휴가 화면에서 언제든 바꿀 수 있다. */}
+      <View style={styles.carryOver}>
+        <NativeCheckbox
+          value={props.carryOver}
+          onValueChange={props.onCarryOverChange}
+          label="주기가 끝나도 이월돼요"
+          testID="onboarding-overnight-carry-over"
+        />
+        <Text style={styles.carryOverHint}>
+          안 쓴 정기외박이 사라지지 않고 쌓이는 부대라면 켜주세요.
+        </Text>
+      </View>
+
       {firstGrant ? (
         <Animated.Text entering={FadeIn.duration(240)} style={styles.live}>
           첫 사용 가능 주기는{" "}
           <Text style={styles.liveStrong}>{firstGrant}</Text>
           부터예요.
+          {props.carryOver ? " 안 쓴 몫은 그 뒤로도 쌓여요." : ""}
         </Animated.Text>
       ) : null}
 
@@ -168,6 +187,8 @@ const useStyles = makeStyles(({ colors }) => ({
   /* 값을 못 고치던 시절엔 테두리 두른 타일이었다. 이제 입력칸이라 껍데기를
      걷고 라벨 + 인풋 한 벌로 둔다. */
   metric: { flex: 1, gap: spacing.xs },
+  carryOver: { gap: spacing.xs },
+  carryOverHint: { color: colors.mute, fontSize: 12, lineHeight: 18 },
   metricLabel: { fontSize: 13, fontWeight: "600", color: colors.ink },
   live: { fontSize: 13, lineHeight: 20, color: colors.body },
   liveStrong: { fontWeight: "700", color: colors.ink },

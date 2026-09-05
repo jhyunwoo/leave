@@ -40,6 +40,9 @@ export function OvernightStep(props: {
   onIntervalChange: (value: string) => void;
   daysPerGrant: string;
   onDaysPerGrantChange: (value: string) => void;
+  /** 주기가 끝나도 남길지. 부대마다 달라 기준일과 함께 여기서 묻는다. */
+  carryOver: boolean;
+  onCarryOverChange: (value: boolean) => void;
   error: string | null;
   pending: boolean;
   onNext: () => void;
@@ -107,9 +110,27 @@ export function OvernightStep(props: {
         </Field>
       </div>
 
+      {/* 이월 여부도 "우리 부대 정기외박이 어떻게 도는가"의 일부라 기준일·주기와
+          같은 화면에 둔다. 나중에 보유 휴가 화면에서 언제든 바꿀 수 있다. */}
+      <label className="check-field">
+        <input
+          type="checkbox"
+          checked={props.carryOver}
+          onChange={(e) => props.onCarryOverChange(e.target.checked)}
+          data-testid="onboarding-overnight-carry-over"
+        />
+        <span>
+          <strong>주기가 끝나도 이월돼요</strong>
+          <small>
+            안 쓴 정기외박이 사라지지 않고 쌓이는 부대라면 켜주세요.
+          </small>
+        </span>
+      </label>
+
       {firstGrant && (
         <p className="ob-note is-live">
           첫 사용 가능 주기는 <strong>{firstGrant}</strong>부터예요.
+          {props.carryOver ? " 안 쓴 몫은 그 뒤로도 사라지지 않고 쌓여요." : ""}
         </p>
       )}
 

@@ -310,6 +310,10 @@ export const regularOvernightConfigs = sqliteTable(
     intervalDays: integer("interval_days"),
     intervalMonths: integer("interval_months"),
     daysPerGrant: integer("days_per_grant"),
+    // 주기가 끝나도 안 쓴 몫을 남길지(0028). 이월 여부는 부대 지침이라 사용자가 정한다.
+    carryOver: integer("carry_over", { mode: "boolean" })
+      .notNull()
+      .default(false),
     updatedAt: text("updated_at").notNull(),
   },
 );

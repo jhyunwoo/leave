@@ -14,6 +14,7 @@ import {
   nextGrantDateAfter,
   regularOvernightAvailableIn,
   regularOvernightBlockMessage,
+  regularOvernightPooledRemaining,
   regularOvernightUsageByCycle,
   type RegularOvernightConfig,
   type SegmentLike,
@@ -748,5 +749,257 @@ describe("달 단위 주기 (육군 분기)", () => {
     expect(
       cycleFor({ ...armyConfig, intervalMonths: null }, "2026-05-01"),
     ).toBe(null);
+  });
+});
+
+describe("이월을 켜면 주기 몫이 쌓인다", () => {
+  // 2026-04-24 주기 시작, 42일 주기, 회당 3일.
+  //   첫 적립 2026-06-05 = 1주기 첫날
+  //   1주기 2026-06-05 ~ 2026-07-16
+  //   2주기 2026-07-17 ~ 2026-08-27
+  //   3주기 2026-08-28 ~ 2026-10-08
+  const carry: RegularOvernightConfig = {
+    enabled: true,
+    startDate: "2026-04-24",
+    intervalDays: 42,
+    daysPerGrant: 3,
+    carryOver: true,
+  };
+  const strict: RegularOvernightConfig = { ...carry, carryOver: false };
+  const dischargeAt = "2028-12-31";
+  const seg = (startDate: string, endDate: string): SegmentLike => ({
+    category: "overnight",
+    overnightKind: "regular",
+    startDate,
+    endDate,
+  });
+  const check = (
+    config: RegularOvernightConfig,
+    requested: SegmentLike[],
+    existing: SegmentLike[] = [],
+  ) => checkRegularOvernight({ config, existing, requested, dischargeAt });
+  const pooled = (used: SegmentLike[], on: string) =>
+    regularOvernightPooledRemaining({ config: carry, used, dischargeAt, on });
+
+  it("한 주기를 통째로 넘기면 다음 주기에 두 주기 몫이 쌓인다", () => {
+    // 이월이 없을 때 이 자리의 잔여는 3일이다(위 "이월되지 않는다" 묶음).
+    expect(pooled([], "2026-07-20")).toBe(6);
+    expect(pooled([], "2026-08-30")).toBe(9);
+  });
+
+  it("첫 적립 전에는 쌓인 몫이 없다", () => {
+    expect(pooled([], "2026-06-04")).toBe(0);
+    // 첫 적립일 당일에 1주기 몫이 들어온다.
+    expect(pooled([], "2026-06-05")).toBe(3);
+  });
+
+  it("쌓인 몫 안이면 한 주기 몫보다 많이 쓸 수 있다", () => {
+    // 1주기를 통째로 남기고 2주기에 5일 — 누적 6일 안이라 통과한다.
+    expect(check(carry, [seg("2026-07-20", "2026-07-24")])).toBeNull();
+    // 같은 요청이 이월을 끄면 그 주기 몫 3일을 넘겨 막힌다.
+    expect(check(strict, [seg("2026-07-20", "2026-07-24")])).toEqual({
+      kind: "over_cycle",
+      cycle: expect.objectContaining({ index: 2 }),
+      usedDays: 5,
+    });
+  });
+
+  it("쌓인 몫을 넘기면 견준 기준일과 함께 막는다", () => {
+    const block = check(carry, [seg("2026-07-20", "2026-07-26")]);
+    expect(block).toEqual({
+      kind: "over_pool",
+      cycle: expect.objectContaining({ index: 2, end: "2026-08-27" }),
+      grantedDays: 6,
+      usedDays: 7,
+    });
+    expect(regularOvernightBlockMessage(block!)).toBe(
+      "8월 27일까지 쌓이는 정기외박 6일을 1일 초과했어요",
+    );
+  });
+
+  it("이미 저장된 구간까지 더해 누적을 센다", () => {
+    // 1주기에 이미 3일을 썼으면 2주기까지의 누적 여유는 3일뿐이다.
+    const existing = [seg("2026-06-10", "2026-06-12")];
+    expect(
+      check(carry, [seg("2026-07-20", "2026-07-22")], existing),
+    ).toBeNull();
+    expect(check(carry, [seg("2026-07-20", "2026-07-23")], existing)).toEqual(
+      expect.objectContaining({
+        kind: "over_pool",
+        grantedDays: 6,
+        usedDays: 7,
+      }),
+    );
+  });
+
+  it("주기 경계에서 앞선 주기의 상한이 먼저 걸린다", () => {
+    // 1주기 마지막 날(7/16)까지 4일을 쓰면 그 시점 누적 몫 3일을 넘는다.
+    // 뒤에 2주기 몫이 들어온다고 해서 앞당겨 쓸 수는 없다.
+    const block = check(carry, [seg("2026-07-13", "2026-07-18")]);
+    expect(block).toEqual({
+      kind: "over_pool",
+      cycle: expect.objectContaining({ index: 1, end: "2026-07-16" }),
+      grantedDays: 3,
+      usedDays: 4,
+    });
+  });
+
+  it("주기 마지막 날까지 딱 맞게 쓰는 것은 막지 않는다", () => {
+    // 7/14~7/16 = 3일이 1주기 몫과 정확히 같다.
+    expect(check(carry, [seg("2026-07-14", "2026-07-16")])).toBeNull();
+  });
+
+  it("첫 적립 전 날짜는 이월과 무관하게 막힌다", () => {
+    expect(check(carry, [seg("2026-06-03", "2026-06-04")])).toEqual({
+      kind: "before_first_grant",
+      firstGrantDate: "2026-06-05",
+    });
+  });
+
+  it("적립일이 전역 뒤인 주기는 이월을 켜도 받지 못한다", () => {
+    // 3주기 적립일은 2026-08-28. 전역이 그 하루 전이면 그 몫은 애초에 없다.
+    const block = checkRegularOvernight({
+      config: carry,
+      existing: [],
+      requested: [seg("2026-08-28", "2026-08-29")],
+      dischargeAt: "2026-08-27",
+    });
+    expect(block).toEqual(expect.objectContaining({ kind: "after_discharge" }));
+    // 전역일 당일이 적립일이면 그 주기는 받는다.
+    expect(
+      checkRegularOvernight({
+        config: carry,
+        existing: [],
+        requested: [seg("2026-08-28", "2026-08-29")],
+        dischargeAt: "2026-08-28",
+      }),
+    ).toBeNull();
+  });
+
+  it("쌓인 몫도 전역일까지 받는 것만 센다", () => {
+    // 오늘이 한참 뒤라도 전역일이 2주기 안이면 3주기 몫은 들어오지 않는다.
+    expect(
+      regularOvernightPooledRemaining({
+        config: carry,
+        used: [],
+        dischargeAt: "2026-08-01",
+        on: "2027-01-01",
+      }),
+    ).toBe(6);
+  });
+
+  it("주기별 잔여를 그대로 더하면 누적 잔여가 된다", () => {
+    // 서버 합계(regularOvernightSummary)가 기대는 성질이다. 이월분까지 당겨 쓴
+    // 주기는 음수가 되어 앞선 주기의 남은 몫을 정확히 상쇄한다.
+    const used = [seg("2026-07-20", "2026-07-24")];
+    const cycles = cyclesInRange(carry, "2026-06-05", "2026-08-27");
+    const sum = cycles.reduce(
+      (total, cycle) => total + cycleRemainingDays(cycle, used),
+      0,
+    );
+    expect(cycles.map((cycle) => cycleRemainingDays(cycle, used))).toEqual([
+      3, -2,
+    ]);
+    expect(sum).toBe(1);
+    expect(pooled(used, "2026-08-27")).toBe(1);
+  });
+
+  it("구간 범위 잔여도 누적 기준으로 답한다", () => {
+    const available = (from: string, to: string, used: SegmentLike[] = []) =>
+      regularOvernightAvailableIn({
+        config: carry,
+        used,
+        dischargeAt,
+        from,
+        to,
+      });
+    // 2주기 안이면 두 주기 몫이 다 보인다.
+    expect(available("2026-07-20", "2026-07-22")).toBe(6);
+    // 1주기에 걸치면 그 시점 누적 3일이 상한이다(가장 빡빡한 주기를 따른다).
+    expect(available("2026-07-15", "2026-07-20")).toBe(3);
+    // 이미 넘겨 쓴 상태는 음수로 그대로 내보낸다 — 칩 숫자와 차단 시점이 어긋나지 않게.
+    expect(
+      available("2026-07-20", "2026-07-22", [seg("2026-07-01", "2026-07-08")]),
+    ).toBeLessThan(0);
+  });
+
+  it("이월을 끄면 같은 입력이 다시 주기별로 막힌다", () => {
+    // 되돌릴 수 있다는 보장 — 잔여가 전부 설정에서 파생하므로 남는 것이 없다.
+    const requested = [seg("2026-07-20", "2026-07-24")];
+    expect(check(carry, requested)).toBeNull();
+    expect(check(strict, requested)).toEqual(
+      expect.objectContaining({ kind: "over_cycle" }),
+    );
+    expect(
+      regularOvernightPooledRemaining({
+        config: strict,
+        used: [],
+        dischargeAt,
+        on: "2026-07-20",
+      }),
+    ).toBe(6);
+  });
+});
+
+describe("달 단위 주기의 이월", () => {
+  // 육군의 분기 주기. 2026-01-31 시작 → 첫 적립 2026-04-30, 2주기 2026-07-31.
+  // 달 산술을 쓰므로 말일이 끌려가지 않는다(1/31 + 6개월 = 7/31).
+  const carry: RegularOvernightConfig = {
+    enabled: true,
+    startDate: "2026-01-31",
+    intervalDays: null,
+    intervalMonths: 3,
+    daysPerGrant: 2,
+    carryOver: true,
+  };
+  const dischargeAt = "2027-12-31";
+  const seg = (startDate: string, endDate: string): SegmentLike => ({
+    category: "overnight",
+    overnightKind: "regular",
+    startDate,
+    endDate,
+  });
+
+  it("말일이 끌려가지 않은 채로 누적된다", () => {
+    expect(firstGrantDate(carry)).toBe("2026-04-30");
+    expect(cycleFor(carry, "2026-08-01")).toMatchObject({
+      index: 2,
+      start: "2026-07-31",
+      end: "2026-10-30",
+    });
+    // 1·2주기 몫이 함께 쌓여 4일.
+    expect(
+      regularOvernightPooledRemaining({
+        config: carry,
+        used: [],
+        dischargeAt,
+        on: "2026-08-01",
+      }),
+    ).toBe(4);
+  });
+
+  it("쌓인 몫으로 한 주기 몫(2일)보다 길게 쓸 수 있다", () => {
+    expect(
+      checkRegularOvernight({
+        config: carry,
+        existing: [],
+        requested: [seg("2026-08-01", "2026-08-04")],
+        dischargeAt,
+      }),
+    ).toBeNull();
+    expect(
+      checkRegularOvernight({
+        config: carry,
+        existing: [],
+        requested: [seg("2026-08-01", "2026-08-05")],
+        dischargeAt,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "over_pool",
+        grantedDays: 4,
+        usedDays: 5,
+      }),
+    );
   });
 });

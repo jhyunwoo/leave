@@ -121,9 +121,11 @@ export async function getLeaveBalanceSummary(
     today,
   );
 
-  // 자동 적립을 쓰면 정기외박은 주기마다 새로 쌓이고 이월되지 않는다.
+  // 자동 적립을 쓰면 정기외박은 주기마다 새로 쌓이고, 이월을 끄면 넘어가지 않는다.
   // 그래서 누적 총량이 아니라 "이번 주기 몫과 그 주기 안 사용량"만 보여준다.
+  // 이월을 켜면 반대로 첫 적립일부터의 누적이 이 재원의 셈이 된다.
   const cycleBased = isRegularOvernightCycleBased(config);
+  const carryOver = Boolean(config?.carryOver);
   const currentCycle = cycleFor(config, today);
   // 전역까지 앞으로 받을 주기 몫 — 지금 쓸 수는 없지만 보유한 휴가에는 들어간다.
   const cycles = regularOvernightSummary(
@@ -135,14 +137,26 @@ export async function getLeaveBalanceSummary(
 
   const balances: LeaveBalanceItem[] = BALANCE_KEYS.map((key) => {
     if (key === "regular_overnight" && cycleBased) {
-      const grantDays = currentCycle?.grantDays ?? 0;
-      const usedDays = currentCycle
-        ? cycleUsedDays(currentCycle, regularSegments)
-        : 0;
+      // 이월 중이면 아직 오지 않은 주기만 빼고 전부 합친다. 아래 파생 필드
+      // (잔여·계획·자동 적립)는 이 셋에서만 나오므로 여기만 갈라 놓으면 된다.
+      const pooled = cycles.list.filter((cycle) => cycle.state !== "future");
+      const sumOf = (pick: (cycle: (typeof pooled)[number]) => number) =>
+        pooled.reduce((total, cycle) => total + pick(cycle), 0);
+
+      const grantDays = carryOver
+        ? sumOf((cycle) => cycle.grantDays)
+        : (currentCycle?.grantDays ?? 0);
+      const usedDays = carryOver
+        ? sumOf((cycle) => cycle.usedDays)
+        : currentCycle
+          ? cycleUsedDays(currentCycle, regularSegments)
+          : 0;
       // 이번 주기 안에서도 아직 다녀오지 않은 계획은 "쓴 것"에 넣지 않는다.
-      const usedToDateDays = currentCycle
-        ? cycleUsedDays(currentCycle, clipSegmentsTo(regularSegments, today))
-        : 0;
+      const usedToDateDays = carryOver
+        ? sumOf((cycle) => cycle.usedToDateDays)
+        : currentCycle
+          ? cycleUsedDays(currentCycle, clipSegmentsTo(regularSegments, today))
+          : 0;
       return {
         key,
         label: BALANCE_LABELS[key],
@@ -197,6 +211,7 @@ export async function getLeaveBalanceSummary(
           daysPerGrant: config.daysPerGrant,
           // 설정에서 파생하는 표시용 값 — 저장하지 않는다.
           nextGrantDate: nextGrantDateAfter(config, todayInSeoul()),
+          carryOver: config.carryOver,
         }
       : {
           enabled: false,
@@ -205,6 +220,7 @@ export async function getLeaveBalanceSummary(
           intervalMonths: null,
           daysPerGrant: null,
           nextGrantDate: null,
+          carryOver: false,
         },
   };
 }
@@ -318,6 +334,9 @@ export async function saveRegularOvernightConfig(
         intervalDays: input.intervalDays ?? null,
         intervalMonths: input.intervalMonths ?? null,
         daysPerGrant: input.daysPerGrant,
+        // 구버전 앱은 이 값을 보내지 않는다. 화면에 없는 스위치를 켠 채로 두면
+        // "껐는데 안 꺼진다"가 되므로, 보내지 않으면 꺼진 것으로 저장한다.
+        carryOver: input.carryOver ?? false,
         updatedAt: now,
       }
     : {
@@ -327,6 +346,7 @@ export async function saveRegularOvernightConfig(
         intervalDays: null,
         intervalMonths: null,
         daysPerGrant: null,
+        carryOver: false,
         updatedAt: now,
       };
   await db.insert(regularOvernightConfigs).values(values).onConflictDoUpdate({

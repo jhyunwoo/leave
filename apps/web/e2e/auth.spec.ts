@@ -133,8 +133,12 @@ test("회원가입 후 한 화면 한 입력 온보딩 9단계", async ({ page }
   await expect(step("username").getByText("사용할 수 있어요")).toBeVisible();
   await next.click();
 
-  // 공군이므로 정기외박 단계가 있다(육군이면 건너뛴다).
+  // 정기외박 단계는 군종을 가리지 않고 모두 밟는다.
   await expect(step("overnight")).toBeVisible();
+  // 이월 여부도 여기서 함께 묻는다 — 기준일을 모르면 통째로 건너뛴다.
+  await expect(
+    page.getByTestId("onboarding-overnight-carry-over"),
+  ).not.toBeChecked();
   await page.getByTestId("onboarding-overnight-skip").click();
 
   await expect(step("group")).toBeVisible();

@@ -22,19 +22,28 @@ export const CYCLE_BANNER_HEIGHT = 30;
 /**
  * 이번 정기외박 주기 요약. 주기 몫은 다음 적립 전날까지 써야 하고 이월되지 않아서
  * 남은 일수와 마감까지 며칠인지를 달력 맨 위에 붙여둔다.
+ *
+ * 이월을 켜면 마감이라는 것이 없다 — 남은 몫이 사라지지 않으므로 D-day를 떼고
+ * 이번 주기 잔여 대신 누적 잔여를 말한다. 그때는 재촉할 이유도 없어 강조하지 않는다.
  */
 export function CycleBanner(props: {
   cycle: RegularOvernightCycle;
   usedDays: number;
+  /** 이월 중일 때의 누적 잔여. 이월이 꺼져 있으면 null. */
+  pooledRemaining: number | null;
 }) {
   const colors = useColors();
   const balance = useBalanceColors();
   const today = todayInSeoul();
-  const remaining = Math.max(props.cycle.grantDays - props.usedDays, 0);
+  const carryOver = props.pooledRemaining !== null;
+  const remaining = Math.max(
+    props.pooledRemaining ?? props.cycle.grantDays - props.usedDays,
+    0,
+  );
   const daysLeft = Math.max(diffDays(today, props.cycle.end), 0);
   const tone = balance.regular_overnight;
   // 남은 정기외박이 없으면 조용히, 마감이 일주일 안이면 눈에 띄게.
-  const urgent = remaining > 0 && daysLeft <= 7;
+  const urgent = !carryOver && remaining > 0 && daysLeft <= 7;
 
   return (
     <BannerLine
@@ -49,8 +58,10 @@ export function CycleBanner(props: {
     >
       정기외박 {props.cycle.index}주기{" "}
       {fmtRangeTiny(props.cycle.start, props.cycle.end)} ·{" "}
-      {props.cycle.grantDays}일 중 {props.usedDays}일 사용 · 잔여 {remaining}일
-      · 마감 D-{daysLeft}
+      {props.cycle.grantDays}일 중 {props.usedDays}일 사용 ·{" "}
+      {carryOver
+        ? `누적 잔여 ${remaining}일`
+        : `잔여 ${remaining}일 · 마감 D-${daysLeft}`}
     </BannerLine>
   );
 }

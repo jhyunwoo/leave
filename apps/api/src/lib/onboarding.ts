@@ -118,6 +118,7 @@ export function serializeOnboardingStatus(
           intervalDays: config.intervalDays,
           intervalMonths: config.intervalMonths,
           daysPerGrant: config.daysPerGrant,
+          carryOver: config.carryOver,
         }
       : null,
     unitId: user.unitId,
@@ -158,6 +159,7 @@ export async function saveOnboardingProfile(
       intervalDays: null,
       intervalMonths: null,
       daysPerGrant: null,
+      carryOver: false,
       updatedAt: new Date().toISOString(),
     };
     await db

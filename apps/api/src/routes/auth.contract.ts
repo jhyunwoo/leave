@@ -192,6 +192,8 @@ const onboardingStatusSchema = z.object({
       intervalDays: z.number().nullable(),
       intervalMonths: z.number().nullable(),
       daysPerGrant: z.number().nullable(),
+      /** 켜면 주기가 끝나도 남은 몫이 사라지지 않고 하나의 누적 잔여로 쌓인다. */
+      carryOver: z.boolean(),
     })
     .nullable(),
   unitId: z.string().nullable(),

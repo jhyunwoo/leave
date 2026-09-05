@@ -31,6 +31,7 @@ import { todayInSeoul, type ISODate } from "@leave/shared/dates";
 import {
   cycleForDisplay,
   cycleUsedDays,
+  regularOvernightPooledRemaining,
   firstGrantDate,
 } from "@leave/shared/regular-overnight";
 import { useNetInfo } from "@react-native-community/netinfo";
@@ -196,6 +197,21 @@ export function CalendarScreen() {
           )
         : 0,
     [currentCycle, myLeaves.data],
+  );
+  // 이월 중에는 마감이라는 것이 없고, 쓸 수 있는 몫도 이번 주기가 아니라 누적이다.
+  const pooledRemaining = useMemo(
+    () =>
+      regularOvernight?.carryOver
+        ? regularOvernightPooledRemaining({
+            config: regularOvernight,
+            used: (myLeaves.data?.leaves ?? []).flatMap(
+              (leave) => leave.segments,
+            ),
+            dischargeAt,
+            on: today,
+          })
+        : null,
+    [regularOvernight, myLeaves.data, dischargeAt, today],
   );
   // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다. 다만 그 적립일이 전역일보다
   // 뒤면 끝내 받지 못하므로 기다리라고 하지 않는다.
@@ -424,7 +440,11 @@ export function CalendarScreen() {
           {leaveDrag.statusLabel ?? syncStatusLabel}
         </Text>
         {currentCycle ? (
-          <CycleBanner cycle={currentCycle} usedDays={cycleUsage} />
+          <CycleBanner
+            cycle={currentCycle}
+            usedDays={cycleUsage}
+            pooledRemaining={pooledRemaining}
+          />
         ) : pendingFirstGrant ? (
           <FirstGrantBanner firstGrantDate={pendingFirstGrant} />
         ) : null}

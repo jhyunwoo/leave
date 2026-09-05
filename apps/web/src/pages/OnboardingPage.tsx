@@ -95,6 +95,10 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
         REGULAR_OVERNIGHT_DEFAULTS[initial?.branch ?? "army"].daysPerGrant,
     ),
   );
+  // 이월은 통상 운영이 아니라 부대 지침이라 기본값을 깔지 않는다 — 꺼진 채로 묻는다.
+  const [carryOver, setCarryOver] = useState(
+    props.status.regularOvernight?.carryOver ?? false,
+  );
   const [inGroup, setInGroup] = useState(Boolean(props.status.unitId));
   // 이름은 이 단계에서 곧바로 서버에 저장된다(UsernameStep 주석). 여기서 드는 값은
   // 뒤로 갔다 돌아왔을 때 입력칸을 비우지 않기 위한 것뿐이다.
@@ -171,6 +175,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
                 value: Number(interval),
               }),
               daysPerGrant: Number(daysPerGrant),
+              carryOver,
             },
       );
       if (skip) setStartDate("");
@@ -322,6 +327,8 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
               onIntervalChange={setInterval}
               daysPerGrant={daysPerGrant}
               onDaysPerGrantChange={setDaysPerGrant}
+              carryOver={carryOver}
+              onCarryOverChange={setCarryOver}
               error={error}
               pending={saveRegular.isPending}
               onNext={() => void submitOvernight()}
