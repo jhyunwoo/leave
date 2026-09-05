@@ -4,6 +4,29 @@
 홈 화면과 잠금화면에서 바로 보여준다. 코드는 [`apps/native/src/widgets`](../apps/native/src/widgets)에
 있고, 설정은 `apps/native/app.json`의 `expo-widgets` 플러그인 항목이다.
 
+## 크기와 색
+
+| 위젯                       | 크기                                      |
+| -------------------------- | ----------------------------------------- |
+| 리브 지표 (`LeaveMetric`)  | 홈 소·중·대형 + 잠금화면 원형·사각·인라인 |
+| 리브 요약 (`LeaveSummary`) | 홈 중·대형                                |
+
+크기를 하나 더하는 일은 **세 곳을 함께** 고치는 일이다 — `app.json`의
+`supportedFamilies`(생성되는 Swift에 `.supportedFamilies([...])`로 그대로 박힌다),
+레이아웃 함수의 `environment.widgetFamily` 분기, 그리고 목록을 통째로 비교하는
+`apps/native/test/widget-metrics.test.ts`. 분기를 빠뜨리면 오류 없이 **작은 모양이
+그대로 늘어난다.**
+
+홈 화면 위젯은 라이트·다크 모두 **진한 브랜드 그린(`#163300`) 배경에 흰 값**을 쓴다.
+라벨은 라임(`#9fe870`), 캡션은 연초록(`#c5edab`)이다. 스킴에 따라 뒤집지 않는 이유는
+초록이 이제 표면이 아니라 정체성이기 때문이다 — 어느 홈 화면에 놓여도 같은 덩어리로
+보이는 편이 눈에 띈다. 브랜드 primary인 라임을 배경으로 쓰지 않은 것은 대비 때문이다.
+라임 위의 흰 글씨는 1.5:1이라 읽히지 않는다(`#163300` 위 흰색은 13.9:1).
+
+**잠금화면(accessory) 세 종류에는 색을 칠하지 않는다.** 시스템이 vibrant로 렌더링하므로
+여기서 칠하면 대비만 나빠진다. 레이아웃 함수의 `accessory` 가드가 색을 `undefined`로
+떨어뜨린다.
+
 ## 위젯은 새로고침할 때 JS를 돌릴 수 없다
 
 그래서 위젯이 그리는 것은 **앱이 미리 넣어 둔 값**뿐이다. 그대로 두면 "앱을 켜야
@@ -32,16 +55,16 @@
 
 ## 지표를 고르는 길이 두 개인 이유
 
-- **iOS 17+**: 위젯을 길게 눌러 "위젯 편집"에서 고른다. 목록은 `app.json`의
+- **위젯 편집(iOS 17+)**: 위젯을 길게 눌러 고른다. 목록은 `app.json`의
   `configuration.parameters.metric` enum에서 오고, 고른 값은 `environment.configuration`으로
   들어온다. 위젯마다 다르게 둘 수 있어 가장 좋은 경로다.
-- **Android**: 위젯별 설정 화면이 없다. `expo-widgets`의 안드로이드 플러그인은
-  configuration activity를 만들지 않으므로(`withAndroidWidgetManifest.js`), 위젯을
-  길게 눌러도 고를 화면이 없다. 그래서 **인앱 "위젯 설정" 화면**이 기본 지표를 정하고
-  props의 `defaultMetric`으로 실려 간다. 모든 위젯 인스턴스가 같은 지표를 본다.
+- **인앱 "위젯 설정" 화면**: 기본 지표를 정하고 props의 `defaultMetric`으로 실려 간다.
+  요약 위젯은 지표가 여럿이라 위젯 편집만으로는 고를 수 없어 구성이 항상 여기서 오고,
+  지표 위젯도 iOS 16.4~16.x에서는 편집 자체가 없어(아래 참고) 이 값만 본다.
 
-요약 위젯은 지표가 여럿이라 어느 플랫폼에서도 위젯 편집만으로는 고를 수 없다.
-구성은 항상 인앱 설정에서 온다.
+이 화면으로 가는 입구는 **프로필 탭 맨 아래**다. 한때 "내 정보 수정" 안에 있었는데,
+위젯을 붙이는 일은 내 값을 고치는 일이 아니라 내 상태를 보는 또 하나의 길이고,
+무엇보다 편집 화면 안에서는 아무도 찾지 못했다.
 
 `defaultMetric`은 그밖에 **고른 지표에 보여줄 값이 없을 때**(그룹에 참여하지 않아
 출타 여유가 없거나, 병장이라 진급이 없을 때)의 대비책으로도 쓰인다. 그 자리마저
@@ -87,15 +110,29 @@ App Group은 `group.app.leave.mobile`이다. 이 값이 바뀌면 이미 배포�
 상자를 보게 되므로 기본값(`group.<bundleId>`)에 기대지 않고 `app.json`에 못 박아 두었고,
 테스트가 번들 id와의 관계를 확인한다.
 
-## Android에서 확인하지 못한 것
+## Android 위젯은 내렸다 — 패키지에 구현이 없다
 
-`widgetURL`은 `@expo/ui/swift-ui`의 모디파이어라 **iOS에만 걸린다.** Android에서 위젯을
-눌렀을 때 어디로 가는지는 Glance 쪽 기본 동작에 달려 있고, 실기기 검증에서 확인해야 한다.
-지표별 착지점(`METRIC_LINKS`)이 Android에서도 그대로 통한다고 가정하지 말 것.
+`enableAndroid`는 `false`다. "검증이 덜 됐다"가 아니라 **`expo-widgets@57.0.16`에
+안드로이드 구현이 없다.** 패키지를 열어 확인한 것:
 
-`expo-widgets`의 Android는 SDK 57 문서에 아직 없는 opt-in(`enableAndroid`)이다. 구현은
-패키지에 들어 있지만(`expo.modules.widgets.WidgetsModule`, Glance 1.2.0-rc01) iOS만큼
-검증되지 않았다.
+- `android/.../WidgetsModule.kt`는 `Name("ExpoWidgets")` 한 줄이고 함수가 하나도 없다.
+- JS쪽 `src/ExpoWidgets.ts`(안드로이드가 고르는 파일)는 통째로 no-op 스텁이다 —
+  `updateTimeline`이 빈 함수라 **타임라인이 조용히 버려진다.** 예외도 나지 않는다.
+- `ExpoWidgetsGlanceWidget.kt`는 `provideContent { Text(widgetName) }` 한 줄이다.
+  플러그인이 만드는 provider도 이 클래스를 그대로 상속한다.
+
+즉 켜 두면 사용자의 홈 화면에 **문자 "LeaveMetric"이 그려진다.** `.widget.tsx`의
+레이아웃은 안드로이드에서 한 번도 평가되지 않는다.
+
+다시 켜려면 Glance 컴포저블과 SharedPreferences 전달 경로를 직접 쓰는 config plugin이
+필요하다 — 이 저장소의 위젯 코드를 고쳐서 될 일이 아니다. `enableAndroid === false`는
+`apps/native/test/widget-metrics.test.ts`가 못 박고 있으니, 켜는 것은 반드시 의식적인
+결정이 된다.
+
+레이아웃 함수가 `environment.widgetFamily`로 크기를 가르는 것도 iOS 전용이다
+(`ios/Widgets/Utils.swift`가 채워 준다). 안드로이드에는 환경 맵 자체가 없어 값이
+`undefined`로 오므로, **크기 분기의 마지막 `return`은 언제나 fall-through 기본값으로
+남겨 둔다.**
 
 ## 개인정보 매니페스트
 

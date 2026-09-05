@@ -2,7 +2,7 @@
   "expo": {
     "name": "리브",
     "slug": "leave",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -211,7 +211,7 @@
         "expo-widgets",
         {
           "groupIdentifier": "group.app.leave.mobile",
-          "enableAndroid": true,
+          "enableAndroid": false,
           "widgets": [
             {
               "name": "LeaveMetric",
@@ -220,6 +220,8 @@
               "contentMarginsDisabled": false,
               "supportedFamilies": [
                 "systemSmall",
+                "systemMedium",
+                "systemLarge",
                 "accessoryCircular",
                 "accessoryRectangular",
                 "accessoryInline"
@@ -264,11 +266,6 @@
                     ]
                   }
                 }
-              },
-              "android": {
-                "targetCellWidth": 2,
-                "targetCellHeight": 2,
-                "resizeMode": "none"
               }
             },
             {
@@ -276,12 +273,7 @@
               "displayName": "리브 요약",
               "description": "전역·다음 휴가·남은 휴가를 한 화면에서 봅니다.",
               "contentMarginsDisabled": false,
-              "supportedFamilies": ["systemMedium", "systemLarge"],
-              "android": {
-                "targetCellWidth": 4,
-                "targetCellHeight": 2,
-                "resizeMode": "horizontal"
-              }
+              "supportedFamilies": ["systemMedium", "systemLarge"]
             }
           ]
         }

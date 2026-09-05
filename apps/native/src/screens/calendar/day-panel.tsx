@@ -2,6 +2,14 @@
  * 달력에서 고른 하루의 요약 패널(네이티브).
  * 출타율·공휴일·제한 기간을 알리고 그날의 출타 명단(day-roster.tsx)과
  * 내 개인 일정을 보여준다.
+ *
+ * 맨 아래 동작은 성격에 따라 세 층으로 나눠 놓았다 — 주 동작(휴가 등록) 한 줄,
+ * 성격이 같은 두 "추가"를 나란히 한 줄, 그리고 구분선 아래에 이 날짜와 무관한
+ * 이동(개인 일정 전체 보기). 예전에는 넷이 같은 폭으로 세로로 쌓여 있어 무엇이
+ * 주 동작인지, 가운데 둘이 어떻게 다른지 한눈에 잡히지 않았다.
+ *
+ * 라벨에서 "이 날부터"·"이 날에"를 뺀 것도 같은 이유다. 패널 제목이 이미
+ * "선택한 날짜 / 9월 17일 (목)"이라 버튼마다 그 접두어를 반복할 이유가 없다.
  */
 
 import {
@@ -15,6 +23,7 @@ import {
 import {
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -28,7 +37,7 @@ import { makeStyles, radius, spacing } from "@/theme";
 import { DayRoster } from "./day-roster";
 
 /**
- * 아래 두 동작 버튼 사이 간격.
+ * 아래 동작 버튼들의 **세로** 간격. 가로로 나란한 두 버튼에는 쓰지 않는다.
  *
  * iOS 버튼은 SwiftUI 호스트라 자기 RN 레이아웃 상자보다 큰 캡슐을 그린다. 상자는
  * 호스트가 스스로 잰 크기(변형에 따라 24~43pt)인데 그려지는 캡슐은 48pt여서,
@@ -169,27 +178,38 @@ export function DayPanel(props: {
       )}
 
       <View style={styles.actions}>
-        <Button title="이 날부터 휴가 등록" onPress={props.onAddLeave} />
-        {props.onAddPersonalEvent ? (
-          <Button
-            title="이 날에 개인 일정 추가"
-            variant="secondary"
-            onPress={props.onAddPersonalEvent}
-          />
+        <Button title="휴가 등록" onPress={props.onAddLeave} />
+
+        {props.onAddPersonalEvent || props.onAddUnitEvent ? (
+          <View style={styles.addRow}>
+            {props.onAddPersonalEvent ? (
+              <Button
+                title="개인 일정"
+                variant="secondary"
+                onPress={props.onAddPersonalEvent}
+                style={styles.addRowItem}
+              />
+            ) : null}
+            {props.onAddUnitEvent ? (
+              <Button
+                title="부대 일정"
+                variant="secondary"
+                onPress={props.onAddUnitEvent}
+                style={styles.addRowItem}
+              />
+            ) : null}
+          </View>
         ) : null}
-        {props.onAddUnitEvent ? (
-          <Button
-            title="이 날에 부대 일정 추가"
-            variant="secondary"
-            onPress={props.onAddUnitEvent}
-          />
-        ) : null}
+
         {props.onOpenPersonalEvents ? (
-          <Button
-            title="개인 일정 전체 보기"
-            variant="ghost"
-            onPress={props.onOpenPersonalEvents}
-          />
+          <>
+            <View style={styles.actionsDivider} />
+            <Button
+              title="개인 일정 전체 보기"
+              variant="ghost"
+              onPress={props.onOpenPersonalEvents}
+            />
+          </>
         ) : null}
       </View>
     </View>
@@ -366,4 +386,24 @@ const useStyles = makeStyles(({ colors }) => ({
   personalTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   personalMeta: { fontSize: 12, color: colors.mute },
   actions: { gap: ACTION_GAP },
+  /**
+   * 같은 성격의 두 "추가"를 한 줄에 나란히 둔다. 세로로 쌓으면 색·모양·문구가
+   * 거의 같아 눈이 구분할 단서가 없고, 주 동작(휴가 등록)과도 무게가 같아 보인다.
+   *
+   * 가로 간격에는 `ACTION_GAP` 보정을 쓰지 않는다 — 그 보정은 iOS 버튼이 자기
+   * 상자보다 **세로로** 크게 그려지는 문제를 메우는 값이라 여기서는 뜻이 없다.
+   */
+  addRow: { flexDirection: "row", gap: spacing.md },
+  /**
+   * 라벨이 짧아야 성립한다. `button.ios.tsx`는 SwiftUI Host가 라벨을 재지 못해
+   * `estimateLabelWidth`로 `minWidth`를 깔아 주는데, Yoga에서 `minWidth`는 부모
+   * 폭을 이긴다. "개인 일정"/"부대 일정"은 5자라 어림값이 111pt고 가장 좁은
+   * 화면에서도 반 칸에 들어가지만, 라벨을 길게 바꾸면 버튼이 카드 밖으로 밀린다.
+   */
+  addRowItem: { flex: 1 },
+  /** 아래 링크는 생성이 아니라 이동이다. 구분선이 그 차이를 말해 준다. */
+  actionsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.hairline,
+  },
 }));

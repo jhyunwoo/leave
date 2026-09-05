@@ -1,5 +1,5 @@
 /**
- * 지표 하나를 크게 보여주는 위젯. 홈 화면 소형과 잠금화면 세 종류를 함께 그린다.
+ * 지표 하나를 크게 보여주는 위젯. 홈 화면 소·중·대형과 잠금화면 세 종류를 함께 그린다.
  *
  * ## 이 파일의 함수는 보통 함수가 아니다
  *
@@ -47,11 +47,17 @@ function LeaveMetricLayout(
 ) {
   "widget";
 
-  const dark = environment.colorScheme === "dark";
-  const ink = dark ? "#f2f4f0" : "#0e0f0c";
-  const mute = dark ? "#8e918c" : "#868685";
-  const accent = dark ? "#79d553" : "#347a1f";
-  const canvas = dark ? "#1c1c1e" : "#ffffff";
+  // 홈 화면 위젯은 라이트·다크 모두 진한 브랜드 그린 위에 흰 글씨를 얹는다.
+  // 초록이 표면이 아니라 정체성이라 스킴에 따라 뒤집지 않는다 — 홈 화면 어디에
+  // 놓여도 같은 덩어리로 보이는 편이 눈에 띈다.
+  //
+  // 값 자체는 theme.ts의 inkDeep·primary·primaryNeutral과 같지만, `widget`
+  // 함수는 바깥 스코프를 볼 수 없어 리터럴로 적는다(파일 머리주석 참고).
+  // #163300 위 대비: 흰색 13.9:1, 라임 9.5:1, 연초록 10.7:1 — 전부 AAA.
+  const ink = "#ffffff";
+  const mute = "#c5edab";
+  const accent = "#9fe870";
+  const canvas = "#163300";
 
   const family = environment.widgetFamily;
   const accessory =
@@ -85,12 +91,12 @@ function LeaveMetricLayout(
           accessibilityLabel(`리브. ${message}`),
         ]}
       >
-        <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+        <Text modifiers={[font({ size: 13, weight: "bold" }), ...tint(strong)]}>
           리브
         </Text>
         <Text
           modifiers={[
-            font({ size: 13 }),
+            font({ size: 14 }),
             ...tint(soft),
             lineLimit(2),
             minimumScaleFactor(0.7),
@@ -159,12 +165,12 @@ function LeaveMetricLayout(
           accessibilityLabel("리브. 아직 보여줄 값이 없어요"),
         ]}
       >
-        <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+        <Text modifiers={[font({ size: 13, weight: "bold" }), ...tint(strong)]}>
           리브
         </Text>
         <Text
           modifiers={[
-            font({ size: 13 }),
+            font({ size: 14 }),
             ...tint(soft),
             lineLimit(2),
             minimumScaleFactor(0.7),
@@ -247,7 +253,94 @@ function LeaveMetricLayout(
     );
   }
 
-  // systemSmall — 홈 화면.
+  // 홈 화면 세 크기는 같은 배치(라벨 → 값 → 캡션)를 크기만 바꿔 쓴다. 라벨은
+  // 라임 강조, 값은 흰색, 캡션은 연초록 — 값이 가장 밝고 크게 읽히도록 둔다.
+  if (family === "systemLarge") {
+    return (
+      <VStack
+        alignment="leading"
+        spacing={6}
+        modifiers={[
+          padding({ top: 22, leading: 22, bottom: 22, trailing: 22 }),
+          containerBackground(canvas, "widget"),
+          widgetURL(link),
+          accessibilityLabel(`${metric.label}. ${metric.spoken}`),
+        ]}
+      >
+        <Text modifiers={[font({ size: 18, weight: "bold" }), ...tint(strong)]}>
+          {metric.label}
+        </Text>
+        <Text
+          modifiers={[
+            font({ size: 80, weight: "heavy" }),
+            ...tint(body),
+            lineLimit(1),
+            minimumScaleFactor(0.4),
+          ]}
+        >
+          {metric.value}
+        </Text>
+        {metric.caption ? (
+          <Text
+            modifiers={[
+              font({ size: 17 }),
+              ...tint(soft),
+              lineLimit(2),
+              minimumScaleFactor(0.8),
+            ]}
+          >
+            {metric.caption}
+          </Text>
+        ) : null}
+        <Spacer />
+      </VStack>
+    );
+  }
+
+  if (family === "systemMedium") {
+    return (
+      <VStack
+        alignment="leading"
+        spacing={4}
+        modifiers={[
+          padding({ top: 18, leading: 18, bottom: 18, trailing: 18 }),
+          containerBackground(canvas, "widget"),
+          widgetURL(link),
+          accessibilityLabel(`${metric.label}. ${metric.spoken}`),
+        ]}
+      >
+        <Text modifiers={[font({ size: 15, weight: "bold" }), ...tint(strong)]}>
+          {metric.label}
+        </Text>
+        <Text
+          modifiers={[
+            font({ size: 56, weight: "heavy" }),
+            ...tint(body),
+            lineLimit(1),
+            minimumScaleFactor(0.4),
+          ]}
+        >
+          {metric.value}
+        </Text>
+        {metric.caption ? (
+          <Text
+            modifiers={[
+              font({ size: 15 }),
+              ...tint(soft),
+              lineLimit(1),
+              minimumScaleFactor(0.8),
+            ]}
+          >
+            {metric.caption}
+          </Text>
+        ) : null}
+        <Spacer />
+      </VStack>
+    );
+  }
+
+  // systemSmall — 홈 화면. **여기가 마지막 fall-through다.** 안드로이드에는
+  // 위젯 환경 맵이 없어 `family`가 undefined로 오므로 반드시 남겨 둔다.
   return (
     <VStack
       alignment="leading"
@@ -259,13 +352,13 @@ function LeaveMetricLayout(
         accessibilityLabel(`${metric.label}. ${metric.spoken}`),
       ]}
     >
-      <Text modifiers={[font({ size: 12, weight: "bold" }), ...tint(strong)]}>
+      <Text modifiers={[font({ size: 13, weight: "bold" }), ...tint(strong)]}>
         {metric.label}
       </Text>
       <Text
         modifiers={[
-          font({ size: 34, weight: "heavy" }),
-          ...tint(strong),
+          font({ size: 40, weight: "heavy" }),
+          ...tint(body),
           lineLimit(1),
           minimumScaleFactor(0.5),
         ]}
@@ -275,8 +368,8 @@ function LeaveMetricLayout(
       {metric.caption ? (
         <Text
           modifiers={[
-            font({ size: 12 }),
-            ...tint(body),
+            font({ size: 13 }),
+            ...tint(soft),
             lineLimit(2),
             minimumScaleFactor(0.8),
           ]}

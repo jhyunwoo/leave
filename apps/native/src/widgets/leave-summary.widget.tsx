@@ -29,11 +29,12 @@ function LeaveSummaryLayout(
 ) {
   "widget";
 
-  const dark = environment.colorScheme === "dark";
-  const ink = dark ? "#f2f4f0" : "#0e0f0c";
-  const mute = dark ? "#8e918c" : "#868685";
-  const accent = dark ? "#79d553" : "#347a1f";
-  const canvas = dark ? "#1c1c1e" : "#ffffff";
+  // 지표 위젯과 같은 팔레트를 쓴다 — 라이트·다크 모두 진한 브랜드 그린 배경에
+  // 흰 값, 라임 강조, 연초록 보조. 이유와 대비 수치는 leave-metric.widget.tsx에.
+  const ink = "#ffffff";
+  const mute = "#c5edab";
+  const accent = "#9fe870";
+  const canvas = "#163300";
 
   const shell = [
     padding({ top: 14, leading: 16, bottom: 14, trailing: 16 }),
@@ -54,7 +55,7 @@ function LeaveSummaryLayout(
       >
         <Text
           modifiers={[
-            font({ size: 13, weight: "bold" }),
+            font({ size: 14, weight: "bold" }),
             foregroundStyle(accent),
           ]}
         >
@@ -62,7 +63,7 @@ function LeaveSummaryLayout(
         </Text>
         <Text
           modifiers={[
-            font({ size: 14 }),
+            font({ size: 15 }),
             foregroundStyle(mute),
             lineLimit(3),
             minimumScaleFactor(0.8),
@@ -96,13 +97,13 @@ function LeaveSummaryLayout(
       >
         <Text
           modifiers={[
-            font({ size: 13, weight: "bold" }),
+            font({ size: 14, weight: "bold" }),
             foregroundStyle(accent),
           ]}
         >
           리브
         </Text>
-        <Text modifiers={[font({ size: 14 }), foregroundStyle(mute)]}>
+        <Text modifiers={[font({ size: 15 }), foregroundStyle(mute)]}>
           아직 보여줄 값이 없어요
         </Text>
         <Spacer />
@@ -122,7 +123,7 @@ function LeaveSummaryLayout(
       >
         <Text
           modifiers={[
-            font({ size: 13, weight: "bold" }),
+            font({ size: 14, weight: "bold" }),
             foregroundStyle(accent),
           ]}
         >
@@ -135,7 +136,7 @@ function LeaveSummaryLayout(
               <VStack alignment="leading" spacing={1}>
                 <Text
                   modifiers={[
-                    font({ size: 12, weight: "semibold" }),
+                    font({ size: 14, weight: "semibold" }),
                     foregroundStyle(mute),
                   ]}
                 >
@@ -144,7 +145,7 @@ function LeaveSummaryLayout(
                 {metric.caption ? (
                   <Text
                     modifiers={[
-                      font({ size: 11 }),
+                      font({ size: 12 }),
                       foregroundStyle(mute),
                       lineLimit(1),
                     ]}
@@ -156,7 +157,7 @@ function LeaveSummaryLayout(
               <Spacer />
               <Text
                 modifiers={[
-                  font({ size: 22, weight: "heavy" }),
+                  font({ size: 28, weight: "heavy" }),
                   foregroundStyle(ink),
                   lineLimit(1),
                   minimumScaleFactor(0.6),
@@ -180,7 +181,7 @@ function LeaveSummaryLayout(
     >
       <Text
         modifiers={[
-          font({ size: 13, weight: "bold" }),
+          font({ size: 14, weight: "bold" }),
           foregroundStyle(accent),
         ]}
       >
@@ -198,7 +199,7 @@ function LeaveSummaryLayout(
             >
               <Text
                 modifiers={[
-                  font({ size: 11, weight: "semibold" }),
+                  font({ size: 13, weight: "semibold" }),
                   foregroundStyle(mute),
                   lineLimit(1),
                 ]}
@@ -207,7 +208,7 @@ function LeaveSummaryLayout(
               </Text>
               <Text
                 modifiers={[
-                  font({ size: 24, weight: "heavy" }),
+                  font({ size: 30, weight: "heavy" }),
                   foregroundStyle(ink),
                   lineLimit(1),
                   minimumScaleFactor(0.5),

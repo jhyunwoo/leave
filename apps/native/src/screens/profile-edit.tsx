@@ -1,5 +1,5 @@
 /**
- * 내 정보 화면(네이티브) — 신원 수정, 사용자 이름, 위젯, 계정과 개인정보.
+ * 내 정보 화면(네이티브) — 신원 수정, 사용자 이름, 계정과 개인정보.
  *
  * 사용처: 프로필 탭의 "내 정보 수정".
  *
@@ -74,7 +74,6 @@ export function ProfileEditScreen() {
   const styles = useStyles();
   const colors = useColors();
   const { sizeClass, isCompact } = useWindowSizeClass();
-  const router = useRouter();
   const me = useMe();
   const refresh = useRefresh(me);
   const deleteAccount = useDeleteAccount();
@@ -144,22 +143,6 @@ export function ProfileEditScreen() {
           <EditProfileCard user={user} />
 
           <UsernameCard username={user.username} />
-
-          <ContentPanel style={styles.card}>
-            <Text selectable style={styles.sectionTitle}>
-              홈 화면 위젯
-            </Text>
-            <Text selectable style={styles.sectionBody}>
-              전역일 D-Day·다음 휴가·남은 휴가를 홈 화면과 잠금화면에서 바로 볼
-              수 있어요. 어떤 지표를 보여줄지 여기서 고릅니다.
-            </Text>
-            <Button
-              title="위젯 설정"
-              variant="secondary"
-              onPress={() => router.push("/widget-settings")}
-              testID="open-widget-settings"
-            />
-          </ContentPanel>
 
           <ContentPanel style={styles.card}>
             <Text selectable style={styles.sectionTitle}>

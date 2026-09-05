@@ -82,7 +82,16 @@ describe("위젯 설정", () => {
       "LeaveSummary",
     ]);
     // 잠금화면(accessory*)은 지표 위젯에만 붙는다. 요약은 그 자리에 들어가지 않는다.
-    expect(metricWidget!.supportedFamilies).toContain("accessoryCircular");
+    // 목록을 통째로 못 박는 이유: 크기를 하나 더하면 레이아웃 함수에도 그 분기를
+    // 넣어야 하는데(`environment.widgetFamily`), 빠뜨리면 조용히 소형 모양이 늘어난다.
+    expect(metricWidget!.supportedFamilies).toEqual([
+      "systemSmall",
+      "systemMedium",
+      "systemLarge",
+      "accessoryCircular",
+      "accessoryRectangular",
+      "accessoryInline",
+    ]);
     expect(
       config.widgets.find((widget) => widget.name === "LeaveSummary")!
         .supportedFamilies,
@@ -97,8 +106,13 @@ describe("위젯 설정", () => {
     );
   });
 
-  it("Android 위젯을 함께 내보낸다", () => {
-    expect(config.enableAndroid).toBe(true);
+  it("Android 위젯은 내리고 내보내지 않는다", () => {
+    // expo-widgets 57.0.16의 안드로이드 구현은 껍데기다 — JS쪽 native 모듈은
+    // `updateTimeline`이 빈 함수인 no-op 스텁이고, Glance 위젯은 `Text(widgetName)`
+    // 한 줄이라 화면에 "LeaveMetric"이라는 글자가 그려진다. 켜 두면 동작하지 않는
+    // 위젯을 사용자에게 내주게 되므로 내렸다. 다시 켜려면 Glance 쪽을 직접 써야
+    // 하고, 그것이 의식적인 결정이 되도록 여기서 못 박는다.
+    expect(config.enableAndroid).toBe(false);
   });
 
   it("모든 지표에 이름·설명·착지점이 있다", () => {
