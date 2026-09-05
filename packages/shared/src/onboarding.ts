@@ -35,6 +35,10 @@ import { REGULAR_OVERNIGHT_DEFAULTS } from "./regular-overnight-guidance";
  * `dates`만 예외로 입대일과 전역예정일을 함께 둔다 — 전역일은 입대일에서
  * 자동 계산되는 값이라, 따로 떼면 사용자가 이미 정해진 답을 한 번 더 넘기게 된다.
  *
+ * `howto`는 질문이 아니라 유일한 설명 화면이라 순서가 다른 이유로 정해져 있다. 그룹까지
+ * 만들어 본 뒤라야 "같은 그룹의 출타 인원"이 무슨 말인지 통한다 — 앞에 두면 아직 아무
+ * 맥락이 없는 사람에게 용어부터 던지게 된다.
+ *
  * `username`이 별칭(`name`) 바로 뒤가 아니라 `rank` 뒤에 있는 것은 이어하기 때문이다.
  * 1~5단계의 답은 `rank`의 "다음"에서 프로필 한 벌로 처음 저장된다. 사용자 이름은
  * 유일성 때문에 그 자리에서 바로 서버에 넣어야 하는데, 별칭 뒤에 두면 "이름은
@@ -50,6 +54,7 @@ export const ONBOARDING_STEP_IDS = [
   "username",
   "overnight",
   "group",
+  "howto",
   "done",
 ] as const;
 
@@ -87,7 +92,9 @@ export function onboardingResumeStep(status: {
   if (!status.profile) return "welcome";
   // 사용자 이름은 저장되는 순간 유일성을 얻는다 — 있으면 다시 묻지 않는다.
   if (!status.username) return "username";
-  if (status.unitId) return "done";
+  // 사용법 단계에는 서버 상태가 없어 "봤는지"를 알 수 없다. 곧장 `done`으로 보내면
+  // 그룹에 이미 들어간 사람은 설명을 영영 못 보므로, 한 번 더 보는 쪽을 고른다.
+  if (status.unitId) return "howto";
   return status.regularOvernight ? "group" : "overnight";
 }
 
@@ -131,11 +138,66 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
     title: "함께 쓸 그룹이 있나요?",
     lead: "같은 그룹의 계획이 모여야 날짜별 출타 현황이 맞아떨어져요.",
   },
+  howto: {
+    title: "리브는 이렇게 써요",
+    lead: "한 번만 읽어두면 돼요. 다시 보고 싶으면 사용 가이드에 그대로 있어요.",
+  },
   done: {
     title: "준비 끝났어요",
     lead: "이제 달력에서 휴가를 계획할 수 있어요.",
   },
 };
+
+/* -------------------------------------------------------------- 사용법 */
+
+export interface OnboardingHowtoCard {
+  id: string;
+  /** 무엇을 하는지 한 줄. 기능 이름이 아니라 사용자가 할 일로 적는다. */
+  title: string;
+  /** 그 화면이 실제로 무엇을 계산해 주는지. */
+  body: string;
+}
+
+/**
+ * 사용법 단계에 펼치는 카드.
+ *
+ * 웹과 앱이 각자 그리되 문구는 여기 한 벌만 둔다 — 화면 파일에 적으면 한쪽만
+ * 고쳐져 서서히 갈라진다(이 파일 머리말이 경고하는 그 상황이다).
+ *
+ * 아이콘을 함께 두지 않는 이유는, 웹의 SVG와 네이티브의 글꼴 이모지가 결국 서로
+ * 다른 그림이 되기 때문이다. 두 화면이 같은 말을 하는 것이 같은 그림을 그리는 것보다
+ * 중요하다.
+ *
+ * 여기 적는 규칙과 숫자는 전부 이 저장소가 실제로 계산하는 것이어야 한다
+ * (`GuidePage.tsx`가 지키는 규칙과 같다). 군 규정을 해석해 적지 않는다.
+ */
+export const ONBOARDING_HOWTO: readonly OnboardingHowtoCard[] = [
+  {
+    id: "calendar",
+    title: "달력에서 휴가를 등록해요",
+    body: "날짜를 눌러 기간을 잡고 제목과 휴가 종류를 고르면 끝이에요. 연가와 포상휴가처럼 종류가 섞인 일정도 구간으로 나눠 담을 수 있어요.",
+  },
+  {
+    id: "overage",
+    title: "빨간 날은 출타 인원이 넘친 날이에요",
+    body: "같은 그룹의 계획을 날짜마다 세어, 그룹이 정한 하루 최대 출타 인원을 넘으면 그날이 빨갛게 표시돼요. 한 사람이 휴가를 여러 개 등록해도 1명으로 세요.",
+  },
+  {
+    id: "notify",
+    title: "넘치면 그날 휴가인 모두에게 알려요",
+    body: "등록한 사람만이 아니라 그날 나가기로 한 부대원 전원에게 알림이 가요. 받고 싶지 않은 종류는 알림 설정에서 하나씩 끌 수 있어요.",
+  },
+  {
+    id: "grants",
+    title: "보유 휴가에서 잔여를 확인해요",
+    body: "연가·포상휴가는 받은 건마다 만기가 달라 적립분 단위로 쌓이고, 쓴 날은 만기가 빠른 적립분부터 빠져요. 정기외박은 주기 기준으로 따로 세요.",
+  },
+  {
+    id: "friends",
+    title: "친구와 일정을 맞춰봐요",
+    body: "@아이디로 친구를 찾고 양쪽이 모두 수락하면 달력에서 일정을 나란히 볼 수 있어요. 개인 일정은 휴가와 따로 저장돼 나만 봐요.",
+  },
+] as const;
 
 /* ------------------------------------------------------------ 군종별 색 */
 

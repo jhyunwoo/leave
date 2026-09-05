@@ -3,9 +3,9 @@
  *
  * 사용처: `App.tsx`가 `onboarding.completed === false`일 때 라우트 대신 띄운다.
  *
- * 화면은 `ONBOARDING_STEP_IDS` 순서를 그대로 따라가고, 육군은 정기외박 단계를
- * 건너뛴다(`onboardingSteps`). 왼쪽 히어로는 답변이 쌓일수록 자라나므로 단계가
- * 늘어난 만큼 지루해지지 않는다.
+ * 화면은 `ONBOARDING_STEP_IDS` 순서를 그대로 따라간다 — 군종에 따라 갈라지지 않는다
+ * (`onboardingSteps`). 왼쪽 히어로는 답변이 쌓일수록 자라나므로 단계가 늘어난 만큼
+ * 지루해지지 않는다. 마지막 두 단계(`howto`·`done`)는 묻지 않고 알려주는 화면이다.
  *
  * 서버 쓰기는 세 곳뿐이다.
  *  - 계급 단계의 "다음" : 프로필 다섯 필드를 한 벌로 PUT
@@ -50,6 +50,7 @@ import {
 } from "../state/pending-invite";
 import { DoneStep } from "./onboarding/DoneStep";
 import { GroupStep } from "./onboarding/GroupStep";
+import { HowtoStep } from "./onboarding/HowtoStep";
 import { OvernightStep } from "./onboarding/OvernightStep";
 import {
   BranchStep,
@@ -334,6 +335,8 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
               onNext={() => void submitOvernight()}
               onSkip={() => void submitOvernight(true)}
             />
+          ) : step === "howto" ? (
+            <HowtoStep onNext={advance} />
           ) : step === "group" ? (
             <GroupStep
               pendingCode={readPendingInvite()}

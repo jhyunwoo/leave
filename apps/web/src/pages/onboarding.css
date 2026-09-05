@@ -422,6 +422,36 @@
   transform: rotate(-45deg);
 }
 
+/* 사용법 카드. 한 화면에 다섯 장이 서므로 카드마다 테두리를 두르지 않고
+   왼쪽 선 하나로 나눈다 — 상자가 다섯 개면 목록이 아니라 벽으로 읽힌다. */
+.ob-howto {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.ob-howto li {
+  display: grid;
+  gap: 3px;
+  padding-left: var(--sp-md);
+  border-left: 2px solid var(--primary-neutral, #c5edab);
+}
+
+.ob-howto strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ob-howto span {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--body);
+}
+
 .ob-summary {
   margin: 0;
   border: 1px solid var(--hairline);

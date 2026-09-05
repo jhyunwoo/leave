@@ -1,4 +1,4 @@
-# 최소수집 가입 → 온보딩 8단계 → 비식별 그룹 생성 → 일정 시뮬레이션 → 계정 삭제.
+# 최소수집 가입 → 온보딩 10단계 → 비식별 그룹 생성 → 일정 시뮬레이션 → 계정 삭제.
 appId: app.leave.mobile
 env:
   PASSWORD: "test-only-password-123"
@@ -37,7 +37,7 @@ env:
 - tapOn:
     id: "onboarding-next"
 
-# 육군을 고르면 정기외박 단계가 빠져 단계가 하나 줄어든다.
+# 군종은 단계 수를 바꾸지 않는다 — 육군도 분기마다 정기외박을 운영한다.
 - assertVisible: "어느 군에 계신가요?"
 - tapOn:
     id: "onboarding-branch-army"
@@ -57,7 +57,21 @@ env:
 - tapOn:
     id: "onboarding-next"
 
-# 육군이라 정기외박을 건너뛰고 바로 그룹 단계로 온다.
+# 프로필을 저장한 뒤에 공개 이름을 묻는다(이어하기 판정이 저장된 값 두 개로 끝나도록).
+- assertVisible: "친구가 찾을 이름을 정해주세요"
+- tapOn:
+    id: "onboarding-username"
+- inputText: "limewhale"
+- inputRandomNumber:
+    length: 6
+- tapOn:
+    id: "onboarding-next"
+
+# 정기외박 기준일은 부대마다 달라 모를 수 있다. 모르면 통째로 건너뛴다.
+- assertVisible: "정기외박 기준일이 언제인가요?"
+- tapOn:
+    id: "onboarding-overnight-skip"
+
 - assertVisible: "함께 쓸 그룹이 있나요?"
 - tapOn:
     id: "onboarding-group-create"
@@ -75,6 +89,12 @@ env:
 - assertVisible: "동료를 초대해보세요"
 - tapOn:
     id: "onboarding-invite-done"
+
+# 묻지 않고 알려주는 화면. 여기서 앱을 어디서 쓰는지 익힌다.
+- assertVisible: "리브는 이렇게 써요"
+- assertVisible: "달력에서 휴가를 등록해요"
+- tapOn:
+    id: "onboarding-next"
 
 - assertVisible: "준비 끝났어요"
 - tapOn:

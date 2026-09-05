@@ -44,13 +44,13 @@ export function DoneStep(props: {
     ["복무", `${props.enlistedAt} → ${props.dischargeAt}`],
     ["계급", RANK_LABELS[props.rank]],
   ];
-  if (props.branch !== "army")
-    rows.push([
-      "정기외박",
-      props.overnightStartDate
-        ? `${props.overnightStartDate} 기준`
-        : "나중에 설정",
-    ]);
+  // 군종을 가리지 않는다 — 육군도 분기마다 정기외박을 운영하고 같은 단계를 밟는다.
+  rows.push([
+    "정기외박",
+    props.overnightStartDate
+      ? `${props.overnightStartDate} 기준`
+      : "나중에 설정",
+  ]);
   rows.push(["공유 그룹", props.inGroup ? "참여함" : "나중에"]);
 
   return (

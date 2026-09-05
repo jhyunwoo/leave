@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BRANCHES,
+  ONBOARDING_COPY,
+  ONBOARDING_HOWTO,
   ONBOARDING_STEP_IDS,
   REGULAR_OVERNIGHT_DEFAULTS,
   onboardingResumeStep,
@@ -43,6 +45,58 @@ describe("온보딩 단계", () => {
     expect(onboardingStepIndex("welcome")).toBe(0);
     expect(onboardingStepIndex("overnight")).toBe(
       ONBOARDING_STEP_IDS.indexOf("overnight"),
+    );
+  });
+
+  it("사용법은 그룹을 정한 뒤, 완료 직전에 온다", () => {
+    // 그룹까지 만들어 본 뒤라야 "같은 그룹의 출타 인원"이 무슨 말인지 통한다.
+    expect(onboardingStepIndex("howto")).toBe(onboardingStepIndex("group") + 1);
+    expect(onboardingStepIndex("done")).toBe(onboardingStepIndex("howto") + 1);
+  });
+
+  it("이미 그룹에 들어간 사람도 사용법에서 이어진다", () => {
+    // 사용법에는 서버 상태가 없어 "봤는지"를 알 수 없다 — 한 번 더 보는 쪽을 고른다.
+    for (const branch of BRANCHES) {
+      expect(
+        onboardingResumeStep({
+          ...profile(branch),
+          regularOvernight: { enabled: true },
+          unitId: "unit-1",
+        }),
+      ).toBe("howto");
+    }
+  });
+
+  it("모든 단계에 제목과 한 줄 설명이 있다", () => {
+    // 화면은 ONBOARDING_COPY만 보고 그린다 — 빠진 단계가 있으면 빈 제목이 나간다.
+    for (const step of ONBOARDING_STEP_IDS) {
+      expect(ONBOARDING_COPY[step].title.length).toBeGreaterThan(0);
+      expect(ONBOARDING_COPY[step].lead.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("사용법 카드", () => {
+  it("웹과 앱이 같은 문구를 쓰도록 한 벌만 둔다", () => {
+    expect(ONBOARDING_HOWTO.length).toBeGreaterThanOrEqual(4);
+    const ids = ONBOARDING_HOWTO.map((card) => card.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const card of ONBOARDING_HOWTO) {
+      expect(card.title.length).toBeGreaterThan(0);
+      expect(card.body.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("달력·출타 인원·잔여·친구를 모두 설명한다", () => {
+    // 어느 하나가 빠지면 처음 들어온 사람이 그 화면을 못 찾는다.
+    expect(ONBOARDING_HOWTO.map((card) => card.id)).toEqual(
+      expect.arrayContaining([
+        "calendar",
+        "overage",
+        "notify",
+        "grants",
+        "friends",
+      ]),
     );
   });
 });

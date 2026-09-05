@@ -4,9 +4,9 @@
  * 사용처: `app/onboarding.tsx`. `_layout.tsx`의 Stack.Protected가
  * `isAuthed && !onboardingComplete`일 때만 이 화면을 띄운다.
  *
- * 단계 구성은 웹과 같은 `ONBOARDING_STEP_IDS` 순서를 따르고, 육군은 정기외박
- * 단계를 건너뛴다(`onboardingSteps`). 위쪽 히어로는 답변이 쌓일수록 자라나므로
- * 단계가 늘어난 만큼 지루해지지 않는다.
+ * 단계 구성은 웹과 같은 `ONBOARDING_STEP_IDS` 순서를 따른다 — 군종에 따라 갈라지지
+ * 않는다(`onboardingSteps`). 위쪽 히어로는 답변이 쌓일수록 자라나므로 단계가 늘어난
+ * 만큼 지루해지지 않는다. 마지막 두 단계(`howto`·`done`)는 묻지 않고 알려주는 화면이다.
  *
  * 서버 쓰기는 세 곳뿐이다.
  *  - 계급 단계의 "다음" : 프로필 다섯 필드를 한 벌로 PUT
@@ -52,6 +52,7 @@ import {
 import { makeStyles, radius, spacing } from "@/theme";
 import { DoneStep } from "./done-step";
 import { GroupStep } from "./group-step";
+import { HowtoStep } from "./howto-step";
 import { OvernightStep } from "./overnight-step";
 import {
   BranchStep,
@@ -336,6 +337,8 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
               onNext={() => void submitOvernight()}
               onSkip={() => void submitOvernight(true)}
             />
+          ) : step === "howto" ? (
+            <HowtoStep onNext={advance} />
           ) : step === "group" ? (
             <GroupStep
               inGroup={inGroup}

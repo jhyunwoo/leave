@@ -66,7 +66,7 @@ test("로그인 화면의 ?next=는 이 사이트 안의 경로로만 해석된�
   expect(new URL(page.url()).origin).toBe("http://localhost:5173");
 });
 
-test("회원가입 후 한 화면 한 입력 온보딩 9단계", async ({ page }) => {
+test("회원가입 후 한 화면 한 입력 온보딩 10단계", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -143,6 +143,12 @@ test("회원가입 후 한 화면 한 입력 온보딩 9단계", async ({ page }
 
   await expect(step("group")).toBeVisible();
   await page.getByTestId("onboarding-group-skip").click();
+
+  // 묻지 않고 알려주는 화면 — 처음 들어온 사람이 앱을 어디서 쓰는지 여기서 익힌다.
+  await expect(step("howto")).toBeVisible();
+  await expect(step("howto")).toContainText("달력에서 휴가를 등록해요");
+  await expect(step("howto")).toContainText("보유 휴가에서 잔여를 확인해요");
+  await next.click();
 
   // 마지막 요약에는 앞서 답한 값이 그대로 되짚어져야 한다.
   await expect(step("done")).toBeVisible();
