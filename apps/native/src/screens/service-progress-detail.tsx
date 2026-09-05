@@ -11,7 +11,9 @@
  */
 
 import { useMe, useMyDutyDays } from "@leave/client";
-import { kstMidnight, type ISODate } from "@leave/shared/dates";
+import { fmtDateK } from "@leave/shared/calendar";
+import { kstMidnight, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { isDischargedOn } from "@leave/shared/rank";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -203,7 +205,14 @@ function ProgressContent(props: {
       lineHeight: tailFontSize * 1.35,
     },
   ];
-  const finished = staticPercent >= 100;
+  /*
+   * 전역 판정은 진행률이 아니라 날짜로 한다.
+   *
+   * `staticPercent >= 100`은 프레임 시계가 멈춘 자리에 기대는 판정이라, 시계가
+   * 조금 늦게 도는 순간에는 99.99…%가 되어 완료 상태가 깜빡인다. 카드와 같은
+   * 규칙(`isDischargedOn`)을 써야 두 화면이 같은 날 같은 말을 한다.
+   */
+  const finished = isDischargedOn(props.dischargeAt, todayInSeoul());
   const notStarted = now <= start;
 
   function handleProgressPress() {
@@ -272,9 +281,17 @@ function ProgressContent(props: {
 
           <View style={screenStyles.daySide}>
             {finished ? (
-              <Text selectable style={screenStyles.dayState}>
-                복무를 마쳤어요
-              </Text>
+              <>
+                <Text selectable style={screenStyles.dayCelebration}>
+                  🎉
+                </Text>
+                <Text selectable style={screenStyles.dayState}>
+                  전역을 축하해요
+                </Text>
+                <Text selectable style={screenStyles.dayDuty}>
+                  {fmtDateK(props.dischargeAt)}자로{"\n"}복무를 마쳤어요
+                </Text>
+              </>
             ) : notStarted ? (
               <Text selectable style={screenStyles.dayState}>
                 입대 전이에요
@@ -546,6 +563,7 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "600",
     textAlign: "center",
   },
+  dayCelebration: { fontSize: 34, textAlign: "center" },
   verticalTrack: {
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,

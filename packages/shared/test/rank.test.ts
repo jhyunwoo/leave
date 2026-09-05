@@ -5,11 +5,14 @@ import {
   eachDate,
   fullMonthsBetween,
   getRankInfo,
+  isDischargedOn,
   isValidISODate,
+  kstMidnight,
   monthBounds,
   nextPromotionDate,
   normalizeLegacyDischargeDate,
   scheduledRank,
+  serviceProgressAt,
   standardDischargeDate,
   standardPromotionDate,
 } from "../src";
@@ -188,5 +191,22 @@ describe("getRankInfo", () => {
     expect(done.serviceProgress).toBe(1);
     expect(done.daysUntilDischarge).toBe(0);
     expect(done.rank).toBe("sergeant");
+  });
+});
+
+describe("isDischargedOn", () => {
+  it("전역일 당일부터 전역으로 본다", () => {
+    expect(isDischargedOn("2027-07-04", "2027-07-03")).toBe(false);
+    expect(isDischargedOn("2027-07-04", "2027-07-04")).toBe(true);
+    expect(isDischargedOn("2027-07-04", "2027-07-05")).toBe(true);
+  });
+
+  it("진행률이 100%가 되는 시점과 어긋나지 않는다", () => {
+    const enlistedAt = "2026-01-05";
+    const dischargeAt = "2027-07-04";
+    // 전역일 00:00(KST)에 이미 100%다 — 그 하루를 "복무 중"으로 두면 문구와 어긋난다.
+    const atDischarge = kstMidnight(dischargeAt);
+    expect(serviceProgressAt(enlistedAt, dischargeAt, atDischarge)).toBe(1);
+    expect(isDischargedOn(dischargeAt, dischargeAt)).toBe(true);
   });
 });

@@ -183,6 +183,20 @@ export function serviceProgressAt(
   return Math.min(Math.max((now - start) / (end - start), 0), 1);
 }
 
+/**
+ * 전역했는가 — 전역일 당일부터 참이다.
+ *
+ * 경계가 "당일 포함"인 이유는 복무 진행률의 끝이 `kstMidnight(dischargeAt)`이기
+ * 때문이다. 그 시각에 이미 100%이므로, 전역일 하루를 "아직 복무 중"으로 두면
+ * 진행률은 100%인데 문구는 "전역까지 0일"이 되어 서로 어긋난다.
+ *
+ * 판정을 여기 두는 이유는 화면 두 곳(복무율 카드·전체 화면)이 같은 답을 내야
+ * 하기 때문이다. 각자 `serviceProgressAt(...) >= 1`을 적으면 한쪽만 고쳐진다.
+ */
+export function isDischargedOn(dischargeAt: ISODate, on: ISODate): boolean {
+  return on >= dischargeAt;
+}
+
 export function getRankInfo(params: {
   enlistedAt: ISODate;
   dischargeAt: ISODate;

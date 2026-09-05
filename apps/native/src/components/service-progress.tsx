@@ -16,8 +16,9 @@
  * 화면이 앞에 있고 앱이 포그라운드일 때만 시계와 프레임 콜백이 돈다.
  */
 
-import { kstMidnight, type ISODate } from "@leave/shared/dates";
-import { serviceProgressAt } from "@leave/shared/rank";
+import { fmtDateK } from "@leave/shared/calendar";
+import { kstMidnight, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { isDischargedOn, serviceProgressAt } from "@leave/shared/rank";
 import { Text, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedProps,
@@ -119,6 +120,36 @@ export function ServiceProgress(props: {
   const percent =
     serviceProgressAt(props.enlistedAt, props.dischargeAt, now) * 100;
 
+  /*
+   * 전역한 사람에게는 흐르는 퍼센트와 "전역까지 0일" 대신 축하를 보여준다.
+   *
+   * 예전에는 전역일에 이 카드가 100%인 채로 "전역까지 0일"이라고 적혀 있었다.
+   * 숫자는 맞지만 그 사람에게 남은 이야기가 아니다. 전체 화면(service-progress-detail)은
+   * 이미 완료 상태를 따로 그리고 있었는데 카드만 그러지 못했다.
+   */
+  const discharged = isDischargedOn(props.dischargeAt, todayInSeoul());
+
+  if (discharged) {
+    return (
+      <View style={styles.root}>
+        <Text selectable style={styles.percent}>
+          복무 100%
+        </Text>
+        <View
+          style={styles.track}
+          accessibilityRole="progressbar"
+          accessibilityLabel="복무 100%, 전역했어요"
+          accessibilityValue={{ min: 0, max: 100, now: 100 }}
+        >
+          <View style={[styles.fill, { width: "100%" }]} />
+        </View>
+        <Text selectable style={styles.celebration}>
+          🎉 전역을 축하해요! {fmtDateK(props.dischargeAt)}자로 복무를 마쳤어요.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       {reducedMotion ? (
@@ -203,5 +234,11 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.mute,
     flexShrink: 1,
     textAlign: "right",
+  },
+  celebration: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "700",
+    color: colors.positiveDeep,
   },
 }));
