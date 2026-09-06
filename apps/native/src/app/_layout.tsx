@@ -214,6 +214,11 @@ function RootNavigator() {
       <Stack
         screenOptions={{
           headerShown: false,
+          // Android 헤더는 본문과 같은 배경으로 공간을 차지하게 한다.
+          headerStyle:
+            process.env.EXPO_OS === "android"
+              ? { backgroundColor: colors.canvasSoft }
+              : undefined,
           contentStyle: { backgroundColor: colors.canvasSoft },
         }}
       >
@@ -237,7 +242,7 @@ function RootNavigator() {
               headerShown: true,
               title: "프로필",
               headerBackTitle: "뒤로",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               headerTintColor: colors.brand,
               headerTitleStyle: { fontWeight: "600", color: colors.ink },
@@ -251,7 +256,7 @@ function RootNavigator() {
               headerShown: true,
               title: "그룹 초대",
               headerBackTitle: "뒤로",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               headerTintColor: colors.brand,
               headerTitleStyle: { fontWeight: "600", color: colors.ink },
@@ -263,7 +268,7 @@ function RootNavigator() {
               presentation: "formSheet",
               headerShown: true,
               title: "그룹 참여",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: [0.75, 1],
@@ -282,7 +287,7 @@ function RootNavigator() {
               presentation: "formSheet",
               headerShown: true,
               title: "그룹 관리",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: [0.75, 1],
@@ -303,10 +308,8 @@ function RootNavigator() {
               title: "보유 휴가",
               // 탭은 헤더를 숨겨 제목이 없으므로, 돌아갈 곳을 뒤로가기에 직접 적는다.
               headerBackTitle: "내 휴가",
-              // 탭 스택들과 같은 규칙 — headerStyle로 배경을 칠하지 않고 시스템의
-              // 반투명 바를 그대로 쓴다. 불투명하게 칠하면 다크모드에서 본문과
-              // 색이 어긋나 흰 띠처럼 보인다. 웹에는 blur 바가 없어 흐름에 남긴다.
-              headerTransparent: process.env.EXPO_OS !== "web",
+              // iOS만 시스템 반투명 바를 쓴다. Android는 헤더 공간을 확보한다.
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               headerTintColor: colors.brand,
               headerTitleStyle: { fontWeight: "600", color: colors.ink },
@@ -318,7 +321,7 @@ function RootNavigator() {
               headerShown: true,
               title: "위젯 설정",
               headerBackTitle: "프로필",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               headerTintColor: colors.brand,
               headerTitleStyle: { fontWeight: "600", color: colors.ink },
@@ -331,7 +334,7 @@ function RootNavigator() {
               headerShown: true,
               title: "휴가 상세",
               headerBackTitle: "뒤로",
-              headerTransparent: process.env.EXPO_OS !== "web",
+              headerTransparent: process.env.EXPO_OS === "ios",
               headerShadowVisible: false,
               headerTintColor: colors.brand,
               headerTitleStyle: { fontWeight: "600", color: colors.ink },

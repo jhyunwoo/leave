@@ -12,7 +12,12 @@ export default function CalendarStackLayout() {
       screenLayout={sideSafeAreaScreenLayout}
       screenOptions={{
         headerShown: process.env.EXPO_OS !== "web",
-        headerTransparent: process.env.EXPO_OS !== "web",
+        // Android는 투명 헤더 아래 콘텐츠의 상단 여백을 자동 보정하지 않는다.
+        headerTransparent: process.env.EXPO_OS === "ios",
+        headerStyle:
+          process.env.EXPO_OS === "android"
+            ? { backgroundColor: colors.canvas }
+            : undefined,
         headerShadowVisible: false,
         headerBackButtonDisplayMode: "minimal",
         headerTintColor: colors.brand,

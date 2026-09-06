@@ -91,7 +91,7 @@ const WEEK_ROW_HEIGHT = 32;
 const STRIP_TOP_GAP = spacing.xs;
 /** 동기화 시각 한 줄. 아래 styles.syncStatus의 height와 같아야 한다. */
 const STATUS_ROW_HEIGHT = 20;
-const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
+const NATIVE_HEADER_HEIGHT = 44;
 
 const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -229,7 +229,10 @@ export function CalendarScreen() {
     STATUS_ROW_HEIGHT +
     WEEK_ROW_HEIGHT +
     (hasBanner ? CYCLE_BANNER_HEIGHT : 0);
-  const headerHeight = insets.top + NATIVE_HEADER_HEIGHT + glassStripHeight;
+  // Android는 스택이 헤더 공간을 확보하므로 수동 여백을 중복 적용하지 않는다.
+  const headerTopInset =
+    process.env.EXPO_OS === "android" ? 0 : insets.top + NATIVE_HEADER_HEIGHT;
+  const headerHeight = headerTopInset + glassStripHeight;
 
   // 선택 날짜가 속한 달의 달력(바텀시트 패널용). 스크롤 블록과 같은 캐시를 재사용.
   const panelMonth = selectedDate
@@ -422,7 +425,7 @@ export function CalendarScreen() {
         style={[
           styles.glassStrip,
           {
-            top: insets.top + NATIVE_HEADER_HEIGHT,
+            top: headerTopInset,
             height: glassStripHeight,
           },
         ]}
@@ -474,7 +477,7 @@ export function CalendarScreen() {
           styles.inspectorContent,
           {
             // 투명한 네이티브 헤더 아래에서 시작하고, 탭바에 가리지 않게 끝난다.
-            paddingTop: insets.top + NATIVE_HEADER_HEIGHT + spacing.sm,
+            paddingTop: headerTopInset + spacing.sm,
             paddingBottom: insets.bottom + spacing.xxxl * 2,
           },
         ]}

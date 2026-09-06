@@ -167,9 +167,11 @@ export async function checkOverageAndNotify(params: {
         const results = await sendExpoPushMessages(
           affectedMembers.map((member) => ({
             token: member.expoPushToken,
-            message: buildNotificationPushMessage(
-              notificationIdByUser.get(member.id)!,
-            ),
+            message: buildNotificationPushMessage({
+              id: notificationIdByUser.get(member.id)!,
+              title,
+              body,
+            }),
           })),
         );
         const resultByToken = new Map(results.map((r) => [r.token, r]));

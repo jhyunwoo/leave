@@ -413,3 +413,96 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
     page.getByRole("grid", { name: /친구 달력/ }).first(),
   ).toBeVisible();
 });
+
+test("친구 휴가 알림에서 내 휴가 유무와 관계없이 날짜별 비교 모달을 연다", async ({
+  page,
+  request,
+}) => {
+  const me = await signup(request, "notifyme", "나");
+  const friend = await signup(request, "notifyfriend", "알림친구");
+  for (const user of [me, friend]) {
+    expect(
+      (
+        await request.post(`${API}/units`, {
+          headers: authorization(user.token),
+          data: { name: `알림비교-${uniqueTag()}`, maxLeaveCount: 3 },
+        })
+      ).ok(),
+    ).toBeTruthy();
+  }
+  expect(
+    (
+      await request.post(`${API}/friends/requests`, {
+        headers: authorization(me.token),
+        data: { username: friend.username },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  expect(
+    (
+      await request.post(`${API}/friends/requests/${me.id}/accept`, {
+        headers: authorization(friend.token),
+      })
+    ).ok(),
+  ).toBeTruthy();
+  expect(
+    (
+      await request.post(`${API}/leaves`, {
+        headers: authorization(me.token),
+        data: {
+          title: "내 비교 휴가",
+          segments: [
+            {
+              category: "annual",
+              startDate: "2026-11-03",
+              endDate: "2026-11-03",
+            },
+          ],
+        },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  expect(
+    (
+      await request.post(`${API}/leaves`, {
+        headers: authorization(friend.token),
+        data: {
+          title: "친구 비공개 제목",
+          segments: [
+            {
+              category: "annual",
+              startDate: "2026-11-02",
+              endDate: "2026-11-04",
+            },
+          ],
+        },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  await signIn(page, me.token);
+  await page.goto("/notifications");
+  await page.getByRole("button", { name: "자세히", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("알림친구");
+  await expect(dialog).toContainText("이 날짜에는 내 휴가가 없어요.");
+  await dialog.getByRole("button", { name: "다음 날짜" }).click();
+  await expect(dialog).toContainText("내 비교 휴가");
+  await expect(dialog).not.toContainText("친구 비공개 제목");
+  await dialog.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page).toHaveURL(/\/notifications$/);
+  expect(
+    (
+      await request.delete(`${API}/friends/${friend.id}`, {
+        headers: authorization(me.token),
+      })
+    ).ok(),
+  ).toBeTruthy();
+  await page.getByRole("button", { name: "자세히", exact: true }).click();
+  await expect(dialog).toContainText(
+    "친구 관계가 변경되어 이 일정을 볼 수 없어요.",
+  );
+  await expect(dialog).not.toContainText("내 비교 휴가");
+  await expect(dialog).not.toContainText("알림친구님의 휴가");
+});

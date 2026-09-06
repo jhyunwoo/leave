@@ -136,10 +136,9 @@ export const adminNotificationRoutes = new Hono<AdminAppEnv>()
     };
     await db.insert(notifications).values(notification);
     if (input.data.sendPush) {
-      // 잠금화면에는 제목·본문을 싣지 않는다. 상세는 앱에서 notificationId로 조회한다.
       const results = await sendExpoPush(
         [user.expoPushToken],
-        buildNotificationPushMessage(notification.id),
+        buildNotificationPushMessage(notification),
       );
       const result = results[0];
       await db.insert(pushLogs).values({

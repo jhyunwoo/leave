@@ -11,13 +11,13 @@
  * ## 두 가지 규칙을 여기서 지킨다
  *
  * **한 문장에 100개.** 친구 알림은 사람 수만큼 행을 넣으므로 D1 바인드 상한에
- * 정면으로 부딪힌다(알림 행은 컬럼이 8개라 12명이면 넘는다). `insertStatements`로
+ * 정면으로 부딪힌다. `insertStatements`로
  * 나눠 담고 한 `batch`로 묶어 "일부에게만 알림이 간" 상태를 만들지 않는다.
  *
- * **남의 휴가 id를 알림에 담지 않는다.** `notifications.leaveId`는 받는 사람이
+ * **내 휴가 상세와 친구 일정 연결을 구분한다.** `notifications.leaveId`는 받는 사람이
  * 열 수 있는 휴가를 가리킬 때만 뜻이 있다. 친구의 휴가는 `/leaves/{id}`로 열
- * 수 없으므로 비워 둔다(초과 알림도 같은 이유로 그 자리를 비운다 —
- * `apps/native/src/screens/notifications.tsx`의 주석 참고).
+ * 수 없으므로 비워 둔다. 친구 휴가는 별도 연결 정보로 저장하고 친구 일정 API에서
+ * 현재 권한을 다시 확인한다.
  */
 
 import { fmtRange, type ISODate } from "@leave/shared";
@@ -43,6 +43,12 @@ async function deliver(
     recipients: Recipient[];
     title: string;
     body: string;
+    friendLeave?: {
+      userId: string;
+      leaveId: string;
+      startDate: ISODate;
+      endDate: ISODate;
+    };
     waitUntil: (promise: Promise<unknown>) => void;
   },
 ): Promise<void> {
@@ -64,9 +70,12 @@ async function deliver(
         userId: recipient.id,
         title: input.title,
         body: input.body,
-        // 남의 휴가·계정을 가리키는 id는 담지 않는다(위 머리주석).
+        // 내 휴가 상세 링크와 친구 일정 조회 정보를 구분한다.
         leaveId: null,
         datesJson: null,
+        friendLeaveJson: input.friendLeave
+          ? JSON.stringify(input.friendLeave)
+          : null,
         read: false,
         createdAt: now,
       })),
@@ -78,9 +87,11 @@ async function deliver(
       const results = await sendExpoPushMessages(
         input.recipients.map((recipient) => ({
           token: recipient.expoPushToken,
-          message: buildNotificationPushMessage(
-            notificationIdByUser.get(recipient.id)!,
-          ),
+          message: buildNotificationPushMessage({
+            id: notificationIdByUser.get(recipient.id)!,
+            title: input.title,
+            body: input.body,
+          }),
         })),
       );
       const resultByToken = new Map(results.map((r) => [r.token, r]));
@@ -154,7 +165,7 @@ export async function notifyFriendsOfLeave(
   db: Db,
   input: {
     actor: { id: string; name: string };
-    leave: { startDate: ISODate; endDate: ISODate };
+    leave: { id: string; startDate: ISODate; endDate: ISODate };
     waitUntil: (promise: Promise<unknown>) => void;
   },
 ): Promise<void> {
@@ -227,6 +238,12 @@ export async function notifyFriendsOfLeave(
   await deliver(db, {
     recipients,
     title: "친구의 새 휴가",
+    friendLeave: {
+      userId: input.actor.id,
+      leaveId: input.leave.id,
+      startDate: input.leave.startDate,
+      endDate: input.leave.endDate,
+    },
     body: `${input.actor.name}님이 ${fmtRange(input.leave.startDate, input.leave.endDate)} 휴가를 등록했어요.`,
     waitUntil: input.waitUntil,
   });

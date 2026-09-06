@@ -113,8 +113,14 @@ test("휴가를 등록하면 수락된 친구에게만 알림이 간다", async 
   const friendNotifications = await notificationsOf(friend);
   assert.equal(friendNotifications.length, before + 1);
   assert.match(friendNotifications[0].body, /휴가등록자/);
-  // 남의 휴가 id는 담지 않는다 — 받는 사람이 열 수 없는 화면을 가리키게 된다.
+  // 내 휴가 상세 링크는 비워 두고, 친구 일정 조회에 쓸 연결 정보를 따로 담는다.
   assert.equal(friendNotifications[0].leaveId, null);
+  assert.deepEqual(friendNotifications[0].friendLeave, {
+    userId: actor.data.user.id,
+    leaveId: created.data.leave.id,
+    startDate: "2026-11-02",
+    endDate: "2026-11-04",
+  });
 
   assert.equal((await notificationsOf(stranger)).length, 0);
   // 대기중인 사람에게는 친구 요청 알림 한 건만 있어야 한다.

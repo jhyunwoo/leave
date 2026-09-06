@@ -329,6 +329,7 @@ export const notifications = sqliteTable(
     body: text("body").notNull(),
     leaveId: text("leave_id"),
     datesJson: text("dates_json"),
+    friendLeaveJson: text("friend_leave_json"),
     read: integer("read", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     // 사용자가 알림함에서 지운 시각. 값이 있으면 사용자 API에서 보이지 않는다.

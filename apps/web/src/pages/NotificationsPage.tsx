@@ -2,7 +2,8 @@
  * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
  */
 
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
+import { FriendLeaveNotificationModal } from "../components/FriendLeaveNotificationModal";
 import { Link, useNavigate } from "react-router";
 import {
   useDeleteNotification,
@@ -20,6 +21,10 @@ export function NotificationsPage() {
   const markRead = useMarkNotificationsRead();
   const del = useDeleteNotification();
   const myLeaves = useMyLeaves();
+  const [friendDetail, setFriendDetail] = useState<{
+    notification: Notification;
+    date?: string;
+  } | null>(null);
   const navigate = useNavigate();
 
   /**
@@ -50,6 +55,23 @@ export function NotificationsPage() {
     void navigate(`/leaves/${target.leaveId}?date=${target.date}`);
   };
 
+  const openNotification = (
+    notification: Notification,
+    dates = notification.dates,
+  ) => {
+    if (notification.friendLeave) {
+      setFriendDetail({ notification, date: dates[0] });
+      return;
+    }
+    if (dates.length === 0) {
+      alert(
+        "연결 정보가 없는 이전 알림이에요. 친구 탭에서 일정을 확인해주세요.",
+      );
+      return;
+    }
+    openDates(dates);
+  };
+
   /**
    * 알림 한 건을 지운다. 확인을 묻지 않는다 — 메일함처럼, 알림은 지워도 잃는 것이
    * 없고 되짚을 휴가는 캘린더에 그대로 남는다.
@@ -77,11 +99,11 @@ export function NotificationsPage() {
   );
 
   // 카드·행 전체가 클릭 대상이라 키보드로도 같은 동작이 되게 한다.
-  const onCardKeyDown = (dates: string[]) => (e: KeyboardEvent) => {
+  const onCardKeyDown = (notification: Notification) => (e: KeyboardEvent) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     if (e.target !== e.currentTarget) return;
     e.preventDefault();
-    openDates(dates);
+    openNotification(notification);
   };
 
   /** 날짜 배지 줄. 배지 하나하나가 그 날짜의 상세로 가는 입구다. */
@@ -104,7 +126,7 @@ export function NotificationsPage() {
             onClick={(e) => {
               // 행 전체 클릭과 겹치지 않게 배지 클릭을 따로 처리한다.
               e.stopPropagation();
-              openDates([d]);
+              openNotification(notification, [d]);
             }}
             style={{ cursor: "pointer", border: "1px solid var(--negative)" }}
           >
@@ -129,6 +151,13 @@ export function NotificationsPage() {
         gap: "var(--sp-xl)",
       }}
     >
+      {friendDetail?.notification.friendLeave && (
+        <FriendLeaveNotificationModal
+          target={friendDetail.notification.friendLeave}
+          date={friendDetail.date}
+          onClose={() => setFriendDetail(null)}
+        />
+      )}
       <header
         style={{
           display: "flex",
@@ -198,8 +227,8 @@ export function NotificationsPage() {
             role="button"
             tabIndex={0}
             aria-label={`최근 알림: ${latest.title}. 휴가 상세 보기`}
-            onClick={() => openDates(latest.dates)}
-            onKeyDown={onCardKeyDown(latest.dates)}
+            onClick={() => openNotification(latest)}
+            onKeyDown={onCardKeyDown(latest)}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -233,7 +262,7 @@ export function NotificationsPage() {
                   className="btn btn-secondary btn-sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openDates(latest.dates);
+                    openNotification(latest);
                   }}
                 >
                   자세히
@@ -262,8 +291,8 @@ export function NotificationsPage() {
                     role="button"
                     tabIndex={0}
                     aria-label={`${n.title}. 휴가 상세 보기`}
-                    onClick={() => openDates(n.dates)}
-                    onKeyDown={onCardKeyDown(n.dates)}
+                    onClick={() => openNotification(n)}
+                    onKeyDown={onCardKeyDown(n)}
                     style={{
                       display: "flex",
                       gap: "var(--sp-md)",

@@ -214,7 +214,11 @@ export const leaveRoutes = app
     if (saved.row.status !== "draft") {
       await notifyFriendsOfLeave(db, {
         actor: { id: user.id, name: user.name },
-        leave: { startDate: saved.row.startDate, endDate: saved.row.endDate },
+        leave: {
+          id: saved.row.id,
+          startDate: saved.row.startDate,
+          endDate: saved.row.endDate,
+        },
         waitUntil: (p) => c.executionCtx.waitUntil(p),
       });
     }

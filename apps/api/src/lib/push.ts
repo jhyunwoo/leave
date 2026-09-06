@@ -9,22 +9,16 @@ export interface PushMessage {
   data?: Record<string, unknown>;
 }
 
-/**
- * 잠금화면에 그룹명·그룹 id·휴가 날짜·친구 이름이 노출되지 않도록 하는 최소 푸시 payload.
- * 상세 내용은 인증 후 notificationId로 인앱 알림을 조회한다.
- *
- * 문구가 종류를 가리지 않는 이유는 이 payload가 Expo·APNs·FCM을 지나기 때문이다.
- * 종류마다 다른 제목을 쓰면 그 제목 자체가 "이 사람에게 친구 요청이 왔다"는
- * 정보가 되어, 담지 않기로 한 것을 문구로 흘리게 된다. 앱 이름과 아이콘은 OS가
- * 이미 보여주므로 제목이 서비스명을 다시 말할 필요도 없다.
- */
-export function buildNotificationPushMessage(
-  notificationId: string,
-): PushMessage {
+/** 인앱 알림의 제목·본문을 표시하고, 열람에 필요한 알림 id만 data에 담는다. */
+export function buildNotificationPushMessage(notification: {
+  id: string;
+  title: string;
+  body: string;
+}): PushMessage {
   return {
-    title: "새 알림",
-    body: "앱에서 새로운 알림을 확인해주세요.",
-    data: { notificationId },
+    title: notification.title,
+    body: notification.body,
+    data: { notificationId: notification.id },
   };
 }
 
@@ -69,7 +63,7 @@ export async function sendExpoPush(
   return sendExpoPushMessages(tokens.map((token) => ({ token, message })));
 }
 
-/** 서로 다른 최소 payload를 토큰별로 지정하면서 Expo의 100건 배치를 유지한다. */
+/** 서로 다른 알림 payload를 토큰별로 지정하면서 Expo의 100건 배치를 유지한다. */
 export async function sendExpoPushMessages(
   messages: TokenPushMessage[],
 ): Promise<PushSendResult[]> {

@@ -21,6 +21,7 @@ import {
 import { createApp } from "../lib/app";
 import {
   errorResponse,
+  friendLeaveNotificationSchema,
   jsonContent,
   notificationPrefsResponseSchema,
   notificationSchema,
@@ -168,6 +169,7 @@ export const notificationRoutes = app
           body: notifications.body,
           leaveId: notifications.leaveId,
           datesJson: notifications.datesJson,
+          friendLeaveJson: notifications.friendLeaveJson,
           read: notifications.read,
           createdAt: notifications.createdAt,
         })
@@ -200,6 +202,7 @@ export const notificationRoutes = app
           body: row.body,
           leaveId: row.leaveId,
           dates: parseDates(row),
+          friendLeave: parseFriendLeave(row.friendLeaveJson),
           read: row.read,
           createdAt: row.createdAt,
         })),
@@ -318,3 +321,14 @@ export const notificationRoutes = app
       });
     return c.json({ preferences: next }, 200);
   });
+
+// 이전 알림에는 연결 정보가 없다. 잘못된 저장 값도 알림함 전체를 막지 않는다.
+function parseFriendLeave(json: string | null) {
+  if (!json) return null;
+  try {
+    const parsed = friendLeaveNotificationSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}

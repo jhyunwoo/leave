@@ -42,7 +42,7 @@ import { makeStyles, radius, spacing, useColors } from "@/theme";
 const LEGEND_HEIGHT = 42;
 const WEEK_ROW_HEIGHT = 32;
 const STRIP_TOP_GAP = spacing.xs;
-const NATIVE_HEADER_HEIGHT = process.env.EXPO_OS === "android" ? 56 : 44;
+const NATIVE_HEADER_HEIGHT = 44;
 
 type PendingPersonalNavigation =
   | { kind: "new"; date: ISODate }
@@ -67,7 +67,10 @@ export function FriendCalendarScreen() {
   const calendar = useFriendCalendar(friendIds, panelMonth);
   const events = usePersonalEvents(panelMonth);
   const stripHeight = STRIP_TOP_GAP + LEGEND_HEIGHT + WEEK_ROW_HEIGHT;
-  const contentTopInset = insets.top + NATIVE_HEADER_HEIGHT + stripHeight;
+  // Android는 스택이 헤더 공간을 확보하므로 수동 여백을 중복 적용하지 않는다.
+  const headerTopInset =
+    process.env.EXPO_OS === "android" ? 0 : insets.top + NATIVE_HEADER_HEIGHT;
+  const contentTopInset = headerTopInset + stripHeight;
 
   const selectDate = (date: ISODate) => {
     pendingAfterSheet.current = null;
@@ -123,7 +126,7 @@ export function FriendCalendarScreen() {
             style={[
               styles.glassStrip,
               {
-                top: insets.top + NATIVE_HEADER_HEIGHT,
+                top: headerTopInset,
                 height: stripHeight,
               },
             ]}
@@ -198,7 +201,7 @@ export function FriendCalendarScreen() {
         contentContainerStyle={[
           styles.inspectorContent,
           {
-            paddingTop: insets.top + NATIVE_HEADER_HEIGHT + spacing.sm,
+            paddingTop: headerTopInset + spacing.sm,
             paddingBottom: insets.bottom + spacing.xxxl * 2,
           },
         ]}

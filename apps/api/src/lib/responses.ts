@@ -315,6 +315,13 @@ export const notificationPrefsResponseSchema = z
   })
   .openapi("NotificationPreferences");
 
+export const friendLeaveNotificationSchema = z.object({
+  userId: z.string(),
+  leaveId: z.string(),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+});
+
 export const notificationSchema = z
   .object({
     id: z.string(),
@@ -322,6 +329,7 @@ export const notificationSchema = z
     body: z.string(),
     leaveId: z.string().nullable(),
     dates: z.array(z.string()),
+    friendLeave: friendLeaveNotificationSchema.nullable(),
     read: z.boolean(),
     createdAt: z.string(),
   })

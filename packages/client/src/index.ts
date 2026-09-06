@@ -29,3 +29,4 @@ export * from "./hooks/users";
 export * from "./hooks/personal-events";
 
 export * from "./forms/use-leave-form";
+export * from "./hooks/notification-leave";

@@ -11,7 +11,7 @@
  *              훑으며 어떤 날짜가 걸렸는지 비교할 수 있다. 위계는 카드 크기 대신
  *              선택 상태와 안 읽음 표시가 진다.
  *
- * 어느 쪽이든 "알림 → 내 휴가" 해석 규칙은 하나뿐이다(`resolveDate`).
+ * 친구 휴가 알림은 비교 모달로, 초과 알림은 해당 날짜의 내 휴가로 연결한다.
  */
 
 import { fmtDateTimeShort, fmtDateShort } from "@leave/shared/calendar";
@@ -38,6 +38,7 @@ import { inspectorWidth, useWindowSizeClass } from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
+import { FriendLeaveNotificationModal } from "@/components/friend-leave-notification-modal";
 import { notify } from "@/lib/dialog";
 import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
@@ -61,6 +62,10 @@ export function NotificationsScreen() {
   const markRead = useMarkNotificationsRead();
   const del = useDeleteNotification();
   const myLeaves = useMyLeaves();
+  const [friendDetail, setFriendDetail] = useState<{
+    notification: Notification;
+    date?: string;
+  } | null>(null);
   const router = useRouter();
 
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -98,6 +103,24 @@ export function NotificationsScreen() {
       pathname: "/leave/[leaveId]",
       params: { leaveId: target.leaveId, date: target.date },
     });
+  };
+
+  const openNotification = (
+    notification: Notification,
+    dates = notification.dates,
+  ) => {
+    if (notification.friendLeave) {
+      setFriendDetail({ notification, date: dates[0] });
+      return;
+    }
+    if (dates.length === 0) {
+      notify(
+        "연결 정보가 없는 알림이에요",
+        "이전 알림은 친구 탭에서 일정을 확인해주세요.",
+      );
+      return;
+    }
+    openDates(dates);
   };
 
   /**
@@ -144,7 +167,7 @@ export function NotificationsScreen() {
             key={date}
             accessibilityRole="button"
             accessibilityLabel={`${fmtDateShort(date)} 휴가 상세 보기`}
-            onPress={() => openDates([date])}
+            onPress={() => openNotification(notification, [date])}
             style={styles.dateChip}
           >
             <Text style={styles.dateChipText}>{fmtDateShort(date)}</Text>
@@ -220,6 +243,13 @@ export function NotificationsScreen() {
 
   return (
     <>
+      {friendDetail?.notification.friendLeave && (
+        <FriendLeaveNotificationModal
+          target={friendDetail.notification.friendLeave}
+          date={friendDetail.date}
+          onClose={() => setFriendDetail(null)}
+        />
+      )}
       {isCompact ? (
         <ScrollView
           style={styles.root}
@@ -249,7 +279,7 @@ export function NotificationsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
                   testID="latest-notification"
-                  onPress={() => openDates(latest.dates)}
+                  onPress={() => openNotification(latest)}
                   style={styles.latestTap}
                 >
                   <Text style={styles.latestTitle} selectable>
@@ -267,7 +297,7 @@ export function NotificationsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${latest.title} 휴가 상세 보기`}
-                    onPress={() => openDates(latest.dates)}
+                    onPress={() => openNotification(latest)}
                   >
                     <Text style={styles.detailLink}>자세히</Text>
                   </Pressable>
@@ -283,7 +313,7 @@ export function NotificationsScreen() {
                         key={n.id}
                         notification={n}
                         divider={index > 0}
-                        onPress={() => openDates(n.dates)}
+                        onPress={() => openNotification(n)}
                         dates={renderDates(n)}
                         menu={renderMenu(n)}
                       />
@@ -357,6 +387,14 @@ export function NotificationsScreen() {
                       {fmtDateTimeShort(selected.createdAt)}
                     </Text>
 
+                    {selected.friendLeave && (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => openNotification(selected)}
+                      >
+                        <Text style={styles.detailLink}>자세히</Text>
+                      </Pressable>
+                    )}
                     {selected.dates.length > 0 ? (
                       <View style={styles.affected}>
                         <Text style={styles.sectionTitle}>걸린 날짜</Text>
@@ -372,7 +410,7 @@ export function NotificationsScreen() {
                                   : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
                               }
                               disabled={!mine}
-                              onPress={() => openDates([date])}
+                              onPress={() => openNotification(selected, [date])}
                               style={styles.affectedRow}
                             >
                               <Text style={styles.affectedDate}>

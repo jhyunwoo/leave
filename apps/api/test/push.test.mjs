@@ -7,36 +7,63 @@ import {
 } from "../src/lib/push.ts";
 import { req, signup, sleep } from "./helpers.mjs";
 
-test("푸시 payload는 generic 문구와 notificationId만 포함한다", async () => {
-  const originalFetch = globalThis.fetch;
-  let sent;
-  globalThis.fetch = async (_url, init) => {
-    sent = JSON.parse(String(init.body));
-    return new Response(
-      JSON.stringify({ data: [{ status: "ok", id: "ticket-id" }] }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
-  };
-  try {
-    const notificationId = crypto.randomUUID();
-    await sendExpoPush(
-      ["ExponentPushToken[test-token]"],
-      buildNotificationPushMessage(notificationId),
-    );
-    assert.equal(sent.length, 1);
-    // 종류를 가리지 않는 문구다 — 제목 자체가 알림 종류를 흘리면 안 된다.
-    assert.equal(sent[0].title, "새 알림");
-    assert.equal(sent[0].body, "앱에서 새로운 알림을 확인해주세요.");
-    assert.deepEqual(sent[0].data, { notificationId });
-    assert.deepEqual(Object.keys(sent[0].data), ["notificationId"]);
-    assert.ok(!JSON.stringify(sent[0]).includes("unitId"));
-    assert.ok(!JSON.stringify(sent[0]).includes("dates"));
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
+for (const notification of [
+  {
+    id: "friend-leave",
+    title: "친구의 새 휴가",
+    body: "민수님이 11.2 ~ 11.4 휴가를 등록했어요.",
+  },
+  {
+    id: "friend-request",
+    title: "새 친구 요청",
+    body: "지민님이 친구 요청을 보냈어요. 친구 탭에서 확인해주세요.",
+  },
+  {
+    id: "overage",
+    title: "최대 출타 인원 초과 알림",
+    body: "우리 그룹에서 11월 2일 외 2일에 최대 출타 인원을 초과했습니다. 휴가 일정을 확인해주세요.",
+  },
+  {
+    id: "admin",
+    title: "서비스 점검 안내",
+    body: "9월 7일 02:00~03:00에는 서비스 이용이 어려워요.",
+  },
+]) {
+  test(`푸시에 알림별 제목과 상세 본문을 전달한다: ${notification.id}`, async () => {
+    const originalFetch = globalThis.fetch;
+    let sent;
+    globalThis.fetch = async (_url, init) => {
+      sent = JSON.parse(String(init.body));
+      return Response.json({ data: [{ status: "ok", id: "ticket-id" }] });
+    };
+    try {
+      await sendExpoPush(
+        ["ExponentPushToken[test-token]"],
+        buildNotificationPushMessage({
+          ...notification,
+          userId: "recipient",
+          leaveId: "private-leave",
+          datesJson: '["2026-11-02"]',
+        }),
+      );
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0].title, notification.title);
+      assert.equal(sent[0].body, notification.body);
+      assert.deepEqual(sent[0].data, { notificationId: notification.id });
+      assert.deepEqual(Object.keys(sent[0]).sort(), [
+        "body",
+        "data",
+        "sound",
+        "title",
+        "to",
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+}
 
-test("사용자별 notificationId를 민감 정보 없이 한 요청으로 배치한다", async () => {
+test("서로 다른 알림 내용과 수신자별 notificationId를 한 요청으로 배치한다", async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;
   let sent;
@@ -59,14 +86,37 @@ test("사용자별 notificationId를 민감 정보 없이 한 요청으로 배�
     await sendExpoPushMessages([
       {
         token: "ExponentPushToken[first]",
-        message: buildNotificationPushMessage(firstId),
+        message: buildNotificationPushMessage({
+          id: firstId,
+          title: "새 친구 요청",
+          body: "민수님의 친구 요청",
+        }),
       },
       {
         token: "ExponentPushToken[second]",
-        message: buildNotificationPushMessage(secondId),
+        message: buildNotificationPushMessage({
+          id: secondId,
+          title: "친구의 새 휴가",
+          body: "지민님의 11월 2일 휴가",
+        }),
       },
     ]);
     assert.equal(calls, 1);
+    assert.deepEqual(
+      sent.map(({ to, title, body }) => ({ to, title, body })),
+      [
+        {
+          to: "ExponentPushToken[first]",
+          title: "새 친구 요청",
+          body: "민수님의 친구 요청",
+        },
+        {
+          to: "ExponentPushToken[second]",
+          title: "친구의 새 휴가",
+          body: "지민님의 11월 2일 휴가",
+        },
+      ],
+    );
     assert.deepEqual(
       sent.map((message) => message.data),
       [{ notificationId: firstId }, { notificationId: secondId }],
