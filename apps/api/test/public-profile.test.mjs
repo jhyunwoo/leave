@@ -152,13 +152,18 @@ test("기존 사용자 프로필은 계속 인증과 관계 응답을 요구한�
 test("공개 프로필 조회는 접속 IP별로 제한한다", async () => {
   const target = await signup();
   const headers = { "CF-Connecting-IP": "198.51.100.77" };
+  const limit = 60;
 
-  for (let count = 0; count < 60; count += 1) {
+  // 고정 창의 끝에서 시작하면 앞선 창과 다음 창에 요청이 나뉠 수 있다. 두 창의
+  // 상한보다 한 번 더 시도해 429를 확인하되, 테스트용 상한은 작게 유지한다.
+  for (let count = 0; count <= limit * 2; count += 1) {
     const response = await publicProfile(target.username, headers);
-    assert.equal(response.status, 200, `허용 범위의 ${count + 1}번째 요청`);
+    if (response.status === 429) {
+      assert.equal(response.headers["retry-after"], "60");
+      assert.equal(response.headers["cache-control"], "no-store");
+      return;
+    }
+    assert.equal(response.status, 200, `${count + 1}번째 요청`);
   }
-  const limited = await publicProfile(target.username, headers);
-  assert.equal(limited.status, 429);
-  assert.equal(limited.headers["retry-after"], "60");
-  assert.equal(limited.headers["cache-control"], "no-store");
+  assert.fail("두 고정 창 안에서 rate limit이 적용되지 않았습니다");
 });

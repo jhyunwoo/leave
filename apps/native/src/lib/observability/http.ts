@@ -29,6 +29,9 @@ const REPORT_WINDOW_MS = 30_000;
 let networkOnline: boolean | null = null;
 let networkType: string | null = null;
 
+type FetchInput =
+  string | URL | { readonly url: string; readonly method?: string };
+
 function shouldReportOnce(key: string): boolean {
   const now = Date.now();
   const last = recentReports.get(key);
@@ -42,7 +45,7 @@ function shouldReportOnce(key: string): boolean {
   return true;
 }
 
-function requestUrl(input: Parameters<typeof globalThis.fetch>[0]): string {
+function requestUrl(input: FetchInput): string {
   try {
     if (typeof input === "string") return input;
     if (input instanceof URL) return input.toString();
@@ -52,10 +55,7 @@ function requestUrl(input: Parameters<typeof globalThis.fetch>[0]): string {
   }
 }
 
-function requestMethod(
-  input: Parameters<typeof globalThis.fetch>[0],
-  init?: RequestInit,
-): string {
+function requestMethod(input: FetchInput, init?: RequestInit): string {
   try {
     if (init?.method) return init.method.toUpperCase();
     if (typeof input !== "string" && !(input instanceof URL) && input.method) {
