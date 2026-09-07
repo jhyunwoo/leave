@@ -1,7 +1,7 @@
 /**
  * 달력 드래그의 좌표 계산 — "지금 손가락이 어느 날짜 칸 위인가".
  *
- * 사용처: components/calendar-drag/use-leave-chip-drag.ts.
+ * 사용처: components/calendar-drag/session.ts.
  *
  * ## 왜 절대 좌표가 아니라 이동량(translation)인가
  *
@@ -11,7 +11,7 @@
  *
  * 대신 **집어 든 칸의 격자 좌표는 드래그가 시작되는 순간 칩 자신의 날짜에서 정확히
  * 알 수 있다.** 거기에 이동량만 더하면 되므로 필요한 것은 칸 간격뿐이다.
- * 드래그 중에는 목록 스크롤을 얼려 두므로 이 가정이 유지된다(calendar-scroll.tsx).
+ * 두 번째 손가락으로 스크롤한 거리도 더해 화면 아래 바뀐 날짜를 찾는다.
  *
  * 가장 가까운 격자점으로 반올림하는 것이 곧 "잡은 지점 기준 이동"이다 — 놓은 칸은
  * 집어 든 칸과 같은 칸 안 위치를 갖는다.
@@ -24,11 +24,10 @@ export type LatticeDay = { date: string; inMonth: boolean };
 export type LatticeGrid = readonly (readonly LatticeDay[])[];
 
 /**
- * 드래그 한 번 동안 고정으로 쓰는 격자 정보.
+ * 현재 목록의 격자 정보.
  *
- * `grids`는 드래그 시작 시점의 **스냅샷**이어야 한다. 목록은 스크롤 중에 앞뒤로
- * 달을 이어 붙이고 꼬리를 잘라내므로(calendar-scroll.tsx의 capTail), 제스처 도중에
- * 살아 있는 배열을 다시 읽으면 인덱스가 밀린다.
+ * 목록은 스크롤 중에 앞뒤로 달을 이어 붙이고 꼬리를 잘라낸다. `grids`를 교체할
+ * 때는 세션이 출발 칸 인덱스와 스크롤 원점도 함께 보정해야 한다.
  */
 export type DragLattice = {
   /** 달 블록 하나의 높이(calendar-scroll의 monthBlockHeight). */
@@ -87,6 +86,7 @@ export function resolveDrop(
   from: LatticeCell,
   translationX: number,
   translationY: number,
+  scrollDelta = 0,
 ): string | null {
   const { itemHeight, rowPitch, colPitch, labelHeight, grids } = lattice;
   if (rowPitch <= 0 || colPitch <= 0 || itemHeight <= 0) return null;
@@ -100,7 +100,8 @@ export function resolveDrop(
     from.monthIndex * itemHeight +
     labelHeight +
     from.row * rowPitch +
-    translationY;
+    translationY +
+    scrollDelta;
 
   // 달 이름 띠 위에 걸친 지점은 앞뒤 두 달 모두 후보다. 행 격자에 더 가까운 쪽이
   // 이긴다 — 띠는 어느 쪽으로도 놓을 수 있는 중립 구간이 된다.

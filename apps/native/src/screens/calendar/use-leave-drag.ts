@@ -53,7 +53,10 @@ function planMove(
   };
 }
 
-export function useLeaveDrag(leaves: readonly MyLeave[] | undefined): {
+export function useLeaveDrag(
+  leaves: readonly MyLeave[] | undefined,
+  onEdit: (leave: MyLeave) => void,
+): {
   /** 지금 휴가를 끌고 있는지. */
   isDragging: boolean;
   /** 끄는 동안 머리말 줄에 대신 띄울 안내. 드래그가 없으면 null. */
@@ -87,8 +90,7 @@ export function useLeaveDrag(leaves: readonly MyLeave[] | undefined): {
       verdict: moved?.verdict ?? "ok",
       phase: drag.phase,
     } as const;
-    // 원래 자리는 끄는 내내 남겨 둔다 — 제스처가 붙은 칩이 사라지면 RNGH가
-    // 핸들러를 버려 드래그가 들린 채로 굳는다(month-calendar.tsx의 MyLeaveChip).
+    // 출발 위치와 옮길 위치를 함께 보여준다.
     for (const [date, day] of buildMyLeaveDayMap([leave])) {
       map.set(date, { ...day, role: "origin", ...badge });
     }
@@ -106,11 +108,28 @@ export function useLeaveDrag(leaves: readonly MyLeave[] | undefined): {
 
   // 손을 뗐다. 여기서 실제로 저장한다.
   useEffect(() => {
-    if (!drag || drag.phase !== "dropped" || committing.current) return;
+    if (
+      !drag ||
+      (drag.phase !== "dropped" && drag.phase !== "editing") ||
+      committing.current
+    )
+      return;
     committing.current = true;
 
     void (async () => {
       try {
+        if (drag.phase === "editing") {
+          if (
+            leave &&
+            (await confirmAction({
+              title: "휴가 편집",
+              message: `"${leave.title}" 휴가의 일정과 내용을 편집할까요?`,
+              confirmLabel: "편집",
+            }))
+          )
+            onEdit(leave);
+          return;
+        }
         if (
           !leave ||
           !moved ||
@@ -172,13 +191,17 @@ export function useLeaveDrag(leaves: readonly MyLeave[] | undefined): {
         setDrag(null);
       }
     })();
-  }, [drag, leave, moved, setDrag, updateLeave]);
+  }, [drag, leave, moved, setDrag, updateLeave, onEdit]);
 
   const statusLabel = useMemo(() => {
     if (!drag) return null;
     if (drag.phase === "saving") return "옮기는 중…";
     if (drag.hoverDate == null) return "달력 안의 날짜에 놓아주세요";
-    if (drag.deltaDays === 0) return "옮길 날짜로 끌어주세요";
+    if (drag.phase === "editing") return "휴가 편집";
+    if (drag.deltaDays === 0)
+      return drag.hasMoved
+        ? "옮길 날짜로 끌어주세요"
+        : "놓으면 편집 · 다른 손가락으로 월 이동";
     if (moved?.verdict === "conflict") return "겹치는 휴가가 있어요";
     const range = moved ? segmentsRange(moved.segments) : null;
     if (!range) return null;

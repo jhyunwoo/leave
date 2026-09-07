@@ -55,6 +55,7 @@ import {
   useMyLeaves,
   usePersonalEvents,
   type Calendar,
+  type MyLeave,
 } from "@leave/client";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
 import { Button } from "@/components/button";
@@ -126,6 +127,7 @@ export function CalendarScreen() {
   // 폼을 열었는지와 폼의 시작일을 한 값으로 둔다. 날짜 시트를 닫으면서 열어야
   // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
   const [formDate, setFormDate] = useState<ISODate | null>(null);
+  const [editingLeave, setEditingLeave] = useState<MyLeave | null>(null);
   /**
    * 시트가 닫히기를 기다리는 다음 행동. 아래 openAfterSheet 주석 참고.
    *
@@ -174,7 +176,7 @@ export function CalendarScreen() {
   );
 
   // 달력에서 휴가 칩을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
-  const leaveDrag = useLeaveDrag(myLeaves.data?.leaves);
+  const leaveDrag = useLeaveDrag(myLeaves.data?.leaves, setEditingLeave);
 
   // 끄는 도중에는 시트가 닫히기를 기다리던 요청을 무효로 본다 — 그 사이에 폼이나
   // 상세 화면이 뜨면 드래그가 갈 곳을 잃는다.
@@ -401,7 +403,8 @@ export function CalendarScreen() {
    * 시트를 띄워도 되는 조건. 세 가지가 모두 맞아야 한다 —
    * 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 것.
    */
-  const daySheetPresented = isCompact && selectedDate != null && !formDate;
+  const daySheetPresented =
+    isCompact && selectedDate != null && !formDate && !editingLeave;
   // 날짜 상세 시트 높이. 시트 디텐트와 시트 안 RN 콘텐츠가 같은 값을 써야
   // 안쪽 스크롤이 바닥까지 닿는다(sheet-snap-point.ts의 pinnedSheetHeight).
   const daySheetHeight = Math.round(windowHeight * 0.75);
@@ -659,7 +662,7 @@ export function CalendarScreen() {
         // 인스펙터로 자리를 옮겼을 뿐이고, 지우면 보던 날짜를 잃는다.
         onDismiss={() => {
           pendingAfterSheet.current = null;
-          if (isCompact && !formDate) setSelectedDate(null);
+          if (isCompact && !formDate && !editingLeave) setSelectedDate(null);
         }}
         // 시트가 화면에서 사라진 뒤. 이제 모달을 띄우거나 화면을 밀어도 된다.
         onClosed={() => {
@@ -751,6 +754,13 @@ export function CalendarScreen() {
           visible
           initialDate={formDate}
           onClose={() => setFormDate(null)}
+        />
+      )}
+      {editingLeave && (
+        <LazyLeaveFormModal
+          visible
+          editing={editingLeave}
+          onClose={() => setEditingLeave(null)}
         />
       )}
     </>

@@ -2,8 +2,8 @@
  * 달력에서 휴가 칩을 끌어 옮기는 동안의 상태.
  *
  * 세 곳이 이 상태를 나눠 쓴다 —
- * - `components/calendar-scroll.tsx`가 격자 치수를 채우고, 드래그 중에는 스크롤을 얼린다.
- * - `components/calendar-drag/use-leave-chip-drag.ts`가 제스처로 드래그를 만들고 옮긴다.
+ * - `components/calendar-scroll.tsx`가 격자 치수와 목록 스크롤을 연결한다.
+ * - `components/calendar-drag`가 휴가 선택과 두 손가락 이동을 맡는다.
  * - `screens/calendar/index.tsx`가 휴가 목록과 저장을 쥐고 있어, 미리보기를 파생하고
  *   놓인 순간 실제로 저장한다.
  *
@@ -18,7 +18,7 @@ import type { MyLeaveDay } from "@leave/client";
 
 /**
  * 달력 격자의 치수. `CalendarScroll`이 창 크기에 맞춰 계산해 둔 값을 그대로 옮긴다.
- * 읽는 쪽은 드래그가 시작되는 순간뿐이라 이 값이 바뀌어도 리렌더를 만들지 않는다.
+ * 드래그 도중 앞뒤로 달이 붙으면 좌표 원점도 함께 보정한다.
  */
 export type CalendarGridMetrics = {
   /** 달 블록 하나의 높이. */
@@ -48,6 +48,8 @@ export type LeaveDragVerdict =
 export type LeaveDragPhase =
   /** 손가락이 아직 화면에 있다. */
   | "dragging"
+  /** 이동 없이 길게 누르고 놓았다. 편집 옵션을 연다. */
+  | "editing"
   /** 손을 뗐다. 달력 화면이 이 상태를 보고 저장을 시작한다. */
   | "dropped"
   /** 서버에 보내는 중. 미리보기를 그대로 둔 채 기다린다. */
@@ -61,6 +63,8 @@ export type LeaveDrag = {
   hoverDate: ISODate | null;
   /** 휴가 전체가 밀려날 일수. */
   deltaDays: number;
+  /** 손떨림을 넘는 이동이나 두 번째 손가락 스크롤을 한 적이 있는가. */
+  hasMoved: boolean;
   phase: LeaveDragPhase;
 };
 

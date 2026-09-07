@@ -45,6 +45,8 @@ import type { MyLeaveDay } from "@leave/client";
 import { useCalendar, usePersonalEvents } from "@leave/client";
 import { useWindowSizeClass } from "@/adaptive";
 import { MonthCalendar } from "@/components/month-calendar";
+import { CalendarDragContext } from "@/components/calendar-drag/context";
+import { useCalendarDrag } from "@/components/calendar-drag/use-calendar-drag";
 import {
   BOTTOM_ALLOWANCE,
   CELL_GAP,
@@ -143,6 +145,18 @@ export const CalendarScroll = forwardRef<
    * 제스처 객체여야 하고, 인스턴스가 매 렌더 바뀌면 관계가 다시 맺어지므로 고정한다.
    */
   const scrollGesture = useMemo<NativeGesture>(() => Gesture.Native(), []);
+  const drag = useCalendarDrag({
+    listRef,
+    initialOffset: itemHeight * INITIAL_SPAN,
+    viewportHeight: listHeight,
+    contentInset: contentTopInset + spacing.xxl,
+    onScrollBeginDrag,
+    resetScrollFlags,
+  });
+  const calendarGesture = useMemo(
+    () => Gesture.Simultaneous(scrollGesture, drag.context.gesture),
+    [scrollGesture, drag.context.gesture],
+  );
   const dragActive = useAtomValue(calendarDragActiveAtom);
   const setGridMetrics = useSetAtom(calendarGridMetricsAtom);
 
@@ -189,67 +203,74 @@ export const CalendarScroll = forwardRef<
 
   return (
     <View style={styles.root} onLayout={onListLayout}>
-      <GestureDetector gesture={scrollGesture}>
-        <FlatList
-          ref={listRef}
-          data={months}
-          keyExtractor={(m) => m}
-          renderItem={({ item }) => (
-            <MonthBlock
-              unitId={unitId}
-              month={item}
-              height={itemHeight}
-              cellHeight={cellHeight}
-              showAttendees={cellHeight >= CELL_H_ATTENDEES}
-              selectedDate={selectedDate}
-              onSelectDate={onSelectDate}
-              myLeaveDays={myLeaveDays}
-              regularOvernight={regularOvernight}
-              currentCycle={currentCycle}
-              dischargeAt={dischargeAt}
-              dragScrollGesture={scrollGesture}
-            />
-          )}
-          getItemLayout={(_, index) => ({
-            length: itemHeight,
-            offset: itemHeight * index,
-            index,
-          })}
-          contentOffset={{ x: 0, y: itemHeight * INITIAL_SPAN }}
-          contentContainerStyle={{
-            paddingTop: contentTopInset,
-            paddingHorizontal: spacing.lg,
-            paddingBottom: spacing.xxl,
-          }}
-          contentInsetAdjustmentBehavior="never"
-          initialNumToRender={3}
-          windowSize={7}
-          maxToRenderPerBatch={4}
-          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-          onScroll={onScroll}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onScrollEndDrag={onScrollEndDrag}
-          onMomentumScrollBegin={onMomentumScrollBegin}
-          onScrollToTop={onScrollToTop}
-          // onScroll이 하는 일은 "지금 맨 위 근처인가" 하나뿐이고, 그 판정은
-          // PREPEND_INTERVAL_MS(250ms)로 한 번 더 걸러진다. 매 프레임(16ms) 콜백을
-          // 받을 이유가 없어 30Hz로 낮춘다 — 앱에서 가장 무거운 스크롤 구간의
-          // JS 이벤트를 절반으로 줄이면서 판정은 그대로다.
-          scrollEventThrottle={32}
-          onEndReached={onEndReached}
-          onEndReachedThreshold={1.5}
-          snapToInterval={itemHeight}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          showsVerticalScrollIndicator={false}
-          // 휴가를 끄는 동안에는 달력이 따라 움직이면 안 된다. 손가락 아래 날짜가
-          // 바뀌어 버리고, 이어붙이기가 목록 인덱스를 밀어 드래그가 잡아 둔 격자
-          // 스냅샷과 어긋난다.
-          scrollEnabled={!dragActive}
-          style={styles.list}
-        />
-      </GestureDetector>
+      <CalendarDragContext.Provider value={drag.context}>
+        <GestureDetector gesture={calendarGesture}>
+          <FlatList
+            ref={listRef}
+            data={months}
+            keyExtractor={(m) => m}
+            renderItem={({ item }) => (
+              <MonthBlock
+                unitId={unitId}
+                month={item}
+                height={itemHeight}
+                cellHeight={cellHeight}
+                showAttendees={cellHeight >= CELL_H_ATTENDEES}
+                selectedDate={selectedDate}
+                onSelectDate={onSelectDate}
+                myLeaveDays={myLeaveDays}
+                regularOvernight={regularOvernight}
+                currentCycle={currentCycle}
+                dischargeAt={dischargeAt}
+                dragScrollGesture={scrollGesture}
+              />
+            )}
+            getItemLayout={(_, index) => ({
+              length: itemHeight,
+              offset: itemHeight * index,
+              index,
+            })}
+            contentOffset={{ x: 0, y: itemHeight * INITIAL_SPAN }}
+            contentContainerStyle={{
+              paddingTop: contentTopInset,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.xxl,
+            }}
+            contentInsetAdjustmentBehavior="never"
+            initialNumToRender={3}
+            windowSize={7}
+            maxToRenderPerBatch={4}
+            // 드래그 중 prepend 보정은 세션이 맡아 이중으로 이동하지 않는다.
+            maintainVisibleContentPosition={
+              dragActive ? undefined : { minIndexForVisible: 1 }
+            }
+            onScroll={(event) => {
+              drag.trackScroll(event);
+              onScroll(event);
+            }}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onScrollEndDrag={onScrollEndDrag}
+            onMomentumScrollBegin={onMomentumScrollBegin}
+            onScrollToTop={onScrollToTop}
+            // onScroll이 하는 일은 "지금 맨 위 근처인가" 하나뿐이고, 그 판정은
+            // PREPEND_INTERVAL_MS(250ms)로 한 번 더 걸러진다. 매 프레임(16ms) 콜백을
+            // 받을 이유가 없어 30Hz로 낮춘다 — 앱에서 가장 무거운 스크롤 구간의
+            // JS 이벤트를 절반으로 줄이면서 판정은 그대로다.
+            scrollEventThrottle={32}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={1.5}
+            snapToInterval={itemHeight}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            showsVerticalScrollIndicator={false}
+            // 첫 손가락은 휴가만 옮긴다. 드래그 중의 목록 이동은 루트 제스처가
+            // 둘째 손가락의 이동량으로 scrollToOffset을 호출해 제어한다.
+            scrollEnabled={!dragActive}
+            style={styles.list}
+          />
+        </GestureDetector>
+      </CalendarDragContext.Provider>
     </View>
   );
 });

@@ -56,6 +56,11 @@ describe("resolveDrop", () => {
     expect(resolveDrop(lattice, from, 0, 0)).toBe("2026-01-15");
   });
 
+  it("첫 손가락이 멈춰 있어도 달력이 스크롤되면 그 아래 날짜를 고른다", () => {
+    expect(resolveDrop(lattice, from, 0, 0, ITEM_HEIGHT)).toBe("2026-02-19");
+    expect(resolveDrop(lattice, from, 0, 0, ROW_PITCH)).toBe("2026-01-22");
+  });
+
   it("한 칸 옆은 하루", () => {
     expect(resolveDrop(lattice, from, COL_PITCH, 0)).toBe("2026-01-16");
     expect(resolveDrop(lattice, from, -COL_PITCH, 0)).toBe("2026-01-14");
