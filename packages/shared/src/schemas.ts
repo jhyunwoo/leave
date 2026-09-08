@@ -76,6 +76,10 @@ export const monthSchema = z
   .string()
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "YYYY-MM 형식이어야 합니다");
 
+export const localTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:mm 형식의 유효한 시간이어야 합니다");
+
 export const normalizedEmailSchema = z
   .string()
   .transform(normalizeEmail)
@@ -272,9 +276,20 @@ export const leaveSegmentSchema = z
     overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
     startDate: isoDateSchema,
     endDate: isoDateSchema,
+    regularOvernightCycleStart: isoDateSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     overnightKindRefine(value, ctx);
+    if (
+      value.regularOvernightCycleStart &&
+      !(value.category === "overnight" && value.overnightKind === "regular")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["regularOvernightCycleStart"],
+        message: "정기외박에만 차감 주기를 지정할 수 있습니다",
+      });
+    }
     if (value.startDate > value.endDate) {
       ctx.addIssue({
         code: "custom",
@@ -300,6 +315,8 @@ export const leaveCreateSchema = z
     reason: z.string().trim().max(500).optional(),
     // 생략하면 기존 동작대로 "희망"(집계 반영)으로 저장한다.
     status: z.enum(LEAVE_STATUSES).optional(),
+    // 구버전 클라이언트가 생략하면 서버가 21:00으로 저장한다.
+    returnTime: localTimeSchema.optional(),
     segments: z
       .array(leaveSegmentSchema)
       .min(1, "휴가 구간을 하나 이상 입력해주세요")
@@ -563,10 +580,6 @@ export const friendIdsSchema = z
     (ids) => ids.length <= MAX_FRIEND_CALENDAR_SELECTION,
     `친구는 최대 ${MAX_FRIEND_CALENDAR_SELECTION}명까지 선택할 수 있습니다`,
   );
-
-export const localTimeSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:mm 형식의 유효한 시간이어야 합니다");
 
 function validateEventRange(
   value: {

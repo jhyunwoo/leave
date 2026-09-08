@@ -31,6 +31,7 @@ test("내 휴가 목록 CRUD", async () => {
     },
   });
   assert.equal(created.status, 201);
+  assert.equal(created.data.leave.returnTime, "21:00");
   const id = created.data.leave.id;
 
   const mine = await req("GET", "/leaves/mine", { token });
@@ -40,6 +41,7 @@ test("내 휴가 목록 CRUD", async () => {
     token,
     body: {
       title: "수정휴가",
+      returnTime: "18:30",
       segments: [
         { category: "annual", startDate: "2026-08-02", endDate: "2026-08-04" },
       ],
@@ -47,6 +49,10 @@ test("내 휴가 목록 CRUD", async () => {
   });
   assert.equal(updated.status, 200);
   assert.equal(updated.data.leave.title, "수정휴가");
+  assert.equal(updated.data.leave.returnTime, "18:30");
+
+  const afterUpdate = await req("GET", "/leaves/mine", { token });
+  assert.equal(afterUpdate.data.leaves[0].returnTime, "18:30");
 
   const del = await req("DELETE", `/leaves/${id}`, { token });
   assert.equal(del.status, 200);

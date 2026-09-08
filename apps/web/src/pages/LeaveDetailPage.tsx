@@ -156,6 +156,9 @@ export function LeaveDetailPage(props: { me: Me }) {
         <p className="body-lg text-body" style={{ marginTop: "var(--sp-sm)" }}>
           {fmtRange(leave.startDate, leave.endDate)}
         </p>
+        <p className="caption text-mute" style={{ marginTop: 4 }}>
+          복귀 예정 {leave.returnTime}
+        </p>
         {leave.reason && (
           <p className="caption text-mute" style={{ marginTop: 4 }}>
             {leave.reason}

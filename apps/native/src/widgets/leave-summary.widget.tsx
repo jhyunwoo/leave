@@ -131,6 +131,14 @@ function LeaveSummaryLayout(
         </Text>
         {shown.map((key) => {
           const metric = metrics[key]!;
+          const timerInterval =
+            typeof metric.timerStartAt === "number" &&
+            typeof metric.timerEndAt === "number"
+              ? {
+                  lower: new Date(metric.timerStartAt),
+                  upper: new Date(metric.timerEndAt),
+                }
+              : undefined;
           return (
             <HStack key={key} alignment="firstTextBaseline" spacing={8}>
               <VStack alignment="leading" spacing={1}>
@@ -156,6 +164,7 @@ function LeaveSummaryLayout(
               </VStack>
               <Spacer />
               <Text
+                timerInterval={timerInterval}
                 modifiers={[
                   font({ size: 28, weight: "heavy" }),
                   foregroundStyle(ink),
@@ -190,6 +199,14 @@ function LeaveSummaryLayout(
       <HStack alignment="top" spacing={12}>
         {shown.map((key) => {
           const metric = metrics[key]!;
+          const timerInterval =
+            typeof metric.timerStartAt === "number" &&
+            typeof metric.timerEndAt === "number"
+              ? {
+                  lower: new Date(metric.timerStartAt),
+                  upper: new Date(metric.timerEndAt),
+                }
+              : undefined;
           return (
             <VStack
               key={key}
@@ -198,6 +215,7 @@ function LeaveSummaryLayout(
               modifiers={[frame({ maxWidth: 1000, alignment: "leading" })]}
             >
               <Text
+                timerInterval={timerInterval}
                 modifiers={[
                   font({ size: 13, weight: "semibold" }),
                   foregroundStyle(mute),

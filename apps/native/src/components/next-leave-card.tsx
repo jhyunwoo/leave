@@ -17,16 +17,16 @@ export function NextLeaveCard(props: {
   const styles = useStyles();
   const { leave, phase, days } = props.countdown;
   const onLeave = phase === "onLeave";
+  const minutes = props.countdown.remainingMinutes ?? 0;
+  const remaining = `${Math.floor(minutes / 60)}시간 ${String(minutes % 60).padStart(2, "0")}분`;
   /** 종료일 당일. D-0은 "0일 남았다"로 읽히므로 D-DAY로 바꿔 쓴다. */
   const lastDay = onLeave && days === 0;
   const range = fmtRange(leave.startDate, leave.endDate);
 
   // 스크린리더가 "D-12"를 읽으면 뜻이 사라진다. 눈으로 읽는 표기와 따로 풀어 쓴다.
-  const spokenCount = lastDay
-    ? "오늘이 마지막 날이에요"
-    : onLeave
-      ? `종료까지 ${days}일 남았어요`
-      : `${days}일 남았어요`;
+  const spokenCount = onLeave
+    ? `복귀까지 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남았어요`
+    : `${days}일 남았어요`;
 
   return (
     <Pressable
@@ -41,7 +41,7 @@ export function NextLeaveCard(props: {
           {onLeave ? "휴가 중" : "다음 휴가"}
         </Text>
         <Text style={styles.value} selectable>
-          {lastDay ? "D-DAY" : `D-${days}`}
+          {onLeave ? remaining : `D-${days}`}
         </Text>
         <Text style={styles.caption} numberOfLines={1} selectable>
           {leave.title} · {range}

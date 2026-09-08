@@ -27,7 +27,10 @@ export function useLeaveChipDrag(args: {
   const { leaveId, status, date, scrollGesture } = args;
   const context = useContext(CalendarDragContext);
   return useMemo(() => {
-    let touch: CalendarTouch | null = null;
+    // runOnJS(true)여도 Expo는 인라인 콜백을 worklet factory로 변환한다.
+    // let touch를 쓰면 onStart가 초기 null을 값으로 캡처한다. 같은 객체를
+    // 공유해야 onTouchesDown이 기록한 실제 손가락을 onStart에서도 읽는다.
+    const pointer: { touch: CalendarTouch | null } = { touch: null };
     const pan = Gesture.Pan()
       .enabled(
         leaveId != null &&
@@ -40,13 +43,14 @@ export function useLeaveChipDrag(args: {
       .activateAfterLongPress(250)
       .runOnJS(true)
       .onTouchesDown((event) => {
-        touch ??= event.changedTouches[0] ?? null;
+        pointer.touch ??= event.changedTouches[0] ?? null;
       })
       .onStart(() => {
-        if (leaveId && touch) context?.begin(leaveId, date, touch);
+        if (leaveId && pointer.touch)
+          context?.begin(leaveId, date, pointer.touch);
       })
       .onFinalize(() => {
-        touch = null;
+        pointer.touch = null;
       });
     if (context) pan.simultaneousWithExternalGesture(context.gesture);
     return scrollGesture ? pan.blocksExternalGesture(scrollGesture) : pan;

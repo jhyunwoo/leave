@@ -55,8 +55,19 @@ export function useServiceTicker(active: boolean): number {
     if (!active) return;
     const tick = () => setNow(Date.now());
     tick();
-    const id = setInterval(tick, TICK_MS);
-    return () => clearInterval(id);
+    // 분 경계에 맞춰야 21:00 복귀가 21:00:37까지 남아 있는 식으로 늦지 않는다.
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(
+      () => {
+        tick();
+        interval = setInterval(tick, TICK_MS);
+      },
+      TICK_MS - (Date.now() % TICK_MS),
+    );
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, [active]);
 
   return now;

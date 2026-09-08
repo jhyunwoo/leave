@@ -32,6 +32,10 @@ export class CalendarDragSession {
   private secondary: CalendarTouch | null = null;
   private moved = false;
 
+  get hasMoved(): boolean {
+    return this.moved;
+  }
+
   constructor(
     leaveId: string,
     date: ISODate,
@@ -83,8 +87,8 @@ export class CalendarDragSession {
     this.drag.hasMoved = this.moved;
   }
 
-  release(ids: readonly number[]): "edit" | "drop" | null {
-    if (ids.includes(this.start.id)) return this.moved ? "drop" : "edit";
+  release(ids: readonly number[]): "cancel" | "drop" | null {
+    if (ids.includes(this.start.id)) return this.moved ? "drop" : "cancel";
     if (this.secondary && ids.includes(this.secondary.id))
       this.secondary = null;
     return null;

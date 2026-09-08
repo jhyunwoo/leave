@@ -278,7 +278,20 @@ export type SegmentLike = Pick<
   "category" | "startDate" | "endDate"
 > & {
   overnightKind?: LeaveSegment["overnightKind"] | null;
+  regularOvernightCycleStart?: ISODate | null;
 };
+
+/** 구간과 하루라도 겹쳐 선택할 수 있는 정기외박 주기. */
+export function eligibleRegularOvernightCycles(
+  config: RegularOvernightConfig | null | undefined,
+  rangeStart: ISODate,
+  rangeEnd: ISODate,
+  dischargeAt?: ISODate | null,
+): RegularOvernightCycle[] {
+  return cyclesInRange(config, rangeStart, rangeEnd).filter(
+    (cycle) => !dischargeAt || cycle.start <= dischargeAt,
+  );
+}
 
 /** SegmentLike는 overnightKind가 null일 수 있어 재원 판별 전에 맞춰준다. */
 function balanceKeyOf(segment: SegmentLike) {
@@ -296,6 +309,13 @@ export function cycleUsedDays(
   let used = 0;
   for (const segment of segments) {
     if (balanceKeyOf(segment) !== "regular_overnight") continue;
+    if (segment.regularOvernightCycleStart) {
+      if (segment.regularOvernightCycleStart === cycle.start) {
+        used += diffDays(segment.startDate, segment.endDate) + 1;
+      }
+      continue;
+    }
+    // 마이그레이션 전/오래된 응답은 기존의 겹치는 일수 계산으로 안전하게 읽는다.
     const start =
       segment.startDate > cycle.start ? segment.startDate : cycle.start;
     const end = segment.endDate < cycle.end ? segment.endDate : cycle.end;
@@ -462,6 +482,10 @@ export type RegularOvernightBlock =
   | { kind: "before_first_grant"; firstGrantDate: ISODate }
   /** 적립일이 전역일 뒤라 그 주기 몫을 애초에 받지 못한다. */
   | { kind: "after_discharge"; cycle: RegularOvernightCycle }
+  /** 여러 주기와 겹쳐 사용자가 차감 주기를 골라야 한다. */
+  | { kind: "cycle_required"; cycles: RegularOvernightCycle[] }
+  /** 저장된 선택 주기가 현재 날짜 구간과 더는 겹치지 않는다. */
+  | { kind: "cycle_mismatch" }
   /** 그 주기 몫보다 많이 쓴다. usedDays는 이미 쓴 것까지 더한 값. */
   | { kind: "over_cycle"; cycle: RegularOvernightCycle; usedDays: number }
   /**
@@ -496,28 +520,53 @@ export function checkRegularOvernight(input: {
   // 자동 적립을 안 쓰면 정기외박도 여느 재원처럼 적립분으로 따진다 — 여기서 막지 않는다.
   if (!active) return null;
 
-  const requestedUsage = regularOvernightUsageByCycle(
-    input.config,
-    input.requested,
-  );
-  if (requestedUsage.beforeFirstGrantDays > 0) {
-    return { kind: "before_first_grant", firstGrantDate: firstGrantOf(active) };
-  }
-  if (!requestedUsage.cycles.length) return null;
-
-  for (const { cycle } of requestedUsage.cycles) {
-    if (cycle.start > input.dischargeAt) {
-      return { kind: "after_discharge", cycle };
+  const normalizedRequested: SegmentLike[] = [];
+  const requestedCycles = new Map<string, RegularOvernightCycle>();
+  for (const segment of input.requested) {
+    if (balanceKeyOf(segment) !== "regular_overnight") {
+      normalizedRequested.push(segment);
+      continue;
     }
+    const overlapping = cyclesInRange(
+      input.config,
+      segment.startDate,
+      segment.endDate,
+    );
+    if (!overlapping.length) {
+      return {
+        kind: "before_first_grant",
+        firstGrantDate: firstGrantOf(active),
+      };
+    }
+    const selected = segment.regularOvernightCycleStart
+      ? overlapping.find(
+          (cycle) => cycle.start === segment.regularOvernightCycleStart,
+        )
+      : overlapping.length === 1
+        ? overlapping[0]
+        : undefined;
+    if (!selected) {
+      return segment.regularOvernightCycleStart
+        ? { kind: "cycle_mismatch" }
+        : { kind: "cycle_required", cycles: overlapping };
+    }
+    if (selected.start > input.dischargeAt) {
+      return { kind: "after_discharge", cycle: selected };
+    }
+    requestedCycles.set(selected.start, selected);
+    normalizedRequested.push({
+      ...segment,
+      regularOvernightCycleStart: selected.start,
+    });
   }
 
-  const all = [...input.existing, ...input.requested];
+  const all = [...input.existing, ...normalizedRequested];
 
   // 이월 중에는 주기별 상한이 없다. 대신 요청이 건드린 주기의 경계마다 "그때까지 받은
   // 몫"과 "그때까지 쓴 일수"를 견준다. 앞선 주기에서 남긴 몫이 그대로 살아 있으므로
   // 한 주기 몫을 넘겨 쓰는 것 자체는 막지 않는다.
   if (active.carryOver) {
-    for (const { cycle } of requestedUsage.cycles) {
+    for (const cycle of requestedCycles.values()) {
       const grantedDays = grantedThroughCycle(active, cycle.index);
       const usedDays = usedThroughCycle(active, all, cycle.index);
       if (usedDays > grantedDays) {
@@ -528,12 +577,8 @@ export function checkRegularOvernight(input: {
   }
 
   // 이미 저장된 구간에 이번 요청을 더해 주기별 사용량을 다시 센다.
-  const after = regularOvernightUsageByCycle(input.config, all);
-  const usedByCycleStart = new Map(
-    after.cycles.map((entry) => [entry.cycle.start, entry.usedDays]),
-  );
-  for (const { cycle } of requestedUsage.cycles) {
-    const usedDays = usedByCycleStart.get(cycle.start) ?? 0;
+  for (const cycle of requestedCycles.values()) {
+    const usedDays = cycleUsedDays(cycle, all);
     if (usedDays > cycle.grantDays) {
       return { kind: "over_cycle", cycle, usedDays };
     }
@@ -547,6 +592,12 @@ export function regularOvernightBlockMessage(
 ): string {
   if (block.kind === "before_first_grant") {
     return `정기외박은 첫 적립일(${fmtDateShort(block.firstGrantDate)}) 이후부터 사용할 수 있습니다`;
+  }
+  if (block.kind === "cycle_required") {
+    return "여러 정기외박 주기에 걸쳐 있어 차감할 주기를 선택해주세요";
+  }
+  if (block.kind === "cycle_mismatch") {
+    return "선택한 정기외박 주기가 현재 기간과 겹치지 않아요";
   }
   const { cycle } = block;
   const label = `정기외박 ${cycle.index}주기(${fmtRangeTiny(cycle.start, cycle.end)})`;
@@ -575,13 +626,17 @@ export function regularOvernightAvailableIn(input: {
   dischargeAt: ISODate;
   from: ISODate;
   to: ISODate;
+  cycleStart?: ISODate | null;
 }): number {
   const active = activeConfig(input.config);
   if (!active) return 0;
   // cyclesInRange는 첫 적립 전을 잘라내므로, 범위가 그 앞에서 시작하면 따로 막는다.
   if (input.from < firstGrantOf(active)) return 0;
 
-  const cycles = cyclesInRange(input.config, input.from, input.to);
+  const overlapping = cyclesInRange(input.config, input.from, input.to);
+  const cycles = input.cycleStart
+    ? overlapping.filter((cycle) => cycle.start === input.cycleStart)
+    : overlapping;
   if (!cycles.length) return 0;
 
   let available = Infinity;

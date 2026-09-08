@@ -44,6 +44,18 @@ describe("휴가 구간 초안 — 개수 모델", () => {
     expect(draftsEndDate("", [{ key: "annual", days: 4 }])).toBe("");
   });
 
+  it("날짜를 파생해도 선택한 정기외박 주기를 보존한다", () => {
+    expect(
+      resolveDrafts(START, [
+        {
+          key: "regular_overnight",
+          days: 2,
+          regularOvernightCycleStart: "2026-08-01",
+        },
+      ])[0]?.regularOvernightCycleStart,
+    ).toBe("2026-08-01");
+  });
+
   it("전체 종료일은 개수의 합에서 나온다", () => {
     const drafts: SegmentDraft[] = [
       { key: "annual", days: 4 },

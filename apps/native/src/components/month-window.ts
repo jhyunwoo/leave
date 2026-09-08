@@ -11,6 +11,19 @@ import type { WindowSizeClass } from "@/adaptive";
 
 /** 처음 담아 두는 달 수 = 이 값 * 2 + 1. 가운데가 오늘이 든 달. */
 export const INITIAL_SPAN = 2;
+
+/** 프로그램으로 움직인 위치를 가장 가까운 월 시작점과 안전한 목록 범위로 맞춘다. */
+export function settledMonthOffset(
+  offset: number,
+  itemHeight: number,
+  monthCount: number,
+): { index: number; offset: number } {
+  const index = Math.max(
+    0,
+    Math.min(monthCount - 1, Math.round(offset / itemHeight)),
+  );
+  return { index, offset: index * itemHeight };
+}
 /** 한 번에 이어 붙이는 달 수. */
 export const PAGE_SIZE = 6;
 /**

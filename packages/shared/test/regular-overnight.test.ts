@@ -429,6 +429,38 @@ describe("정기외박 사용 가능 여부", () => {
     );
   });
 
+  it("선택한 주기와 하루만 겹쳐도 전체 정기외박을 그 주기에서 차감한다", () => {
+    const selectedCycle = cycleFor(config, "2026-08-03")!;
+    const request = {
+      ...regular("2026-07-31", "2026-08-03"),
+      regularOvernightCycleStart: selectedCycle.start,
+    };
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: [request],
+        dischargeAt: discharge,
+      }),
+    ).toBe(null);
+    expect(cycleUsedDays(selectedCycle, [request])).toBe(4);
+  });
+
+  it("선택한 주기와 겹치지 않는 정기외박은 막는다", () => {
+    const block = checkRegularOvernight({
+      config,
+      existing: [],
+      requested: [
+        {
+          ...regular("2026-08-03", "2026-08-05"),
+          regularOvernightCycleStart: "2026-06-22",
+        },
+      ],
+      dischargeAt: discharge,
+    });
+    expect(block?.kind).toBe("cycle_mismatch");
+  });
+
   it("다른 주기의 사용량은 섞지 않는다", () => {
     // 2주기를 꽉 채워도 3주기 몫은 그대로다.
     expect(
@@ -835,12 +867,17 @@ describe("이월을 켜면 주기 몫이 쌓인다", () => {
   it("주기 경계에서 앞선 주기의 상한이 먼저 걸린다", () => {
     // 1주기 마지막 날(7/16)까지 4일을 쓰면 그 시점 누적 몫 3일을 넘는다.
     // 뒤에 2주기 몫이 들어온다고 해서 앞당겨 쓸 수는 없다.
-    const block = check(carry, [seg("2026-07-13", "2026-07-18")]);
+    const block = check(carry, [
+      {
+        ...seg("2026-07-13", "2026-07-18"),
+        regularOvernightCycleStart: "2026-06-05",
+      },
+    ]);
     expect(block).toEqual({
       kind: "over_pool",
       cycle: expect.objectContaining({ index: 1, end: "2026-07-16" }),
       grantedDays: 3,
-      usedDays: 4,
+      usedDays: 6,
     });
   });
 

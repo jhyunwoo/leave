@@ -35,7 +35,7 @@ describe("CalendarDragSession", () => {
   it("움직이지 않은 길게 누르기는 미세한 손떨림을 허용하고 편집을 연다", () => {
     const session = begin();
     session.move([{ ...primary, absoluteX: 223, absoluteY: 322 }], 1400);
-    expect(session.release([primary.id])).toBe("edit");
+    expect(session.release([primary.id])).toBe("cancel");
   });
 
   it("움직였다 원래 날짜로 돌아오면 편집을 열지 않는다", () => {

@@ -62,6 +62,17 @@ describe("planLeaveMerge — 붙음/겹침/상태", () => {
     expect(plan.absorbedIds).toEqual(["b"]);
   });
 
+  it("합쳐진 휴가의 복귀 시간은 가장 늦게 끝나는 일정 것을 따른다", () => {
+    const before = leave("a", [seg("annual", "2026-02-03", "2026-02-05")], {
+      returnTime: "18:00",
+    });
+    const after = leave("b", [seg("annual", "2026-02-06", "2026-02-09")], {
+      returnTime: "20:30",
+    });
+    const plan = planLeaveMerge(before, [after]);
+    expect(plan).toMatchObject({ kind: "merged", returnTime: "20:30" });
+  });
+
   it("하루라도 비면 합치지 않는다", () => {
     const before = leave("a", [seg("annual", "2026-02-03", "2026-02-05")]);
     const incoming = leave("b", [seg("annual", "2026-02-07", "2026-02-09")]);

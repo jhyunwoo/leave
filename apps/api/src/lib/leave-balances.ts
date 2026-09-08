@@ -17,6 +17,7 @@ import {
   COUNTED_LEAVE_STATUSES,
   cycleFor,
   cycleUsedDays,
+  eligibleRegularOvernightCycles,
   fmtDateShort,
   isExpiringSoon,
   isRegularOvernightCycleBased,
@@ -416,6 +417,29 @@ export async function assertSegmentsAvailable(
   const after = allocateAllGrants(grants, [...allSegments, ...segments], today);
   const cycleBased = isRegularOvernightCycleBased(config);
 
+  // 구버전 클라이언트도 한 주기만 겹치는 구간은 그대로 저장할 수 있다. 여러 주기와
+  // 겹치면 공용 판정이 선택을 요구하며, 임의로 어느 주기를 차감하지 않는다.
+  if (cycleBased) {
+    for (const segment of segments) {
+      if (
+        segment.category !== "overnight" ||
+        segment.overnightKind !== "regular" ||
+        segment.regularOvernightCycleStart
+      ) {
+        continue;
+      }
+      const candidates = eligibleRegularOvernightCycles(
+        config,
+        segment.startDate,
+        segment.endDate,
+        cycleDischargeDate(user),
+      );
+      if (candidates.length === 1) {
+        segment.regularOvernightCycleStart = candidates[0]!.start;
+      }
+    }
+  }
+
   const requested = new Set(
     segments.map((segment) => segmentBalanceKey(segment)),
   );
@@ -457,6 +481,7 @@ function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
     startDate: segment.startDate,
     endDate: segment.endDate,
     days: segment.days,
+    regularOvernightCycleStart: segment.regularOvernightCycleStart ?? null,
   }));
 }
 
@@ -494,6 +519,7 @@ type SegmentPick = {
   startDate: string;
   endDate: string;
   days: number;
+  regularOvernightCycleStart: string | null;
 };
 
 /** 구간 행들을 leaveId별 Map으로 접는다. */
@@ -507,6 +533,9 @@ export function foldSegmentRows(rows: readonly SegmentPick[]) {
       startDate: row.startDate,
       endDate: row.endDate,
       days: row.days,
+      ...(row.regularOvernightCycleStart
+        ? { regularOvernightCycleStart: row.regularOvernightCycleStart }
+        : {}),
     });
     result.set(row.leaveId, values);
   }
@@ -521,6 +550,7 @@ const segmentColumns = {
   startDate: leaveSegments.startDate,
   endDate: leaveSegments.endDate,
   days: leaveSegments.days,
+  regularOvernightCycleStart: leaveSegments.regularOvernightCycleStart,
 } as const;
 
 export async function segmentsForLeaves(db: Db, leaveIds: string[]) {

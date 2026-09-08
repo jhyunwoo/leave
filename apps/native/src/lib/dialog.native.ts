@@ -38,3 +38,25 @@ export function confirmAction(options: {
     );
   });
 }
+
+export type LeaveHoldAction = "edit" | "delete" | "cancel";
+
+/** 달력 칩을 가만히 누르고 있을 때 손을 떼기 전에 여는 편집 메뉴. */
+export function chooseLeaveHoldAction(title: string): Promise<LeaveHoldAction> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      title,
+      "휴가 작업을 선택하세요.",
+      [
+        { text: "취소", style: "cancel", onPress: () => resolve("cancel") },
+        { text: "수정", onPress: () => resolve("edit") },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () => resolve("delete"),
+        },
+      ],
+      { onDismiss: () => resolve("cancel") },
+    );
+  });
+}

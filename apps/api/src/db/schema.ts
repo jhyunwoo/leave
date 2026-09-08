@@ -173,6 +173,7 @@ export const leaves = sqliteTable(
     title: text("title").notNull(),
     startDate: text("start_date").notNull(),
     endDate: text("end_date").notNull(),
+    returnTime: text("return_time").notNull().default("21:00"),
     reason: text("reason"),
     // draft는 나만 보이고 집계에서 빠진다. 자세한 규칙은 shared의 LEAVE_STATUSES 참고.
     status: text("status", { enum: LEAVE_STATUSES })
@@ -259,6 +260,7 @@ export const leaveSegments = sqliteTable(
     startDate: text("start_date").notNull(),
     endDate: text("end_date").notNull(),
     days: integer("days").notNull(),
+    regularOvernightCycleStart: text("regular_overnight_cycle_start"),
   },
   (t) => [
     index("leave_segments_leave_start_idx").on(t.leaveId, t.startDate),

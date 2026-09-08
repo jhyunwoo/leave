@@ -47,6 +47,7 @@ import { NextLeaveCard } from "@/components/next-leave-card";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
+import { useActiveGate, useServiceTicker } from "@/lib/service-progress-clock";
 import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 import { LeaveDetailContent } from "./leave-detail-content";
@@ -73,6 +74,8 @@ export function LeavesScreen() {
   // 만들지 않는다 — 목록에서 항목을 훑는 동안 히스토리가 쌓이면 안 된다.
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const router = useRouter();
+  const active = useActiveGate();
+  const now = useServiceTicker(active);
 
   const holdings = summarizeHoldings(balances.data?.balances);
   /** 만료·소멸처럼 눈에 띄어야 하는 것만 경고 색으로. 계획은 경고가 아니다. */
@@ -93,7 +96,7 @@ export function LeavesScreen() {
 
   const myLeaves = leaves.data?.leaves ?? [];
   const sections = partitionMyLeaves(leaves.data?.leaves);
-  const countdown = nextLeaveCountdown(leaves.data?.leaves);
+  const countdown = nextLeaveCountdown(leaves.data?.leaves, new Date(now));
   // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
   const selectedLeave =
     myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;

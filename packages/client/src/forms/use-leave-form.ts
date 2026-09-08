@@ -18,6 +18,7 @@ import {
   draftDaysByKey,
   draftsEndDate,
   draftsToSegments,
+  eligibleRegularOvernightCycles,
   fitDraftsToTotal,
   inclusiveDays,
   isCountedLeaveStatus,
@@ -107,6 +108,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
   /* --- 폼 상태 -------------------------------------------------------- */
   const [title, setTitle] = useState(editing?.title ?? "");
   const [reason, setReason] = useState(editing?.reason ?? "");
+  const [returnTime, setReturnTime] = useState(editing?.returnTime ?? "21:00");
   const [startDate, setStartDate] = useState(
     editing?.startDate ?? fallbackDate,
   );
@@ -230,6 +232,46 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const cycleBased = isRegularOvernightCycleBased(regularConfig);
   const dischargeAt = me.data?.user.dischargeAt ?? "";
 
+  const regularCycleChoices = useMemo(
+    () =>
+      resolved.map((draft) =>
+        draft.key === "regular_overnight"
+          ? eligibleRegularOvernightCycles(
+              regularConfig,
+              draft.startDate,
+              draft.endDate,
+              dischargeAt,
+            )
+          : [],
+      ),
+    [resolved, regularConfig, dischargeAt],
+  );
+
+  useEffect(() => {
+    if (!cycleBased) return;
+    setDraftState((current) => {
+      let changed = false;
+      const next = current.map((draft, index) => {
+        if (draft.key !== "regular_overnight") return draft;
+        const choices = regularCycleChoices[index] ?? [];
+        const valid = choices.some(
+          (cycle) => cycle.start === draft.regularOvernightCycleStart,
+        );
+        const selected = valid
+          ? draft.regularOvernightCycleStart
+          : choices.length === 1
+            ? choices[0]!.start
+            : null;
+        if (selected === (draft.regularOvernightCycleStart ?? null)) {
+          return draft;
+        }
+        changed = true;
+        return { ...draft, regularOvernightCycleStart: selected };
+      });
+      return changed ? next : current;
+    });
+  }, [cycleBased, regularCycleChoices]);
+
   // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
   const savedRegular = useMemo<SegmentLike[]>(
     () =>
@@ -324,6 +366,15 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const moveDraft = (from: number, to: number) =>
     setDrafts((current) => reorderDrafts(current, from, to));
 
+  const setRegularOvernightCycle = (index: number, cycleStart: string) =>
+    setDrafts((current) =>
+      current.map((draft, draftIndex) =>
+        draftIndex === index
+          ? { ...draft, regularOvernightCycleStart: cycleStart }
+          : draft,
+      ),
+    );
+
   // 폼이 이번에 정기외박으로 잡아둔 구간.
   const draftRegular = useMemo<SegmentLike[]>(
     () =>
@@ -333,6 +384,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
           ...balanceKeyToCategory(draft.key),
           startDate: draft.startDate,
           endDate: draft.endDate,
+          regularOvernightCycleStart: draft.regularOvernightCycleStart ?? null,
         })),
     [resolved],
   );
@@ -364,6 +416,9 @@ export function useLeaveForm(options: LeaveFormOptions) {
   /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
   const rowAvailable = (from: string, to: string): Map<BalanceKey, number> => {
     if (!cycleBased) return availableByKey;
+    const draft = resolved.find(
+      (item) => item.startDate === from && item.endDate === to,
+    );
     return new Map(availableByKey).set(
       "regular_overnight",
       regularOvernightAvailableIn({
@@ -372,6 +427,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
         dischargeAt,
         from,
         to,
+        cycleStart: draft?.regularOvernightCycleStart,
       }),
     );
   };
@@ -405,9 +461,11 @@ export function useLeaveForm(options: LeaveFormOptions) {
         ? `휴가는 최대 ${MAX_DATE_RANGE_DAYS}일까지 등록할 수 있어요.`
         : drafts.length > MAX_LEAVE_SEGMENTS
           ? `휴가 종류는 최대 ${MAX_LEAVE_SEGMENTS}개까지 이어 쓸 수 있어요.`
-          : needsTitle && title.trim().length === 0
-            ? "휴가 제목을 입력해주세요."
-            : balanceBlockMessage || null;
+          : !/^([01]\d|2[0-3]):[0-5]\d$/.test(returnTime)
+            ? "복귀 시간을 HH:mm 형식으로 입력해주세요."
+            : needsTitle && title.trim().length === 0
+              ? "휴가 제목을 입력해주세요."
+              : balanceBlockMessage || null;
   const canSubmit = submitBlocker === null;
 
   /* --- 종류 더하기 도우미 ---------------------------------------------- */
@@ -445,6 +503,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
     const input: LeaveCreateInput = {
       title: options.deriveTitle?.(drafts) ?? title.trim(),
       status,
+      returnTime,
       segments: draftsToSegments(startDate, drafts),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
     };
@@ -473,6 +532,8 @@ export function useLeaveForm(options: LeaveFormOptions) {
     setTitle,
     reason,
     setReason,
+    returnTime,
+    setReturnTime,
     status,
     setStatus,
     startDate,
@@ -491,6 +552,8 @@ export function useLeaveForm(options: LeaveFormOptions) {
     addDraft,
     removeDraftAt,
     moveDraft,
+    regularCycleChoices,
+    setRegularOvernightCycle,
     duration,
     validRange,
     selectedSimulation,

@@ -75,6 +75,7 @@ function serializeLeave(
     title: row.title,
     startDate: row.startDate,
     endDate: row.endDate,
+    returnTime: row.returnTime,
     reason: row.reason,
     status: row.status,
     segments: segmentsByLeave.get(row.id) ?? [],
@@ -196,6 +197,7 @@ export const leaveRoutes = app
       reason: input.reason ?? null,
       // 생략하면 기존 동작대로 "희망"(집계 반영)으로 저장한다.
       status: input.status ?? "shared",
+      returnTime: input.returnTime ?? "21:00",
       createdAt: new Date().toISOString(),
       segments,
     });
@@ -264,6 +266,7 @@ export const leaveRoutes = app
         title: existing.title,
         reason: existing.reason,
         status,
+        returnTime: existing.returnTime,
         createdAt: existing.createdAt,
         segments,
       },
@@ -314,6 +317,7 @@ export const leaveRoutes = app
         reason: input.reason ?? null,
         // 상태를 보내지 않으면 지금 상태를 유지한다(초안이 조용히 공유되지 않게).
         status: input.status ?? existing.status,
+        returnTime: input.returnTime ?? existing.returnTime,
         createdAt: existing.createdAt,
         segments: toSegments(input),
       },

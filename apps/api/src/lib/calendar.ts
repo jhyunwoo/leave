@@ -53,6 +53,7 @@ const leaveColumns = {
   title: leaves.title,
   startDate: leaves.startDate,
   endDate: leaves.endDate,
+  returnTime: leaves.returnTime,
   reason: leaves.reason,
   status: leaves.status,
 } as const;
@@ -221,6 +222,7 @@ export async function buildCalendarPayloads(input: {
         title: leave.title,
         startDate: leave.startDate,
         endDate: leave.endDate,
+        returnTime: leave.returnTime,
         reason: leave.reason,
         status: leave.status,
         segments: segmentMap.get(leave.id) ?? [],

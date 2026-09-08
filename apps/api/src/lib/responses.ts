@@ -109,6 +109,7 @@ export const leaveSegmentResponseSchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   days: z.number(),
+  regularOvernightCycleStart: z.string().nullable().optional(),
 });
 
 export const leaveSchema = z
@@ -118,6 +119,7 @@ export const leaveSchema = z
     title: z.string(),
     startDate: z.string(),
     endDate: z.string(),
+    returnTime: z.string(),
     reason: z.string().nullable(),
     status: z.enum(LEAVE_STATUSES),
     segments: z.array(leaveSegmentResponseSchema),
@@ -131,6 +133,7 @@ export const calendarLeaveSchema = z
     title: z.string(),
     startDate: z.string(),
     endDate: z.string(),
+    returnTime: z.string(),
     reason: z.string().nullable(),
     status: z.enum(LEAVE_STATUSES),
     segments: z.array(leaveSegmentResponseSchema),

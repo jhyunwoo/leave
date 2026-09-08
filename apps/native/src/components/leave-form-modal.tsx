@@ -190,6 +190,17 @@ export function LeaveFormModal(props: {
             testID="leave-date-range"
           />
 
+          <Field label="복귀 시간" hint="휴가 종료일의 복귀 예정 시각이에요.">
+            <Input
+              value={form.returnTime}
+              onChangeText={form.setReturnTime}
+              placeholder="21:00"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              testID="leave-return-time"
+            />
+          </Field>
+
           <View style={sheet.isCompact ? styles.stack : styles.pairRow}>
             <View
               style={[
@@ -273,24 +284,48 @@ export function LeaveFormModal(props: {
                 onDragActiveChange={setReordering}
                 testID="segment-list"
                 items={resolved.map((draft, index) => (
-                  <SegmentRow
-                    key={index}
-                    draft={draft}
-                    removable={resolved.length > 1}
-                    remainingByKey={form.rowAvailable(
-                      draft.startDate,
-                      draft.endDate,
-                    )}
-                    onChangeKey={(key) =>
-                      form.setDrafts((current) =>
-                        current.map((item, i) =>
-                          i === index ? { ...item, key } : item,
-                        ),
-                      )
-                    }
-                    onChangeDays={(days) => form.setDraftDays(index, days)}
-                    onRemove={() => form.removeDraftAt(index)}
-                  />
+                  <View key={index} style={styles.segmentWithCycle}>
+                    <SegmentRow
+                      draft={draft}
+                      removable={resolved.length > 1}
+                      remainingByKey={form.rowAvailable(
+                        draft.startDate,
+                        draft.endDate,
+                      )}
+                      onChangeKey={(key) =>
+                        form.setDrafts((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, key } : item,
+                          ),
+                        )
+                      }
+                      onChangeDays={(days) => form.setDraftDays(index, days)}
+                      onRemove={() => form.removeDraftAt(index)}
+                    />
+                    {draft.key === "regular_overnight" &&
+                    (form.regularCycleChoices[index]?.length ?? 0) > 1 ? (
+                      <View style={styles.cycleChoices}>
+                        <Text style={styles.segmentHint}>
+                          차감할 정기외박 주기
+                        </Text>
+                        {form.regularCycleChoices[index]!.map((cycle) => (
+                          <Button
+                            key={cycle.start}
+                            title={`${cycle.index}주기 · ${fmtRangeTiny(cycle.start, cycle.end)}`}
+                            variant={
+                              draft.regularOvernightCycleStart === cycle.start
+                                ? "primary"
+                                : "secondary"
+                            }
+                            size="sm"
+                            onPress={() =>
+                              form.setRegularOvernightCycle(index, cycle.start)
+                            }
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
                 ))}
               />
             ) : (
@@ -357,6 +392,8 @@ const useStyles = makeStyles(({ colors }) => ({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  segmentWithCycle: { gap: spacing.sm },
+  cycleChoices: { gap: spacing.xs, paddingHorizontal: spacing.xs },
   stack: { gap: spacing.lg },
   // 두 카드가 같은 높이로 늘어나 짝처럼 보이게 한다(기본 alignItems: stretch).
   // flex는 여기서만 준다 — 세로로 쌓을 때 flex:1을 주면 카드가 세로로 늘어난다.

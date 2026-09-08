@@ -24,6 +24,7 @@ import {
   monthRange,
   PREPEND_INTERVAL_MS,
   prependMonths,
+  settledMonthOffset,
 } from "@/components/month-window";
 
 export * from "@/components/month-window";
@@ -39,6 +40,7 @@ export interface MonthScrollWindow {
    * onMomentumScrollEnd를 쏘지 않아 표시가 굳는 것에 대한 대비.
    */
   resetScrollFlags: () => void;
+  settleDragOffset: (offset: number) => number;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag: () => void;
   onScrollEndDrag: () => void;
@@ -170,6 +172,19 @@ export function useMonthScrollWindow(options: {
     momentumScrolling.current = false;
   }, []);
 
+  const settleDragOffset = useCallback(
+    (offset: number) => {
+      const settled = settledMonthOffset(offset, itemHeight, months.length);
+      settledMonth.current = months[settled.index] ?? settledMonth.current;
+      listRef.current?.scrollToOffset({
+        offset: settled.offset,
+        animated: false,
+      });
+      return settled.offset;
+    },
+    [itemHeight, months],
+  );
+
   const onEndReached = useCallback(() => {
     setMonths((ms) => appendMonths(ms, latestMonth));
   }, [latestMonth]);
@@ -200,6 +215,7 @@ export function useMonthScrollWindow(options: {
     listRef,
     scrollToMonth,
     resetScrollFlags,
+    settleDragOffset,
     onScroll,
     onScrollBeginDrag,
     onScrollEndDrag,

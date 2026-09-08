@@ -54,9 +54,17 @@ function source(over: Partial<WidgetSource> = {}): WidgetSource {
   };
 }
 
+function dailyEntries(sourceValue: WidgetSource) {
+  return buildWidgetTimeline(sourceValue, NOW).filter(
+    (entry, index) =>
+      index === 0 || entry.date.toISOString().endsWith("T15:00:00.000Z"),
+  );
+}
+
 describe("위젯 타임라인", () => {
   it("오늘부터 14일치를 날짜 순서로 만든다", () => {
-    const entries = buildWidgetTimeline(source(), NOW);
+    const timeline = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     expect(entries).toHaveLength(TIMELINE_DAYS);
     expect(entries.map((entry) => entry.props.date)).toEqual([
       "2026-06-15",
@@ -74,30 +82,30 @@ describe("위젯 타임라인", () => {
       "2026-06-27",
       "2026-06-28",
     ]);
-    for (let i = 1; i < entries.length; i += 1) {
-      expect(entries[i]!.date.getTime()).toBeGreaterThan(
-        entries[i - 1]!.date.getTime(),
+    for (let i = 1; i < timeline.length; i += 1) {
+      expect(timeline[i]!.date.getTime()).toBeGreaterThan(
+        timeline[i - 1]!.date.getTime(),
       );
     }
   });
 
   it("첫 엔트리는 자정이 아니라 지금이다", () => {
     // 앱에서 밀어 넣은 값이 다음 자정까지 기다리지 않고 바로 보여야 한다.
-    const entries = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     expect(entries[0]!.date).toEqual(NOW);
     // 그 다음부터는 한국시간 자정 = UTC 15:00.
     expect(entries[1]!.date.toISOString()).toBe("2026-06-15T15:00:00.000Z");
   });
 
   it("전역 D-Day가 하루씩 줄어든다", () => {
-    const entries = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     expect(entries[0]!.props.metrics.discharge?.value).toBe("D-182");
     expect(entries[1]!.props.metrics.discharge?.value).toBe("D-181");
     expect(entries[13]!.props.metrics.discharge?.value).toBe("D-169");
   });
 
   it("전역 당일은 D-DAY, 그 뒤로는 지표가 사라진다", () => {
-    const entries = buildWidgetTimeline(
+    const entries = dailyEntries(
       source({
         profile: {
           enlistedAt: "2025-06-15",
@@ -105,14 +113,13 @@ describe("위젯 타임라인", () => {
           rank: "sergeant",
         },
       }),
-      NOW,
     );
     expect(entries[2]!.props.metrics.discharge?.value).toBe("D-DAY");
     expect(entries[3]!.props.metrics.discharge).toBeUndefined();
   });
 
   it("남은 일과일은 지나간 일과일만큼 줄어든다", () => {
-    const entries = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     // 6/15(월) 기준 100일. 6/16에는 6/15 하루를 보냈으므로 99.
     expect(entries[0]!.props.metrics.dutyDays?.value).toBe("100일");
     expect(entries[1]!.props.metrics.dutyDays?.value).toBe("99일");
@@ -127,12 +134,12 @@ describe("위젯 타임라인", () => {
   });
 
   it("남은 일과일은 0 아래로 내려가지 않는다", () => {
-    const entries = buildWidgetTimeline(source({ dutyDaysToday: 2 }), NOW);
+    const entries = dailyEntries(source({ dutyDaysToday: 2 }));
     expect(entries[13]!.props.metrics.dutyDays?.value).toBe("0일");
   });
 
   it("다음 휴가 D-Day가 휴가 중에는 복귀까지로 바뀐다", () => {
-    const entries = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     expect(entries[0]!.props.metrics.nextLeave).toMatchObject({
       label: "다음 휴가",
       value: "D-5",
@@ -140,11 +147,16 @@ describe("위젯 타임라인", () => {
     // 6/20 시작 — 그날은 휴가 중이고 종료(6/22)까지 이틀.
     expect(entries[5]!.props.metrics.nextLeave).toMatchObject({
       label: "휴가 중",
-      value: "D-2",
+      value: "69시간 00분",
     });
     // 6/22는 마지막 날.
-    expect(entries[7]!.props.metrics.nextLeave?.value).toBe("D-DAY");
-    // 휴가가 끝나면 셀 것이 없다.
+    expect(entries[7]!.props.metrics.nextLeave?.value).toBe("21시간 00분");
+    // 복귀시각이 되면 자정 전이어도 셀 것이 없다.
+    const returnEntry = buildWidgetTimeline(source(), NOW).find(
+      (entry) => entry.date.toISOString() === "2026-06-22T12:00:00.000Z",
+    );
+    expect(returnEntry?.props.metrics.nextLeave).toBeUndefined();
+    // 다음 날에도 셀 것이 없다.
     expect(entries[8]!.props.metrics.nextLeave).toBeUndefined();
   });
 
@@ -157,7 +169,7 @@ describe("위젯 타임라인", () => {
   });
 
   it("복무율은 날마다 오른다", () => {
-    const entries = buildWidgetTimeline(source(), NOW);
+    const entries = dailyEntries(source());
     const first = entries[0]!.props.metrics.progress!;
     const last = entries[13]!.props.metrics.progress!;
     expect(first.gauge).toBeGreaterThan(0);
@@ -243,7 +255,7 @@ describe("위젯 타임라인", () => {
       "전역까지 182일 남았어요",
     );
     expect(entries[7]!.props.metrics.nextLeave?.spoken).toBe(
-      "오늘이 휴가 마지막 날이에요",
+      "복귀까지 21시간 0분 남았어요",
     );
   });
 });

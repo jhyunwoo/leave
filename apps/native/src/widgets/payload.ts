@@ -23,6 +23,7 @@ import {
   addDays,
   diffDays,
   kstMidnight,
+  todayInSeoul,
   type ISODate,
 } from "@leave/shared/dates";
 import { dutyDaysBetween, type DateRange } from "@leave/shared/duty-days";
@@ -71,6 +72,9 @@ export type MetricValue = {
   compact: string;
   /** 0~1. 원형 게이지를 그릴 수 있는 지표만 **키를 넣는다**. */
   gauge?: number;
+  /** iOS SwiftUI가 앱 실행 없이 복귀까지 실시간으로 줄이는 타이머 구간. */
+  timerStartAt?: number;
+  timerEndAt?: number;
 };
 
 /**
@@ -233,24 +237,30 @@ function dutyDays(
 function nextLeave(
   date: ISODate,
   leaves: readonly MyLeave[],
+  at: Date,
 ): MetricValue | undefined {
-  const countdown = nextLeaveCountdown(leaves, date);
+  const countdown = nextLeaveCountdown(leaves, at);
   if (!countdown) return undefined;
 
   const { leave, phase, days } = countdown;
   const onLeave = phase === "onLeave";
-  const lastDay = onLeave && days === 0;
+  const minutes = countdown.remainingMinutes ?? 0;
+  const hoursText = `${Math.floor(minutes / 60)}시간 ${String(minutes % 60).padStart(2, "0")}분`;
+  const [returnHour, returnMinute] = (leave.returnTime ?? "21:00")
+    .split(":")
+    .map(Number) as [number, number];
+  const returnAt =
+    kstMidnight(leave.endDate) + (returnHour * 60 + returnMinute) * 60_000;
   const range = fmtRangeTiny(leave.startDate, leave.endDate);
   return {
     label: onLeave ? "휴가 중" : "다음 휴가",
-    value: lastDay ? "D-DAY" : dday(days),
+    value: onLeave ? hoursText : dday(days),
     caption: `${leave.title} · ${range}`,
-    spoken: lastDay
-      ? "오늘이 휴가 마지막 날이에요"
-      : onLeave
-        ? `휴가 종료까지 ${days}일 남았어요`
-        : `다음 휴가까지 ${days}일 남았어요`,
-    compact: `${onLeave ? "복귀" : "휴가"} ${lastDay ? "D-DAY" : dday(days)}`,
+    spoken: onLeave
+      ? `복귀까지 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남았어요`
+      : `다음 휴가까지 ${days}일 남았어요`,
+    compact: `${onLeave ? "복귀" : "휴가"} ${onLeave ? hoursText : dday(days)}`,
+    ...(onLeave ? { timerStartAt: at.getTime(), timerEndAt: returnAt } : {}),
   };
 }
 
@@ -312,7 +322,7 @@ function headroom(
 }
 
 /** 한 날짜의 지표 묶음. 값이 없는 지표는 키를 넣지 않는다. */
-function metricsOn(source: WidgetSource, date: ISODate) {
+function metricsOn(source: WidgetSource, date: ISODate, at: Date) {
   const metrics: Partial<Record<MetricKey, MetricValue>> = {};
   const { profile } = source;
 
@@ -335,7 +345,7 @@ function metricsOn(source: WidgetSource, date: ISODate) {
     }
   }
 
-  const upcoming = nextLeave(date, source.leaves);
+  const upcoming = nextLeave(date, source.leaves, at);
   if (upcoming) metrics.nextLeave = upcoming;
 
   const held = balance(source.snapshot.holdings);
@@ -368,18 +378,42 @@ export function buildWidgetTimeline(
 
   for (let offset = 0; offset < TIMELINE_DAYS; offset += 1) {
     const date = addDays(source.today, offset);
+    const entryAt = offset === 0 ? now : new Date(kstMidnight(date));
     entries.push({
-      date: offset === 0 ? now : new Date(kstMidnight(date)),
+      date: entryAt,
       props: {
         state: "ready",
         asOf,
         date,
         defaultMetric: source.defaultMetric,
         summaryMetrics: [...source.summaryMetrics],
-        metrics: metricsOn(source, date),
+        metrics: metricsOn(source, date, entryAt),
       },
     });
   }
+
+  // 자정 사이에 복귀하는 순간에는 끝난 휴가를 내리고 다음 일정으로 전환한다.
+  for (const leave of source.leaves) {
+    const [hour, minute] = (leave.returnTime ?? "21:00").split(":").map(Number);
+    const instant = new Date(
+      kstMidnight(leave.endDate) + (hour! * 60 + minute!) * 60_000,
+    );
+    if (instant <= now || instant > entries[entries.length - 1]!.date) continue;
+    const date = todayInSeoul(instant);
+    entries.push({
+      date: instant,
+      props: {
+        state: "ready",
+        asOf,
+        date,
+        defaultMetric: source.defaultMetric,
+        summaryMetrics: [...source.summaryMetrics],
+        metrics: metricsOn(source, date, instant),
+      },
+    });
+  }
+
+  entries.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return entries;
 }

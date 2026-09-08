@@ -182,6 +182,15 @@ function LeaveMetricLayout(
     );
   }
 
+  const timerInterval =
+    typeof metric.timerStartAt === "number" &&
+    typeof metric.timerEndAt === "number"
+      ? {
+          lower: new Date(metric.timerStartAt),
+          upper: new Date(metric.timerEndAt),
+        }
+      : undefined;
+
   if (family === "accessoryInline") {
     return (
       <Text modifiers={[widgetURL(link), accessibilityLabel(metric.spoken)]}>
@@ -200,7 +209,10 @@ function LeaveMetricLayout(
           min={0}
           max={1}
           currentValueLabel={
-            <Text modifiers={[font({ size: 13, weight: "semibold" })]}>
+            <Text
+              timerInterval={timerInterval}
+              modifiers={[font({ size: 13, weight: "semibold" })]}
+            >
               {metric.value}
             </Text>
           }
@@ -220,6 +232,7 @@ function LeaveMetricLayout(
         <AccessoryWidgetBackground />
         <Text modifiers={[font({ size: 10 })]}>{metric.label}</Text>
         <Text
+          timerInterval={timerInterval}
           modifiers={[
             font({ size: 15, weight: "bold" }),
             minimumScaleFactor(0.6),
@@ -241,7 +254,10 @@ function LeaveMetricLayout(
         <Text modifiers={[font({ size: 12, weight: "semibold" })]}>
           {metric.label}
         </Text>
-        <Text modifiers={[font({ size: 20, weight: "bold" })]}>
+        <Text
+          timerInterval={timerInterval}
+          modifiers={[font({ size: 20, weight: "bold" })]}
+        >
           {metric.value}
         </Text>
         {metric.caption ? (
@@ -271,6 +287,7 @@ function LeaveMetricLayout(
           {metric.label}
         </Text>
         <Text
+          timerInterval={timerInterval}
           modifiers={[
             font({ size: 80, weight: "heavy" }),
             ...tint(body),
@@ -313,6 +330,7 @@ function LeaveMetricLayout(
           {metric.label}
         </Text>
         <Text
+          timerInterval={timerInterval}
           modifiers={[
             font({ size: 56, weight: "heavy" }),
             ...tint(body),
@@ -356,6 +374,7 @@ function LeaveMetricLayout(
         {metric.label}
       </Text>
       <Text
+        timerInterval={timerInterval}
         modifiers={[
           font({ size: 40, weight: "heavy" }),
           ...tint(body),

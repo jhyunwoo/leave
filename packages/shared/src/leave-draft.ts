@@ -27,6 +27,7 @@ export type SegmentDraft = {
   key: BalanceKey;
   /** 이 종류를 며칠 쓰는가. 1 이상의 정수. 날짜는 여기서 파생된다. */
   days: number;
+  regularOvernightCycleStart?: ISODate | null;
 };
 
 export type ResolvedDraft = SegmentDraft & {
@@ -79,7 +80,7 @@ export function resolveDrafts(
   for (const draft of drafts) {
     const days = normalizeDays(draft.days);
     const endDate = addDays(cursor, days - 1);
-    resolved.push({ key: draft.key, days, startDate: cursor, endDate });
+    resolved.push({ ...draft, days, startDate: cursor, endDate });
     cursor = addDays(endDate, 1);
   }
   return resolved;
@@ -107,7 +108,7 @@ export function fitDraftsToTotal(
     if (remaining < 1) break;
     // 뒤 구간이 최소 하루씩은 가져갈 수 있게 남겨 둔다.
     const days = Math.min(normalizeDays(draft.days), remaining);
-    fitted.push({ key: draft.key, days });
+    fitted.push({ ...draft, days });
     remaining -= days;
   }
 
@@ -181,6 +182,9 @@ export function draftsToSegments(
     ...balanceKeyToCategory(draft.key),
     startDate: draft.startDate,
     endDate: draft.endDate,
+    ...(draft.key === "regular_overnight" && draft.regularOvernightCycleStart
+      ? { regularOvernightCycleStart: draft.regularOvernightCycleStart }
+      : {}),
   }));
 }
 
@@ -202,6 +206,14 @@ export function segmentsToDrafts(
           ? "regular_overnight"
           : "other_overnight") as BalanceKey,
       days: inclusiveDays(segment.startDate, segment.endDate),
+      ...(segment.overnightKind === "regular" &&
+      "regularOvernightCycleStart" in segment
+        ? {
+            regularOvernightCycleStart:
+              (segment as { regularOvernightCycleStart?: ISODate | null })
+                .regularOvernightCycleStart ?? null,
+          }
+        : {}),
     }));
 }
 

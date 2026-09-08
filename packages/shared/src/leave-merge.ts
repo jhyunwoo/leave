@@ -37,6 +37,7 @@ export type MergeCandidate = {
   reason: string | null;
   status: LeaveStatus;
   createdAt: string;
+  returnTime?: string;
   segments: LeaveSegment[];
 };
 
@@ -52,6 +53,7 @@ export type LeaveMergePlan =
       createdAt: string;
       title: string;
       reason: string | null;
+      returnTime: string;
       segments: LeaveSegment[];
       /** 사라질 휴가 id들. hostId는 들어 있지 않다. */
       absorbedIds: string[];
@@ -85,7 +87,12 @@ function combineSegments(
     // 앞 구간 끝 다음 날에 시작하지 않으면 빈틈이거나 겹침이다.
     if (segment.startDate !== addDays(last.endDate, 1)) return null;
     // 같은 재원끼리만 잇는다. 재원이 다르면 구간을 그대로 남겨야 일수가 보존된다.
-    if (segmentBalanceKey(last) === segmentBalanceKey(segment)) {
+    if (
+      segmentBalanceKey(last) === segmentBalanceKey(segment) &&
+      // 정기외박은 같은 재원이어도 차감 주기가 다르면 서로 다른 원장 항목이다.
+      (segmentBalanceKey(segment) !== "regular_overnight" ||
+        last.regularOvernightCycleStart === segment.regularOvernightCycleStart)
+    ) {
       last.endDate = segment.endDate;
       last.days = inclusiveDays(last.startDate, last.endDate);
       continue;
@@ -183,6 +190,7 @@ export function planLeaveMerge(
     createdAt: host.createdAt,
     title: named.length ? named[0]!.title : titleFromSegments(segments),
     reason: combineReasons(ordered),
+    returnTime: ordered[ordered.length - 1]!.returnTime ?? "21:00",
     segments,
     absorbedIds: ordered
       .filter((part) => part.id !== host.id)

@@ -77,6 +77,7 @@ async function loadMergeCandidates(
       reason: row.reason,
       status: row.status,
       createdAt: row.createdAt,
+      returnTime: row.returnTime,
       segments: segmentMap.get(row.id) ?? [],
     }))
     .filter((candidate) => candidate.segments.length > 0);
@@ -117,6 +118,7 @@ export async function saveLeaveWithMerge(
           createdAt: plan.createdAt,
           title: plan.title,
           reason: plan.reason,
+          returnTime: plan.returnTime,
           segments: plan.segments,
           // incoming이 아직 행이 없는 등록일 때만 지울 대상에서 뺀다. 수정(PATCH)이면
           // incoming.id는 이미 있는 행이라 다른 이웃에 흡수될 수 있고, 그때는
@@ -130,6 +132,7 @@ export async function saveLeaveWithMerge(
           createdAt: incoming.createdAt,
           title: incoming.title,
           reason: incoming.reason,
+          returnTime: incoming.returnTime ?? "21:00",
           segments: incoming.segments,
           absorbedIds: [] as string[],
         };
@@ -141,6 +144,7 @@ export async function saveLeaveWithMerge(
     title: saved.title,
     startDate: range.startDate,
     endDate: range.endDate,
+    returnTime: saved.returnTime,
     reason: saved.reason,
     status: incoming.status,
     createdAt: saved.createdAt,
@@ -189,6 +193,7 @@ export async function saveLeaveWithMerge(
             title: row.title,
             startDate: row.startDate,
             endDate: row.endDate,
+            returnTime: row.returnTime,
             reason: row.reason,
             status: row.status,
           })

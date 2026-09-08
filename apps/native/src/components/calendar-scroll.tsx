@@ -126,6 +126,7 @@ export const CalendarScroll = forwardRef<
     listRef,
     scrollToMonth,
     resetScrollFlags,
+    settleDragOffset,
     onScroll,
     onScrollBeginDrag,
     onScrollEndDrag,
@@ -152,6 +153,7 @@ export const CalendarScroll = forwardRef<
     contentInset: contentTopInset + spacing.xxl,
     onScrollBeginDrag,
     resetScrollFlags,
+    settleDragOffset,
   });
   const calendarGesture = useMemo(
     () => Gesture.Simultaneous(scrollGesture, drag.context.gesture),

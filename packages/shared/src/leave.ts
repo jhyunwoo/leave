@@ -140,6 +140,8 @@ export type LeaveSegment = {
   startDate: ISODate;
   endDate: ISODate;
   days: number;
+  /** 정기외박 전체 일수를 차감할 주기의 시작일. */
+  regularOvernightCycleStart?: ISODate | null;
 };
 
 /**

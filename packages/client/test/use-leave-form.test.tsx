@@ -308,6 +308,65 @@ describe("기간 변경", () => {
   });
 });
 
+describe("정기외박 주기 선택", () => {
+  it("여러 주기에 하루라도 걸치면 차감할 주기를 직접 고른다", async () => {
+    const { wrapper } = setup(
+      undefined,
+      [
+        {
+          key: "annual",
+          totalDays: 0,
+          usedDays: 0,
+          remainingDays: 0,
+          remainingAsOfTodayDays: 0,
+        },
+        {
+          key: "regular_overnight",
+          totalDays: 4,
+          usedDays: 0,
+          remainingDays: 4,
+          remainingAsOfTodayDays: 4,
+        },
+      ],
+      undefined,
+      {
+        regularOvernight: {
+          enabled: true,
+          startDate: "2026-01-01",
+          intervalDays: 30,
+          daysPerGrant: 4,
+        },
+      },
+    );
+    const { result } = await renderForm(wrapper, "2026-03-01");
+
+    await waitFor(() =>
+      expect(result.current.drafts[0]?.key).toBe("regular_overnight"),
+    );
+    act(() => result.current.setDraftDays(0, 2));
+    await waitFor(() =>
+      expect(result.current.regularCycleChoices[0]).toHaveLength(2),
+    );
+    // 하루짜리였을 때 자동 선택된 첫 주기는 기간을 늘려도 유효하므로 유지한다.
+    expect(result.current.resolved[0]?.regularOvernightCycleStart).toBe(
+      result.current.regularCycleChoices[0]![0]!.start,
+    );
+
+    act(() =>
+      result.current.setRegularOvernightCycle(
+        0,
+        result.current.regularCycleChoices[0]![1]!.start,
+      ),
+    );
+    await waitFor(() =>
+      expect(result.current.resolved[0]?.regularOvernightCycleStart).toBe(
+        result.current.regularCycleChoices[0]![1]!.start,
+      ),
+    );
+    expect(result.current.balanceBlockMessage).toBe("");
+  });
+});
+
 describe("종류별 개수", () => {
   it("개수를 올리면 종료일이 따라 늘어난다", async () => {
     const { wrapper } = setup();
@@ -436,6 +495,7 @@ describe("잔여 검사", () => {
         // 앞뒤 공백은 제거해서 보낸다.
         title: "제주도 휴가",
         reason: "가족 여행",
+        returnTime: "21:00",
         status: "shared",
         segments: [
           {

@@ -10,6 +10,10 @@
 import { fmtRange } from "@leave/shared/calendar";
 import type { ISODate } from "@leave/shared/dates";
 import { segmentsRange, shiftSegments } from "@leave/shared/leave";
+import {
+  eligibleRegularOvernightCycles,
+  type RegularOvernightConfig,
+} from "@leave/shared/regular-overnight";
 import { planLeaveMerge } from "@leave/shared/leave-merge";
 import { leaveCreateSchema } from "@leave/shared/schemas";
 import { onlineManager } from "@tanstack/react-query";
@@ -18,9 +22,12 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   buildMyLeaveDayMap,
   useUpdateLeave,
+  useDeleteLeave,
+  useLeaveBalances,
+  useMe,
   type MyLeave,
 } from "@leave/client";
-import { confirmAction, notify } from "@/lib/dialog";
+import { chooseLeaveHoldAction, confirmAction, notify } from "@/lib/dialog";
 import {
   calendarDragAtom,
   calendarDragPreviewAtom,
@@ -39,8 +46,40 @@ function planMove(
   leave: MyLeave,
   leaves: readonly MyLeave[],
   deltaDays: number,
-): { segments: MyLeave["segments"]; verdict: LeaveDragVerdict } {
-  const segments = shiftSegments(leave.segments, deltaDays);
+  regularConfig: RegularOvernightConfig | null,
+  dischargeAt: string,
+): {
+  segments: MyLeave["segments"];
+  verdict: LeaveDragVerdict;
+  needsCycleChoice: boolean;
+} {
+  let needsCycleChoice = false;
+  const segments = shiftSegments(leave.segments, deltaDays).map((segment) => {
+    if (
+      segment.category !== "overnight" ||
+      segment.overnightKind !== "regular"
+    ) {
+      return segment;
+    }
+    const choices = eligibleRegularOvernightCycles(
+      regularConfig,
+      segment.startDate,
+      segment.endDate,
+      dischargeAt,
+    );
+    if (
+      choices.some(
+        (cycle) => cycle.start === segment.regularOvernightCycleStart,
+      )
+    ) {
+      return segment;
+    }
+    if (choices.length === 1) {
+      return { ...segment, regularOvernightCycleStart: choices[0]!.start };
+    }
+    needsCycleChoice = choices.length > 1;
+    return { ...segment, regularOvernightCycleStart: null };
+  });
   const plan = planLeaveMerge({ ...leave, segments }, leaves);
   return {
     segments,
@@ -50,6 +89,7 @@ function planMove(
         : plan.kind === "merged"
           ? "merge"
           : "ok",
+    needsCycleChoice,
   };
 }
 
@@ -66,6 +106,9 @@ export function useLeaveDrag(
   const setDrag = useSetAtom(calendarDragAtom);
   const setPreview = useSetAtom(calendarDragPreviewAtom);
   const updateLeave = useUpdateLeave();
+  const deleteLeave = useDeleteLeave();
+  const balances = useLeaveBalances();
+  const me = useMe();
   const committing = useRef(false);
 
   const leave = useMemo(
@@ -76,8 +119,14 @@ export function useLeaveDrag(
 
   const moved = useMemo(() => {
     if (!drag || !leave || drag.hoverDate == null) return null;
-    return planMove(leave, leaves ?? [], drag.deltaDays);
-  }, [drag, leave, leaves]);
+    return planMove(
+      leave,
+      leaves ?? [],
+      drag.deltaDays,
+      balances.data?.regularOvernight ?? null,
+      me.data?.user.dischargeAt ?? "",
+    );
+  }, [drag, leave, leaves, balances.data, me.data]);
 
   // 덧그릴 칸들. 저장된 칸과 똑같이 생기도록 같은 함수로 만든다.
   useEffect(() => {
@@ -119,15 +168,20 @@ export function useLeaveDrag(
     void (async () => {
       try {
         if (drag.phase === "editing") {
+          if (!leave) return;
+          const action = await chooseLeaveHoldAction(leave.title);
+          if (action === "edit") onEdit(leave);
           if (
-            leave &&
+            action === "delete" &&
             (await confirmAction({
-              title: "휴가 편집",
-              message: `"${leave.title}" 휴가의 일정과 내용을 편집할까요?`,
-              confirmLabel: "편집",
+              title: "휴가 삭제",
+              message: `"${leave.title}" 휴가를 삭제할까요?`,
+              confirmLabel: "삭제",
+              destructive: true,
             }))
-          )
-            onEdit(leave);
+          ) {
+            await deleteLeave.mutateAsync(leave.id);
+          }
           return;
         }
         if (
@@ -143,6 +197,15 @@ export function useLeaveDrag(
             "기간이 겹쳐요",
             "그 자리에 이미 등록한 휴가가 있어요. 다른 날짜로 옮겨주세요.",
           );
+          return;
+        }
+        if (moved.needsCycleChoice) {
+          const range = segmentsRange(moved.segments)!;
+          onEdit({
+            ...leave,
+            ...range,
+            segments: moved.segments,
+          });
           return;
         }
         // 오프라인에서는 시도조차 하지 않는다. 이 앱의 mutation은 networkMode가
@@ -177,6 +240,7 @@ export function useLeaveDrag(
           input: leaveCreateSchema.parse({
             title: leave.title,
             status: leave.status,
+            returnTime: leave.returnTime,
             segments: moved.segments,
             ...(leave.reason ? { reason: leave.reason } : {}),
           }),
@@ -191,7 +255,7 @@ export function useLeaveDrag(
         setDrag(null);
       }
     })();
-  }, [drag, leave, moved, setDrag, updateLeave, onEdit]);
+  }, [drag, leave, moved, setDrag, updateLeave, deleteLeave, onEdit]);
 
   const statusLabel = useMemo(() => {
     if (!drag) return null;

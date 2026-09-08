@@ -13,7 +13,12 @@
  */
 // 도메인 하위 경로에서 직접 가져온다. 배럴(`@leave/shared`)은 zod 스키마까지 함께
 // 평가시킨다 — 자세한 배경은 packages/shared/src/index.ts 주석 참고.
-import { diffDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import {
+  diffDays,
+  kstMidnight,
+  todayInSeoul,
+  type ISODate,
+} from "@leave/shared/dates";
 import { isCountedLeaveStatus } from "@leave/shared/leave";
 import { partitionMyLeaves } from "./my-leaves-sections";
 import type { MyLeave } from "./types";
@@ -24,7 +29,17 @@ export type NextLeaveCountdown = {
   phase: "onLeave" | "upcoming";
   /** `onLeave`면 종료일까지, `upcoming`이면 시작일까지 남은 날. 음수는 없다. */
   days: number;
+  /** 휴가 중일 때 복귀시각까지 남은 분. 초 단위는 올림한다. */
+  remainingMinutes?: number;
 };
+
+const DEFAULT_RETURN_TIME = "21:00";
+
+function returnAt(leave: MyLeave): number {
+  const time = leave.returnTime ?? DEFAULT_RETURN_TIME;
+  const [hours, minutes] = time.split(":").map(Number) as [number, number];
+  return kstMidnight(leave.endDate) + (hours * 60 + minutes) * 60_000;
+}
 
 /**
  * 카운트다운할 휴가 한 건과 남은 날. 셀 휴가가 없으면 null.
@@ -35,19 +50,31 @@ export type NextLeaveCountdown = {
  */
 export function nextLeaveCountdown(
   leaves: readonly MyLeave[] | undefined,
-  today: ISODate = todayInSeoul(),
+  at: ISODate | Date = new Date(),
 ): NextLeaveCountdown | null {
+  const today = at instanceof Date ? todayInSeoul(at) : at;
+  const now = at instanceof Date ? at.getTime() : kstMidnight(today);
   const counted = (leaves ?? []).filter((leave) =>
     isCountedLeaveStatus(leave.status),
   );
-  const leave = partitionMyLeaves(counted, today).upcoming[0];
+  const candidates = partitionMyLeaves(counted, today).upcoming.filter(
+    (leave) => !(at instanceof Date) || returnAt(leave) > now,
+  );
+  const leave = candidates[0];
   if (!leave) return null;
 
   const onLeave = leave.startDate <= today;
   const target = onLeave ? leave.endDate : leave.startDate;
-  return {
+  const result: NextLeaveCountdown = {
     leave,
     phase: onLeave ? "onLeave" : "upcoming",
     days: Math.max(diffDays(today, target), 0),
   };
+  if (onLeave && at instanceof Date) {
+    result.remainingMinutes = Math.max(
+      Math.ceil((returnAt(leave) - now) / 60_000),
+      0,
+    );
+  }
+  return result;
 }

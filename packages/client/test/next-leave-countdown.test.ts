@@ -74,6 +74,38 @@ describe("nextLeaveCountdown", () => {
     expect(result).toMatchObject({ phase: "onLeave", days: 2 });
   });
 
+  it("진행 중인 휴가는 복귀 시각까지 남은 총 시간과 분을 센다", () => {
+    const current = {
+      ...leave("a", "2026-08-14", "2026-08-18"),
+      returnTime: "21:00",
+    };
+    const result = nextLeaveCountdown(
+      [current],
+      new Date("2026-08-16T10:53:30.000Z"), // 서울 8/16 19:53:30
+    );
+    expect(result).toMatchObject({
+      phase: "onLeave",
+      remainingMinutes: 2947, // 49시간 6분 30초를 분 단위로 올림
+    });
+  });
+
+  it("복귀 시각이 지나면 진행 중 휴가를 끝내고 다음 휴가를 고른다", () => {
+    const ended = {
+      ...leave("ended", "2026-08-14", TODAY),
+      returnTime: "21:00",
+    };
+    const upcoming = {
+      ...leave("next", "2026-08-20", "2026-08-22"),
+      returnTime: "21:00",
+    };
+    const result = nextLeaveCountdown(
+      [ended, upcoming],
+      new Date("2026-08-16T12:00:00.000Z"), // 서울 21:00
+    );
+    expect(result?.leave.id).toBe("next");
+    expect(result).toMatchObject({ phase: "upcoming", days: 4 });
+  });
+
   it("오늘이 종료일이면 0이다 — 음수로 내려가지 않는다", () => {
     const result = nextLeaveCountdown([leave("a", "2026-08-14", TODAY)], TODAY);
     expect(result).toMatchObject({ phase: "onLeave", days: 0 });

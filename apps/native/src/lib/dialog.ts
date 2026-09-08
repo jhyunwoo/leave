@@ -25,3 +25,14 @@ export function confirmAction(options: {
     : options.title;
   return Promise.resolve(globalThis.confirm(body));
 }
+
+export type LeaveHoldAction = "edit" | "delete" | "cancel";
+
+export function chooseLeaveHoldAction(title: string): Promise<LeaveHoldAction> {
+  const answer = globalThis.prompt(
+    `${title}\n\n수정 또는 삭제를 입력해주세요.`,
+  );
+  if (answer === "수정") return Promise.resolve("edit");
+  if (answer === "삭제") return Promise.resolve("delete");
+  return Promise.resolve("cancel");
+}

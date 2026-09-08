@@ -36,6 +36,7 @@ export function useCalendarDrag(options: {
   contentInset: number;
   onScrollBeginDrag: () => void;
   resetScrollFlags: () => void;
+  settleDragOffset: (offset: number) => number;
 }) {
   const {
     listRef,
@@ -44,20 +45,28 @@ export function useCalendarDrag(options: {
     contentInset,
     onScrollBeginDrag,
     resetScrollFlags,
+    settleDragOffset,
   } = options;
   const store = useStore();
   const session = useRef<CalendarDragSession | null>(null);
   const offset = useRef(initialOffset);
   const active = useSharedValue(false);
+  const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearEditTimer = useCallback(() => {
+    if (editTimer.current) clearTimeout(editTimer.current);
+    editTimer.current = null;
+  }, []);
 
   const cancel = useCallback(() => {
+    clearEditTimer();
     active.set(false);
     if (!session.current) return;
     session.current = null;
     setCalendarDragPressActive(false);
     resetScrollFlags();
     store.set(calendarDragAtom, null);
-  }, [active, resetScrollFlags, store]);
+  }, [active, clearEditTimer, resetScrollFlags, store]);
 
   const publish = useCallback(() => {
     const current = session.current;
@@ -110,6 +119,16 @@ export function useCalendarDrag(options: {
       });
       store.set(calendarDragAtom, { ...session.current.drag });
       selectionHaptic();
+      // 칩 인식 250ms 뒤부터 세므로, 누른 지 총 650ms가 되면 손을 떼기 전에 연다.
+      editTimer.current = setTimeout(() => {
+        const current = session.current;
+        if (!current || current.hasMoved) return;
+        session.current = null;
+        active.set(false);
+        setCalendarDragPressActive(false);
+        resetScrollFlags();
+        store.set(calendarDragAtom, { ...current.drag, phase: "editing" });
+      }, 400);
     },
     [active, listRef, resetScrollFlags, store],
   );
@@ -129,10 +148,18 @@ export function useCalendarDrag(options: {
             viewportHeight,
         ),
       );
+      if (current.hasMoved) clearEditTimer();
       if (before !== current.scrollOffset) onScrollBeginDrag();
       publish();
     },
-    [store, contentInset, viewportHeight, onScrollBeginDrag, publish],
+    [
+      store,
+      contentInset,
+      viewportHeight,
+      onScrollBeginDrag,
+      publish,
+      clearEditTimer,
+    ],
   );
 
   const release = useCallback(
@@ -148,16 +175,18 @@ export function useCalendarDrag(options: {
       ]);
       const result = current.release(touches.map((touch) => touch.id));
       if (!result) return;
+      clearEditTimer();
+      offset.current = settleDragOffset(current.scrollOffset);
       session.current = null;
       active.set(false);
       setCalendarDragPressActive(false);
       resetScrollFlags();
-      store.set(calendarDragAtom, {
-        ...current.drag,
-        phase: result === "edit" ? "editing" : "dropped",
-      });
+      store.set(
+        calendarDragAtom,
+        result === "cancel" ? null : { ...current.drag, phase: "dropped" },
+      );
     },
-    [active, resetScrollFlags, store, move],
+    [active, clearEditTimer, resetScrollFlags, settleDragOffset, store, move],
   );
 
   const onTouchesMove = useCallback(

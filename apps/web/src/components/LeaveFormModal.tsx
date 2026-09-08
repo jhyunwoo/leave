@@ -106,6 +106,16 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
           testId="leave-date-range"
         />
 
+        <Field label="복귀 시간" hint="휴가 종료일의 복귀 예정 시각이에요.">
+          <input
+            className="input"
+            type="time"
+            value={form.returnTime}
+            onChange={(event) => form.setReturnTime(event.target.value)}
+            data-testid="leave-return-time"
+          />
+        </Field>
+
         <Field label="계획 상태" hint={statusHint(form.status)}>
           <select
             className="input"
@@ -237,6 +247,30 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                         </option>
                       ))}
                     </select>
+
+                    {draft.key === "regular_overnight" &&
+                    (form.regularCycleChoices[index]?.length ?? 0) > 1 ? (
+                      <select
+                        className="input"
+                        style={{ gridColumn: "1 / -1" }}
+                        value={draft.regularOvernightCycleStart ?? ""}
+                        aria-label={`${index + 1}번째 정기외박 차감 주기`}
+                        onChange={(event) =>
+                          form.setRegularOvernightCycle(
+                            index,
+                            event.target.value,
+                          )
+                        }
+                      >
+                        <option value="">차감 주기 선택</option>
+                        {form.regularCycleChoices[index]!.map((cycle) => (
+                          <option key={cycle.start} value={cycle.start}>
+                            {cycle.index}주기 ·{" "}
+                            {fmtRangeTiny(cycle.start, cycle.end)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
 
                     {/* 날짜가 아니라 개수를 고른다. 시작·종료일은 여기서 파생된다. */}
                     <input

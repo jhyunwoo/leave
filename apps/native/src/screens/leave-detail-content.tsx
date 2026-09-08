@@ -110,6 +110,9 @@ export function LeaveDetailContent(props: {
         <Text style={styles.leaveDates} selectable>
           {fmtRange(leave.startDate, leave.endDate)}
         </Text>
+        <Text style={styles.leaveReason} selectable>
+          복귀 예정 {leave.returnTime}
+        </Text>
         {leave.reason ? (
           <Text style={styles.leaveReason} selectable>
             {leave.reason}
