@@ -208,3 +208,35 @@ test("내비게이션 배지와 알림함은 하나의 폴링 응답만 활성�
   await expect.poll(() => inboxGets).toBe(2);
   expect(summaryGets).toBe(summaryAtInboxOpen);
 });
+
+test("휴가 중 카운트다운은 매초 갱신되고 복귀 시각에 종료한다", async ({
+  page,
+  request,
+}) => {
+  const token = await createAccount(request);
+  await page.clock.install({ time: new Date("2026-09-08T11:00:00Z") });
+  await page.route("**/leaves/mine", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "http://localhost:5173" },
+      body: JSON.stringify({
+        leaves: [
+          { ...fakeLeave("countdown", "2026-09-08"), returnTime: "21:00" },
+        ],
+      }),
+    }),
+  );
+  await page.addInitScript(
+    (value) => localStorage.setItem("leave.token", value),
+    token,
+  );
+  await page.goto("/leaves");
+  const card = page.getByTestId("next-leave-card");
+  await expect(card).toBeVisible();
+  await page.clock.pauseAt(new Date("2026-09-08T11:59:57Z"));
+  await expect(card).toContainText("0시간 00분 03초");
+  await page.clock.fastForward(1_000);
+  await expect(card).toContainText("0시간 00분 02초");
+  await page.clock.fastForward(2_000);
+  await expect(card).toHaveCount(0);
+});

@@ -48,7 +48,10 @@ export function useActiveGate(): boolean {
 }
 
 /** 막대와 접근성 값을 위한 저속 시계. */
-export function useServiceTicker(active: boolean): number {
+export function useServiceTicker(
+  active: boolean,
+  intervalMs = TICK_MS,
+): number {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -60,15 +63,15 @@ export function useServiceTicker(active: boolean): number {
     const timeout = setTimeout(
       () => {
         tick();
-        interval = setInterval(tick, TICK_MS);
+        interval = setInterval(tick, intervalMs);
       },
-      TICK_MS - (Date.now() % TICK_MS),
+      intervalMs - (Date.now() % intervalMs),
     );
     return () => {
       clearTimeout(timeout);
       if (interval) clearInterval(interval);
     };
-  }, [active]);
+  }, [active, intervalMs]);
 
   return now;
 }

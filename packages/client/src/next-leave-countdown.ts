@@ -29,8 +29,8 @@ export type NextLeaveCountdown = {
   phase: "onLeave" | "upcoming";
   /** `onLeave`면 종료일까지, `upcoming`이면 시작일까지 남은 날. 음수는 없다. */
   days: number;
-  /** 휴가 중일 때 복귀시각까지 남은 분. 초 단위는 올림한다. */
-  remainingMinutes?: number;
+  /** 휴가 중일 때 복귀시각까지 남은 초. 밀리초는 올림한다. */
+  remainingSeconds?: number;
 };
 
 const DEFAULT_RETURN_TIME = "21:00";
@@ -71,10 +71,16 @@ export function nextLeaveCountdown(
     days: Math.max(diffDays(today, target), 0),
   };
   if (onLeave && at instanceof Date) {
-    result.remainingMinutes = Math.max(
-      Math.ceil((returnAt(leave) - now) / 60_000),
+    result.remainingSeconds = Math.max(
+      Math.ceil((returnAt(leave) - now) / 1_000),
       0,
     );
   }
   return result;
+}
+
+/** 24시간을 넘겨도 총 시간으로 표시한다. 웹·앱·위젯 공통 표기. */
+export function formatLeaveRemainingTime(seconds: number): string {
+  const total = Math.max(0, Math.ceil(seconds));
+  return `${Math.floor(total / 3600)}시간 ${String(Math.floor(total / 60) % 60).padStart(2, "0")}분 ${String(total % 60).padStart(2, "0")}초`;
 }

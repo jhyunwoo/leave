@@ -67,6 +67,7 @@ import { makeStyles, spacing, useColors } from "@/theme";
 
 export interface CalendarScrollHandle {
   scrollToToday: () => void;
+  scrollToMonth: (month: string) => void;
 }
 
 /**
@@ -205,7 +206,11 @@ export const CalendarScroll = forwardRef<
 
   useImperativeHandle(
     ref,
-    () => ({ scrollToToday: () => scrollToMonth(currentMonth) }),
+    () => ({
+      scrollToToday: () => scrollToMonth(currentMonth),
+      // 편집 시트가 닫히며 레이아웃이 바뀌기 전에 저장된 월에 즉시 자리 잡는다.
+      scrollToMonth: (month: string) => scrollToMonth(month, false),
+    }),
     [scrollToMonth, currentMonth],
   );
 

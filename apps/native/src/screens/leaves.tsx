@@ -75,7 +75,7 @@ export function LeavesScreen() {
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const router = useRouter();
   const active = useActiveGate();
-  const now = useServiceTicker(active);
+  const now = useServiceTicker(active, 1_000);
 
   const holdings = summarizeHoldings(balances.data?.balances);
   /** 만료·소멸처럼 눈에 띄어야 하는 것만 경고 색으로. 계획은 경고가 아니다. */

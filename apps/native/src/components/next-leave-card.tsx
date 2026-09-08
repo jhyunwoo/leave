@@ -7,7 +7,10 @@
 
 import { fmtRange } from "@leave/shared/calendar";
 import { Pressable, Text, View } from "react-native";
-import type { NextLeaveCountdown } from "@leave/client";
+import {
+  formatLeaveRemainingTime,
+  type NextLeaveCountdown,
+} from "@leave/client";
 import { makeStyles, radius, spacing } from "@/theme";
 
 export function NextLeaveCard(props: {
@@ -17,15 +20,16 @@ export function NextLeaveCard(props: {
   const styles = useStyles();
   const { leave, phase, days } = props.countdown;
   const onLeave = phase === "onLeave";
-  const minutes = props.countdown.remainingMinutes ?? 0;
-  const remaining = `${Math.floor(minutes / 60)}시간 ${String(minutes % 60).padStart(2, "0")}분`;
+  const remaining = formatLeaveRemainingTime(
+    props.countdown.remainingSeconds ?? 0,
+  );
   /** 종료일 당일. D-0은 "0일 남았다"로 읽히므로 D-DAY로 바꿔 쓴다. */
   const lastDay = onLeave && days === 0;
   const range = fmtRange(leave.startDate, leave.endDate);
 
   // 스크린리더가 "D-12"를 읽으면 뜻이 사라진다. 눈으로 읽는 표기와 따로 풀어 쓴다.
   const spokenCount = onLeave
-    ? `복귀까지 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남았어요`
+    ? `복귀까지 ${remaining} 남았어요`
     : `${days}일 남았어요`;
 
   return (
@@ -40,7 +44,12 @@ export function NextLeaveCard(props: {
         <Text style={styles.eyebrow} selectable>
           {onLeave ? "휴가 중" : "다음 휴가"}
         </Text>
-        <Text style={styles.value} selectable>
+        <Text
+          style={styles.value}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          selectable
+        >
           {onLeave ? remaining : `D-${days}`}
         </Text>
         <Text style={styles.caption} numberOfLines={1} selectable>

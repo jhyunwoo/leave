@@ -760,6 +760,11 @@ export function CalendarScreen() {
         <LazyLeaveFormModal
           visible
           editing={editingLeave}
+          onSaved={(result) => {
+            scrollRef.current?.scrollToMonth(
+              result.leave.startDate.slice(0, 7),
+            );
+          }}
           onClose={() => setEditingLeave(null)}
         />
       )}

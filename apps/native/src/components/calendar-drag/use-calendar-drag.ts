@@ -123,6 +123,7 @@ export function useCalendarDrag(options: {
       editTimer.current = setTimeout(() => {
         const current = session.current;
         if (!current || current.hasMoved) return;
+        offset.current = settleDragOffset(current.scrollOffset, date);
         session.current = null;
         active.set(false);
         setCalendarDragPressActive(false);
@@ -130,7 +131,7 @@ export function useCalendarDrag(options: {
         store.set(calendarDragAtom, { ...current.drag, phase: "editing" });
       }, 750);
     },
-    [active, listRef, resetScrollFlags, store],
+    [active, listRef, resetScrollFlags, settleDragOffset, store],
   );
 
   const move = useCallback(

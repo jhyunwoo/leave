@@ -6,7 +6,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { nextLeaveCountdown } from "../src/next-leave-countdown";
+import {
+  formatLeaveRemainingTime,
+  nextLeaveCountdown,
+} from "../src/next-leave-countdown";
 import type { MyLeave } from "../src/types";
 
 const TODAY = "2026-08-16";
@@ -74,7 +77,7 @@ describe("nextLeaveCountdown", () => {
     expect(result).toMatchObject({ phase: "onLeave", days: 2 });
   });
 
-  it("진행 중인 휴가는 복귀 시각까지 남은 총 시간과 분을 센다", () => {
+  it("진행 중인 휴가는 복귀 시각까지 남은 총 시간과 분, 초를 센다", () => {
     const current = {
       ...leave("a", "2026-08-14", "2026-08-18"),
       returnTime: "21:00",
@@ -85,8 +88,18 @@ describe("nextLeaveCountdown", () => {
     );
     expect(result).toMatchObject({
       phase: "onLeave",
-      remainingMinutes: 2947, // 49시간 6분 30초를 분 단위로 올림
+      remainingSeconds: 176790, // 49시간 6분 30초
     });
+  });
+
+  it("마지막 1초와 밀리초를 올림하고 복귀 순간에는 사라진다", () => {
+    const current = { ...leave("a", TODAY, TODAY), returnTime: "21:00" };
+    expect(
+      nextLeaveCountdown([current], new Date("2026-08-16T11:59:59.500Z")),
+    ).toMatchObject({ remainingSeconds: 1 });
+    expect(
+      nextLeaveCountdown([current], new Date("2026-08-16T12:00:00.000Z")),
+    ).toBeNull();
   });
 
   it("복귀 시각이 지나면 진행 중 휴가를 끝내고 다음 휴가를 고른다", () => {
@@ -189,4 +202,11 @@ describe("nextLeaveCountdown", () => {
     nextLeaveCountdown(input, TODAY);
     expect(input.map((l) => l.id)).toEqual(["b", "a"]);
   });
+});
+
+it("총 시간, 분, 초를 일관되게 표시한다", () => {
+  expect(formatLeaveRemainingTime(176790)).toBe("49시간 06분 30초");
+  expect(formatLeaveRemainingTime(3600)).toBe("1시간 00분 00초");
+  expect(formatLeaveRemainingTime(59)).toBe("0시간 00분 59초");
+  expect(formatLeaveRemainingTime(0)).toBe("0시간 00분 00초");
 });

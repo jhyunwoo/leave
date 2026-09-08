@@ -23,6 +23,7 @@ import {
   LazyLeaveFormModal,
   preloadLeaveFormModal,
 } from "../components/LazyLeaveFormModal";
+import { NextLeaveCard } from "../components/NextLeaveCard";
 import { LeaveStatusControl } from "../components/LeaveStatusControl";
 
 /**
@@ -124,6 +125,8 @@ export function LeavesPage() {
           휴가 등록
         </button>
       </header>
+
+      <NextLeaveCard leaves={leaves.data?.leaves} />
 
       {balances.data && (
         <Link

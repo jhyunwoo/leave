@@ -33,7 +33,10 @@ import {
   serviceProgressAt,
   type Rank,
 } from "@leave/shared/rank";
-import { nextLeaveCountdown } from "@leave/client/next-leave-countdown";
+import {
+  formatLeaveRemainingTime,
+  nextLeaveCountdown,
+} from "@leave/client/next-leave-countdown";
 import type { LeaveHoldings } from "@leave/client/leave-holdings";
 import type { MyLeave } from "@leave/client/types";
 import {
@@ -244,8 +247,7 @@ function nextLeave(
 
   const { leave, phase, days } = countdown;
   const onLeave = phase === "onLeave";
-  const minutes = countdown.remainingMinutes ?? 0;
-  const hoursText = `${Math.floor(minutes / 60)}시간 ${String(minutes % 60).padStart(2, "0")}분`;
+  const hoursText = formatLeaveRemainingTime(countdown.remainingSeconds ?? 0);
   const [returnHour, returnMinute] = (leave.returnTime ?? "21:00")
     .split(":")
     .map(Number) as [number, number];
@@ -257,7 +259,7 @@ function nextLeave(
     value: onLeave ? hoursText : dday(days),
     caption: `${leave.title} · ${range}`,
     spoken: onLeave
-      ? `복귀까지 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남았어요`
+      ? `복귀까지 ${hoursText} 남았어요`
       : `다음 휴가까지 ${days}일 남았어요`,
     compact: `${onLeave ? "복귀" : "휴가"} ${onLeave ? hoursText : dday(days)}`,
     ...(onLeave ? { timerStartAt: at.getTime(), timerEndAt: returnAt } : {}),

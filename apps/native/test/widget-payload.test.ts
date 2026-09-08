@@ -147,10 +147,10 @@ describe("위젯 타임라인", () => {
     // 6/20 시작 — 그날은 휴가 중이고 종료(6/22)까지 이틀.
     expect(entries[5]!.props.metrics.nextLeave).toMatchObject({
       label: "휴가 중",
-      value: "69시간 00분",
+      value: "69시간 00분 00초",
     });
     // 6/22는 마지막 날.
-    expect(entries[7]!.props.metrics.nextLeave?.value).toBe("21시간 00분");
+    expect(entries[7]!.props.metrics.nextLeave?.value).toBe("21시간 00분 00초");
     // 복귀시각이 되면 자정 전이어도 셀 것이 없다.
     const returnEntry = buildWidgetTimeline(source(), NOW).find(
       (entry) => entry.date.toISOString() === "2026-06-22T12:00:00.000Z",
@@ -255,7 +255,7 @@ describe("위젯 타임라인", () => {
       "전역까지 182일 남았어요",
     );
     expect(entries[7]!.props.metrics.nextLeave?.spoken).toBe(
-      "복귀까지 21시간 0분 남았어요",
+      "복귀까지 21시간 00분 00초 남았어요",
     );
   });
 });

@@ -34,7 +34,7 @@ export interface MonthScrollWindow {
   months: string[];
   listRef: React.RefObject<FlatList<string> | null>;
   /** 그 달로 옮긴다. 목록에 없으면 그 달을 가운데 둔 목록으로 다시 짠다. */
-  scrollToMonth: (month: string) => void;
+  scrollToMonth: (month: string, animated?: boolean) => void;
   /**
    * 끌기·관성 표시를 내린다. 관성 스크롤 도중 scrollEnabled를 끄면 iOS가
    * onMomentumScrollEnd를 쏘지 않아 표시가 굳는 것에 대한 대비.
@@ -77,6 +77,7 @@ export function useMonthScrollWindow(options: {
   // 목록을 다시 짠 뒤에 옮겨갈 달. scrollToMonth 참고.
   const pendingMonth = useRef<string | null>(null);
   const settledMonth = useRef(currentMonth);
+  const visibleMonth = useRef(currentMonth);
   // 첫 렌더의 contentOffset이 이 값으로 계산되므로, 이후 값이 바뀌면 아래
   // useEffect가 보고 있던 달로 다시 맞춘다.
   const initialItemHeight = useRef(itemHeight);
@@ -88,9 +89,10 @@ export function useMonthScrollWindow(options: {
     if (target == null) return;
     const idx = months.indexOf(target);
     if (idx < 0) return;
-    pendingMonth.current = null;
     // 셀 마운트가 끝난 다음 프레임에 옮겨야 새 콘텐츠 높이가 반영된 뒤 자리 잡는다.
     const frame = requestAnimationFrame(() => {
+      // 목록 추가로 프레임이 취소되면 목적지를 남겨 다음 커밋에서 다시 이동한다.
+      pendingMonth.current = null;
       listRef.current?.scrollToOffset({
         offset: itemHeight * idx,
         animated: false,
@@ -102,7 +104,7 @@ export function useMonthScrollWindow(options: {
   useEffect(() => {
     if (initialItemHeight.current === itemHeight) return;
     initialItemHeight.current = itemHeight;
-    const idx = months.indexOf(settledMonth.current);
+    const idx = months.indexOf(visibleMonth.current);
     if (idx < 0) return;
     const frame = requestAnimationFrame(() => {
       listRef.current?.scrollToOffset({
@@ -117,13 +119,14 @@ export function useMonthScrollWindow(options: {
   }, [itemHeight]);
 
   const scrollToMonth = useCallback(
-    (month: string) => {
+    (month: string, animated = true) => {
       const idx = months.indexOf(month);
       settledMonth.current = month;
+      visibleMonth.current = month;
       if (idx >= 0) {
         listRef.current?.scrollToOffset({
           offset: itemHeight * idx,
-          animated: true,
+          animated,
         });
         return;
       }
@@ -136,6 +139,12 @@ export function useMonthScrollWindow(options: {
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const y = e.nativeEvent.contentOffset.y;
+      // 모달 표시·scrollEnabled 전환은 momentum end 없이 스크롤을 끊을 수 있다.
+      // 크기가 바뀔 때 복원할 월은 마지막 종료 이벤트가 아니라 실제 보이는 월이다.
+      if (pendingMonth.current == null) {
+        const index = settledMonthOffset(y, itemHeight, months.length).index;
+        visibleMonth.current = months[index] ?? visibleMonth.current;
+      }
       // 손으로 끌어 올릴 때만 이어 붙인다. 상태바 탭처럼 프로그램이 맨 위까지
       // 끌고 가는 스크롤에서도 붙이면, 애니메이션 한 번에 수십 년치가 쌓여
       // 1984년 같은 엉뚱한 달에 도착하고 달마다 달력 요청이 나간다.
@@ -152,7 +161,7 @@ export function useMonthScrollWindow(options: {
         setMonths((ms) => prependMonths(ms, earliestMonth));
       }
     },
-    [itemHeight, earliestMonth],
+    [itemHeight, earliestMonth, months],
   );
 
   const onScrollBeginDrag = useCallback(() => {
@@ -181,6 +190,7 @@ export function useMonthScrollWindow(options: {
         targetDate ? months.indexOf(targetDate.slice(0, 7)) : -1,
       );
       settledMonth.current = months[settled.index] ?? settledMonth.current;
+      visibleMonth.current = settledMonth.current;
       listRef.current?.scrollToOffset({
         offset: settled.offset,
         animated: false,
