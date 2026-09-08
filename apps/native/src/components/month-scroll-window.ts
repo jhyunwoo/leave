@@ -40,7 +40,7 @@ export interface MonthScrollWindow {
    * onMomentumScrollEnd를 쏘지 않아 표시가 굳는 것에 대한 대비.
    */
   resetScrollFlags: () => void;
-  settleDragOffset: (offset: number) => number;
+  settleDragOffset: (offset: number, targetDate?: string | null) => number;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag: () => void;
   onScrollEndDrag: () => void;
@@ -173,8 +173,13 @@ export function useMonthScrollWindow(options: {
   }, []);
 
   const settleDragOffset = useCallback(
-    (offset: number) => {
-      const settled = settledMonthOffset(offset, itemHeight, months.length);
+    (offset: number, targetDate?: string | null) => {
+      const settled = settledMonthOffset(
+        offset,
+        itemHeight,
+        months.length,
+        targetDate ? months.indexOf(targetDate.slice(0, 7)) : -1,
+      );
       settledMonth.current = months[settled.index] ?? settledMonth.current;
       listRef.current?.scrollToOffset({
         offset: settled.offset,

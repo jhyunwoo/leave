@@ -117,6 +117,12 @@ export const CalendarScroll = forwardRef<
     listHeight - contentTopInset - BOTTOM_ALLOWANCE,
   );
   const itemHeight = monthBlockHeight(cellHeight);
+  // 초기 위치는 마운트 때만 준다. 이후 측정·저장으로 다시 렌더되어도
+  // contentOffset을 현재 달의 위치로 재설정하지 않는다.
+  const [initialContentOffset] = useState(() => ({
+    x: 0,
+    y: itemHeight * INITIAL_SPAN,
+  }));
 
   // 창·보정·이동은 친구 달력과 같은 상태 기계를 쓴다(month-scroll-window).
   // 부대 달력은 볼 수 있는 범위를 제한하지 않는다 — 입대 이전 달도 계속 위로
@@ -232,7 +238,7 @@ export const CalendarScroll = forwardRef<
               offset: itemHeight * index,
               index,
             })}
-            contentOffset={{ x: 0, y: itemHeight * INITIAL_SPAN }}
+            contentOffset={initialContentOffset}
             contentContainerStyle={{
               paddingTop: contentTopInset,
               paddingHorizontal: spacing.lg,

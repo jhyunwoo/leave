@@ -17,10 +17,16 @@ export function settledMonthOffset(
   offset: number,
   itemHeight: number,
   monthCount: number,
+  targetIndex = -1,
 ): { index: number; offset: number } {
   const index = Math.max(
     0,
-    Math.min(monthCount - 1, Math.round(offset / itemHeight)),
+    Math.min(
+      monthCount - 1,
+      targetIndex >= 0 && targetIndex < monthCount
+        ? targetIndex
+        : Math.round(offset / itemHeight),
+    ),
   );
   return { index, offset: index * itemHeight };
 }

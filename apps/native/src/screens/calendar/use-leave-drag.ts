@@ -265,7 +265,7 @@ export function useLeaveDrag(
     if (drag.deltaDays === 0)
       return drag.hasMoved
         ? "옮길 날짜로 끌어주세요"
-        : "놓으면 편집 · 다른 손가락으로 월 이동";
+        : "1초 누르면 편집 · 다른 손가락으로 월 이동";
     if (moved?.verdict === "conflict") return "겹치는 휴가가 있어요";
     const range = moved ? segmentsRange(moved.segments) : null;
     if (!range) return null;

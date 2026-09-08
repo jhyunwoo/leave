@@ -36,7 +36,7 @@ export function useCalendarDrag(options: {
   contentInset: number;
   onScrollBeginDrag: () => void;
   resetScrollFlags: () => void;
-  settleDragOffset: (offset: number) => number;
+  settleDragOffset: (offset: number, targetDate?: ISODate | null) => number;
 }) {
   const {
     listRef,
@@ -119,7 +119,7 @@ export function useCalendarDrag(options: {
       });
       store.set(calendarDragAtom, { ...session.current.drag });
       selectionHaptic();
-      // 칩 인식 250ms 뒤부터 세므로, 누른 지 총 650ms가 되면 손을 떼기 전에 연다.
+      // 칩 인식 250ms 뒤부터 세므로, 누른 지 총 1초가 되면 손을 떼기 전에 연다.
       editTimer.current = setTimeout(() => {
         const current = session.current;
         if (!current || current.hasMoved) return;
@@ -128,7 +128,7 @@ export function useCalendarDrag(options: {
         setCalendarDragPressActive(false);
         resetScrollFlags();
         store.set(calendarDragAtom, { ...current.drag, phase: "editing" });
-      }, 400);
+      }, 750);
     },
     [active, listRef, resetScrollFlags, store],
   );
@@ -176,7 +176,10 @@ export function useCalendarDrag(options: {
       const result = current.release(touches.map((touch) => touch.id));
       if (!result) return;
       clearEditTimer();
-      offset.current = settleDragOffset(current.scrollOffset);
+      offset.current = settleDragOffset(
+        current.scrollOffset,
+        result === "cancel" ? null : current.drag.hoverDate,
+      );
       session.current = null;
       active.set(false);
       setCalendarDragPressActive(false);
