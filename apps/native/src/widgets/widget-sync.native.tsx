@@ -25,8 +25,7 @@ import { useLeaveBalances, useMyLeaves } from "@leave/client/hooks/leaves";
 import { addDays, todayInSeoul } from "@leave/shared/dates";
 import { useEffect, useMemo, useRef } from "react";
 import { captureHandledError } from "@/lib/observability";
-import { LeaveMetricWidget } from "./leave-metric.widget";
-import { LeaveSummaryWidget } from "./leave-summary.widget";
+import { publishWidgetTimeline } from "./widget-publisher";
 import {
   buildWidgetTimeline,
   emptyWidgetProps,
@@ -39,14 +38,15 @@ import { buildWidgetSource } from "./sources";
 import { useWidgetPreferences } from "./use-widget-preferences";
 
 /** 두 위젯은 같은 payload를 받는다 — 무엇을 고를지만 서로 다르다. */
-function pushTimeline(entries: WidgetTimelineEntry[]): void {
+async function pushTimeline(entries: WidgetTimelineEntry[]): Promise<boolean> {
   try {
-    LeaveMetricWidget.updateTimeline(entries);
-    LeaveSummaryWidget.updateTimeline(entries);
+    await publishWidgetTimeline(entries);
+    return true;
   } catch (error) {
     // 위젯이 없거나(구형 OS) 익스텐션이 아직 설치되지 않은 기기가 있다.
     // 홈 화면 장식 하나 때문에 앱이 멈추면 안 된다.
     captureHandledError(error, { source: "home_widget" });
+    return false;
   }
 }
 
@@ -58,7 +58,7 @@ function PlaceholderWidgetSync({
 }) {
   useEffect(() => {
     const now = new Date();
-    pushTimeline([
+    void pushTimeline([
       { date: now, props: emptyWidgetProps(state, todayInSeoul(now), now) },
     ]);
   }, [state]);
@@ -118,8 +118,13 @@ function ReadyWidgetSync() {
     if (!me.data) return;
     const signature = timelineSignature(entries);
     if (signature === lastSignature.current) return;
-    lastSignature.current = signature;
-    pushTimeline(entries);
+    let active = true;
+    void pushTimeline(entries).then((published) => {
+      if (active && published) lastSignature.current = signature;
+    });
+    return () => {
+      active = false;
+    };
   }, [entries, me.data]);
 
   return null;

@@ -1,0 +1,4 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#163300" />
+  <corners android:radius="@dimen/leave_widget_radius" />
+</shape>

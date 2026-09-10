@@ -1,0 +1,9 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/leave_widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+  android:orientation="vertical" android:gravity="center_vertical" android:padding="16dp"
+  android:background="@drawable/leave_widget_background">
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/leave_widget_brand"
+    android:textColor="#9fe870" android:textSize="16sp" android:textStyle="bold" />
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/leave_widget_open"
+    android:textColor="#ffffff" android:textSize="16sp" android:maxLines="3" />
+</LinearLayout>

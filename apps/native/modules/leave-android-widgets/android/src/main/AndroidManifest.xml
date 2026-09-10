@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <application>
+    <receiver android:name=".LeaveMetricWidgetReceiver" android:exported="false" android:label="@string/leave_widget_metric_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/leave_metric_widget" />
+    </receiver>
+    <receiver android:name=".LeaveSummaryWidgetReceiver" android:exported="false" android:label="@string/leave_widget_summary_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/leave_summary_widget" />
+    </receiver>
+    <receiver android:name=".WidgetClockReceiver" android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

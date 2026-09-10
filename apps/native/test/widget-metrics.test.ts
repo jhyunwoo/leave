@@ -106,12 +106,11 @@ describe("위젯 설정", () => {
     );
   });
 
-  it("Android 위젯은 내리고 내보내지 않는다", () => {
+  it("expo-widgets의 Android 스텁은 내보내지 않는다", () => {
     // expo-widgets 57.0.16의 안드로이드 구현은 껍데기다 — JS쪽 native 모듈은
     // `updateTimeline`이 빈 함수인 no-op 스텁이고, Glance 위젯은 `Text(widgetName)`
     // 한 줄이라 화면에 "LeaveMetric"이라는 글자가 그려진다. 켜 두면 동작하지 않는
-    // 위젯을 사용자에게 내주게 되므로 내렸다. 다시 켜려면 Glance 쪽을 직접 써야
-    // 하고, 그것이 의식적인 결정이 되도록 여기서 못 박는다.
+    // 위젯을 내주지 않는다. Android는 로컬 leave-android-widgets 모듈이 담당한다.
     expect(config.enableAndroid).toBe(false);
   });
 

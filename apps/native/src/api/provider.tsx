@@ -19,6 +19,7 @@ import {
   clearObservabilityUser,
 } from "@/lib/observability";
 import { clearPersistedQueryCache } from "@/lib/query-persistence";
+import { resetWidgetSession } from "@/widgets/widget-publisher";
 import { setSessionAtom } from "@/state/auth";
 import { api, setUnauthorizedHandler, unwrap } from "./client";
 
@@ -35,6 +36,7 @@ export function ApiProvider(props: { children: ReactNode }) {
         message: "authentication session expired",
         level: "info",
       });
+      void resetWidgetSession(false);
       clearObservabilityUser();
       queryClient.clear();
       void clearPersistedQueryCache();
@@ -51,6 +53,7 @@ export function ApiProvider(props: { children: ReactNode }) {
       client: api,
       unwrap,
       setSessionToken: async (token) => {
+        await resetWidgetSession(token !== null);
         await clearPersistedQueryCache();
         if (token === null) {
           clearPendingProfile();

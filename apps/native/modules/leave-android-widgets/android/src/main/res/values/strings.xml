@@ -1,0 +1,9 @@
+<resources>
+  <string name="leave_widget_metric_name">리브 지표</string>
+  <string name="leave_widget_summary_name">리브 요약</string>
+  <string name="leave_widget_metric_description">전역일과 휴가 중 원하는 지표를 크게 봅니다. 앱의 위젯 설정에서 바꿀 수 있어요.</string>
+  <string name="leave_widget_summary_description">전역일과 휴가 지표를 함께 봅니다. 앱에서 표시 순서를 바꿀 수 있어요.</string>
+  <string name="leave_widget_open">앱을 열어 최신 정보를 확인하세요</string>
+  <string name="leave_widget_brand">리브</string>
+  <dimen name="leave_widget_radius">24dp</dimen>
+</resources>

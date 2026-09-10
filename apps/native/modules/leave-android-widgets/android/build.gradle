@@ -1,0 +1,32 @@
+buildscript {
+  repositories { mavenCentral() }
+  dependencies {
+    classpath("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:${kotlinVersion}")
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+group = 'expo.modules.leavewidgets'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.leavewidgets'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+  buildFeatures { compose true }
+}
+
+// Glance 1.2.0 replaces expo-widgets' transitive 1.2.0-rc01 through normal Gradle
+// version resolution. Match the host's Kotlin Compose compiler; never pin a second compiler.
+dependencies {
+  implementation 'androidx.glance:glance:1.2.0'
+  implementation 'androidx.glance:glance-appwidget:1.2.0'
+  implementation 'androidx.work:work-runtime-ktx:2.11.2'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.json:json:20240303'
+}
