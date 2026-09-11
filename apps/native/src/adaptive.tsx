@@ -30,22 +30,16 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { breakpoints, layout, spacing } from "@/theme";
+import { layout, spacing } from "@/theme";
+import {
+  resolveWindowSizeClass,
+  type WindowSizeClass,
+} from "./window-size-class";
 
-export type WindowSizeClass = "compact" | "medium" | "expanded";
-
-/**
- * 폭 → 크기 클래스. 순수 함수라 훅 없이도 쓸 수 있고 값만 보고 검증할 수 있다.
- *
- *   compact  : < 768  휴대폰, iPad Split View의 좁은 칸, 접힌 폴더블
- *   medium   : 768–1023  태블릿 세로, 안드로이드 멀티윈도우 절반
- *   expanded : ≥ 1024  태블릿 가로, iPad 12.9" 세로, 데스크톱 창
- */
-export function resolveWindowSizeClass(width: number): WindowSizeClass {
-  if (width >= breakpoints.expanded) return "expanded";
-  if (width >= breakpoints.medium) return "medium";
-  return "compact";
-}
+export {
+  resolveWindowSizeClass,
+  type WindowSizeClass,
+} from "./window-size-class";
 
 export type AdaptiveLayout = {
   /** 창 폭(논리 px). 화면 폭이 아니라 앱에 주어진 폭이다. */
@@ -63,7 +57,7 @@ export type AdaptiveLayout = {
 /** 지금 창의 크기 클래스와 그로부터 나오는 판단들. */
 export function useWindowSizeClass(): AdaptiveLayout {
   const { width, height } = useWindowDimensions();
-  const sizeClass = resolveWindowSizeClass(width);
+  const sizeClass = resolveWindowSizeClass(width, height);
   return {
     width,
     height,
@@ -85,6 +79,9 @@ export function useWindowSizeClass(): AdaptiveLayout {
  * 270pt짜리 두 열이 되어 오히려 좁아진다.
  *
  * 재는 동안(첫 프레임)에는 compact로 본다 — 좁은 쪽으로 틀리는 편이 안전하다.
+ *
+ * 높이는 넘기지 않는다. 여기서 재는 것은 컨테이너의 폭 하나이고, 시트 안에서는
+ * 높이가 창 높이와 무관하게 바뀌므로 짧은 변 규칙의 근거가 되지 못한다.
  */
 export function useMeasuredSizeClass(): {
   width: number;

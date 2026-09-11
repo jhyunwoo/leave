@@ -49,6 +49,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { makeStyles, radius, spacing } from "@/theme";
 import { DoneStep } from "./done-step";
 import { GroupStep } from "./group-step";
@@ -206,7 +207,7 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
 
   return (
     <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
       style={styles.root}
     >
       <View style={styles.bar}>

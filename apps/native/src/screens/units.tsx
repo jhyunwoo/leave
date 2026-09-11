@@ -26,6 +26,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import {
   type IssuedUnitInvite,
   useCreateUnit,
@@ -311,7 +312,7 @@ function CreateUnitModal(props: {
       testID="create-unit-sheet"
     >
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
         style={styles.createSheet}
       >
         <SheetScaffold

@@ -8,6 +8,7 @@ import { signupSchema } from "@leave/shared";
 import { Link } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, ScrollView, Text, View } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSignup } from "@leave/client";
 import { Button } from "@/components/button";
@@ -82,7 +83,7 @@ export function SignupScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
       style={styles.root}
     >
       <ScrollView

@@ -20,6 +20,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "./keyboard-avoid";
 import type { LeaveGrantItem } from "@leave/client";
 import { useCreateLeaveGrant, useUpdateLeaveGrant } from "@leave/client";
 import { Button } from "@/components/button";
@@ -105,7 +106,7 @@ export function LeaveGrantModal(props: {
       testID="leave-grant-sheet"
     >
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
         style={styles.sheet}
       >
         <SheetScaffold

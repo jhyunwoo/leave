@@ -35,6 +35,7 @@ import {
 } from "@leave/shared";
 import { useState } from "react";
 import { KeyboardAvoidingView, Text, View } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "./keyboard-avoid";
 import { useMeasuredSizeClass } from "@/adaptive";
 import { notify } from "@/lib/dialog";
 import { layout, makeStyles, radius, spacing } from "@/theme";
@@ -108,7 +109,7 @@ export function LeaveFormModal(props: {
       testID="leave-form-sheet"
     >
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
         style={styles.sheet}
         onLayout={sheet.onLayout}
       >

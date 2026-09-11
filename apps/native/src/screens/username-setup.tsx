@@ -12,6 +12,7 @@
 import { useSetUsername } from "@leave/client";
 import { useState } from "react";
 import { KeyboardAvoidingView, ScrollView, Text, View } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { UsernameField, useUsernameDraft } from "@/components/username-field";
@@ -40,7 +41,7 @@ export function UsernameSetupScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
       style={styles.flex}
     >
       <ScrollView

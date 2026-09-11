@@ -52,6 +52,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { BuildInfo } from "@/components/build-info";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -494,7 +495,7 @@ function PasskeySheet(props: { onClose: () => void }) {
   return (
     <FormSheet isPresented onDismiss={props.onClose} testID="passkey-sheet">
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
         style={styles.sheet}
       >
         <SheetScaffold title="패스키" onClose={props.onClose}>
@@ -586,7 +587,7 @@ function ChangePasswordSheet(props: { onClose: () => void }) {
       testID="change-password-sheet"
     >
       <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
         style={styles.sheet}
       >
         <SheetScaffold

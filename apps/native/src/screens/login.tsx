@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLogin, usePasskeyLogin } from "@leave/client";
 import { Button } from "@/components/button";
@@ -50,7 +51,7 @@ export function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
       style={styles.root}
     >
       <ScrollView

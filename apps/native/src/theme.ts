@@ -298,10 +298,11 @@ export const layout = {
  * 기준으로 삼는다 — 같은 iPad라도 Split View에서는 좁은 창이고, 폴더블은 한
  * 기기 안에서 두 크기를 오간다.
  *
- * 값은 DESIGN.md의 반응형 표(Mobile <768 / Tablet 768–1023 / Desktop ≥1024)와
- * 맞춘다. 웹과 네이티브가 같은 폭에서 같은 판단을 하도록.
+ * 값과 판단 함수는 `window-size-class.ts`에 있다 — RN을 부르지 않는 순수 모듈이라
+ * 단위 테스트로 고정할 수 있다. 토큰을 한 곳에서 읽는 흐름은 그대로 두려고 여기서
+ * 다시 내보낸다.
  */
-export const breakpoints = { medium: 768, expanded: 1024 } as const;
+export { breakpoints } from "./window-size-class";
 
 export const type = {
   displayWeight: "900" as const,
