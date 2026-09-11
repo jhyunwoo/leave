@@ -143,6 +143,7 @@ export const unitRoutes = app
       referenceMemberTotal,
       maxLeaveCount: input.maxLeaveCount,
       returnDayCounts: input.returnDayCounts ?? true,
+      outingCounts: input.outingCounts ?? true,
       lastTotalUpdatedAt,
       creatorId: user.id,
       adminId: user.id,
@@ -214,6 +215,9 @@ export const unitRoutes = app
     }
     if (input.returnDayCounts !== undefined) {
       patch.returnDayCounts = input.returnDayCounts;
+    }
+    if (input.outingCounts !== undefined) {
+      patch.outingCounts = input.outingCounts;
     }
 
     if (Object.keys(patch).length > 0) {

@@ -162,6 +162,25 @@ export function useLeaveForm(options: LeaveFormOptions) {
   }, [startDate, endDate]);
   const calendar = useCalendarDays(me.data?.unit?.id ?? null, calendarMonths);
 
+  /**
+   * 이 계획이 그룹 출타율에 더하는 인원. 보통 1명이지만 둘일 때 0이다.
+   *  - 수정 중: 내 몫이 이미 서버 통계에 들어 있다.
+   *  - 외출만으로 이뤄진 계획인데 그룹이 외출을 세지 않는다: 저장해도 숫자가 그대로다.
+   *    외출은 다른 재원과 한 휴가에 섞일 수 없으므로(`leaveCreateSchema`) 전부인지만 본다.
+   * 여기서 한 번 정해 아래 두 곳이 같은 가정을 쓰게 한다 — 갈리면 미리보기와 추천이
+   * 서로 다른 숫자를 말한다.
+   */
+  const selfCount = useMemo(() => {
+    if (editing) return 0;
+    if (
+      me.data?.unit?.outingCounts === false &&
+      drafts.every((draft) => isOutingBalanceKey(draft.key))
+    ) {
+      return 0;
+    }
+    return 1;
+  }, [drafts, editing, me.data?.unit?.outingCounts]);
+
   /** 이 계획을 더했을 때 구간 안에서 가장 붐비는 날의 비율. */
   const selectedSimulation = useMemo(() => {
     if (!validRange || calendar.days.length === 0) return null;
@@ -172,8 +191,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
       const stat = stats.get(addDays(startDate, index));
       // 기준이 없는 날(allowed=0)이 하나라도 끼면 비율 자체가 뜻을 잃는다.
       if (!stat || stat.allowed <= 0) return null;
-      // 수정 중이면 내 몫이 이미 통계에 들어 있으므로 더하지 않는다.
-      const countAfter = stat.count + (editing ? 0 : 1);
+      const countAfter = stat.count + selfCount;
       peak = Math.max(peak, Math.round((countAfter / stat.allowed) * 100));
       exceeded ||= countAfter > stat.allowed;
     }
@@ -185,7 +203,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
           ? "moderate"
           : "roomy";
     return { peak, exceeded, level, label: crowdLevelLabel(level) };
-  }, [calendar.days, duration, editing, startDate, validRange]);
+  }, [calendar.days, duration, selfCount, startDate, validRange]);
 
   /** 선택 구간이 제한 기간(검열·훈련)에 걸리면 저장 전에 알려야 한다. */
   const blackoutWarning = useMemo(() => {
@@ -205,14 +223,14 @@ export function useLeaveForm(options: LeaveFormOptions) {
     return recommendDateRanges({
       days: calendar.days.map((day) => ({
         date: day.date,
-        count: day.count + (editing ? 0 : 1),
+        count: day.count + selfCount,
         allowed: day.allowed,
       })),
       selectedStart: startDate,
       durationDays: duration,
       radiusDays: RECOMMENDATION_RADIUS_DAYS,
     });
-  }, [calendar.days, duration, editing, startDate, validRange]);
+  }, [calendar.days, duration, selfCount, startDate, validRange]);
 
   /* --- 구간(어느 날짜에 어떤 재원을 쓰는가) ---------------------------- */
   /** 초안 구간에 실제 시작·종료일과 일수를 채워 넣은 것. 화면은 이걸 그린다. */

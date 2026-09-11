@@ -17,6 +17,7 @@ import {
   computeDayStats,
   isCountedLeaveStatus,
   monthBounds,
+  outingDatesOfSegments,
 } from "@leave/shared";
 import { and, asc, eq, gte, lte } from "drizzle-orm";
 import {
@@ -198,20 +199,23 @@ export async function buildCalendarPayloads(input: {
     const days = computeDayStats({
       // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
       //
-      // 구간이 아니라 **머리행 범위**를 쓴다. 그래서 외출(같은 날 복귀)도 그날
-      // 출타 인원에 들어간다 — 이 숫자가 답하는 것은 "그날 몇 명이 부대 밖에
-      // 있는가"이므로 맞다. 남은 일과일은 반대로 외출을 빼는데(`lib/duty-days.ts`),
-      // 그쪽이 묻는 것은 "그날 일과가 사라지는가"다. 두 정의를 같게 맞추려 들면
-      // 한쪽이 반드시 틀린다.
+      // 기간은 구간이 아니라 **머리행 범위**로 편다. 구간은 외출을 가려내는 데에만
+      // 쓴다 — 외출을 이 숫자에 넣을지는 부대 설정(`units.outingCounts`)이 정한다.
+      // 켜 두면(기본) 외출도 그날 출타 인원이다. 이 숫자가 답하는 것은 "그날 몇 명이
+      // 부대 밖에 있는가"이고 외출은 온종일 밖이기 때문이다. 남은 일과일은 설정과
+      // 무관하게 언제나 외출을 빼는데(`lib/duty-days.ts`), 그쪽이 묻는 것은 "그날
+      // 일과가 사라지는가"다. 두 정의를 같게 맞추려 들면 한쪽이 반드시 틀린다.
       leaves: sharedRows.map((leave) => ({
         userId: leave.userId,
         startDate: leave.startDate,
         endDate: leave.endDate,
+        outingDates: outingDatesOfSegments(segmentMap.get(leave.id) ?? []),
       })),
       maxCount: unit.maxLeaveCount,
       rangeStart: start,
       rangeEnd: end,
       returnDayCounts: unit.returnDayCounts,
+      outingCounts: unit.outingCounts,
     }).map((day) => ({
       date: day.date,
       count: day.count,

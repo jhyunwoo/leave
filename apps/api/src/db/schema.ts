@@ -128,9 +128,18 @@ export const units = sqliteTable("units", {
   /**
    * 복귀일을 출타 인원으로 셀지. 부대마다 "복귀일 오전 복귀 = 그날은 출타 아님"인
    * 곳과 아닌 곳이 갈려 하드코딩할 수 없다. 당일 외출(시작=종료)은 이 값과
-   * 무관하게 항상 하루로 센다.
+   * 무관하게 항상 하루로 센다 — 외출을 뺄지는 아래 `outingCounts`가 정한다.
    */
   returnDayCounts: integer("return_day_counts", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  /**
+   * 외출한 날을 출타 인원으로 셀지. 일과 후 외출을 하루 최대 출타 인원 한도에
+   * 넣는 부대도, 넣지 않는 부대도 있다. 끄면 그 부대의 달력 비율·초과 판정·초과
+   * 알림이 외출한 날을 세지 않는다(출타 명단에는 그대로 남는다 — 그날 부대 밖에
+   * 있는 것은 사실이다).
+   */
+  outingCounts: integer("outing_counts", { mode: "boolean" })
     .notNull()
     .default(true),
   lastTotalUpdatedAt: text("last_total_updated_at"),

@@ -31,6 +31,15 @@ type SetupContext = {
     intervalDays: number;
     daysPerGrant: number;
   } | null;
+  /** 그룹을 주면 달력 조회가 일어난다(혼잡도·추천의 근거). */
+  unit?: { id: string; outingCounts: boolean } | null;
+  calendarDays?: {
+    date: string;
+    count: number;
+    allowed: number;
+    exceeded: boolean;
+    blocked: boolean;
+  }[];
 };
 
 /** 연가 5일만 남은 사용자. 그룹은 없어 달력 조회가 일어나지 않는다. */
@@ -65,7 +74,7 @@ function setup(
               id: "u1",
               dischargeAt: context.dischargeAt ?? "2027-12-31",
             },
-            unit: null,
+            unit: context.unit ?? null,
           }),
       },
     },
@@ -81,6 +90,21 @@ function setup(
             })),
       },
       $post: createLeave,
+    },
+    units: {
+      ":id": {
+        calendar: {
+          $get: ({ query }: { query: { month: string } }) =>
+            Promise.resolve({
+              month: query.month,
+              days: context.calendarDays ?? [],
+              leaves: [],
+              attendees: [],
+              blackouts: [],
+              events: [],
+            }),
+        },
+      },
     },
   };
   const queryClient = testQueryClient();
@@ -518,6 +542,52 @@ describe("제목", () => {
 
     await waitFor(() =>
       expect(result.current.submitBlocker).toBe("휴가 제목을 입력해주세요."),
+    );
+  });
+});
+
+describe("이 계획을 더하면 — 그룹이 외출을 세지 않을 때", () => {
+  /** 9/1에 이미 2명, 기준 3명. 내 계획을 더하면 100%가 되는 자리다. */
+  const days = [
+    {
+      date: "2026-09-01",
+      count: 2,
+      allowed: 3,
+      exceeded: false,
+      blocked: false,
+    },
+  ];
+
+  it("외출만으로 이뤄진 계획은 자기 자신을 출타율에 더하지 않는다", async () => {
+    const { wrapper } = setup(undefined, undefined, undefined, {
+      unit: { id: "unit-1", outingCounts: false },
+      calendarDays: days,
+    });
+    const { result } = await renderForm(wrapper);
+
+    await waitFor(() =>
+      expect(result.current.selectedSimulation?.peak).toBe(100),
+    );
+
+    act(() => result.current.setDrafts([{ key: "outing", days: 1 }]));
+
+    await waitFor(() =>
+      expect(result.current.selectedSimulation?.peak).toBe(67),
+    );
+    expect(result.current.selectedSimulation?.exceeded).toBe(false);
+  });
+
+  it("그룹이 외출을 세면 외출 계획도 평소처럼 한 명을 더한다", async () => {
+    const { wrapper } = setup(undefined, undefined, undefined, {
+      unit: { id: "unit-1", outingCounts: true },
+      calendarDays: days,
+    });
+    const { result } = await renderForm(wrapper);
+
+    act(() => result.current.setDrafts([{ key: "outing", days: 1 }]));
+
+    await waitFor(() =>
+      expect(result.current.selectedSimulation?.peak).toBe(100),
     );
   });
 });

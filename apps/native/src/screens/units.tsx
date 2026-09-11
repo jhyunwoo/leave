@@ -269,6 +269,7 @@ function CreateUnitModal(props: {
   const [name, setName] = useState("");
   const [referenceTotal, setReferenceTotal] = useState("");
   const [maxCount, setMaxCount] = useState("1");
+  const [outingCounts, setOutingCounts] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUnit();
 
@@ -287,6 +288,7 @@ function CreateUnitModal(props: {
       referenceMemberTotal:
         referenceTotal.trim() === "" ? null : Number(referenceTotal),
       maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
+      outingCounts,
     } satisfies UnitCreateInput;
     const parsed = unitCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -359,7 +361,10 @@ function CreateUnitModal(props: {
           <LeaveLimitFields
             count={maxCount}
             onCountChange={setMaxCount}
+            outingCounts={outingCounts}
+            onOutingCountsChange={setOutingCounts}
             testID="create-unit-max-out"
+            outingTestID="create-unit-outing-counts"
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </SheetScaffold>

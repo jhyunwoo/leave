@@ -3,6 +3,7 @@ import {
   computeDayStats,
   findExceededDates,
   maxAllowedOut,
+  outingDatesOfSegments,
   usersOnLeaveDuring,
   type LeaveSpan,
 } from "../src";
@@ -95,6 +96,91 @@ describe("computeDayStats", () => {
     ]);
   });
 
+  it("counts outings by default even when the unit can opt out", () => {
+    const stats = computeDayStats({
+      leaves: [
+        {
+          userId: "a",
+          startDate: "2026-08-15",
+          endDate: "2026-08-15",
+          outingDates: ["2026-08-15"],
+        },
+      ],
+      maxCount: 2,
+      rangeStart: "2026-08-15",
+      rangeEnd: "2026-08-15",
+    });
+    expect(stats[0]?.count).toBe(1);
+  });
+
+  it("drops outing days when the unit does not count them", () => {
+    const stats = computeDayStats({
+      leaves: [
+        {
+          userId: "a",
+          startDate: "2026-08-15",
+          endDate: "2026-08-15",
+          outingDates: ["2026-08-15"],
+        },
+        { userId: "b", startDate: "2026-08-15", endDate: "2026-08-16" },
+      ],
+      maxCount: 2,
+      rangeStart: "2026-08-15",
+      rangeEnd: "2026-08-16",
+      outingCounts: false,
+    });
+
+    expect(stats).toMatchObject([
+      { date: "2026-08-15", count: 1, userIds: ["b"] },
+      { date: "2026-08-16", count: 1 },
+    ]);
+  });
+
+  it("still counts someone whose other leave covers the same day as an outing", () => {
+    const stats = computeDayStats({
+      leaves: [
+        {
+          userId: "a",
+          startDate: "2026-08-15",
+          endDate: "2026-08-15",
+          outingDates: ["2026-08-15"],
+        },
+        { userId: "a", startDate: "2026-08-14", endDate: "2026-08-15" },
+      ],
+      maxCount: 2,
+      rangeStart: "2026-08-15",
+      rangeEnd: "2026-08-15",
+      outingCounts: false,
+    });
+    expect(stats[0]?.count).toBe(1);
+  });
+
+  it("drops an excluded outing only once when return days are not counted", () => {
+    // 하루짜리 외출은 복귀일 특례로 살아남은 뒤 외출 단계에서 빠진다. 두 규칙이
+    // 겹쳐도 없는 날을 한 번 더 빼거나 앞날까지 지우지 않아야 한다.
+    const stats = computeDayStats({
+      leaves: [
+        {
+          userId: "outing",
+          startDate: "2026-08-15",
+          endDate: "2026-08-15",
+          outingDates: ["2026-08-15"],
+        },
+        { userId: "overnight", startDate: "2026-08-14", endDate: "2026-08-15" },
+      ],
+      maxCount: 2,
+      rangeStart: "2026-08-14",
+      rangeEnd: "2026-08-15",
+      returnDayCounts: false,
+      outingCounts: false,
+    });
+
+    expect(stats).toMatchObject([
+      { date: "2026-08-14", count: 1 },
+      { date: "2026-08-15", count: 0 },
+    ]);
+  });
+
   it("keeps calendar-day math stable across year and leap-day boundaries", () => {
     const stats = computeDayStats({
       leaves: [
@@ -110,6 +196,26 @@ describe("computeDayStats", () => {
     expect(byDate.get("2025-12-31")).toBe(1);
     expect(byDate.get("2026-01-01")).toBe(1);
     expect(byDate.get("2028-02-29")).toBe(1);
+  });
+});
+
+describe("outingDatesOfSegments", () => {
+  it("keeps only outing segments and spreads multi-day legacy rows", () => {
+    expect(
+      outingDatesOfSegments([
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-03" },
+        { category: "outing", startDate: "2026-08-05", endDate: "2026-08-05" },
+        { category: "outing", startDate: "2026-08-08", endDate: "2026-08-09" },
+      ]),
+    ).toEqual(["2026-08-05", "2026-08-08", "2026-08-09"]);
+  });
+
+  it("returns nothing for a leave without outing segments", () => {
+    expect(
+      outingDatesOfSegments([
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-01" },
+      ]),
+    ).toEqual([]);
   });
 });
 
@@ -130,6 +236,30 @@ describe("findExceededDates", () => {
       maxCount: 2,
     });
     expect(dates).toEqual(["2026-08-03"]); // a+b+c 3명 → 초과
+  });
+
+  it("does not flag a date the unit's excluded outings would have pushed over", () => {
+    const newLeave = {
+      userId: "c",
+      startDate: "2026-08-03",
+      endDate: "2026-08-03",
+    };
+    const leaves: LeaveSpan[] = [
+      { userId: "a", startDate: "2026-08-03", endDate: "2026-08-03" },
+      {
+        userId: "b",
+        startDate: "2026-08-03",
+        endDate: "2026-08-03",
+        outingDates: ["2026-08-03"],
+      },
+      newLeave,
+    ];
+    expect(findExceededDates({ leaves, newLeave, maxCount: 2 })).toEqual([
+      "2026-08-03",
+    ]);
+    expect(
+      findExceededDates({ leaves, newLeave, maxCount: 2, outingCounts: false }),
+    ).toEqual([]);
   });
 
   it("returns empty when nothing exceeds", () => {

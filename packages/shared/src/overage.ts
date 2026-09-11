@@ -16,6 +16,35 @@ export interface LeaveSpan {
   userId: string;
   startDate: ISODate;
   endDate: ISODate;
+  /**
+   * 이 휴가 중 외출인 날짜. 부대가 외출을 출타 인원에서 뺄 때(`outingCounts: false`)만 본다.
+   * 구간을 읽을 수 없는 자리는 비워 두면 되고, 그때는 "외출도 센다"는 기존 동작으로 기운다.
+   */
+  outingDates?: readonly ISODate[];
+}
+
+/**
+ * 구간 목록에서 외출인 날짜만 펴낸다. `LeaveSpan.outingDates`를 채우는 자리가 쓴다.
+ *
+ * 휴가 단위가 아니라 **날짜 단위**다. 외출을 다른 재원과 한 휴가에 섞지 못하게 막은 것도,
+ * 외출 구간을 하루로 못 박은 것도 나중에 생긴 규칙이라, 여러 날짜짜리 외출 구간이나
+ * 다른 재원과 섞인 휴가가 옛 데이터로 남아 있을 수 있다(`outing.ts`의 `outingUsedDays` 주석).
+ */
+export function outingDatesOfSegments(
+  segments: readonly {
+    category: string;
+    startDate: ISODate;
+    endDate: ISODate;
+  }[],
+): ISODate[] {
+  const dates: ISODate[] = [];
+  for (const segment of segments) {
+    if (segment.category !== "outing") continue;
+    for (const date of eachDate(segment.startDate, segment.endDate)) {
+      dates.push(date);
+    }
+  }
+  return dates;
 }
 
 /**
@@ -51,6 +80,11 @@ export function computeDayStats(params: {
    * 외출은 이 값과 무관하게 하루로 센다.
    */
   returnDayCounts?: boolean;
+  /**
+   * 외출한 날을 출타 인원으로 셀지 여부. `false`면 각 휴가의 `outingDates`에 든 날은
+   * 그 사람을 세지 않는다.
+   */
+  outingCounts?: boolean;
 }): DayStat[] {
   const {
     leaves,
@@ -58,6 +92,7 @@ export function computeDayStats(params: {
     rangeStart,
     rangeEnd,
     returnDayCounts = true,
+    outingCounts = true,
   } = params;
   const allowed = maxAllowedOut(maxCount);
   const byDate = new Map<ISODate, Set<string>>();
@@ -74,7 +109,20 @@ export function computeDayStats(params: {
     }
     const from = leave.startDate > rangeStart ? leave.startDate : rangeStart;
     const to = effectiveEnd < rangeEnd ? effectiveEnd : rangeEnd;
+    /*
+     * 외출은 **복귀일 트림 뒤에** 거른다. 순서를 뒤집으면 안 된다 — 하루짜리 외출은
+     * 위 특례(`startDate === endDate`)로 살아남은 뒤 여기서 빠져야, 복귀일을 세지 않는
+     * 부대에서도 "외출 하루가 두 번 빠지는" 일이 생기지 않는다.
+     *
+     * 같은 사람이 같은 날 외출과 다른 휴가를 함께 갖고 있으면 그 사람은 여전히 세어진다.
+     * 날짜별 집합에 넣는 것은 사람이고, 거르는 것은 이 휴가의 몫뿐이다.
+     */
+    const skip =
+      outingCounts || !leave.outingDates?.length
+        ? null
+        : new Set(leave.outingDates);
     for (const date of eachDate(from, to)) {
+      if (skip?.has(date)) continue;
       byDate.get(date)?.add(leave.userId);
     }
   }
@@ -97,6 +145,7 @@ export function findExceededDates(params: {
   newLeave: { startDate: ISODate; endDate: ISODate };
   maxCount: number | null | undefined;
   returnDayCounts?: boolean;
+  outingCounts?: boolean;
 }): ISODate[] {
   return computeDayStats({
     leaves: params.leaves,
@@ -104,6 +153,7 @@ export function findExceededDates(params: {
     rangeStart: params.newLeave.startDate,
     rangeEnd: params.newLeave.endDate,
     returnDayCounts: params.returnDayCounts,
+    outingCounts: params.outingCounts,
   })
     .filter((s) => s.exceeded)
     .map((s) => s.date);

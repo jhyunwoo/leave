@@ -100,6 +100,7 @@ export function serializeUnit(
     referenceMemberTotal: unit.referenceMemberTotal,
     maxLeaveCount: unit.maxLeaveCount,
     returnDayCounts: unit.returnDayCounts,
+    outingCounts: unit.outingCounts,
     lastTotalUpdatedAt: unit.lastTotalUpdatedAt,
     memberCount,
     adminId: unit.adminId,

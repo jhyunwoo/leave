@@ -75,6 +75,8 @@ export const unitSchema = z
     maxLeaveCount: z.number(),
     // 복귀일을 출타로 셀지. 부대마다 달라 그룹 설정으로 노출한다.
     returnDayCounts: z.boolean(),
+    // 외출한 날을 출타로 셀지. 이것도 부대마다 갈린다.
+    outingCounts: z.boolean(),
     lastTotalUpdatedAt: z.string().nullable(),
     // 앱 가입자 수.
     memberCount: z.number(),

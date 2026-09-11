@@ -7,6 +7,7 @@ import {
   availabilitySignal,
   fmtRangeTiny,
   getHoliday,
+  segmentOnDate,
   type RegularOvernightCycle,
 } from "@leave/shared";
 import type { Calendar } from "@leave/client";
@@ -32,6 +33,14 @@ export function DayPanel(props: {
   const stat = calendar.days.find((d) => d.date === date);
   const exceeded = stat?.exceeded ?? false;
   const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
+  // 이 그룹이 외출을 비율에서 빼는데 그날 명단에 외출이 있으면, 비율과 명단 인원이
+  // 다르게 읽힌다. 왜 다른지 그 자리에서 말해 준다.
+  const outingUncounted =
+    calendar.unit.outingCounts === false &&
+    calendar.attendees.some(
+      (attendee) =>
+        segmentOnDate(attendee.segments, date)?.category === "outing",
+    );
   const holiday = getHoliday(date);
   const blackout = calendar.blackouts.find(
     (b) => b.startDate <= date && date <= b.endDate,
@@ -87,6 +96,11 @@ export function DayPanel(props: {
               style={{ color: "var(--negative-deep)", fontWeight: 600 }}
             >
               참고 기준 초과
+            </span>
+          )}
+          {outingUncounted && (
+            <span className="caption text-mute">
+              외출은 이 그룹 설정에서 출타율에 세지 않아요.
             </span>
           )}
         </div>

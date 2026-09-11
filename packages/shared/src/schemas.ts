@@ -205,6 +205,7 @@ export const unitCreateSchema = z.object({
   referenceMemberTotal: referenceMemberTotalSchema.nullable().optional(),
   maxLeaveCount: maxLeaveCountSchema,
   returnDayCounts: z.boolean().optional(),
+  outingCounts: z.boolean().optional(),
   lastTotalUpdatedAt: inviteExpiresAtSchema.nullable().optional(),
   inviteExpiresAt: inviteExpiresAtSchema.optional(),
   inviteMaxUses: inviteMaxUsesSchema.optional(),
@@ -217,6 +218,7 @@ export const unitUpdateSchema = z.object({
   referenceMemberTotal: referenceMemberTotalSchema.nullable().optional(),
   maxLeaveCount: maxLeaveCountSchema.optional(),
   returnDayCounts: z.boolean().optional(),
+  outingCounts: z.boolean().optional(),
   lastTotalUpdatedAt: inviteExpiresAtSchema.nullable().optional(),
 });
 

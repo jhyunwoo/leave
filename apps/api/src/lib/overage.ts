@@ -11,12 +11,14 @@
 import {
   findExceededDates,
   isCountedLeaveStatus,
+  outingDatesOfSegments,
   usersOnLeaveDuring,
   type ISODate,
 } from "@leave/shared";
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import {
+  leaveSegments,
   leaves,
   notifications,
   pushLogs,
@@ -62,10 +64,11 @@ export async function checkOverageAndNotify(params: {
    * 상한(100)에 걸려 **휴가 등록 자체가 500**이 됐다.
    * 부대원 행은 초과가 실제로 발생했을 때만, 그것도 알림 대상만 읽는다.
    */
-  const [unitRows, unitLeaves] = await db.batch([
+  const [unitRows, unitLeaves, outingSegments] = await db.batch([
     db.select().from(units).where(eq(units.id, unitId)),
     db
       .select({
+        id: leaves.id,
         userId: leaves.userId,
         startDate: leaves.startDate,
         endDate: leaves.endDate,
@@ -80,9 +83,42 @@ export async function checkOverageAndNotify(params: {
           gte(leaves.endDate, changedLeave.startDate),
         ),
       ),
+    /*
+     * 외출 구간만 따로 읽는다 — 부대가 외출을 출타 인원에서 빼도록 설정했을 수 있고
+     * (`units.outingCounts`), 머리행만으로는 어느 날이 외출인지 알 수 없다.
+     *
+     * 부대 값을 보고 조건부로 읽으려면 배치가 끝나기를 기다려야 해서 왕복이 하나 는다.
+     * 외출을 세는 부대(기본)에서 쓰이지 않는 문장 하나가 같은 배치에 더 도는 편이 낫다 —
+     * `leave_segments_dates_idx`로 좁혀지고 외출은 하루짜리라 행이 몇 개 되지 않는다.
+     */
+    db
+      .select({
+        leaveId: leaveSegments.leaveId,
+        category: leaveSegments.category,
+        startDate: leaveSegments.startDate,
+        endDate: leaveSegments.endDate,
+      })
+      .from(leaveSegments)
+      .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+      .innerJoin(users, eq(leaves.userId, users.id))
+      .where(
+        and(
+          eq(users.unitId, unitId),
+          eq(leaveSegments.category, "outing"),
+          lte(leaveSegments.startDate, changedLeave.endDate),
+          gte(leaveSegments.endDate, changedLeave.startDate),
+        ),
+      ),
   ]);
   const unit = unitRows[0];
   if (!unit) return [];
+
+  const outingByLeave = new Map<string, typeof outingSegments>();
+  for (const segment of outingSegments) {
+    const values = outingByLeave.get(segment.leaveId) ?? [];
+    values.push(segment);
+    outingByLeave.set(segment.leaveId, values);
+  }
 
   // 초안·반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
   const spans = unitLeaves
@@ -91,6 +127,7 @@ export async function checkOverageAndNotify(params: {
       userId: l.userId,
       startDate: l.startDate,
       endDate: l.endDate,
+      outingDates: outingDatesOfSegments(outingByLeave.get(l.id) ?? []),
     }));
 
   const exceededDates = findExceededDates({
@@ -101,6 +138,7 @@ export async function checkOverageAndNotify(params: {
     },
     maxCount: unit.maxLeaveCount,
     returnDayCounts: unit.returnDayCounts,
+    outingCounts: unit.outingCounts,
   });
   if (exceededDates.length === 0) return [];
 

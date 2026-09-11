@@ -162,6 +162,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
     unit.referenceMemberTotal == null ? "" : String(unit.referenceMemberTotal),
   );
   const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount));
+  const [outingCounts, setOutingCounts] = useState(unit.outingCounts);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -174,6 +175,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
       referenceMemberTotal:
         referenceTotal.trim() === "" ? null : Number(referenceTotal),
       maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
+      outingCounts,
     } satisfies UnitUpdateInput;
     const parsed = unitUpdateSchema.safeParse(input);
     if (!parsed.success) {
@@ -212,7 +214,13 @@ function EditUnitSection({ unit }: { unit: Unit }) {
           accessibilityLabel="계산 기준 인원"
         />
       </Field>
-      <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
+      <LeaveLimitFields
+        count={maxCount}
+        onCountChange={setMaxCount}
+        outingCounts={outingCounts}
+        onOutingCountsChange={setOutingCounts}
+        outingTestID="unit-outing-counts"
+      />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {saved ? <Text style={styles.saved}>저장했어요.</Text> : null}
       <Button

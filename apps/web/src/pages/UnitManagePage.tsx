@@ -142,6 +142,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
     unit.referenceMemberTotal == null ? "" : String(unit.referenceMemberTotal),
   );
   const [maxCount, setMaxCount] = useState(String(unit.maxLeaveCount));
+  const [outingCounts, setOutingCounts] = useState(unit.outingCounts);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -154,6 +155,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
       referenceMemberTotal:
         referenceTotal.trim() === "" ? null : Number(referenceTotal),
       maxLeaveCount: maxCount.trim() === "" ? Number.NaN : Number(maxCount),
+      outingCounts,
     } satisfies UnitUpdateInput;
     const parsed = unitUpdateSchema.safeParse(input);
     if (!parsed.success) {
@@ -200,7 +202,12 @@ function EditUnitSection({ unit }: { unit: Unit }) {
         />
       </Field>
 
-      <LeaveLimitFields count={maxCount} onCountChange={setMaxCount} />
+      <LeaveLimitFields
+        count={maxCount}
+        onCountChange={setMaxCount}
+        outingCounts={outingCounts}
+        onOutingCountsChange={setOutingCounts}
+      />
 
       {error && (
         <p className="field-error" role="alert">

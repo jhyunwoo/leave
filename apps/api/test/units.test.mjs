@@ -526,3 +526,72 @@ test("부대 관리자는 공유 일정을 등록·수정·삭제하고 부대�
   );
   assert.deepEqual(afterDelete.data.events, []);
 });
+
+test("부대가 외출을 출타율에서 빼면 달력 숫자는 줄고 명단은 그대로다", async () => {
+  const owner = await signup();
+  const created = await createUnit(owner.token, { maxLeaveCount: 1 });
+  const unitId = created.data.unit.id;
+  // 기본값은 기존 동작이다 — 마이그레이션이 돌아간 부대의 숫자가 달라지면 안 된다.
+  assert.equal(created.data.unit.outingCounts, true);
+
+  const member = await signup();
+  await joinCreatedUnit(member.token, created);
+  const date = "2026-08-15";
+
+  await req("POST", "/leaves", {
+    token: owner.token,
+    body: {
+      title: "연가",
+      segments: [{ category: "annual", startDate: date, endDate: date }],
+    },
+  });
+  await req("POST", "/leaves", {
+    token: member.token,
+    body: {
+      title: "평일 외출",
+      segments: [
+        {
+          category: "outing",
+          outingKind: "weekday",
+          startDate: date,
+          endDate: date,
+        },
+      ],
+    },
+  });
+
+  const dayOf = async (token) => {
+    const res = await req("GET", `/units/${unitId}/calendar?month=2026-08`, {
+      token,
+    });
+    assert.equal(res.status, 200);
+    return {
+      day: res.data.days.find((item) => item.date === date),
+      attendees: res.data.attendees,
+      unit: res.data.unit,
+    };
+  };
+
+  const before = await dayOf(member.token);
+  assert.equal(before.day.count, 2);
+  assert.equal(before.day.exceeded, true);
+
+  const patched = await req("PATCH", `/units/${unitId}`, {
+    token: owner.token,
+    body: { outingCounts: false },
+  });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.data.unit.outingCounts, false);
+
+  const after = await dayOf(member.token);
+  assert.equal(after.unit.outingCounts, false);
+  assert.equal(after.day.count, 1, "외출한 사람은 출타 인원에서 빠진다");
+  assert.equal(after.day.exceeded, false);
+  // 그날 부대 밖에 있는 것은 사실이므로 명단에는 그대로 남는다.
+  assert.equal(after.attendees.length, 2);
+  assert.ok(
+    after.attendees.some((entry) =>
+      entry.segments.some((segment) => segment.category === "outing"),
+    ),
+  );
+});
