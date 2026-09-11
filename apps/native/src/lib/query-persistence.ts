@@ -27,16 +27,28 @@ export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 //     이 값을 더하므로, 필드가 없는 옛 캐시가 되살아나면 "남은 NaN일"이 보인다.
 // v4: 달력을 "가까운 달"만 저장하도록 좁혔다(아래 CALENDAR_PERSIST_SPAN). 옛
 //     캐시에는 먼 달이 잔뜩 들어 있어 그대로 되살리면 이번 변경의 목적이 사라진다.
-const CACHE_BUSTER = "native-offline-read-v4";
+// v5: 온보딩 상태를 저장 목록에 넣었다(아래 PERSISTED_QUERY_ROOTS 주석). 옛 캐시에는
+//     그 항목이 없어 첫 실행이 예전처럼 게이트에서 멈추므로 이어 쓸 이유가 없다.
+const CACHE_BUSTER = "native-offline-read-v5";
 const CACHE_KEY = "tanstack-query-cache";
 
-// 계정·알림·관리자 데이터와 mutation은 기기에 남기지 않는다. 오프라인에서
-// 실제로 다시 보여줄 읽기 데이터만 명시적으로 허용한다.
+/**
+ * 계정·알림·관리자 데이터와 mutation은 기기에 남기지 않는다. 오프라인에서
+ * 실제로 다시 보여줄 읽기 데이터만 명시적으로 허용한다.
+ *
+ * `onboarding`이 여기 있는 이유는 화면에 그리기 위해서가 아니라 **앱이 열리기
+ * 위해서**다. 루트 레이아웃은 온보딩 상태를 알기 전에는 아무 화면도 그리지 않는데
+ * (`app/_layout.tsx`), 오프라인에서는 `networkMode: "offlineFirst"`가 첫 실패 뒤
+ * 재시도를 일시정지해 그 응답이 영영 오지 않는다. 저장하지 않으면 통신이 끊긴 곳에서
+ * 앱이 빈 화면에 갇혀, 정작 아래 네 항목을 위해 저장해 둔 달력·내 휴가에 닿지 못한다.
+ * 담기는 것은 내 복무정보뿐이고, 로그아웃·401에서 `clearPersistedQueryCache()`가 지운다.
+ */
 const PERSISTED_QUERY_ROOTS = new Set([
   "calendar",
   "myLeaves",
   "leaveBalances",
   "leaveGrants",
+  "onboarding",
 ]);
 
 /**

@@ -3,15 +3,16 @@
  *
  * expo-router가 이 파일을 모든 화면의 부모로 삼는다.
  *
- * 시작 순서가 화면 깜빡임을 좌우한다. SecureStore에서 토큰을 되살릴 때까지는
- * 스플래시를 유지하고(`ready`), 그 뒤에야 Stack.Protected가 로그인 여부에 따라
- * 갈 곳을 정한다. 먼저 그리면 로그인 화면이 한 프레임 번쩍인다.
+ * 시작 순서가 화면 깜빡임을 좌우한다. 토큰과 온보딩 상태를 모두 알기 전에는
+ * 스플래시를 유지하고(아래 `gate`), 그 뒤에야 Stack.Protected가 갈 곳을 정한다.
+ * 먼저 그리면 로그인·온보딩 화면이 한 프레임 번쩍인다.
  *
  * 쿼리 캐시는 디스크에 저장한다(PersistQueryClientProvider). 통신이 끊긴
- * 훈련장·생활관에서도 마지막으로 본 달력과 내 휴가는 볼 수 있어야 한다.
+ * 훈련장·생활관에서도 마지막으로 본 달력과 내 휴가는 볼 수 있어야 한다 —
+ * 그래서 그 게이트를 통과하는 데 필요한 온보딩 상태까지 함께 저장한다.
  */
 
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, useIsRestoring } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { type ErrorBoundaryProps, Stack, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
@@ -40,6 +41,7 @@ import {
   QUERY_CACHE_MAX_AGE,
   queryPersistenceOptions,
 } from "@/lib/query-persistence";
+import { resolveStartupGate } from "@/lib/startup-gate";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import type { WidgetState } from "@/widgets/payload";
 import { WidgetSync } from "@/widgets/widget-sync";
@@ -154,14 +156,19 @@ function RootNavigator() {
   const token = useAtomValue(tokenAtom);
   const setToken = useSetAtom(tokenAtom);
   const [ready, setReady] = useState(false);
+  // 디스크 캐시 복원이 끝나기 전에는 온보딩 상태가 "없다"와 "아직 모른다"를 구분할 수 없다.
+  const isRestoring = useIsRestoring();
 
   // SecureStore에서 토큰을 되살릴 때까지는 스플래시를 유지한다. 먼저 그리면
   // 로그인 화면이 한 프레임 번쩍이고 나서 홈으로 넘어간다.
+  //
+  // 여기서 스플래시를 내리지 않는다 — 토큰을 되살린 뒤에도 온보딩 상태를 기다리는
+  // 동안은 그릴 화면이 없다(아래 `gate`). 예전에는 이 자리에서 내려서 그 사이가
+  // 빈 캔버스로 보였고, 오프라인에서는 그 상태가 끝나지 않았다.
   useEffect(() => {
     void loadStoredToken().then((stored) => {
       setToken(stored);
       setReady(true);
-      void SplashScreen.hideAsync();
     });
   }, [setToken]);
 
@@ -181,14 +188,35 @@ function RootNavigator() {
   const sessionReady = ready && token !== undefined;
 
   /**
+   * 화면을 그릴 수 있는가. 규칙과 배경은 lib/startup-gate.ts에 있다.
+   *
+   * 디스크 캐시가 온보딩 상태를 들고 있으면(query-persistence.ts) 오프라인 콜드
+   * 스타트도 곧바로 `ready`가 되어 저장해 둔 달력·내 휴가에 닿는다. `unreachable`은
+   * 캐시가 아예 없는 첫 실행에서만 나온다.
+   */
+  const gate = resolveStartupGate({
+    sessionReady,
+    isRestoring,
+    authenticated: isAuthed,
+    hasOnboardingData: onboarding.data !== undefined,
+    onboardingFetchStatus: onboarding.fetchStatus,
+    onboardingErrored: onboarding.isError,
+  });
+
+  // 그릴 화면이 생긴 순간에 내린다. 그 전에 내리면 스플래시와 첫 화면 사이가 빈다.
+  useEffect(() => {
+    if (gate !== "loading") void SplashScreen.hideAsync();
+  }, [gate]);
+
+  /**
    * 홈 화면 위젯이 지금 무엇을 말해야 하는가.
    *
    * **모르는 동안에는 건드리지 않는다.** 세션을 복원하는 중이거나 온보딩 상태를
    * 아직 받지 못한 동안 판단하면 `canBrowse`가 거짓이라 "복무정보를 입력하세요"가
    * 밀려 나가고, 멀쩡한 위젯이 **앱을 켤 때마다** 그 문구로 한 번씩 깜빡인다.
-   * 온보딩 응답은 디스크 캐시 대상이 아니라 켤 때마다 pending을 지난다.
+   * 화면을 그릴 수 있게 된 시점과 판단할 수 있게 된 시점이 같으므로 게이트를 그대로 쓴다.
    */
-  const widgetStateKnown = sessionReady && !(isAuthed && onboarding.isPending);
+  const widgetStateKnown = gate === "ready";
   const widgetState: WidgetState = !isAuthed
     ? "signedOut"
     : canBrowse
@@ -205,8 +233,20 @@ function RootNavigator() {
     </>
   );
 
-  if (!ready || token === undefined || (isAuthed && onboarding.isPending))
-    return lifecycle; // 스플래시 유지
+  if (gate !== "ready")
+    return (
+      <>
+        {lifecycle}
+        {gate === "unreachable" ? (
+          <ErrorScreen
+            title="연결하지 못했어요"
+            body="계정 정보를 아직 받지 못했어요. 네트워크를 확인하고 다시 시도해주세요."
+            actionLabel="다시 시도"
+            onAction={() => void onboarding.refetch()}
+          />
+        ) : null}
+      </>
+    );
 
   return (
     <>
