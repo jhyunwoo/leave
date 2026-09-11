@@ -114,6 +114,43 @@ test("보관 기간이 지난 접속 기록·푸시 로그와 만료 세션을 �
   assert.equal(me.status, 401);
 });
 
+/**
+ * rate limit 카운터도 요청당 한 행이 쌓이는 표다. 창이 지난 행은 키에 창 번호가 들어
+ * 있어 다시 읽히지 않으므로 판정을 바꾸지 않지만, 지우는 곳이 없으면 접속 기록과 같은
+ * 이유로 자란다. **아직 유효한 창을 지우면 그 사용자의 상한이 초기화되므로** 지우는
+ * 것과 남기는 것을 짝으로 확인한다.
+ */
+test("창이 지난 rate limit 카운터만 지운다", async () => {
+  const db = openTestDb();
+  const tag = uniq("rl-");
+  try {
+    const rows = [
+      [`${tag}-expired`, daysAgo(1)],
+      [`${tag}-live`, new Date(Date.now() + 60 * 60 * 1000).toISOString()],
+    ];
+    for (const [key, expiresAt] of rows) {
+      db.prepare(
+        "insert into rate_limit_counters (key, count, expires_at) values (?, 3, ?)",
+      ).run(key, expiresAt);
+    }
+
+    await runScheduled();
+
+    const count = (key) =>
+      db
+        .prepare("select count(*) as n from rate_limit_counters where key = ?")
+        .get(key).n;
+    assert.equal(count(`${tag}-expired`), 0, "창이 지난 카운터가 남았다");
+    assert.equal(
+      count(`${tag}-live`),
+      1,
+      "아직 유효한 창을 지웠다 — 상한이 초기화된다",
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test("동의를 내린 사용자의 요청은 접속 기록에 남지 않는다", async () => {
   const { token, data } = await signup();
   const userId = data.user.id;
