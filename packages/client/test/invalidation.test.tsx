@@ -15,6 +15,7 @@ import {
   useUpdateLeave,
   useUpdateLeaveStatus,
 } from "../src/hooks/leaves";
+import { useUpdateProfile } from "../src/hooks/auth";
 import { useCreateBlackout } from "../src/hooks/blackouts";
 import { useLeaveUnit } from "../src/hooks/units";
 import { queryKeys } from "../src/query-keys";
@@ -511,5 +512,48 @@ describe("그룹 탈퇴", () => {
       seeded: true,
     });
     expect(staleKeys(queryClient)).toContain(JSON.stringify(queryKeys.me));
+  });
+});
+
+/**
+ * 입대일·전역일·군종은 주기 목록과 "앞으로 받을 몫"의 입력이다
+ * (`lib/leave-grants.ts`). 잔여·적립분을 빠뜨려 두는 동안 전역일을 고쳐도 보유 휴가
+ * 화면이 옛 주기를 계속 그렸다. 온보딩 응답에도 같은 필드의 사본이 실린다.
+ */
+describe("내 정보 수정", () => {
+  it("복무 정보에 딸린 캐시를 모두 비운다", async () => {
+    const client = {
+      auth: {
+        me: { $patch: () => Promise.resolve({ user: { id: "me" } }) },
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    // SEEDED에 넣지 않는다 — 그 목록은 다른 테스트의 "정확히 이 집합" 단정에 쓰인다.
+    for (const key of [queryKeys.onboarding, queryKeys.dutyDays]) {
+      queryClient.setQueryData(key, { seeded: true });
+    }
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper });
+
+    result.current.mutate({ dischargeAt: "2027-09-30" });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => {
+      const stale = new Set(staleKeys(queryClient));
+      for (const key of [
+        queryKeys.me,
+        queryKeys.dutyDays,
+        queryKeys.leaveBalances,
+        queryKeys.leaveGrants,
+        queryKeys.onboarding,
+        queryKeys.calendar("unit-1", "2026-09"),
+        queryKeys.unitMembers("unit-1"),
+      ]) {
+        expect(stale).toContain(JSON.stringify(key));
+      }
+    });
+    // 관계 없는 캐시는 건드리지 않는다.
+    expect(staleKeys(queryClient)).not.toContain(
+      JSON.stringify(queryKeys.notifications),
+    );
   });
 });

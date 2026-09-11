@@ -16,9 +16,9 @@ import type {
   PasskeyDeleteInput,
   PasskeyRegistrationOptionsInput,
 } from "@leave/shared";
-import { ApiError } from "@leave/shared/http";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
+import { shouldRetryQuery } from "../query-policy";
 import { useInvalidateKeys } from "./invalidate";
 import { queryKeys } from "../query-keys";
 import type {
@@ -31,18 +31,21 @@ import type {
   PasskeyOptions,
 } from "../types";
 
-/** 401 응답은 다시 물어봐도 답이 달라지지 않으므로 재시도하지 않는다. */
-function retryUnlessUnauthorized(failureCount: number, error: Error): boolean {
-  if (error instanceof ApiError && error.status === 401) return false;
-  return failureCount < 2;
-}
+/*
+ * 재시도 판정은 `query-policy.ts`의 `shouldRetryQuery` 하나만 쓴다.
+ *
+ * 예전에는 이 파일에 401만 거르는 사본이 따로 있었다. 그런데 아래 훅들이 부르는
+ * 엔드포인트가 바로 428(온보딩 미완료, `middleware/onboarding.ts`)과 426(앱 업데이트
+ * 필요, `middleware/min-version.ts`)을 돌려주는 자리다. 온보딩 중에는 화면마다 같은
+ * 요청이 세 번씩 나갔고, 업데이트 안내는 backoff 두 번만큼 늦게 떴다.
+ */
 
 /** 로그인한 사용자와 소속 그룹. 앱 전역에서 "나"의 단일 출처. */
 export function useMe() {
   const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.me,
-    retry: retryUnlessUnauthorized,
+    retry: shouldRetryQuery,
     queryFn: async (context) =>
       unwrap<Me>(
         await client.auth.me.$get(
@@ -63,7 +66,7 @@ export function useMyDutyDays() {
   const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.dutyDays,
-    retry: retryUnlessUnauthorized,
+    retry: shouldRetryQuery,
     queryFn: async (context) =>
       unwrap<DutyDays>(
         await client.auth.me["duty-days"].$get(
@@ -79,7 +82,7 @@ export function useOnboardingStatus(enabled = true) {
   return useQuery({
     queryKey: queryKeys.onboarding,
     enabled,
-    retry: retryUnlessUnauthorized,
+    retry: shouldRetryQuery,
     queryFn: async (context) =>
       unwrap<OnboardingStatus>(
         await client.auth.onboarding.$get(
@@ -100,7 +103,7 @@ export function useAuthBootstrap(enabled = true) {
   return useQuery({
     queryKey: queryKeys.onboarding,
     enabled,
-    retry: retryUnlessUnauthorized,
+    retry: shouldRetryQuery,
     queryFn: async (context) => {
       const bootstrap = unwrap<AuthBootstrap>(
         await client.auth.bootstrap.$get(
@@ -158,6 +161,12 @@ export function useCompleteOnboarding() {
  *
  * 달력 응답에는 별칭과 계급 라벨이 함께 실려 나가므로 달력 캐시도 같이 버린다.
  * 전역 예정일이 바뀌면 남은 일과일의 세는 구간이 통째로 달라진다.
+ *
+ * 입대일·전역일·군종은 **정기외박 주기와 앞으로 받을 몫의 입력**이기도 하다
+ * (`lib/leave-grants.ts`의 `cycleDischargeDate`·`buildCycleList`). 그래서 잔여와
+ * 적립분도 함께 버린다 — 빠뜨려 두는 동안 전역일을 고쳐도 보유 휴가 화면이 옛 주기를
+ * 계속 그렸다. 온보딩 응답에도 같은 필드의 사본이 실리고(`lib/onboarding.ts`),
+ * 군종이 바뀌면 서버가 주기 설정을 지우므로 그것도 다시 받아야 한다.
  */
 export function useUpdateProfile() {
   const { client, unwrap } = useLeaveApi();
@@ -166,6 +175,9 @@ export function useUpdateProfile() {
     queryKeys.dutyDays,
     queryKeys.calendars,
     queryKeys.allUnitMembers,
+    queryKeys.leaveBalances,
+    queryKeys.leaveGrants,
+    queryKeys.onboarding,
   ]);
   return useMutation({
     mutationFn: async (input: ProfileUpdateInput) =>

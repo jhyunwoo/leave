@@ -153,23 +153,38 @@ export async function saveOnboardingProfile(
     .where(eq(users.id, user.id));
 
   if (user.branch !== input.branch) {
-    const cleared = {
-      enabled: false,
-      startDate: null,
-      intervalDays: null,
-      intervalMonths: null,
-      daysPerGrant: null,
-      carryOver: false,
-      updatedAt: new Date().toISOString(),
-    };
-    await db
-      .insert(regularOvernightConfigs)
-      .values({ userId: user.id, ...cleared })
-      .onConflictDoUpdate({
-        target: regularOvernightConfigs.userId,
-        set: cleared,
-      });
+    await clearRegularOvernightForBranchChange(db, user.id);
   }
+}
+
+/**
+ * 군종이 바뀌었을 때 정기외박 자동 적립 설정을 꺼진 상태로 되돌린다.
+ *
+ * 군종을 쓰는 경로가 둘이라(온보딩의 `saveOnboardingProfile`, 설정의
+ * `PATCH /auth/me`) 이 불변식도 두 곳에서 지켜야 한다. 한쪽만 알고 있던 동안,
+ * 프로필에서 육군 → 해군으로 바꾼 계정에 `intervalMonths: 3`이 그대로 남았다.
+ * `regularOvernightInterval`은 개월을 먼저 보므로 적립일 전체가 육군 일정에 머문다.
+ */
+export async function clearRegularOvernightForBranchChange(
+  db: Db,
+  userId: string,
+): Promise<void> {
+  const cleared = {
+    enabled: false,
+    startDate: null,
+    intervalDays: null,
+    intervalMonths: null,
+    daysPerGrant: null,
+    carryOver: false,
+    updatedAt: new Date().toISOString(),
+  };
+  await db
+    .insert(regularOvernightConfigs)
+    .values({ userId, ...cleared })
+    .onConflictDoUpdate({
+      target: regularOvernightConfigs.userId,
+      set: cleared,
+    });
 }
 
 /**

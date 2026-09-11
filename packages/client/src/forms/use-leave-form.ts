@@ -446,25 +446,38 @@ export function useLeaveForm(options: LeaveFormOptions) {
 
   const needsTitle = !options.deriveTitle;
   /**
+   * 주기 재원을 쓰는데 전역일을 아직 모르는 상태.
+   *
+   * 주기 판정은 전역일이 있어야 성립하고(`checkRegularOvernight`), 주기 재원은
+   * 스칼라 잔여 검사에서 일부러 빠져 있다(위 `availableByKey`). 그래서 `me`가 아직
+   * 오지 않은 동안은 **정기외박을 며칠이든 통과시킨 뒤 서버 400을 받았다** — 콜드
+   * 스타트나 딥링크로 달력에 바로 들어와 폼을 열면 실제로 그 창이 열린다.
+   */
+  const awaitingDischargeDate =
+    cycleBased && !dischargeAt && draftRegular.length > 0;
+
+  /**
    * 저장을 막는 이유. null이면 저장할 수 있다.
    *
    * 구간 수·총 기간 상한은 `leaveCreateSchema`가 거절하는 값과 같아야 한다.
    * 개수 스테퍼로는 한 번에 한 칸씩 넘길 수 있어서, 서버까지 갔다가 400을 받는
    * 대신 여기서 이유를 말한다.
    */
-  const submitBlocker: string | null = !startDate
-    ? "휴가 시작일을 선택해주세요."
-    : drafts.length === 0
-      ? "휴가 종류를 선택해주세요."
-      : duration > MAX_DATE_RANGE_DAYS
-        ? `휴가는 최대 ${MAX_DATE_RANGE_DAYS}일까지 등록할 수 있어요.`
-        : drafts.length > MAX_LEAVE_SEGMENTS
-          ? `휴가 종류는 최대 ${MAX_LEAVE_SEGMENTS}개까지 이어 쓸 수 있어요.`
-          : !/^([01]\d|2[0-3]):[0-5]\d$/.test(returnTime)
-            ? "복귀 시간을 HH:mm 형식으로 입력해주세요."
-            : needsTitle && title.trim().length === 0
-              ? "휴가 제목을 입력해주세요."
-              : balanceBlockMessage || null;
+  const submitBlocker: string | null = awaitingDischargeDate
+    ? "복무 정보를 불러오는 중이에요. 잠시 후 다시 시도해주세요."
+    : !startDate
+      ? "휴가 시작일을 선택해주세요."
+      : drafts.length === 0
+        ? "휴가 종류를 선택해주세요."
+        : duration > MAX_DATE_RANGE_DAYS
+          ? `휴가는 최대 ${MAX_DATE_RANGE_DAYS}일까지 등록할 수 있어요.`
+          : drafts.length > MAX_LEAVE_SEGMENTS
+            ? `휴가 종류는 최대 ${MAX_LEAVE_SEGMENTS}개까지 이어 쓸 수 있어요.`
+            : !/^([01]\d|2[0-3]):[0-5]\d$/.test(returnTime)
+              ? "복귀 시간을 HH:mm 형식으로 입력해주세요."
+              : needsTitle && title.trim().length === 0
+                ? "휴가 제목을 입력해주세요."
+                : balanceBlockMessage || null;
   const canSubmit = submitBlocker === null;
 
   /* --- 종류 더하기 도우미 ---------------------------------------------- */

@@ -413,3 +413,70 @@ test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력�
   assert.equal(cleared.data.regularOvernight.intervalDays, null);
   assert.equal(cleared.data.regularOvernight.carryOver, false);
 });
+
+/**
+ * 군종을 쓰는 경로가 둘이다 — 온보딩의 `PUT /auth/onboarding/profile`과 설정의
+ * `PATCH /auth/me`. 위 테스트가 온보딩 쪽을 고정하고, 이쪽이 설정 쪽을 고정한다.
+ * 한쪽만 정리하던 동안 프로필에서 육군 → 해군으로 바꾼 계정에 `intervalMonths: 3`이
+ * 남았고, 개월을 먼저 보는 `regularOvernightInterval` 때문에 적립일 전체가 육군
+ * 일정에 머물렀다.
+ */
+test("내 정보에서 군종을 바꿔도 앞 군종의 정기외박 주기가 남지 않는다", async () => {
+  const { token } = await signup({ branch: "army" });
+  assert.equal(
+    (
+      await req("PUT", "/auth/onboarding/regular-overnight", {
+        token,
+        body: {
+          enabled: true,
+          startDate: "2026-01-31",
+          intervalMonths: 3,
+          daysPerGrant: 2,
+          carryOver: true,
+        },
+      })
+    ).status,
+    200,
+  );
+
+  const changed = await req("PATCH", "/auth/me", {
+    token,
+    body: { branch: "navy" },
+  });
+  assert.equal(changed.status, 200, changed.data?.error);
+  assert.equal(changed.data.user.branch, "navy");
+
+  const after = await req("GET", "/auth/onboarding", { token });
+  assert.equal(after.data.regularOvernight.enabled, false);
+  assert.equal(after.data.regularOvernight.intervalMonths, null);
+  assert.equal(after.data.regularOvernight.intervalDays, null);
+  assert.equal(after.data.regularOvernight.carryOver, false);
+});
+
+test("군종을 그대로 두고 이름만 고치면 주기 설정을 건드리지 않는다", async () => {
+  const { token } = await signup({ branch: "army" });
+  assert.equal(
+    (
+      await req("PUT", "/auth/onboarding/regular-overnight", {
+        token,
+        body: {
+          enabled: true,
+          startDate: "2026-01-31",
+          intervalMonths: 3,
+          daysPerGrant: 2,
+        },
+      })
+    ).status,
+    200,
+  );
+
+  assert.equal(
+    (await req("PATCH", "/auth/me", { token, body: { name: "이름만" } }))
+      .status,
+    200,
+  );
+
+  const after = await req("GET", "/auth/onboarding", { token });
+  assert.equal(after.data.regularOvernight.enabled, true);
+  assert.equal(after.data.regularOvernight.intervalMonths, 3);
+});

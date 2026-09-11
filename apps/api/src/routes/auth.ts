@@ -42,6 +42,7 @@ import { readRemainingDutyDays } from "../lib/duty-days";
 import { leaveRuleMessage } from "../lib/errors";
 import { saveRegularOvernightConfig } from "../lib/leave-balances";
 import {
+  clearRegularOvernightForBranchChange,
   completeOnboarding,
   ensureDefaultAnnualGrant,
   PLACEHOLDER_PROFILE,
@@ -476,6 +477,12 @@ export const authRoutes = app
         signupRank: next.signupRank,
       })
       .where(eq(users.id, user.id));
+
+    // 온보딩과 같은 불변식을 지킨다 — 군마다 주기 단위가 달라 앞 군종의 값이 남으면
+    // 적립일이 전부 어긋난다(clearRegularOvernightForBranchChange 주석 참고).
+    if (user.branch !== next.branch) {
+      await clearRegularOvernightForBranchChange(db, user.id);
+    }
 
     return c.json({ user: serializeUser(next) }, 200);
   })
