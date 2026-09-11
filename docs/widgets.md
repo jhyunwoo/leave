@@ -180,6 +180,17 @@ v1 JSON에는 `version`, `updatedAt`, `expiresAt`, `entries`가 있다. 엔트�
 동일한 타임라인에서 온다. Android의 표준 Chronometer는 0 뒤에 음수로 계속 셀 수 있어
 배터리를 깨워 멈추는 구현을 추가하지 않았다.
 
+그 문구를 만들 때 **`Intl`을 쓰지 않는다.** Hermes/Android의 Intl은 이 앱에서
+`DateTimeFormat.format`만 검증돼 있고 `formatToParts`는 쓰이는 곳이 없다. 여기서 던지면
+`buildAndroidWidgetTimeline`이 던지고 **네이티브 쓰기가 아예 나가지 않아** 위젯이 마지막
+값에 머문 채 조용히 낡는다 — 앱에는 아무 증상이 없다(1.1.0의 `gauge: null` 사고와 같은
+모양). 한국은 서머타임이 없으므로 `KST_OFFSET_MS`를 더한 산술이 정확하고 충분하다.
+
+**복귀 전환 엔트리를 담을 때 창 끝은 루프 전에 붙잡는다.** `buildWidgetTimeline`이 같은
+배열에 push하므로, 배열의 마지막 원소를 상한으로 읽으면 첫 복귀 엔트리를 넣는 순간
+상한이 그 시각으로 내려앉아 그 뒤 휴가가 창 안에 있어도 전부 버려진다. 예정된 휴가가
+둘 이상일 때만 드러나는 종류의 버그다.
+
 ### 갱신과 배터리
 
 앱 쓰기는 저장 직후 모든 활성 지표·요약 인스턴스에 Glance update를 요청한다.
