@@ -475,6 +475,30 @@ export const passkeyChallenges = sqliteTable(
 );
 
 /**
+ * rate limit 고정 창 카운터.
+ *
+ * KV에 두었을 때는 "읽고 더해 쓰기"가 원자적이지 않아, 동시에 도착한 요청이 모두 같은
+ * 값을 읽고 같은 값을 써서 **카운터가 한 번만 올라갔다.** 정밀하지 않은 정도가 아니라
+ * 상한이 사실상 무력해지는 것이고, 6자 초대코드의 안전이 `3회/15분`에 기대고 있어서
+ * (`routes/units.ts`) 그 자리에서는 실제 보안 구멍이었다.
+ *
+ * D1의 `INSERT ... ON CONFLICT DO UPDATE SET count = count + 1 RETURNING`은 한 문장이라
+ * 원자적이다. 창 번호가 키에 들어 있으므로 지난 창의 행은 다시 읽히지 않고, 정리는
+ * 보관 기간 cron이 맡는다(`lib/retention.ts`).
+ */
+export const rateLimitCounters = sqliteTable(
+  "rate_limit_counters",
+  {
+    /** `rl:<이름>:<식별자 해시>:<창 번호>`. 원문 IP·계정 id는 담지 않는다. */
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    /** 이 창이 끝나는 시각. 읽기 판정에는 쓰지 않고 정리에만 쓴다. */
+    expiresAt: text("expires_at").notNull(),
+  },
+  (t) => [index("rate_limit_counters_expires_idx").on(t.expiresAt)],
+);
+
+/**
  * 관리자 감사 로그 — 관리자 계정을 비활성화하거나 삭제해도 운영 이력이 남도록
  * 관리자 이메일 스냅샷을 함께 저장하고 레코드 수정/삭제 API는 제공하지 않는다.
  */

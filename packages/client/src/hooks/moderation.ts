@@ -64,6 +64,12 @@ export function useBlockUser() {
             : { ...current, attendees };
         },
       );
+      // **여기서 달력을 무효화하지 않는 것은 의도다.** 위 패치가 곧 서버 규칙이라
+      // (`lib/calendar.ts`: 차단은 명단에서만 숨기고 days 집계는 그대로 둔다)
+      // 로컬 상태와 서버 응답이 갈리지 않는다. 무효화하면 붙어 있는 달 전부가 다시
+      // 나가는데, 돌아오는 값은 방금 만든 것과 같다. 회귀 감시는
+      // `test/cache-updates.test.tsx`의 "without refetching"이다 — 그 단정이
+      // 이 판단을 지키고 있으니, 고치려면 그 테스트부터 다시 생각할 것.
     },
   });
 }

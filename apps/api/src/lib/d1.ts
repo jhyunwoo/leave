@@ -34,7 +34,25 @@ export function chunkForParams<T>(
   items: readonly T[],
   paramsPerItem: number,
 ): T[][] {
-  const size = Math.max(1, Math.floor(D1_MAX_BOUND_PARAMS / paramsPerItem));
+  /**
+   * 항목 하나가 이미 상한을 넘으면 **쪼개서 해결할 수 없다.**
+   *
+   * 예전에는 `Math.max(1, ...)`가 그 경우를 조용히 덮어, 한 행씩 담긴 문장을 돌려주고
+   * 그 문장이 그대로 D1에서 SQLITE_ERROR가 됐다. 500의 원인이 여기라는 단서가 아무
+   * 데도 남지 않는다. 컬럼을 101개까지 늘린 표가 아직 없어 실제로 걸린 적은 없지만,
+   * 걸리는 날에는 스키마를 늘린 자리에서 바로 드러나야 한다.
+   */
+  if (!Number.isInteger(paramsPerItem) || paramsPerItem < 1) {
+    throw new Error(
+      `항목당 바인드 파라미터 수가 1 이상의 정수여야 합니다 (받은 값: ${paramsPerItem})`,
+    );
+  }
+  if (paramsPerItem > D1_MAX_BOUND_PARAMS) {
+    throw new Error(
+      `항목 하나가 D1 바인드 파라미터 상한을 넘습니다 (${paramsPerItem} > ${D1_MAX_BOUND_PARAMS}). 문장을 쪼개도 해결되지 않으니 컬럼을 나누거나 행을 나눠 넣어야 합니다.`,
+    );
+  }
+  const size = Math.floor(D1_MAX_BOUND_PARAMS / paramsPerItem);
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
     chunks.push(items.slice(i, i + size));

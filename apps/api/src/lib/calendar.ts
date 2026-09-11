@@ -197,6 +197,12 @@ export async function buildCalendarPayloads(input: {
 
     const days = computeDayStats({
       // 초안(draft)과 반려·취소된 계획은 실제로 나가지 않으므로 집계에서 뺀다.
+      //
+      // 구간이 아니라 **머리행 범위**를 쓴다. 그래서 외출(같은 날 복귀)도 그날
+      // 출타 인원에 들어간다 — 이 숫자가 답하는 것은 "그날 몇 명이 부대 밖에
+      // 있는가"이므로 맞다. 남은 일과일은 반대로 외출을 빼는데(`lib/duty-days.ts`),
+      // 그쪽이 묻는 것은 "그날 일과가 사라지는가"다. 두 정의를 같게 맞추려 들면
+      // 한쪽이 반드시 틀린다.
       leaves: sharedRows.map((leave) => ({
         userId: leave.userId,
         startDate: leave.startDate,

@@ -30,6 +30,32 @@ test("초대코드 무차별 대입은 rate limit에 걸린다", async () => {
   assert.match(blocked.data.error, /너무 잦/);
 });
 
+/**
+ * 이 테스트가 지키는 것은 숫자가 아니라 **원자성**이다.
+ *
+ * 카운터가 KV에 있던 동안에는 "읽고 더해 쓰기"가 겹쳐, 동시에 도착한 요청이 모두 같은
+ * 값을 읽고 같은 값을 써서 카운터가 한 번만 올라갔다. 순차 요청만 검사하면 그 구멍이
+ * 드러나지 않는다 — 6자 초대코드의 안전이 이 상한에 기대고 있으므로 병렬로 두드려 본다.
+ */
+test("동시에 두드려도 초대코드 상한을 넘지 못한다", async () => {
+  const attacker = await signup();
+  const code = "Y".repeat(40);
+
+  const attempt = () =>
+    req("POST", "/units/join", { token: attacker.token, body: { code } });
+  const statuses = (await Promise.all(Array.from({ length: 8 }, attempt))).map(
+    (res) => res.status,
+  );
+
+  // 상한 3회/15분. 병렬이라 순서는 보장되지 않지만 **개수는 보장돼야 한다.**
+  assert.equal(
+    statuses.filter((status) => status === 400).length,
+    3,
+    `상한을 넘겨 통과했다: ${JSON.stringify(statuses)}`,
+  );
+  assert.equal(statuses.filter((status) => status === 429).length, 5);
+});
+
 test("지원하지 않는 구버전 앱은 426으로 막고 /meta는 열어둔다", async () => {
   const user = await signup();
 

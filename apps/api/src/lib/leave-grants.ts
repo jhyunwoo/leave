@@ -44,9 +44,6 @@ type User = {
   dischargeAt: string;
 };
 
-/** 주기가 아무리 촘촘해도 화면에 쏟아내지 않도록 두는 상한. */
-const MAX_LISTED_CYCLES = 200;
-
 /**
  * 주기 계산에 쓰는 전역일.
  *
@@ -404,26 +401,28 @@ function buildCycleList(
   const floor = cycleDateAfter(config, 2) ?? config.startDate;
   const end = [dischargeAt, today, floor].reduce((a, b) => (a > b ? a : b));
 
-  return cyclesInRange(config, config.startDate, end)
-    .slice(0, MAX_LISTED_CYCLES)
-    .map((cycle) => {
-      const usedDays = cycleUsedDays(cycle, segments);
-      // 아직 다녀오지 않은 계획은 "쓴 몫"이 아니다 — 주기 안에서도 오늘까지만 센다.
-      const usedToDateDays = cycleUsedDays(
-        cycle,
-        clipSegmentsTo(segments, today),
-      );
-      return {
-        index: cycle.index,
-        start: cycle.start,
-        end: cycle.end,
-        grantDays: cycle.grantDays,
-        usedDays,
-        usedToDateDays,
-        remainingDays: cycle.grantDays - usedDays,
-        remainingAsOfTodayDays: cycle.grantDays - usedToDateDays,
-        state: cycleState(cycle, today),
-        color: cycleColor(cycle.index),
-      };
-    });
+  // 상한을 목록에만 따로 두지 않는다. 예전에는 목록이 200개, 이월 누적이 500개를
+  // 세서 화면의 주기 합계와 "누적 잔여"가 조용히 갈렸다. `cyclesInRange`가 이미
+  // 공용 상한(MAX_REGULAR_OVERNIGHT_CYCLES)에서 멈추고, 그 상한에 닿는 설정은
+  // 저장 단계에서 거절된다(saveRegularOvernightConfig).
+  return cyclesInRange(config, config.startDate, end).map((cycle) => {
+    const usedDays = cycleUsedDays(cycle, segments);
+    // 아직 다녀오지 않은 계획은 "쓴 몫"이 아니다 — 주기 안에서도 오늘까지만 센다.
+    const usedToDateDays = cycleUsedDays(
+      cycle,
+      clipSegmentsTo(segments, today),
+    );
+    return {
+      index: cycle.index,
+      start: cycle.start,
+      end: cycle.end,
+      grantDays: cycle.grantDays,
+      usedDays,
+      usedToDateDays,
+      remainingDays: cycle.grantDays - usedDays,
+      remainingAsOfTodayDays: cycle.grantDays - usedToDateDays,
+      state: cycleState(cycle, today),
+      color: cycleColor(cycle.index),
+    };
+  });
 }

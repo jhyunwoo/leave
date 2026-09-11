@@ -82,7 +82,9 @@ export function useCreatePersonalEvent() {
       unwrap<{ event: PersonalEvent }>(
         await client["personal-events"].$post({ json: input }),
       ),
-    onSuccess: (_data, input) => invalidateEventMonths(queryClient, [input]),
+    // 서버가 돌려준 일정의 날짜로 무효화한다. 입력 기준으로 지우면 서버가 날짜를
+    // 정규화하는 순간 엉뚱한 달이 새로 받아진다 — 수정·삭제는 이미 응답 기준이다.
+    onSuccess: (data) => invalidateEventMonths(queryClient, [data.event]),
   });
 }
 

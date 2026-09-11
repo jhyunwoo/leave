@@ -64,6 +64,11 @@ export async function readRemainingDutyDays(
       ),
     // 구간(leave_segments)으로 읽는 이유는 외출을 빼기 위해서다. 외출은 같은 날
     // 복귀하므로 일과가 사라지지 않는다. 휴가 머리행만 보면 구분할 수 없다.
+    //
+    // **부대 달력의 출타 집계는 외출을 센다**(`lib/calendar.ts`의 computeDayStats는
+    // 머리행 범위를 쓴다). 둘이 어긋난 것이 아니라 묻는 것이 다르다 — 여기는
+    // "그날 일과가 사라지는가", 저기는 "그날 몇 명이 부대 밖에 있는가"다. 외출은
+    // 앞의 답이 아니오, 뒤의 답이 예다. 같게 맞추려 들면 한쪽이 반드시 틀린다.
     db
       .select({
         startDate: leaveSegments.startDate,

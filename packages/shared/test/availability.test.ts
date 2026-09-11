@@ -93,7 +93,7 @@ describe("recommendDateRanges", () => {
       const duration = Math.trunc(input.durationDays);
       if (duration <= 0) return [];
       const byDate = new Map(input.days.map((day) => [day.date, day]));
-      const radius = Math.max(duration, input.radiusDays ?? 14);
+      const radius = Math.max(duration, Math.trunc(input.radiusDays ?? 14));
       const selectedEnd = addDays(input.selectedStart, duration - 1);
       const candidates: Array<{
         startDate: string;
@@ -176,25 +176,73 @@ describe("recommendDateRanges", () => {
       }
     }
 
-    for (const radiusDays of [2.25, 3.75]) {
+    // 소수 반경은 정수로 자른다. 자르지 않으면 연달은 두 후보가 같은 날짜를
+    // 가리켜(`setUTCDate`가 0으로 자른다) 실제로는 이어지지 않는 구간이 추천된다.
+    for (const [radiusDays, truncated] of [
+      [2.25, 2],
+      [3.75, 3],
+    ] as const) {
       const args = {
         days: generatedDays,
         selectedStart,
         durationDays: 2,
-        radiusDays,
         limit: 7,
       };
-      expect(recommendDateRanges(args)).toEqual(naive(args));
+      expect(recommendDateRanges({ ...args, radiusDays })).toEqual(
+        recommendDateRanges({ ...args, radiusDays: truncated }),
+      );
+      expect(recommendDateRanges({ ...args, radiusDays })).toEqual(
+        naive({ ...args, radiusDays: truncated }),
+      );
     }
 
-    expect(
-      recommendDateRanges({
+    // NaN·+Infinity는 배열 길이가 성립하지 않으므로 빈 목록이다.
+    for (const radiusDays of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        recommendDateRanges({
+          days: generatedDays,
+          selectedStart,
+          durationDays: 2,
+          radiusDays,
+        }),
+      ).toEqual([]);
+    }
+    // 반경이 구간 길이보다 작으면(음수·-Infinity 포함) 길이로 올려 잡는다.
+    for (const radiusDays of [-5, Number.NEGATIVE_INFINITY]) {
+      const args = {
         days: generatedDays,
         selectedStart,
         durationDays: 2,
-        radiusDays: Number.NaN,
-      }),
-    ).toEqual([]);
+        limit: 7,
+      };
+      expect(recommendDateRanges({ ...args, radiusDays })).toEqual(
+        recommendDateRanges({ ...args, radiusDays: 2 }),
+      );
+    }
+  });
+
+  it("추천 날짜는 연달은 달력 날짜와 1:1로 대응한다", () => {
+    const days: AvailabilityDay[] = Array.from({ length: 21 }, (_, index) => ({
+      date: `2026-08-${String(index + 1).padStart(2, "0")}`,
+      count: 0,
+      allowed: 5,
+    }));
+    const result = recommendDateRanges({
+      days,
+      selectedStart: "2026-08-11",
+      durationDays: 1,
+      radiusDays: 3.5,
+      limit: 10,
+    });
+    // 반경 3 → 선택일을 뺀 여섯 날. 같은 날짜가 두 번 나오지 않는다.
+    expect(result.map((range) => range.startDate)).toEqual([
+      "2026-08-10",
+      "2026-08-12",
+      "2026-08-09",
+      "2026-08-13",
+      "2026-08-08",
+      "2026-08-14",
+    ]);
   });
 });
 

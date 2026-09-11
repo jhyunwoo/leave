@@ -1,6 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useAuthBootstrap, useMe } from "../src/hooks/auth";
+import {
+  useAuthBootstrap,
+  useMe,
+  useOnboardingStatus,
+} from "../src/hooks/auth";
 import { useCalendar } from "../src/hooks/calendar";
 import { useFriendCalendar } from "../src/hooks/friends";
 import { usePersonalEvents } from "../src/hooks/personal-events";
@@ -105,6 +109,52 @@ describe("웹 인증 부트스트랩", () => {
     const me = renderHook(() => useMe(), { wrapper });
     await waitFor(() => expect(me.result.current.isSuccess).toBe(true));
     expect(meGet).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 두 훅이 `queryKeys.onboarding` 하나를 나눠 쓴다. 일부러 그렇다 — 온보딩 뮤테이션이
+   * 그 키를 무효화하므로 웹 게이트가 다른 키를 쓰면 온보딩을 마친 뒤 낡은 채로 남는다.
+   * 그 공유가 성립하는 전제는 **두 훅이 같은 모양을 쓴다**는 것이다. 한쪽이 감싸거나
+   * 필드를 더하는 순간 다른 쪽 화면이 조용히 깨지므로 여기서 고정한다.
+   */
+  it("부트스트랩과 온보딩 훅은 같은 키에 같은 모양을 쓴다", async () => {
+    const onboarding = {
+      completed: true,
+      username: "hyunwoo",
+      profile: null,
+      regularOvernight: null,
+      unitId: "unit-1",
+    };
+    const bootstrapClient = {
+      auth: {
+        bootstrap: {
+          $get: () => Promise.resolve({ onboarding, me: null }),
+        },
+      },
+    };
+    const statusClient = {
+      auth: { onboarding: { $get: () => Promise.resolve(onboarding) } },
+    };
+
+    const fromBootstrap = testQueryClient();
+    const bootstrap = renderHook(() => useAuthBootstrap(), {
+      wrapper: wrapperFor(
+        fromBootstrap,
+        testAdapter({ client: bootstrapClient }),
+      ),
+    });
+    await waitFor(() => expect(bootstrap.result.current.isSuccess).toBe(true));
+
+    const fromStatus = testQueryClient();
+    const status = renderHook(() => useOnboardingStatus(), {
+      wrapper: wrapperFor(fromStatus, testAdapter({ client: statusClient })),
+    });
+    await waitFor(() => expect(status.result.current.isSuccess).toBe(true));
+
+    expect(fromBootstrap.getQueryData(queryKeys.onboarding)).toEqual(
+      fromStatus.getQueryData(queryKeys.onboarding),
+    );
+    expect(bootstrap.result.current.data).toEqual(status.result.current.data);
   });
 });
 

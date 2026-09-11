@@ -41,8 +41,20 @@ import {
 } from "./dates";
 import { segmentBalanceKey, type LeaveSegment } from "./leave";
 
-/** 아무리 긴 범위를 물어봐도 폭주하지 않도록 두는 주기 수 상한. */
-const MAX_CYCLES = 500;
+/**
+ * 한 사용자가 가질 수 있는 주기 수 상한.
+ *
+ * 이 값은 두 가지를 한꺼번에 떠받친다 — 아무리 긴 범위를 물어봐도 `cyclesInRange`가
+ * 폭주하지 않게 하는 것, 그리고 보유 휴가 화면이 주기를 쏟아내지 않게 하는 것이다.
+ * **두 자리가 다른 수를 쓰면 안 된다.** 목록은 200개까지, 이월 누적은 500개까지
+ * 세던 동안에는 화면의 주기 합계와 "누적 잔여"가 조용히 갈렸다.
+ *
+ * 무음 절단을 막는 진짜 장치는 이 수가 아니라 **설정을 저장할 때 막는 것**이다
+ * (`regularOvernightCycleCount`). 주기 시작일에 하한이 없어서 1900년 + 1일 주기 같은
+ * 설정이 들어오면 4만 주기가 되고, 그때 이 상한은 잔여를 몇 배로 줄여 버린다.
+ * 저장에서 걸러 두면 여기 도달하는 일이 없고, 남은 것은 마지막 방어선뿐이다.
+ */
+export const MAX_REGULAR_OVERNIGHT_CYCLES = 500;
 
 export type RegularOvernightConfig = {
   enabled: boolean;
@@ -226,13 +238,31 @@ export function cyclesInRange(
 
   const cycles: RegularOvernightCycle[] = [];
   let index = Math.max(cyclesElapsed(active, from), 1);
-  for (let guard = 0; guard < MAX_CYCLES; guard += 1) {
+  for (let guard = 0; guard < MAX_REGULAR_OVERNIGHT_CYCLES; guard += 1) {
     const cycle = buildCycle(active, index);
     if (cycle.start > rangeEnd) break;
     cycles.push(cycle);
     index += 1;
   }
   return cycles;
+}
+
+/**
+ * 설정이 `through`까지 만들어 내는 주기 수. 주기를 실제로 만들지 않고 센다.
+ *
+ * 설정을 저장할 때 상한을 넘는지 보는 데 쓴다 — 주기 시작일에 하한이 없어서
+ * "1900-01-01 + 1일 주기"가 들어올 수 있고, 그러면 `cyclesInRange`의 상한이 조용히
+ * 걸려 이월 누적 잔여와 주기 목록이 실제보다 훨씬 작아진다. 만들어 놓고 세면 그
+ * 자체가 폭주라 산술로 센다.
+ */
+export function regularOvernightCycleCount(
+  config: RegularOvernightConfig | null | undefined,
+  through: ISODate,
+): number {
+  const active = activeConfig(config);
+  if (!active) return 0;
+  // 1주기는 첫 적립일에 시작한다. 그 전이면 아직 주기가 없다.
+  return Math.max(0, cyclesElapsed(active, through));
 }
 
 /** 첫 적립일 = 1주기 첫날. 설정이 없으면 null. 대기 구간 안내에 쓴다. */
@@ -251,7 +281,7 @@ export function grantDatesThrough(
   const active = activeConfig(config);
   if (!active) return [];
   const dates: ISODate[] = [];
-  for (let index = 1; index <= MAX_CYCLES; index += 1) {
+  for (let index = 1; index <= MAX_REGULAR_OVERNIGHT_CYCLES; index += 1) {
     const date = cycleDateAt(active, index);
     if (date > on) break;
     dates.push(date);

@@ -18,6 +18,7 @@ import {
   accessLogs,
   passkeyChallenges,
   pushLogs,
+  rateLimitCounters,
   sessions,
 } from "../db/schema";
 import type { Db } from "./db";
@@ -36,6 +37,7 @@ export type RetentionSummary = {
   pushLogs: number;
   sessions: number;
   passkeyChallenges: number;
+  rateLimitCounters: number;
   cutoff: string;
 };
 
@@ -126,11 +128,25 @@ export async function pruneExpiredData(
     return result.meta.changes;
   });
 
+  // 창이 지난 rate limit 카운터. 키에 창 번호가 들어 있어 다시 읽히지 않으므로
+  // 남아 있어도 판정을 바꾸지 않지만, 요청마다 한 행씩 늘어나는 표라 지우는 곳이
+  // 없으면 접속 기록과 같은 이유로 자란다.
+  const removedRateLimitCounters = await deleteInRounds(db, async (limit) => {
+    const result = await db
+      .delete(rateLimitCounters)
+      .where(
+        sql`${rateLimitCounters.key} in (select ${rateLimitCounters.key} from ${rateLimitCounters} where ${rateLimitCounters.expiresAt} <= ${nowIso} limit ${limit})`,
+      )
+      .run();
+    return result.meta.changes;
+  });
+
   return {
     accessLogs: removedAccessLogs,
     pushLogs: removedPushLogs,
     sessions: removedSessions,
     passkeyChallenges: removedPasskeyChallenges,
+    rateLimitCounters: removedRateLimitCounters,
     cutoff,
   };
 }

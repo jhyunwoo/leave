@@ -21,9 +21,11 @@ import {
   fmtDateShort,
   isExpiringSoon,
   isRegularOvernightCycleBased,
+  MAX_REGULAR_OVERNIGHT_CYCLES,
   nextGrantDateAfter,
   planTotalChange,
   regularOvernightBlockMessage,
+  regularOvernightCycleCount,
   segmentBalanceKey,
   todayInSeoul,
   type BalanceKey,
@@ -324,6 +326,30 @@ export async function saveRegularOvernightConfig(
 ) {
   // 군종별 제한은 두지 않는다. 육군도 분기마다 정기외박을 운영하고(2012.12 개정),
   // 주기 길이와 회당 일수는 어차피 부대마다 달라 사용자가 고치는 값이다.
+  //
+  // 다만 **주기 수는 막는다.** 주기 시작일에 하한이 없어서 "1900-01-01 + 1일 주기"가
+  // 스키마를 통과하는데, 그러면 주기가 4만 개가 되어 `cyclesInRange`의 상한이 조용히
+  // 걸린다. 그 순간 이월 누적 잔여와 보유 휴가의 주기 목록이 실제보다 몇십 배 작아진
+  // 채로 화면에 나가고, 사용자는 어디서 틀렸는지 알 방법이 없다. 여기서 거절해
+  // 그 상태가 저장되지 못하게 한다.
+  if (input.enabled) {
+    const cycles = regularOvernightCycleCount(
+      {
+        enabled: true,
+        startDate: input.startDate,
+        intervalDays: input.intervalDays ?? null,
+        intervalMonths: input.intervalMonths ?? null,
+        daysPerGrant: input.daysPerGrant,
+        carryOver: input.carryOver ?? false,
+      },
+      cycleDischargeDate(user),
+    );
+    if (cycles > MAX_REGULAR_OVERNIGHT_CYCLES) {
+      throw new LeaveRuleError(
+        `이 설정은 전역일까지 주기를 ${cycles}개 만듭니다. 주기 시작일을 복무 기간 안으로 옮기거나 주기를 길게 잡아주세요 (최대 ${MAX_REGULAR_OVERNIGHT_CYCLES}개).`,
+      );
+    }
+  }
   const now = new Date().toISOString();
   const values: typeof regularOvernightConfigs.$inferInsert = input.enabled
     ? {

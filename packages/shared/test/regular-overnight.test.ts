@@ -11,9 +11,11 @@ import {
   cyclesInRange,
   firstGrantDate,
   grantDatesThrough,
+  MAX_REGULAR_OVERNIGHT_CYCLES,
   nextGrantDateAfter,
   regularOvernightAvailableIn,
   regularOvernightBlockMessage,
+  regularOvernightCycleCount,
   regularOvernightPooledRemaining,
   regularOvernightUsageByCycle,
   type RegularOvernightConfig,
@@ -1137,5 +1139,58 @@ describe("주기 사용량은 날짜 집합으로 센다", () => {
         },
       ]),
     ).toBe(3);
+  });
+});
+
+/**
+ * 주기 시작일에는 하한이 없어서 "1900-01-01 + 1일 주기"가 스키마를 통과한다. 그러면
+ * 주기가 4만 개가 되고 `cyclesInRange`의 상한이 조용히 걸려, 이월 누적 잔여와 주기
+ * 목록이 실제보다 몇십 배 작아진 채 화면에 나간다. 저장 단계에서 세어 막기 위한 함수다.
+ */
+describe("주기 수 세기", () => {
+  it("설정이 없거나 첫 적립 전이면 0이다", () => {
+    expect(regularOvernightCycleCount(null, "2026-12-31")).toBe(0);
+    expect(
+      regularOvernightCycleCount({ ...config, enabled: false }, "2026-12-31"),
+    ).toBe(0);
+    // 1주기는 첫 적립일(2026-05-11)에 시작한다.
+    expect(regularOvernightCycleCount(config, "2026-05-10")).toBe(0);
+    expect(regularOvernightCycleCount(config, "2026-05-11")).toBe(1);
+  });
+
+  it("주기를 만들지 않고도 cyclesInRange와 같은 수를 센다", () => {
+    for (const through of ["2026-06-30", "2026-12-31", "2027-06-30"]) {
+      expect(regularOvernightCycleCount(config, through)).toBe(
+        cyclesInRange(config, config.startDate!, through).length,
+      );
+    }
+  });
+
+  it("달 단위 주기도 센다", () => {
+    const army: RegularOvernightConfig = {
+      enabled: true,
+      startDate: "2026-01-31",
+      intervalDays: null,
+      intervalMonths: 3,
+      daysPerGrant: 2,
+    };
+    // 4주기는 시작일 + 12개월(2027-01-31)에 시작한다 — 그 전날은 아직 3주기다.
+    expect(regularOvernightCycleCount(army, "2027-01-30")).toBe(3);
+    expect(regularOvernightCycleCount(army, "2027-01-31")).toBe(4);
+  });
+
+  it("폭주하는 설정은 상한을 넘는 수를 그대로 돌려준다", () => {
+    const runaway: RegularOvernightConfig = {
+      enabled: true,
+      startDate: "1900-01-01",
+      intervalDays: 1,
+      daysPerGrant: 1,
+    };
+    const count = regularOvernightCycleCount(runaway, "2026-12-31");
+    expect(count).toBeGreaterThan(MAX_REGULAR_OVERNIGHT_CYCLES);
+    // 실제로 만들면 상한에서 멈춘다 — 그래서 만들기 전에 세야 한다.
+    expect(cyclesInRange(runaway, "1900-01-01", "2026-12-31")).toHaveLength(
+      MAX_REGULAR_OVERNIGHT_CYCLES,
+    );
   });
 });

@@ -7,6 +7,8 @@
  * 허용 기준 대비 비율로 바꿔 여유/보통/임박/초과 네 단계로 말한다.
  */
 
+import { addDays } from "./dates";
+
 export const AVAILABILITY_KEYS = [
   "unknown",
   "roomy",
@@ -59,14 +61,6 @@ export type DateRangeRecommendation = {
   peakPercent: number;
 };
 
-/** YYYY-MM-DD 전용 일수 덧셈. 로컬 타임존을 사용하지 않는다. */
-function addDateDays(date: string, amount: number): string {
-  const [year, month, day] = date.split("-").map(Number);
-  const utc = new Date(Date.UTC(year!, month! - 1, day));
-  utc.setUTCDate(utc.getUTCDate() + amount);
-  return utc.toISOString().slice(0, 10);
-}
-
 /**
  * 선택일 주변에서 같은 길이의 연속 구간 중 가장 여유로운 최대 3개를 고른다.
  * 블랙아웃·기준 미설정·초과 구간은 추천하지 않으며 선택 구간 자체는 제외한다.
@@ -82,24 +76,30 @@ export function recommendDateRanges(input: {
   if (duration <= 0) return [];
 
   const byDate = new Map(input.days.map((day) => [day.date, day]));
-  const radius = Math.max(duration, input.radiusDays ?? 14);
-  const selectedEnd = addDateDays(input.selectedStart, duration - 1);
-  if (Number.isNaN(radius)) return [];
+  /**
+   * 반경은 **정수 일수**다. 소수를 그대로 쓰면 오프셋이 날짜와 1:1로 맞지 않는다 —
+   * 반경 14.5에서 후보 14는 `-0.5`, 후보 15는 `+0.5`가 되고 `setUTCDate`가 0으로
+   * 자르므로 **연달은 두 후보가 같은 날짜를 가리킨다.** 그러면 슬라이딩 창의
+   * 인덱스가 더 이상 연속된 달력 날짜를 뜻하지 않아, 실제로는 이어지지 않는 구간이
+   * 추천으로 올라온다. 타입이 `number`인 채로 두면 언제든 그 값이 들어올 수 있으므로
+   * 받는 자리에서 자른다.
+   */
+  const radius = Math.max(duration, Math.trunc(input.radiusDays ?? 14));
+  // 유한하지 않으면 아래 배열 길이가 성립하지 않는다(`new Array(Infinity)`는 던진다).
+  if (!Number.isFinite(radius)) return [];
+  const selectedEnd = addDays(input.selectedStart, duration - 1);
   const candidates: (DateRangeRecommendation & { distance: number })[] = [];
 
   // Candidate ranges overlap almost completely. Normalize each relevant date
   // once, then slide a duration-sized window across it. A monotonic queue keeps
   // the peak percentage in O(1) amortized time, making the whole search O(n)
   // instead of rescanning up to `duration` days for every candidate.
-  // `radiusDays` is typed as a number rather than an integer. Preserve the
-  // previous loop's fractional-radius behavior: offsets still advance by one,
-  // so there are `floor(radius * 2) + 1` candidate starts.
-  const searchDayCount = Math.floor(radius * 2) + duration;
+  const searchDayCount = radius * 2 + duration;
   const dates = new Array<string>(searchDayCount);
   const valid = new Uint8Array(searchDayCount);
   const percents = new Float64Array(searchDayCount);
   for (let index = 0; index < searchDayCount; index += 1) {
-    const date = addDateDays(input.selectedStart, index - radius);
+    const date = addDays(input.selectedStart, index - radius);
     const day = byDate.get(date);
     dates[index] = date;
     if (!day || day.blocked || day.allowed <= 0 || day.count > day.allowed) {

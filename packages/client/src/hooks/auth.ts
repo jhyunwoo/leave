@@ -77,6 +77,12 @@ export function useMyDutyDays() {
   });
 }
 
+/**
+ * 온보딩 상태. `queryKeys.onboarding`의 기본 소유자다.
+ *
+ * 웹은 이 대신 `useAuthBootstrap`을 쓴다(같은 키, 한 GET으로 `me`까지 받는다).
+ * 한 앱에서 둘을 섞지 않는 이유는 그쪽 주석에 있다.
+ */
 export function useOnboardingStatus(enabled = true) {
   const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
   return useQuery({
@@ -96,6 +102,18 @@ export function useOnboardingStatus(enabled = true) {
 /**
  * 웹 인증 게이트 전용. 온보딩과 내 정보를 한 GET으로 받아 기존 두 캐시 키에
  * 나눠 심는다. 화면과 뮤테이션은 계속 기존 키를 보므로 무효화 범위가 달라지지 않는다.
+ *
+ * ## `useOnboardingStatus`와 캐시 키를 공유한다
+ *
+ * 일부러 그렇다. 온보딩 뮤테이션들이 `queryKeys.onboarding`을 무효화하는데, 웹 게이트가
+ * 다른 키를 쓰면 온보딩을 마친 뒤 게이트가 낡은 채로 남는다. 대신 **한 앱에서는 둘 중
+ * 하나만 쓴다** — 웹은 이것, 네이티브는 `useOnboardingStatus`다. 둘을 같은
+ * QueryClient에 함께 마운트하면 어느 쪽 queryFn이 재조회를 맡는지가 옵저버 등록
+ * 순서에 달리고, 그때는 아래 `me` 심기가 도는 실행과 안 도는 실행이 갈린다(깨지지는
+ * 않는다 — `useMe`가 따로 한 번 더 받는다).
+ *
+ * 두 훅이 같은 키에 **모양이 호환되는 값**을 쓴다는 것이 이 공유의 전제다.
+ * `test/startup-batching.test.tsx`가 그것을 고정한다.
  */
 export function useAuthBootstrap(enabled = true) {
   const { client, unwrap, useRequestAbortSignal } = useLeaveApi();

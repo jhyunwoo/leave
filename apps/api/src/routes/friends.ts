@@ -212,16 +212,23 @@ function noStore(c: { header: (name: string, value: string) => void }) {
 
 export const friendRoutes = app
   .openapi(listFriendsRoute, async (c) => {
+    // `acceptedAt`은 nullable 컬럼이지만 수락된 행에서는 반드시 채워져 있다 —
+    // `friendships_acceptance_check`가 그것을 DB에서 보장한다(db/schema.ts).
+    // 그래도 `!`로 눌러 두지 않고 좁히는 필터를 쓴다. 단정은 보장이 사라진 뒤에도
+    // 그대로 통과하고, 그러면 `since: null`이 `z.string()` 응답으로 새어 나간다.
     const rows = (
       await visibleRelations(drizzle(c.env.DB), c.get("user").id)
-    ).filter((row) => row.status === "accepted");
+    ).filter(
+      (row): row is typeof row & { acceptedAt: string } =>
+        row.status === "accepted" && row.acceptedAt !== null,
+    );
     return c.json(
       {
         friends: rows.map((row) => ({
           userId: row.otherUserId,
           name: row.otherName,
           username: row.otherUsername,
-          since: row.acceptedAt!,
+          since: row.acceptedAt,
         })),
       },
       200,
