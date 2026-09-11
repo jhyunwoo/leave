@@ -18,6 +18,7 @@ import {
   LEAVE_CATEGORIES,
   LEAVE_STATUSES,
   MAX_LEAVE_SEGMENTS,
+  OUTING_KINDS,
   OVERNIGHT_KINDS,
   sortSegments,
   USER_EDITABLE_LEAVE_STATUSES,
@@ -269,17 +270,37 @@ const overnightKindRefine = (
   }
 };
 
+/**
+ * 외출 갈래의 짝 맞춤. 외박(`overnightKindRefine`)과 달리 **갈래가 없어도 통과시킨다** —
+ * 갈래가 생기기 전 버전의 앱이 보내는 외출 구간이 있고, 그때는 평일로 읽는다
+ * (`segmentBalanceKey`). 반대 방향(외출이 아닌데 갈래가 붙는 것)만 막는다.
+ */
+const outingKindRefine = (
+  value: { category: string; outingKind?: string },
+  ctx: z.RefinementCtx,
+) => {
+  if (value.category !== "outing" && value.outingKind) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["outingKind"],
+      message: "외출에만 외출 종류를 지정할 수 있습니다",
+    });
+  }
+};
+
 /** 휴가 한 구간: "8/2~8/5는 연가". 일수는 날짜에서 파생되므로 입력받지 않는다. */
 export const leaveSegmentSchema = z
   .object({
     category: z.enum(LEAVE_CATEGORIES),
     overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+    outingKind: z.enum(OUTING_KINDS).optional(),
     startDate: isoDateSchema,
     endDate: isoDateSchema,
     regularOvernightCycleStart: isoDateSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     overnightKindRefine(value, ctx);
+    outingKindRefine(value, ctx);
     if (
       value.regularOvernightCycleStart &&
       !(value.category === "overnight" && value.overnightKind === "regular")
@@ -289,6 +310,17 @@ export const leaveSegmentSchema = z
         path: ["regularOvernightCycleStart"],
         message: "정기외박에만 차감 주기를 지정할 수 있습니다",
       });
+    }
+    // 외출은 당일 복귀다 — 부대관리훈령의 외출은 그날 과업 개시부터 저녁점호 전까지이고,
+    // 밤을 넘기는 순간 그것은 외박이다(48시간, 공휴일 포함 시 72시간). 이 규칙이 있어야
+    // 외출 구간이 주기를 걸치지 않고, 주기별 셈에 "어느 주기에서 뺄지"를 물을 일이 없다.
+    if (value.category === "outing" && value.startDate !== value.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "외출은 당일 복귀라 하루로만 등록할 수 있습니다",
+      });
+      return;
     }
     if (value.startDate > value.endDate) {
       ctx.addIssue({
@@ -351,6 +383,19 @@ export const leaveCreateSchema = z
         return;
       }
     }
+    // 외출은 그 자체로 한 건이다 — 연가가 끝나면 복귀하고, 다음 날 나가는 외출은
+    // 이어진 하나의 출타가 아니라 별개의 사건이다. 한 휴가에 섞으면 부대 출타 집계가
+    // 마지막 날을 복귀일로 보고 빼 버린다(leave-merge.ts의 hasOuting 주석).
+    if (
+      sorted.length > 1 &&
+      sorted.some((segment) => segment.category === "outing")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["segments"],
+        message: "외출은 다른 휴가와 이어 붙일 수 없습니다",
+      });
+    }
   });
 
 export const leaveUpdateSchema = leaveCreateSchema;
@@ -404,34 +449,66 @@ export const leaveGrantUpdateSchema = z
   .superRefine(grantDateOrder);
 
 /**
- * 정기외박 자동 적립 설정.
+ * 주기 재원(정기외박·외출)의 자동 적립 설정에 공통으로 들어가는 칸.
  *
+ * 두 재원이 같은 문장 구조를 갖는다 — "언제부터, 얼마마다, 회당 몇". 계산도
+ * 같은 엔진(leave-cycle.ts)이 하므로 입력 범위도 한 벌만 둔다. 따로 적으면
+ * 한쪽만 고쳐졌을 때 서버가 받아 준 값을 다른 화면이 못 그리는 상태가 된다.
+ */
+const cycleConfigFields = {
+  // 주기 시작일 — 1주기가 시작하는 날. 첫 적립은 한 주기 뒤에 이뤄진다.
+  startDate: isoDateSchema,
+  intervalDays: z.int().min(1).max(365).nullish(),
+  intervalMonths: z.int().min(1).max(12).nullish(),
+  daysPerGrant: z.int().min(1).max(30),
+  // 주기가 끝나도 남길지. 구버전 앱은 보내지 않으므로 optional이고, 그때는 꺼진다.
+  carryOver: z.boolean().optional(),
+} as const;
+
+/**
  * 주기는 일 또는 개월 중 **하나로만** 정한다. 둘 다 오면 어느 쪽이 이기는지가
  * 저장 계층과 계산 계층의 약속이 되어 버리므로, 애초에 들어오지 못하게 막는다.
- * 달 단위가 필요한 이유는 regular-overnight.ts 머리말에 있다.
+ * 달 단위가 필요한 이유는 leave-cycle.ts 머리말에 있다.
  */
+const cycleIntervalRefine = (
+  value: { intervalDays?: number | null; intervalMonths?: number | null },
+  ctx: z.RefinementCtx,
+) => {
+  if (Boolean(value.intervalDays) === Boolean(value.intervalMonths)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["intervalDays"],
+      message: "주기는 일 또는 개월 중 하나로만 정할 수 있습니다",
+    });
+  }
+};
+
+/** 정기외박 자동 적립 설정. */
 export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   z.object({ enabled: z.literal(false) }),
   z
+    .object({ enabled: z.literal(true), ...cycleConfigFields })
+    .superRefine(cycleIntervalRefine),
+]);
+
+/**
+ * 외출 자동 적립 설정 — 갈래(평일·주말) 하나 몫.
+ *
+ * 갈래마다 따로 저장하므로 요청도 한 번에 하나다. 두 갈래를 한 요청에 묶으면
+ * 한쪽만 고치려는 화면이 나머지 한쪽의 현재 값을 정확히 되보내야 하고, 그 왕복이
+ * 어긋나는 순간 건드리지도 않은 갈래가 꺼진다.
+ *
+ * `daysPerGrant`는 외출에서 **횟수**다 — 외출은 당일 복귀라 한 번이 하루다.
+ */
+export const outingConfigSchema = z.discriminatedUnion("enabled", [
+  z.object({ kind: z.enum(OUTING_KINDS), enabled: z.literal(false) }),
+  z
     .object({
+      kind: z.enum(OUTING_KINDS),
       enabled: z.literal(true),
-      // 주기 시작일 — 1주기가 시작하는 날. 첫 적립은 한 주기 뒤에 이뤄진다.
-      startDate: isoDateSchema,
-      intervalDays: z.int().min(1).max(365).nullish(),
-      intervalMonths: z.int().min(1).max(12).nullish(),
-      daysPerGrant: z.int().min(1).max(30),
-      // 주기가 끝나도 남길지. 구버전 앱은 보내지 않으므로 optional이고, 그때는 꺼진다.
-      carryOver: z.boolean().optional(),
+      ...cycleConfigFields,
     })
-    .superRefine((value, ctx) => {
-      if (Boolean(value.intervalDays) === Boolean(value.intervalMonths)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["intervalDays"],
-          message: "주기는 일 또는 개월 중 하나로만 정할 수 있습니다",
-        });
-      }
-    }),
+    .superRefine(cycleIntervalRefine),
 ]);
 
 /**
@@ -732,6 +809,7 @@ export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
 export type LeaveGrantCreateInput = z.infer<typeof leaveGrantCreateSchema>;
 export type LeaveGrantUpdateInput = z.infer<typeof leaveGrantUpdateSchema>;
+export type OutingConfigInput = z.infer<typeof outingConfigSchema>;
 export type RegularOvernightConfigInput = z.infer<
   typeof regularOvernightConfigSchema
 >;

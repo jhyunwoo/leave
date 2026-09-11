@@ -13,6 +13,7 @@ import {
   leaveGrantUpdateSchema,
   leaveStatusUpdateSchema,
   leaveUpdateSchema,
+  outingConfigSchema,
   regularOvernightConfigSchema,
 } from "@leave/shared";
 import {
@@ -95,6 +96,28 @@ export const regularOvernightRoute = createRoute({
   responses: {
     200: jsonContent(leaveBalanceSummarySchema, "정기외박 설정"),
     400: errorResponse("입력값 오류 또는 지원하지 않는 군종"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+export const outingRoute = createRoute({
+  method: "put",
+  path: "/outing",
+  tags: ["휴가"],
+  summary: "외출 자동 적립 설정 (갈래 하나)",
+  description:
+    "평일·주말 갈래마다 따로 저장한다. 한 요청에 둘을 묶으면 한쪽만 고치려는 화면이 " +
+    "나머지 한쪽의 현재 값을 되보내야 하고, 그 왕복이 어긋나면 건드리지도 않은 갈래가 꺼진다.",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: outingConfigSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveBalanceSummarySchema, "외출 설정"),
+    400: errorResponse("입력값 오류 또는 주기 수 상한 초과"),
     401: errorResponse("인증 실패"),
   },
 });

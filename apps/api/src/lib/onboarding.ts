@@ -11,11 +11,15 @@
 
 import {
   DEFAULT_ANNUAL_DAYS,
+  defaultOutingStartDate,
+  OUTING_DEFAULTS,
+  OUTING_KINDS,
   type OnboardingProfileInput,
 } from "@leave/shared";
 import { and, eq } from "drizzle-orm";
 import {
   leaveGrants,
+  outingConfigs,
   regularOvernightConfigs,
   users,
   type RegularOvernightConfigRow,
@@ -74,6 +78,55 @@ export async function ensureDefaultAnnualGrant(
     createdAt: now,
     updatedAt: now,
   });
+}
+
+/**
+ * 군별 기본 외출 주기를 심는다.
+ *
+ * 연가와 같은 성격이다 — 규정이 아니라 제안값이고, 사용자가 보유 휴가 화면에서
+ * 고친다(packages/shared/src/outing-guidance.ts). 다른 점은 적립분이 아니라
+ * 주기 설정이라는 것뿐이다.
+ *
+ * 온보딩에 단계를 새로 만들지 않았다. 외출은 정기외박과 달리 "월 몇 회"가 군별로
+ * 거의 정해져 있어 물어볼 것이 없고, 단계를 늘리면 첫 화면이 그만큼 길어진다.
+ * 값을 고칠 자리는 보유 휴가 화면에 있다.
+ *
+ * 이미 행이 있으면 건드리지 않는다 — 가입과 온보딩 완료 두 경로로 들어오므로
+ * 두 번째 호출이 사용자가 고쳐 둔 값을 되돌리면 안 된다.
+ */
+export async function ensureDefaultOutingConfigs(
+  db: Db,
+  user: { id: string; branch: UserRow["branch"]; enlistedAt: string },
+): Promise<void> {
+  const existing = await db
+    .select({ kind: outingConfigs.kind })
+    .from(outingConfigs)
+    .where(eq(outingConfigs.userId, user.id))
+    .all();
+  const have = new Set(existing.map((row) => row.kind));
+  const missing = OUTING_KINDS.filter((kind) => !have.has(kind));
+  if (!missing.length) return;
+
+  const now = new Date().toISOString();
+  const startDate = defaultOutingStartDate(user.enlistedAt);
+  await db.insert(outingConfigs).values(
+    missing.map((kind) => {
+      const preset = OUTING_DEFAULTS[user.branch][kind];
+      return {
+        userId: user.id,
+        kind,
+        enabled: preset.enabled,
+        // 꺼진 갈래는 값도 비워 둔다. 사용자가 켜는 순간 화면이 군별 제안값을
+        // 다시 깔아 주므로(폼 기본값), 여기서 미리 채워 둘 이유가 없다.
+        startDate: preset.enabled ? startDate : null,
+        intervalDays: null,
+        intervalMonths: preset.enabled ? preset.intervalMonths : null,
+        daysPerGrant: preset.enabled ? preset.countPerGrant : null,
+        carryOver: false,
+        updatedAt: now,
+      };
+    }),
+  );
 }
 
 /** 이어하기 화면이 필요로 하는 현재 상태. */
@@ -213,6 +266,7 @@ export async function completeOnboarding(
   }
 
   await ensureDefaultAnnualGrant(db, user);
+  await ensureDefaultOutingConfigs(db, user);
   await db
     .update(users)
     .set({ onboardingCompletedAt: new Date().toISOString() })

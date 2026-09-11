@@ -12,6 +12,7 @@ import {
   allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  checkOuting,
   checkRegularOvernight,
   clipSegmentsTo,
   COUNTED_LEAVE_STATUSES,
@@ -20,9 +21,17 @@ import {
   eligibleRegularOvernightCycles,
   fmtDateShort,
   isExpiringSoon,
+  isOutingCycleBased,
   isRegularOvernightCycleBased,
+  leaveCycleCount,
+  MAX_LEAVE_CYCLES,
   MAX_REGULAR_OVERNIGHT_CYCLES,
   nextGrantDateAfter,
+  OUTING_KINDS,
+  outingBalanceKey,
+  outingBlockMessage,
+  outingKindOfBalanceKey,
+  outingUsedDays,
   planTotalChange,
   regularOvernightBlockMessage,
   regularOvernightCycleCount,
@@ -31,6 +40,8 @@ import {
   type BalanceKey,
   type Branch,
   type LeaveSegment,
+  type OutingConfigInput,
+  type OutingKind,
   type RegularOvernightConfigInput,
   type SegmentLike,
 } from "@leave/shared";
@@ -39,6 +50,7 @@ import {
   leaveGrants,
   leaves,
   leaveSegments,
+  outingConfigs,
   regularOvernightConfigs,
   users,
   type LeaveRow,
@@ -56,8 +68,11 @@ import { LeaveRuleError } from "./errors";
 import {
   cycleDischargeDate,
   loadAllocationInputs,
+  outingSummary,
   regularOvernightSummary,
+  serializeOutingConfig,
   toLeaveGrant,
+  type OutingConfigMap,
 } from "./leave-grants";
 
 export type LeaveBalanceItem = {
@@ -104,11 +119,34 @@ function onlyRegularOvernight<
   );
 }
 
+/** 이미 읽어 둔 구간 중 외출만. 갈래는 판정 쪽에서 가른다. */
+function onlyOuting<T extends { category: string }>(
+  segments: readonly T[],
+): T[] {
+  return segments.filter((segment) => segment.category === "outing");
+}
+
+/**
+ * 이 재원이 주기 설정에서 파생하는가.
+ *
+ * 주기 재원은 적립분 원장을 쓰지 않는다 — 총량을 손으로 정할 수도, 적립분을 만들 수도,
+ * 스칼라 잔여로 검사할 수도 없다. 그 셋이 같은 조건을 봐야 해서 여기 한 벌만 둔다.
+ */
+export function isCycleScoped(
+  key: BalanceKey,
+  config: RegularOvernightConfigRow | undefined,
+  outing: OutingConfigMap,
+): boolean {
+  if (key === "regular_overnight") return isRegularOvernightCycleBased(config);
+  const kind = outingKindOfBalanceKey(key);
+  return kind ? isOutingCycleBased(outing[kind]) : false;
+}
+
 export async function getLeaveBalanceSummary(
   db: Db,
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
 ) {
-  const { grantRows, segments, config } = await loadAllocationInputs(
+  const { grantRows, segments, config, outing } = await loadAllocationInputs(
     db,
     user.id,
   );
@@ -116,6 +154,7 @@ export async function getLeaveBalanceSummary(
   // 정기외박 구간은 위에서 이미 읽은 전체 구간의 부분집합이다. 같은 조인을
   // 조건만 좁혀 한 번 더 던지면 왕복만 하나 늘고 결과는 같다 — 여기서 걸러 쓴다.
   const regularSegments = onlyRegularOvernight(segments);
+  const outingSegments = onlyOuting(segments);
 
   const today = todayInSeoul();
   const allocations = allocateAllGrants(
@@ -137,8 +176,69 @@ export async function getLeaveBalanceSummary(
     cycleDischargeDate(user),
     today,
   );
+  // 외출도 주기 재원이라 같은 셈을 갈래마다 한 벌씩 돌린다.
+  const outingCycles = new Map(
+    OUTING_KINDS.map((kind) => [
+      kind,
+      outingSummary(
+        kind,
+        outing[kind],
+        outingSegments,
+        cycleDischargeDate(user),
+        today,
+      ),
+    ]),
+  );
 
   const balances: LeaveBalanceItem[] = BALANCE_KEYS.map((key) => {
+    const outingKind = outingKindOfBalanceKey(key);
+    if (outingKind && isOutingCycleBased(outing[outingKind])) {
+      // 정기외박과 같은 규칙이다 — 주기에서 파생하므로 적립분 셈을 쓰지 않는다.
+      // 다른 점은 차감 주기 선택이 없다는 것뿐이라(외출은 하루) 여기서는
+      // 이번 주기 / 이월 누적을 고르는 갈래만 남는다.
+      const summary = outingCycles.get(outingKind)!;
+      const carry = Boolean(outing[outingKind]?.carryOver);
+      const currentOutingCycle = cycleFor(outing[outingKind], today);
+      const pooled = summary.list.filter((cycle) => cycle.state !== "future");
+      const sumOf = (pick: (cycle: (typeof pooled)[number]) => number) =>
+        pooled.reduce((total, cycle) => total + pick(cycle), 0);
+
+      const grantDays = carry
+        ? sumOf((cycle) => cycle.grantDays)
+        : (currentOutingCycle?.grantDays ?? 0);
+      const usedDays = carry
+        ? sumOf((cycle) => cycle.usedDays)
+        : currentOutingCycle
+          ? outingUsedDays(outingKind, currentOutingCycle, outingSegments)
+          : 0;
+      const usedToDateDays = carry
+        ? sumOf((cycle) => cycle.usedToDateDays)
+        : currentOutingCycle
+          ? outingUsedDays(
+              outingKind,
+              currentOutingCycle,
+              clipSegmentsTo(outingSegments, today),
+            )
+          : 0;
+      return {
+        key,
+        label: BALANCE_LABELS[key],
+        totalDays: grantDays,
+        usedDays,
+        usedToDateDays,
+        plannedDays: usedDays - usedToDateDays,
+        remainingDays: grantDays - usedDays,
+        remainingAsOfTodayDays: grantDays - usedToDateDays,
+        automaticDays: grantDays,
+        cycleScoped: true,
+        expiredDays: 0,
+        upcomingDays: summary.totals.upcomingDays,
+        upcomingAsOfTodayDays: summary.totals.upcomingAsOfTodayDays,
+        unattributedDays: 0,
+        grantCount: 0,
+        expiringSoonDays: 0,
+      };
+    }
     if (key === "regular_overnight" && cycleBased) {
       // 이월 중이면 아직 오지 않은 주기만 빼고 전부 합친다. 아래 파생 필드
       // (잔여·계획·자동 적립)는 이 셋에서만 나오므로 여기만 갈라 놓으면 된다.
@@ -225,6 +325,9 @@ export async function getLeaveBalanceSummary(
           nextGrantDate: null,
           carryOver: false,
         },
+    outing: OUTING_KINDS.map((kind) =>
+      serializeOutingConfig(kind, outing[kind], today),
+    ),
   };
 }
 
@@ -241,7 +344,7 @@ export async function updateLeaveBalanceTotals(
   user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
   totals: Partial<Record<BalanceKey, number>>,
 ) {
-  const { grantRows, segments, config } = await loadAllocationInputs(
+  const { grantRows, segments, config, outing } = await loadAllocationInputs(
     db,
     user.id,
   );
@@ -250,12 +353,11 @@ export async function updateLeaveBalanceTotals(
     segments,
     todayInSeoul(),
   );
-  const cycleBased = isRegularOvernightCycleBased(config);
 
   // 주기에서 파생하는 재원은 사용자가 총량을 정할 수 없다. 클라이언트가 전체 재원을
   // 한 번에 보내므로 거절하는 대신 그 항목만 건너뛴다.
   const editable = (Object.entries(totals) as [BalanceKey, number][]).filter(
-    ([key]) => !(key === "regular_overnight" && cycleBased),
+    ([key]) => !isCycleScoped(key, config, outing),
   );
 
   const plans = editable.map(([key, total]) => {
@@ -385,6 +487,73 @@ export async function saveRegularOvernightConfig(
 }
 
 /**
+ * 외출 자동 적립 설정을 갈래 하나만 저장한다.
+ *
+ * 주기 수 상한을 여기서도 막는 이유는 `saveRegularOvernightConfig`와 같다 — 주기
+ * 시작일에 하한이 없어 "1900-01-01 + 1일 주기"가 스키마를 통과하고, 그러면
+ * `cyclesInRange`의 상한이 조용히 걸려 잔여가 실제보다 몇십 배 작아진 채 나간다.
+ */
+export async function saveOutingConfig(
+  db: Db,
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
+  input: OutingConfigInput,
+) {
+  if (input.enabled) {
+    const cycles = leaveCycleCount(
+      {
+        enabled: true,
+        startDate: input.startDate,
+        intervalDays: input.intervalDays ?? null,
+        intervalMonths: input.intervalMonths ?? null,
+        daysPerGrant: input.daysPerGrant,
+        carryOver: input.carryOver ?? false,
+      },
+      cycleDischargeDate(user),
+    );
+    if (cycles > MAX_LEAVE_CYCLES) {
+      throw new LeaveRuleError(
+        `이 설정은 전역일까지 주기를 ${cycles}개 만듭니다. 주기 시작일을 복무 기간 안으로 옮기거나 주기를 길게 잡아주세요 (최대 ${MAX_LEAVE_CYCLES}개).`,
+      );
+    }
+  }
+  const now = new Date().toISOString();
+  const values: typeof outingConfigs.$inferInsert = input.enabled
+    ? {
+        userId: user.id,
+        kind: input.kind,
+        enabled: true,
+        startDate: input.startDate,
+        // 스키마가 둘 중 하나만 통과시키므로 나머지 한쪽은 반드시 비워 둔다 —
+        // 남겨 두면 다음 저장에서 두 단위가 섞인 행이 된다.
+        intervalDays: input.intervalDays ?? null,
+        intervalMonths: input.intervalMonths ?? null,
+        daysPerGrant: input.daysPerGrant,
+        carryOver: input.carryOver ?? false,
+        updatedAt: now,
+      }
+    : {
+        userId: user.id,
+        kind: input.kind,
+        enabled: false,
+        startDate: null,
+        intervalDays: null,
+        intervalMonths: null,
+        daysPerGrant: null,
+        carryOver: false,
+        updatedAt: now,
+      };
+  await db
+    .insert(outingConfigs)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [outingConfigs.userId, outingConfigs.kind],
+      set: values,
+    });
+  // 잔여량은 설정에서 파생하므로 따로 정리할 적립 원장이 없다.
+  return getLeaveBalanceSummary(db, user);
+}
+
+/**
  * 정기외박은 주기마다 따로 쌓이고 이월되지 않으므로 재원 총합이 아니라
  * 구간이 걸친 주기별로 따져야 한다. 지난 주기에 휴가를 넣더라도 그 주기 몫에서 빠지고,
  * 아직 오지 않은 주기도 그 몫 안이면 미리 쓸 수 있다.
@@ -408,6 +577,28 @@ function assertRegularOvernightAvailable(
 }
 
 /**
+ * 외출도 주기마다 따로 쌓이므로 재원 총합이 아니라 갈래별 주기로 따진다.
+ * 정기외박과 달리 구간이 하루라 차감 주기를 고를 일이 없다(outing.ts 머리말).
+ */
+function assertOutingAvailable(
+  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
+  outing: OutingConfigMap,
+  kind: OutingKind,
+  requested: SegmentLike[],
+  /** 이번 저장으로 사라질 휴가의 구간은 이미 빠져 있어야 한다. */
+  existing: readonly SegmentLike[],
+) {
+  const block = checkOuting({
+    kind,
+    config: outing[kind],
+    existing,
+    requested,
+    dischargeAt: cycleDischargeDate(user),
+  });
+  if (block) throw new LeaveRuleError(outingBlockMessage(kind, block));
+}
+
+/**
  * 요청한 구간을 실제로 지불할 적립분이 있는지 확인한다.
  *
  * "이 요청을 넣기 전"과 "넣은 뒤"를 각각 배분해 보고, 어떤 재원에서든 설명되지 않는
@@ -427,6 +618,7 @@ export async function assertSegmentsAvailable(
     grantRows,
     segments: storedSegments,
     config,
+    outing,
   } = await loadAllocationInputs(db, user.id);
 
   // 이번 저장으로 사라지거나 교체될 휴가의 구간을 뺀다. 예전에는 이 제외를
@@ -471,7 +663,7 @@ export async function assertSegmentsAvailable(
   );
   for (const key of requested) {
     // 주기 단위 재원은 총합이 아니라 주기별로 따로 확인한다.
-    if (key === "regular_overnight" && cycleBased) continue;
+    if (isCycleScoped(key, config, outing)) continue;
     const gained = after[key].unattributedDays - before[key].unattributedDays;
     if (gained <= 0) continue;
 
@@ -496,6 +688,18 @@ export async function assertSegmentsAvailable(
       onlyRegularOvernight(allSegments),
     );
   }
+
+  for (const kind of OUTING_KINDS) {
+    if (!requested.has(outingBalanceKey(kind))) continue;
+    if (!isOutingCycleBased(outing[kind])) continue;
+    assertOutingAvailable(
+      user,
+      outing,
+      kind,
+      segments,
+      onlyOuting(allSegments),
+    );
+  }
 }
 
 function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
@@ -504,6 +708,7 @@ function segmentRowsFor(leaveId: string, segments: LeaveSegment[]) {
     leaveId,
     category: segment.category,
     overnightKind: segment.overnightKind ?? null,
+    outingKind: segment.outingKind ?? null,
     startDate: segment.startDate,
     endDate: segment.endDate,
     days: segment.days,
@@ -542,6 +747,7 @@ type SegmentPick = {
   leaveId: string;
   category: LeaveSegment["category"];
   overnightKind: LeaveSegmentRow["overnightKind"];
+  outingKind: LeaveSegmentRow["outingKind"];
   startDate: string;
   endDate: string;
   days: number;
@@ -556,6 +762,7 @@ export function foldSegmentRows(rows: readonly SegmentPick[]) {
     values.push({
       category: row.category,
       ...(row.overnightKind ? { overnightKind: row.overnightKind } : {}),
+      ...(row.outingKind ? { outingKind: row.outingKind } : {}),
       startDate: row.startDate,
       endDate: row.endDate,
       days: row.days,
@@ -573,6 +780,7 @@ const segmentColumns = {
   leaveId: leaveSegments.leaveId,
   category: leaveSegments.category,
   overnightKind: leaveSegments.overnightKind,
+  outingKind: leaveSegments.outingKind,
   startDate: leaveSegments.startDate,
   endDate: leaveSegments.endDate,
   days: leaveSegments.days,

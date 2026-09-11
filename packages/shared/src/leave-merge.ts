@@ -114,6 +114,21 @@ function combineReasons(parts: readonly MergeCandidate[]): string | null {
   return joined ? joined.slice(0, MAX_LEAVE_REASON) : null;
 }
 
+/**
+ * 외출이 든 휴가는 이웃과 합치지 않는다.
+ *
+ * 외출은 그 자체로 한 건이다. 연가가 끝나면 부대로 복귀하고, 그다음 날 외출을
+ * 나가는 것은 이어진 하나의 출타가 아니라 별개의 사건이다.
+ *
+ * 합치면 두 가지가 깨진다. 첫째, 붙어 있는 외출 둘이 이틀짜리 구간 하나로 접혀
+ * "몇 번 나갔는가"가 사라진다. 둘째, 합쳐진 휴가의 마지막 날이 외출이면 부대
+ * 출타 집계가 그 날을 복귀일로 보고 빼 버린다 — 외출은 그날 온종일 부대 밖에 있는데도
+ * (overage.ts의 `returnDayCounts` 분기는 하루짜리 휴가만 특례로 다룬다).
+ */
+function hasOuting(candidate: MergeCandidate): boolean {
+  return candidate.segments.some((segment) => segment.category === "outing");
+}
+
 export function planLeaveMerge(
   incoming: MergeCandidate,
   others: readonly MergeCandidate[],
@@ -148,11 +163,15 @@ export function planLeaveMerge(
     };
   }
 
+  // 겹침 판정까지는 외출도 똑같이 받는다 — 같은 날 두 번 나갈 수는 없다.
+  // 합치기만 하지 않는다(hasOuting 주석).
+  if (hasOuting(incoming)) return { kind: "alone" };
+
   // 흡수할 때마다 기간이 늘어나므로 더 붙을 이웃이 없을 때까지 반복한다.
   // 이 규칙이 처음부터 있었다면 한 홉이면 끝이지만, 기존 데이터에는 이미 붙은 채로
   // 저장된 휴가들이 남아 있다.
   const parts: MergeCandidate[] = [incoming];
-  const rest = [...pool];
+  const rest = [...pool].filter((other) => !hasOuting(other));
   let grew = true;
   while (grew) {
     grew = false;

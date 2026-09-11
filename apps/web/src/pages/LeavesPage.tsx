@@ -15,6 +15,7 @@ import { Link } from "react-router";
 import type { MyLeave } from "@leave/client";
 import {
   partitionMyLeaves,
+  summarizeHoldings,
   useDeleteLeave,
   useLeaveBalances,
   useMyLeaves,
@@ -42,28 +43,9 @@ export function LeavesPage() {
   const [creating, setCreating] = useState(false);
   const today = todayInSeoul();
 
-  // 보유 휴가 화면과 같은 셈 — 주기 재원은 이번 주기 몫에 앞으로 받을 몫까지 더한다.
-  // 다른 재원의 적립 예정분은 아직 확정이 아니라 여기 넣지 않는다.
-  //
-  // 남은 일수는 오늘까지 다녀온 몫만 뺀다. 아직 가지 않은 계획을 미리 빼면 통장에 있는
-  // 휴가보다 적게 보인다 — 계획은 아래 "계획 N일"로 따로 알린다. 그래서 이번 주기는
-  // remainingAsOfTodayDays를, 앞으로 받을 몫도 계획을 뺀 upcomingDays가 아니라
-  // upcomingAsOfTodayDays를 쓰고, 둘의 차이가 곧 미래 주기에 잡아 둔 계획이다.
-  const holdings = (balances.data?.balances ?? []).reduce(
-    (sum, item) => ({
-      remaining:
-        sum.remaining +
-        item.remainingAsOfTodayDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
-      planned:
-        sum.planned +
-        item.plannedDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays - item.upcomingDays : 0),
-      expiringSoon: sum.expiringSoon + item.expiringSoonDays,
-      expired: sum.expired + item.expiredDays,
-    }),
-    { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
-  );
+  // 이 셈은 웹·앱·보유 휴가 화면이 함께 쓴다(@leave/client의 summarizeHoldings).
+  // 규칙이 미묘해서 화면마다 적어 두면 한 곳만 고쳐졌을 때 숫자가 갈린다.
+  const holdings = summarizeHoldings(balances.data?.balances);
   const visibleBalances = (balances.data?.balances ?? []).filter(
     (item) =>
       item.totalDays > 0 ||

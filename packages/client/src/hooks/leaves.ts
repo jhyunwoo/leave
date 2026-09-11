@@ -9,6 +9,7 @@ import type {
   LeaveGrantCreateInput,
   LeaveGrantUpdateInput,
   LeaveStatusUpdateInput,
+  OutingConfigInput,
   RegularOvernightConfigInput,
 } from "@leave/shared";
 import { monthsSpanning } from "@leave/shared";
@@ -297,6 +298,32 @@ export function useUpdateRegularOvernight() {
     mutationFn: async (input: RegularOvernightConfigInput) =>
       unwrap<LeaveBalanceSummary>(
         await client.leaves["regular-overnight"].$put({ json: input }),
+      ),
+    onSuccess: async (data) => {
+      await setAuthoritativeQueryData(
+        queryClient,
+        queryKeys.leaveBalances,
+        data,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leaveGrants });
+    },
+  });
+}
+
+/**
+ * 외출 자동 적립 설정을 갈래(평일·주말) 하나만 바꾼다.
+ *
+ * 정기외박과 같은 이유로 보유 휴가 화면도 함께 다시 받는다 — 주기 목록이 이
+ * 설정에서 파생하기 때문이다.
+ */
+export function useUpdateOuting() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    scope: LEAVE_HOLDINGS_MUTATION_SCOPE,
+    mutationFn: async (input: OutingConfigInput) =>
+      unwrap<LeaveBalanceSummary>(
+        await client.leaves.outing.$put({ json: input }),
       ),
     onSuccess: async (data) => {
       await setAuthoritativeQueryData(

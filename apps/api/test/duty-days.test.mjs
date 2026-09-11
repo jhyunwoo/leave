@@ -38,9 +38,34 @@ async function topUpBalances(token) {
     totals[item.key] = item.totalDays;
   }
   totals.annual = 300;
-  totals.outing = 300;
   const res = await req("PUT", "/leaves/balances", { token, body: { totals } });
   assert.equal(res.status, 200);
+}
+
+/**
+ * 실제로 일과가 있는 날 하나를 찾는다.
+ *
+ * 외출이 일과일을 깎지 않는다는 것을 "숫자가 그대로다"로만 보면, 하필 주말이나
+ * 공휴일을 골랐을 때도 통과해 버린다. 연가를 하루 넣어 **실제로 1이 줄어드는 날**을
+ * 확인하고 되돌린 뒤, 그 날짜를 외출에 쓴다.
+ */
+async function findDutyDate(token, from) {
+  const before = (await readDutyDays(token)).data.dutyDays;
+  for (let offset = 0; offset < 10; offset += 1) {
+    const date = addDays(from, offset);
+    const created = await req("POST", "/leaves", {
+      token,
+      body: {
+        title: "탐색",
+        segments: [{ category: "annual", startDate: date, endDate: date }],
+      },
+    });
+    assert.equal(created.status, 201);
+    const after = (await readDutyDays(token)).data.dutyDays;
+    await req("DELETE", `/leaves/${created.data.leave.id}`, { token });
+    if (after === before - 1) return date;
+  }
+  throw new Error("열흘 안에 일과일이 없다");
 }
 
 /** 전역이 60일 남은 계정. 창이 짧아 휴가 한 건으로 통째로 덮을 수 있다. */
@@ -143,10 +168,24 @@ test("남은 구간을 덮는 휴가는 일과일을 0으로 만들고, 되돌�
 
 test("외출과 초안 휴가는 일과일에서 빠지지 않는다", async () => {
   const outing = await soldierWithUnit();
+  // 외출은 하루짜리다(부대관리훈령 — 당일 복귀). 그래서 남은 창을 통째로 덮는
+  // 대신, 연가로 1이 줄어드는 것을 확인한 그 날짜에 외출을 넣는다.
+  const dutyDate = await findDutyDate(outing.token, outing.from);
   const outingBefore = await readDutyDays(outing.token);
   // 외출은 같은 날 복귀한다 — 나가 있어도 그 날의 일과가 사라지지 않는다.
-  const outingLeave = await coverWindow(outing.token, outing, {
-    category: "outing",
+  const outingLeave = await req("POST", "/leaves", {
+    token: outing.token,
+    body: {
+      title: "외출",
+      segments: [
+        {
+          category: "outing",
+          outingKind: "weekday",
+          startDate: dutyDate,
+          endDate: dutyDate,
+        },
+      ],
+    },
   });
   assert.equal(outingLeave.status, 201);
   const outingAfter = await readDutyDays(outing.token);

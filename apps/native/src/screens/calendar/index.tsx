@@ -28,6 +28,8 @@
 
 import { WEEKDAYS } from "@leave/shared/calendar";
 import { todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { type OutingKind } from "@leave/shared/leave";
+import { type OutingConfig } from "@leave/shared/outing";
 import {
   cycleForDisplay,
   cycleUsedDays,
@@ -187,6 +189,12 @@ export function CalendarScreen() {
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
+  // 갈래별 외출 설정 — 달력이 주기 시작일 마커를 그리는 데 쓴다.
+  const outingConfigs = useMemo(() => {
+    const map = new Map<OutingKind, OutingConfig>();
+    for (const row of balances.data?.outing ?? []) map.set(row.kind, row);
+    return map;
+  }, [balances.data]);
   const currentCycle = useMemo(
     () => cycleForDisplay(regularOvernight, today, dischargeAt),
     [regularOvernight, today, dischargeAt],
@@ -298,36 +306,8 @@ export function CalendarScreen() {
     );
   }
 
-  if (!unit) {
-    return (
-      <View style={[styles.center, { padding: spacing.xl }]}>
-        {process.env.EXPO_OS === "web" && (
-          <Text style={styles.webTitle}>휴가 계획 달력</Text>
-        )}
-        <ContentPanel style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>아직 공유 그룹이 없어요</Text>
-          <Text style={styles.emptyBody}>
-            초대코드로 그룹에 참여하거나 새 그룹을 만들면 누가 언제 나가는지
-            보이는 달력이 열려요. 그룹 이름에는 실제 부대명을 입력하지 마세요.
-          </Text>
-          <Button
-            title="그룹 참여·만들기"
-            onPress={() => router.push("/units")}
-          />
-          <Button
-            title="개인 일정 보기"
-            variant="secondary"
-            onPress={() => router.push("/(tabs)/(calendar)/personal-events")}
-          />
-          <Button
-            title="친구 달력 보기"
-            variant="secondary"
-            onPress={() => router.push("/(tabs)/(friends)")}
-          />
-        </ContentPanel>
-      </View>
-    );
-  }
+  // 부대가 없어도 달력은 그대로 연다. 부대가 필요한 것은 출타율·출타자·부대 일정뿐이고,
+  // 내 휴가·개인 일정·전역일·주기 표시는 부대와 무관하다. 가입은 툴바에서 안내한다.
 
   /**
    * 휴가 등록 폼을 연다. 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌
@@ -412,12 +392,13 @@ export function CalendarScreen() {
     <View style={styles.calendarPane}>
       <CalendarScroll
         ref={scrollRef}
-        unitId={unit.id}
+        unitId={unit?.id ?? null}
         selectedDate={selectedDate}
         contentTopInset={headerHeight}
         myLeaveDays={myLeaveDays}
         regularOvernight={regularOvernight}
         currentCycle={currentCycle}
+        outing={outingConfigs}
         enlistedMonth={me.data?.user.enlistedAt.slice(0, 7) ?? null}
         dischargeAt={dischargeAt}
         onSelectDate={selectDate}
@@ -599,6 +580,13 @@ export function CalendarScreen() {
         버려진다. 그래서 아이콘 대신 라벨로 둔다 — 두 플랫폼에서 같은 것이 보인다.
       */}
       <Stack.Toolbar placement="right">
+        {/* 부대가 없으면 가입이 이 화면의 주 행동이다. 달력 자체는 그대로 쓰이므로
+            막지 않고, 부대가 있어야 열리는 것(출타율·명단)만 여기서 안내한다. */}
+        {!unit ? (
+          <Stack.Toolbar.Button onPress={() => router.push("/units")}>
+            부대 가입
+          </Stack.Toolbar.Button>
+        ) : null}
         <Stack.Toolbar.Button
           onPress={() => scrollRef.current?.scrollToToday()}
         >

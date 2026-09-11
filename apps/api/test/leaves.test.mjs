@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createUnit, req, signup, sleep, uniq } from "./helpers.mjs";
 
-test("휴가 등록에는 소속 부대가 필요하다", async () => {
+test("부대가 없어도 휴가를 등록할 수 있다", async () => {
+  // 휴가는 내 재원에서 빠지는 내 기록이다. 부대가 필요한 것은 출타 집계와 초과
+  // 알림뿐이라, 아직 그룹에 못 들어간 사람도 계획을 세울 수 있어야 한다.
   const { token } = await signup();
   const res = await req("POST", "/leaves", {
     token,
@@ -13,8 +15,13 @@ test("휴가 등록에는 소속 부대가 필요하다", async () => {
       ],
     },
   });
-  assert.equal(res.status, 400);
-  assert.match(res.data.error, /부대/);
+  assert.equal(res.status, 201);
+  assert.equal(res.data.leave.startDate, "2026-08-01");
+  // 셀 부대가 없으니 초과일도 없다 — 부대 전용 셈은 건너뛴다.
+  assert.deepEqual(res.data.exceededDates, []);
+
+  const mine = await req("GET", "/leaves/mine", { token });
+  assert.equal(mine.data.leaves.length, 1);
 });
 
 test("내 휴가 목록 CRUD", async () => {
@@ -624,23 +631,30 @@ test("계획만 해둔 정기외박은 남은 휴가를 줄이지 않는다", as
     return d.toISOString().slice(0, 10);
   };
 
-  /** 내 휴가 탭 상단 "보유 휴가" 카드가 하는 셈 그대로. */
+  /**
+   * 내 휴가 탭 상단 "보유 휴가" 카드가 하는 셈 그대로
+   * (@leave/client의 summarizeHoldings).
+   *
+   * 외출은 뺀다 — 이 줄은 "남은 휴가 N일"이고 외출은 일이 아니라 횟수다.
+   */
   const card = (data) =>
-    data.balances.reduce(
-      (sum, item) => ({
-        remaining:
-          sum.remaining +
-          item.remainingAsOfTodayDays +
-          (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
-        planned:
-          sum.planned +
-          item.plannedDays +
-          (item.cycleScoped
-            ? item.upcomingAsOfTodayDays - item.upcomingDays
-            : 0),
-      }),
-      { remaining: 0, planned: 0 },
-    );
+    data.balances
+      .filter((item) => item.key !== "outing" && item.key !== "weekend_outing")
+      .reduce(
+        (sum, item) => ({
+          remaining:
+            sum.remaining +
+            item.remainingAsOfTodayDays +
+            (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
+          planned:
+            sum.planned +
+            item.plannedDays +
+            (item.cycleScoped
+              ? item.upcomingAsOfTodayDays - item.upcomingDays
+              : 0),
+        }),
+        { remaining: 0, planned: 0 },
+      );
 
   // 첫 적립이 오늘 — 1주기는 오늘~오늘+41, 2주기는 오늘+42부터.
   await req("PUT", "/leaves/regular-overnight", {

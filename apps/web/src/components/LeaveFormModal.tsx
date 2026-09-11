@@ -11,6 +11,7 @@ import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
+  balanceUnitLabel,
   fmtDateShort,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
@@ -243,7 +244,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                       {BALANCE_KEYS.map((key) => (
                         <option key={key} value={key}>
                           {BALANCE_LABELS[key]} (잔여 {available.get(key) ?? 0}
-                          일)
+                          {balanceUnitLabel(key)})
                         </option>
                       ))}
                     </select>

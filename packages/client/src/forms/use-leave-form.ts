@@ -14,6 +14,7 @@ import {
   addDays,
   appendDraft,
   balanceKeyToCategory,
+  checkOuting,
   checkRegularOvernight,
   draftDaysByKey,
   draftsEndDate,
@@ -21,8 +22,14 @@ import {
   eligibleRegularOvernightCycles,
   fitDraftsToTotal,
   inclusiveDays,
+  isOutingBalanceKey,
+  isOutingCycleBased,
   isRegularOvernightCycleBased,
   leaveCreateSchema,
+  OUTING_KINDS,
+  outingAvailableIn,
+  outingBalanceKey,
+  outingBlockMessage,
   monthsSpanning,
   recommendDateRanges,
   regularOvernightAvailableIn,
@@ -41,6 +48,8 @@ import {
   type BalanceKey,
   type LeaveCreateInput,
   type LeaveStatus,
+  type OutingConfig,
+  type OutingKind,
   type SegmentDraft,
   type SegmentLike,
 } from "@leave/shared";
@@ -232,6 +241,14 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const cycleBased = isRegularOvernightCycleBased(regularConfig);
   const dischargeAt = me.data?.user.dischargeAt ?? "";
 
+  /** 갈래별 외출 설정. 응답이 아직 없거나 구버전이면 빈 표. */
+  const outingConfigs = useMemo(() => {
+    const rows = balances.data?.outing ?? [];
+    const map = new Map<OutingKind, OutingConfig>();
+    for (const row of rows) map.set(row.kind, row);
+    return map;
+  }, [balances.data]);
+
   const regularCycleChoices = useMemo(
     () =>
       resolved.map((draft) =>
@@ -272,10 +289,11 @@ export function useLeaveForm(options: LeaveFormOptions) {
     });
   }, [cycleBased, regularCycleChoices]);
 
-  // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+  // 이미 저장된 내 구간 전부. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+  // 정기외박과 외출 판정이 함께 쓴다 — 각자 자기 재원만 골라 센다.
   // 기준은 서버의 잔여 계산과 같아야 한다(balance-segments.ts 주석 참고) — 예전에는
   // 여기서 초안을 빼고 서버는 세어서, 칩은 여유가 있는데 저장은 400인 조합이 났다.
-  const savedRegular = useMemo<SegmentLike[]>(
+  const savedSegments = useMemo<SegmentLike[]>(
     () =>
       balanceCountedSegments(myLeaves.data?.leaves, {
         excludeLeaveId: editing?.id,
@@ -290,6 +308,10 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const preferredBalanceKey = useMemo<BalanceKey | undefined>(() => {
     let preferred: { key: BalanceKey; remaining: number } | undefined;
     for (const item of balances.data?.balances ?? []) {
+      // 외출은 기본값이 되지 않는다. 잔여가 가장 많다는 이유로 자동 선택되면 폼이
+      // 말없이 "하루·단독" 모드가 되고, 사용자는 왜 종류를 더할 수 없는지 모른다.
+      // 외출은 고르는 것이지 기본으로 놓이는 것이 아니다.
+      if (isOutingBalanceKey(item.key)) continue;
       const remaining =
         item.key === "regular_overnight" &&
         cycleBased &&
@@ -297,7 +319,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
         dischargeAt
           ? regularOvernightAvailableIn({
               config: regularConfig,
-              used: savedRegular,
+              used: savedSegments,
               dischargeAt,
               from: startDate,
               to: endDate,
@@ -314,7 +336,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
     dischargeAt,
     endDate,
     regularConfig,
-    savedRegular,
+    savedSegments,
     startDate,
     validRange,
   ]);
@@ -388,16 +410,50 @@ export function useLeaveForm(options: LeaveFormOptions) {
     [resolved],
   );
 
+  // 폼이 이번에 외출로 잡아둔 구간. 외출은 하루라 주기 선택이 없다.
+  const draftOuting = useMemo<SegmentLike[]>(
+    () =>
+      resolved
+        .filter((draft) => isOutingBalanceKey(draft.key))
+        .map((draft) => ({
+          ...balanceKeyToCategory(draft.key),
+          startDate: draft.startDate,
+          endDate: draft.endDate,
+        })),
+    [resolved],
+  );
+
+  /**
+   * 외출 주기 위반. 갈래마다 따로 보고 먼저 걸리는 것을 알린다 — 평일을 다 썼어도
+   * 주말은 그대로 남으므로 둘을 한 판정으로 묶으면 안 된다.
+   */
+  const outingBlockText = useMemo(() => {
+    if (!dischargeAt || !draftOuting.length) return null;
+    for (const kind of OUTING_KINDS) {
+      const config = outingConfigs.get(kind);
+      if (!isOutingCycleBased(config)) continue;
+      const block = checkOuting({
+        kind,
+        config,
+        existing: savedSegments,
+        requested: draftOuting,
+        dischargeAt,
+      });
+      if (block) return outingBlockMessage(kind, block);
+    }
+    return null;
+  }, [dischargeAt, draftOuting, outingConfigs, savedSegments]);
+
   // 주기 재원은 총합이 아니라 날짜가 속한 주기로 따진다.
   const regularBlock = useMemo(() => {
     if (!cycleBased || !dischargeAt || !draftRegular.length) return null;
     return checkRegularOvernight({
       config: regularConfig,
-      existing: savedRegular,
+      existing: savedSegments,
       requested: draftRegular,
       dischargeAt,
     });
-  }, [cycleBased, dischargeAt, regularConfig, savedRegular, draftRegular]);
+  }, [cycleBased, dischargeAt, regularConfig, savedSegments, draftRegular]);
 
   /** 폼에서 이미 배정한 몫까지 뺀 실제 남은 일수. */
   const availableByKey = useMemo(() => {
@@ -409,26 +465,50 @@ export function useLeaveForm(options: LeaveFormOptions) {
     // 주기 재원은 스칼라 잔여가 "이번 주기" 값이라 미래 주기를 잘못 막는다.
     // 구간 행마다 그 날짜의 주기로 따로 계산한다(아래 rowAvailable).
     if (cycleBased) result.delete("regular_overnight");
+    for (const kind of OUTING_KINDS) {
+      if (isOutingCycleBased(outingConfigs.get(kind))) {
+        result.delete(outingBalanceKey(kind));
+      }
+    }
     return result;
-  }, [remainingByKey, drafts, cycleBased]);
+  }, [remainingByKey, drafts, cycleBased, outingConfigs]);
 
   /** 이 구간 날짜가 속한 주기까지 반영한, 행 하나짜리 잔여 표. */
   const rowAvailable = (from: string, to: string): Map<BalanceKey, number> => {
-    if (!cycleBased) return availableByKey;
-    const draft = resolved.find(
-      (item) => item.startDate === from && item.endDate === to,
-    );
-    return new Map(availableByKey).set(
-      "regular_overnight",
-      regularOvernightAvailableIn({
-        config: regularConfig,
-        used: [...savedRegular, ...draftRegular],
-        dischargeAt,
-        from,
-        to,
-        cycleStart: draft?.regularOvernightCycleStart,
-      }),
-    );
+    const result = new Map(availableByKey);
+    if (cycleBased) {
+      const draft = resolved.find(
+        (item) => item.startDate === from && item.endDate === to,
+      );
+      result.set(
+        "regular_overnight",
+        regularOvernightAvailableIn({
+          config: regularConfig,
+          used: [...savedSegments, ...draftRegular],
+          dischargeAt,
+          from,
+          to,
+          cycleStart: draft?.regularOvernightCycleStart,
+        }),
+      );
+    }
+    // 외출도 같은 이유로 날짜가 속한 주기로 따진다. 주기 선택이 없어 한 줄 더 짧다.
+    for (const kind of OUTING_KINDS) {
+      const config = outingConfigs.get(kind);
+      if (!isOutingCycleBased(config)) continue;
+      result.set(
+        outingBalanceKey(kind),
+        outingAvailableIn({
+          kind,
+          config,
+          used: [...savedSegments, ...draftOuting],
+          dischargeAt,
+          from,
+          to,
+        }),
+      );
+    }
+    return result;
   };
 
   /* --- 저장 가능 여부 --------------------------------------------------- */
@@ -442,7 +522,25 @@ export function useLeaveForm(options: LeaveFormOptions) {
         `${BALANCE_LABELS[key]}를 ${-remaining}일 초과했어요`,
     ),
     ...(regularBlock ? [regularOvernightBlockMessage(regularBlock)] : []),
+    ...(outingBlockText ? [outingBlockText] : []),
   ].join(", ");
+
+  /**
+   * 외출만의 두 제약. 서버 스키마가 막는 것과 같은 값이라 여기서 먼저 말한다 —
+   * 개수 스테퍼로 한 칸만 올려도 400을 받게 두면 이유를 화면에서 알 수 없다.
+   *
+   *  - 외출은 당일 복귀다(부대관리훈령). 밤을 넘기면 그것은 외박이다.
+   *  - 외출은 그 자체로 한 건이다. 연가가 끝나면 복귀하고, 다음 날 나가는 외출은
+   *    이어진 하나의 출타가 아니다(@leave/shared의 leave-merge.ts 주석).
+   */
+  const outingDrafts = drafts.filter((draft) => isOutingBalanceKey(draft.key));
+  const outingShapeBlocker: string | null = !outingDrafts.length
+    ? null
+    : drafts.length > 1
+      ? "외출은 다른 휴가와 이어 붙일 수 없어요. 따로 등록해주세요."
+      : outingDrafts[0]!.days > 1
+        ? "외출은 당일 복귀라 하루로만 등록할 수 있어요."
+        : null;
 
   const needsTitle = !options.deriveTitle;
   /**
@@ -477,7 +575,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
               ? "복귀 시간을 HH:mm 형식으로 입력해주세요."
               : needsTitle && title.trim().length === 0
                 ? "휴가 제목을 입력해주세요."
-                : balanceBlockMessage || null;
+                : (outingShapeBlocker ?? (balanceBlockMessage || null));
   const canSubmit = submitBlocker === null;
 
   /* --- 종류 더하기 도우미 ---------------------------------------------- */
@@ -490,14 +588,18 @@ export function useLeaveForm(options: LeaveFormOptions) {
    * 쪼개지 않는다. 개수 모델에서는 총 기간이 파생값이라 나눌 이유가 없다.
    */
   const suggestedAddKey =
-    lastDraft && drafts.length < MAX_LEAVE_SEGMENTS
+    // 외출이 든 휴가에는 다른 종류를 이어 붙일 수 없다 — 버튼 자체를 감춘다.
+    lastDraft && !outingDrafts.length && drafts.length < MAX_LEAVE_SEGMENTS
       ? (() => {
           const available = rowAvailable(
             lastDraft.startDate,
             lastDraft.endDate,
           );
           return BALANCE_KEYS.find(
-            (key) => key !== lastDraft.key && (available.get(key) ?? 0) >= 1,
+            (key) =>
+              key !== lastDraft.key &&
+              !isOutingBalanceKey(key) &&
+              (available.get(key) ?? 0) >= 1,
           );
         })()
       : undefined;

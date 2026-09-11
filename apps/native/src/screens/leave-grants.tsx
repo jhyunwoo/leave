@@ -28,6 +28,7 @@ import {
   confirmGrantDelete,
   LeaveGrantModal,
 } from "@/components/leave-grant-modal";
+import { OutingSettings } from "@/components/outing-settings";
 import { RegularOvernightSettings } from "@/components/regular-overnight-settings";
 import { StackedBar } from "@/components/stacked-bar";
 import {
@@ -71,7 +72,7 @@ export function LeaveGrantsScreen() {
     );
   }
 
-  const { totals, funds, regularOvernight } = page.data;
+  const { totals, funds, regularOvernight, outing } = page.data;
   const cycleKey = funds.find((fund) => fund.cycleScoped)?.key ?? null;
   // 앞으로 받을 주기 몫도 남은 휴가에 들어가 있다. 지금 쓸 수 있는 양과 다르므로 밝혀 둔다.
   const upcomingCycleDays = regularOvernight.cycles
@@ -225,6 +226,10 @@ export function LeaveGrantsScreen() {
         expanded={showPastCycles}
         onToggle={() => setShowPastCycles((open) => !open)}
       />
+
+      {/* 외출은 위 총합에 들어가지 않는다 — 일이 아니라 횟수라서 "남은 휴가 N일"에
+          더하면 없는 휴가를 있다고 말하게 된다. 그래서 제 단위로 따로 그린다. */}
+      <OutingSettings branch={me.data.user.branch} funds={outing} />
     </ResponsiveGrid>
   ) : null;
 

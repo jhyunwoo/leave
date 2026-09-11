@@ -159,6 +159,7 @@ const lightBalance: BalancePalette = {
   regular_overnight: { fg: "#12439c", bg: "#d8e6ff" },
   other_overnight: { fg: "#065b7a", bg: "#cdeaf6" },
   outing: { fg: "#454745", bg: "#e4e7e2" },
+  weekend_outing: { fg: "#3f4668", bg: "#e0e3f0" },
   other: { fg: "#5a5c59", bg: "#eceee9" },
 };
 
@@ -173,6 +174,7 @@ const darkBalance: BalancePalette = {
   regular_overnight: { fg: "#a9c7ff", bg: "#16294d" },
   other_overnight: { fg: "#9dd6ec", bg: "#0d2f3d" },
   outing: { fg: "#c9ccc6", bg: "#2c2e2b" },
+  weekend_outing: { fg: "#b6bddc", bg: "#22273d" },
   other: { fg: "#b9bcb6", bg: "#262825" },
 };
 

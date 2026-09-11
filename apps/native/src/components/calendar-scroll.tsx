@@ -15,6 +15,11 @@
  */
 
 import { monthBounds, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { OUTING_KINDS, type OutingKind } from "@leave/shared/leave";
+import {
+  outingCycleStartsInRange,
+  type OutingConfig,
+} from "@leave/shared/outing";
 import {
   cyclesInRange,
   type RegularOvernightConfig,
@@ -44,7 +49,10 @@ import {
 import type { MyLeaveDay } from "@leave/client";
 import { useCalendar, usePersonalEvents } from "@leave/client";
 import { useWindowSizeClass } from "@/adaptive";
-import { MonthCalendar } from "@/components/month-calendar";
+import {
+  MonthCalendar,
+  type OutingCycleStart,
+} from "@/components/month-calendar";
 import { CalendarDragContext } from "@/components/calendar-drag/context";
 import { useCalendarDrag } from "@/components/calendar-drag/use-calendar-drag";
 import {
@@ -78,13 +86,19 @@ export interface CalendarScrollHandle {
 export const CalendarScroll = forwardRef<
   CalendarScrollHandle,
   {
-    unitId: string;
+    /**
+     * 소속 부대. **없을 수 있다** — 부대에 가입하지 않아도 달력을 쓴다.
+     * 그때는 출타율·출타자·부대 일정만 빠지고 나머지는 그대로 그린다.
+     */
+    unitId: string | null;
     selectedDate: ISODate | null;
     onSelectDate: (date: ISODate) => void;
     contentTopInset: number;
     myLeaveDays: Map<ISODate, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
     currentCycle: RegularOvernightCycle | null;
+    /** 갈래별 외출 설정. 주기 시작일 마커를 그리는 데 쓴다. */
+    outing: Map<OutingKind, OutingConfig>;
     /** 입대한 달(YYYY-MM). 상태바 탭이 데려갈 목적지. 모르면 null. */
     enlistedMonth: string | null;
     /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
@@ -99,6 +113,7 @@ export const CalendarScroll = forwardRef<
     myLeaveDays,
     regularOvernight,
     currentCycle,
+    outing,
     enlistedMonth,
     dischargeAt,
   },
@@ -234,6 +249,7 @@ export const CalendarScroll = forwardRef<
                 myLeaveDays={myLeaveDays}
                 regularOvernight={regularOvernight}
                 currentCycle={currentCycle}
+                outing={outing}
                 dischargeAt={dischargeAt}
                 dragScrollGesture={scrollGesture}
               />
@@ -289,7 +305,7 @@ export const CalendarScroll = forwardRef<
 });
 
 function MonthBlock(props: {
-  unitId: string;
+  unitId: string | null;
   month: string;
   height: number;
   cellHeight: number;
@@ -299,6 +315,7 @@ function MonthBlock(props: {
   myLeaveDays: Map<ISODate, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
+  outing: Map<OutingKind, OutingConfig>;
   dischargeAt: ISODate | null;
   dragScrollGesture: NativeGesture;
 }) {
@@ -310,33 +327,55 @@ function MonthBlock(props: {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
   }, [props.month, props.regularOvernight]);
+  // 이 달에 **열리는** 외출 주기만. 넘어온 주기는 마커가 아니다(outing.ts 주석).
+  const outingCycleStarts = useMemo<OutingCycleStart[]>(() => {
+    const { start, end } = monthBounds(props.month);
+    return OUTING_KINDS.flatMap((kind) =>
+      outingCycleStartsInRange(
+        props.outing.get(kind),
+        start,
+        end,
+        props.dischargeAt,
+      ).map((cycle) => ({ kind, cycle })),
+    );
+  }, [props.month, props.outing, props.dischargeAt]);
+
+  const grid = (
+    <MonthCalendar
+      month={props.month}
+      calendar={calendar.data}
+      selectedDate={props.selectedDate}
+      onSelectDate={props.onSelectDate}
+      cellHeight={props.cellHeight}
+      showAttendees={props.showAttendees}
+      hideWeekdays
+      myLeaveDays={props.myLeaveDays}
+      cycles={cycles}
+      currentCycle={props.currentCycle}
+      outingCycleStarts={outingCycleStarts}
+      dischargeAt={props.dischargeAt}
+      personalEvents={personalEvents.data?.events}
+      dragScrollGesture={props.dragScrollGesture}
+    />
+  );
 
   return (
     <View style={[styles.monthBlock, { height: props.height }]}>
       <View style={styles.monthHeading}>
         <Text style={styles.monthLabel}>{monthLabel(props.month)}</Text>
       </View>
-      {calendar.isPending ? (
+      {/* 부대가 없으면 부대 달력을 부르지 않는다(useCalendar가 enabled로 이미 끈다).
+          기다릴 것도, 실패할 것도 없으므로 곧바로 그린다. */}
+      {!props.unitId ? (
+        grid
+      ) : calendar.isPending ? (
         <View style={styles.monthLoading}>
           <ActivityIndicator color={colors.ink} />
         </View>
       ) : calendar.isError || !calendar.data ? (
         <Text style={styles.monthError}>이 달을 불러오지 못했어요.</Text>
       ) : (
-        <MonthCalendar
-          calendar={calendar.data}
-          selectedDate={props.selectedDate}
-          onSelectDate={props.onSelectDate}
-          cellHeight={props.cellHeight}
-          showAttendees={props.showAttendees}
-          hideWeekdays
-          myLeaveDays={props.myLeaveDays}
-          cycles={cycles}
-          currentCycle={props.currentCycle}
-          dischargeAt={props.dischargeAt}
-          personalEvents={personalEvents.data?.events}
-          dragScrollGesture={props.dragScrollGesture}
-        />
+        grid
       )}
     </View>
   );

@@ -103,6 +103,69 @@ describe("leaveCreateSchema", () => {
     ).toBe(true);
   });
 
+  it("외출은 하루로만 등록된다 — 밤을 넘기면 그것은 외박이다", () => {
+    const parsed = leaveCreateSchema.safeParse({
+      title: "외출",
+      segments: [
+        {
+          category: "outing",
+          outingKind: "weekday",
+          startDate: "2026-08-01",
+          endDate: "2026-08-02",
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toMatch(/당일 복귀/);
+  });
+
+  it("외출은 다른 종류와 한 휴가로 묶이지 않는다", () => {
+    const parsed = leaveCreateSchema.safeParse({
+      title: "연가 뒤 외출",
+      segments: [
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-02" },
+        {
+          category: "outing",
+          outingKind: "weekday",
+          startDate: "2026-08-03",
+          endDate: "2026-08-03",
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toMatch(/이어 붙일 수 없습니다/);
+  });
+
+  it("외출 갈래는 외출에만 붙는다", () => {
+    expect(
+      leaveCreateSchema.safeParse({
+        title: "연가",
+        segments: [
+          {
+            category: "annual",
+            outingKind: "weekday",
+            startDate: "2026-08-01",
+            endDate: "2026-08-02",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    // 갈래가 없는 외출은 통과한다 — 갈래가 생기기 전 버전의 앱이 보내는 모양이고,
+    // 그때는 평일로 읽는다.
+    expect(
+      leaveCreateSchema.safeParse({
+        title: "외출",
+        segments: [
+          {
+            category: "outing",
+            startDate: "2026-08-01",
+            endDate: "2026-08-01",
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
   it("구간 종료일이 시작일보다 앞서면 실패", () => {
     expect(
       leaveCreateSchema.safeParse({

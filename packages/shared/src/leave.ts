@@ -29,6 +29,19 @@ export const OVERNIGHT_KINDS = ["regular", "other"] as const;
 export type OvernightKind = (typeof OVERNIGHT_KINDS)[number];
 
 /**
+ * 외출의 갈래.
+ *
+ * 규정이 나누는 것이 아니라 **운용이 나눈다**. 부대관리훈령은 외출을 정기·특별·공용으로
+ * 나눌 뿐이지만, 실제로 병사가 세는 단위는 "일과 후에 나가는 것"과 "휴일에 나가는 것"이고
+ * 둘은 횟수도 시간도 따로 관리된다(육군 기준 평일 월 2회 · 주말 월 1회).
+ * 한 주머니로 합치면 "이번 달 주말 외출을 썼는가"에 답할 수 없다.
+ *
+ * 값이 없는 구간은 평일로 읽는다 — 이 갈래가 생기기 전에 저장된 행들이다.
+ */
+export const OUTING_KINDS = ["weekday", "weekend"] as const;
+export type OutingKind = (typeof OUTING_KINDS)[number];
+
+/**
  * 휴가 한 건의 진행 상태.
  *
  * `draft`는 나만 보는 시뮬레이션이라 그룹 집계에도, 출타 명단에도 들어가지 않는다.
@@ -128,7 +141,10 @@ export const BALANCE_KEYS = [
   "sick",
   "regular_overnight",
   "other_overnight",
+  // `outing`은 평일 외출이다. 갈래가 생기기 전부터 응답·적립분·구버전 앱에 실려 있는
+  // 이름이라 그대로 둔다(docs/code-style.md — 프로세스를 벗어난 이름은 바꾸지 않는다).
   "outing",
+  "weekend_outing",
   "other",
 ] as const;
 
@@ -143,9 +159,21 @@ export const BALANCE_LABELS: Record<BalanceKey, string> = {
   sick: "병가",
   regular_overnight: "정기외박",
   other_overnight: "기타 외박",
-  outing: "외출",
+  outing: "평일 외출",
+  weekend_outing: "주말 외출",
   other: "기타",
 };
+
+/**
+ * 이 재원을 세는 단위.
+ *
+ * 외출은 **일이 아니라 횟수**다 — 당일 복귀라 하루가 통째로 사라지지 않고, 부대도
+ * "월 2회"로 관리한다(duty-days.ts가 외출을 일과일에서 빼지 않는 것과 같은 사실).
+ * 화면이 "잔여 2일"이라고 말하면 없는 휴가를 있다고 말하게 된다.
+ */
+export function balanceUnitLabel(key: BalanceKey): string {
+  return key === "outing" || key === "weekend_outing" ? "회" : "일";
+}
 
 /** 국방부 안내 기준의 기본 제안값이며, 사용자가 프로필에서 자유롭게 수정한다. */
 export const DEFAULT_ANNUAL_DAYS: Record<Branch, number> = {
@@ -162,10 +190,25 @@ export const DEFAULT_ANNUAL_DAYS: Record<Branch, number> = {
 export type LeaveSegment = {
   category: LeaveCategory;
   overnightKind?: OvernightKind;
+  /** 외출 구간의 갈래. 없으면 평일로 읽는다. */
+  outingKind?: OutingKind;
   startDate: ISODate;
   endDate: ISODate;
   days: number;
   /** 정기외박 전체 일수를 차감할 주기의 시작일. */
+  regularOvernightCycleStart?: ISODate | null;
+};
+
+/**
+ * 잔여량 계산에 필요한 구간 정보만 추린 형태.
+ * DB 행은 갈래가 없을 때 null이라 undefined와 함께 받아들인다.
+ */
+export type SegmentLike = Pick<
+  LeaveSegment,
+  "category" | "startDate" | "endDate"
+> & {
+  overnightKind?: LeaveSegment["overnightKind"] | null;
+  outingKind?: LeaveSegment["outingKind"] | null;
   regularOvernightCycleStart?: ISODate | null;
 };
 
@@ -179,12 +222,18 @@ export type LeaveSegment = {
 export const MAX_LEAVE_SEGMENTS = 30;
 
 export function segmentBalanceKey(
-  segment: Pick<LeaveSegment, "category" | "overnightKind">,
+  segment: Pick<LeaveSegment, "category" | "overnightKind" | "outingKind">,
 ): BalanceKey {
-  if (segment.category !== "overnight") return segment.category;
-  return segment.overnightKind === "regular"
-    ? "regular_overnight"
-    : "other_overnight";
+  if (segment.category === "overnight") {
+    return segment.overnightKind === "regular"
+      ? "regular_overnight"
+      : "other_overnight";
+  }
+  // 갈래가 비어 있으면 평일이다 — 갈래가 생기기 전에 저장된 구간이 여기로 온다.
+  if (segment.category === "outing") {
+    return segment.outingKind === "weekend" ? "weekend_outing" : "outing";
+  }
+  return segment.category;
 }
 
 export function inclusiveDays(startDate: string, endDate: string): number {

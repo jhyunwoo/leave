@@ -1,5 +1,5 @@
 /**
- * 보유 휴가 화면 — 재원별 적립분과 정기외박 주기를 관리한다.
+ * 보유 휴가 화면 — 재원별 적립분과 주기 재원(정기외박·외출)을 관리한다.
  *
  * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
  * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
@@ -11,6 +11,7 @@ import { Link } from "react-router";
 import type { LeaveGrantFund, LeaveGrantItem, Me } from "@leave/client";
 import { useDeleteLeaveGrant, useLeaveGrants } from "@leave/client";
 import { LeaveGrantModal } from "../components/LeaveGrantModal";
+import { OutingSettings } from "../components/OutingSettings";
 import { RegularOvernightSettings } from "../components/RegularOvernightSettings";
 import { fmtDateShort } from "@leave/shared";
 
@@ -41,7 +42,7 @@ export function LeaveGrantsPage(props: { me: Me }) {
     );
   }
 
-  const { totals, funds, regularOvernight } = page.data;
+  const { totals, funds, regularOvernight, outing } = page.data;
   const cycleKey = funds.find((fund) => fund.cycleScoped)?.key ?? null;
   const active = funds.filter(
     (fund) =>
@@ -203,6 +204,10 @@ export function LeaveGrantsPage(props: { me: Me }) {
         expanded={showPastCycles}
         onToggle={() => setShowPastCycles((open) => !open)}
       />
+
+      {/* 외출은 위 총합에 들어가지 않는다 — 일이 아니라 횟수라서 "남은 휴가 N일"에
+          더하면 없는 휴가를 있다고 말하게 된다. 그래서 제 단위로 따로 그린다. */}
+      <OutingSettings branch={props.me.user.branch} funds={outing} />
 
       {editing && (
         <LeaveGrantModal

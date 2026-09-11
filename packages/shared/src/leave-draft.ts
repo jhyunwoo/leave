@@ -20,6 +20,7 @@ import {
   inclusiveDays,
   type BalanceKey,
   type LeaveCategory,
+  type OutingKind,
   type OvernightKind,
 } from "./leave";
 
@@ -38,12 +39,19 @@ export type ResolvedDraft = SegmentDraft & {
 export function balanceKeyToCategory(key: BalanceKey): {
   category: LeaveCategory;
   overnightKind?: OvernightKind;
+  outingKind?: OutingKind;
 } {
   if (key === "regular_overnight") {
     return { category: "overnight", overnightKind: "regular" };
   }
   if (key === "other_overnight") {
     return { category: "overnight", overnightKind: "other" };
+  }
+  // 외출은 갈래를 반드시 실어 보낸다. 비워 두면 서버가 평일로 읽어(segmentBalanceKey)
+  // 주말 외출을 골랐는데 평일 몫이 깎이는 조합이 난다.
+  if (key === "outing") return { category: "outing", outingKind: "weekday" };
+  if (key === "weekend_outing") {
+    return { category: "outing", outingKind: "weekend" };
   }
   return { category: key };
 }

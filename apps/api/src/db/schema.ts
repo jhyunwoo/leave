@@ -18,6 +18,7 @@ import {
   BRANCHES,
   LEAVE_CATEGORIES,
   LEAVE_STATUSES,
+  OUTING_KINDS,
   OVERNIGHT_KINDS,
   RANKS,
 } from "@leave/shared";
@@ -257,6 +258,9 @@ export const leaveSegments = sqliteTable(
       .references(() => leaves.id, { onDelete: "cascade" }),
     category: text("category", { enum: LEAVE_CATEGORIES }).notNull(),
     overnightKind: text("overnight_kind", { enum: OVERNIGHT_KINDS }),
+    // 외출의 갈래(평일·주말). 비어 있으면 평일로 읽는다 — 갈래가 생기기 전(0032)에
+    // 저장된 행이 그대로 유효해야 해서 notNull을 걸지 않는다.
+    outingKind: text("outing_kind", { enum: OUTING_KINDS }),
     startDate: text("start_date").notNull(),
     endDate: text("end_date").notNull(),
     days: integer("days").notNull(),
@@ -318,6 +322,44 @@ export const regularOvernightConfigs = sqliteTable(
       .default(false),
     updatedAt: text("updated_at").notNull(),
   },
+);
+
+/**
+ * 외출 자동 적립 설정 — 갈래(평일·주말)마다 한 행.
+ *
+ * 컬럼 구성은 `regularOvernightConfigs`와 같다. 두 재원이 같은 주기 엔진을 쓰기
+ * 때문이다(packages/shared/src/leave-cycle.ts). 정기외박처럼 적립 원장을 만들지
+ * 않고 설정에서 파생한다 — 원장으로 담았다가 0009에서 되돌린 전례가 있다.
+ *
+ * 갈래를 컬럼이 아니라 행으로 나눈 것은 한쪽만 켜는 일이 흔하기 때문이다.
+ * 해·공군은 주말 외출 주기가 공개 규정에 없어 기본이 꺼짐이다
+ * (packages/shared/src/outing-guidance.ts).
+ *
+ * `days_per_grant`는 외출에서 **횟수**다. 외출은 당일 복귀라 한 번이 하루다.
+ */
+export const outingConfigs = sqliteTable(
+  "outing_configs",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: OUTING_KINDS }).notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+    // 주기 시작일. 1주기가 시작하는 날이며, 첫 적립은 한 주기 뒤에 이뤄진다.
+    startDate: text("start_date"),
+    // 주기는 일 또는 개월 중 하나로만 채운다(outingConfigSchema). 외출은 "한 달에
+    // 몇 번"으로 운영돼 실제로는 개월 쪽만 쓰지만, 주기 엔진이 둘 다 받으므로
+    // 부대가 "2주마다"처럼 안내하는 경우를 위해 컬럼을 함께 둔다.
+    intervalDays: integer("interval_days"),
+    intervalMonths: integer("interval_months"),
+    daysPerGrant: integer("days_per_grant"),
+    // 주기가 끝나도 안 쓴 횟수를 남길지. 이월 여부는 부대 지침이라 사용자가 정한다.
+    carryOver: integer("carry_over", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
 export const notifications = sqliteTable(
@@ -658,6 +700,7 @@ export type PersonalEventRow = typeof personalEvents.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type LeaveGrantRow = typeof leaveGrants.$inferSelect;
+export type OutingConfigRow = typeof outingConfigs.$inferSelect;
 export type RegularOvernightConfigRow =
   typeof regularOvernightConfigs.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

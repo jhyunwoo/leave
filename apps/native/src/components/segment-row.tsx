@@ -15,6 +15,7 @@
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
+  balanceUnitLabel,
   fmtDateShort,
   type BalanceKey,
   type ResolvedDraft,
@@ -41,6 +42,8 @@ export function SegmentRow(props: {
   const [pickerOpen, setPickerOpen] = useState(false);
   const selectedTone = balance[props.draft.key];
   const selectedRemaining = props.remainingByKey.get(props.draft.key) ?? 0;
+  // 외출은 일이 아니라 횟수다(@leave/shared의 balanceUnitLabel).
+  const selectedUnit = balanceUnitLabel(props.draft.key);
   const days = props.draft.days;
 
   return (
@@ -72,7 +75,7 @@ export function SegmentRow(props: {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`휴가 종류 ${BALANCE_LABELS[props.draft.key]}, 사용 후 잔여 ${selectedRemaining}일`}
+        accessibilityLabel={`휴가 종류 ${BALANCE_LABELS[props.draft.key]}, 사용 후 잔여 ${selectedRemaining}${selectedUnit}`}
         accessibilityHint="휴가 종류를 변경하려면 누르세요. 순서를 바꾸려면 길게 누른 채 끌어주세요"
         accessibilityState={{ expanded: pickerOpen }}
         onPress={() => setPickerOpen((open) => !open)}
@@ -91,7 +94,8 @@ export function SegmentRow(props: {
             {BALANCE_LABELS[props.draft.key]}
           </Text>
           <Text style={[styles.balanceMeta, { color: selectedTone.fg }]}>
-            이 구간 사용 후 잔여 {selectedRemaining}일
+            이 구간 사용 후 잔여 {selectedRemaining}
+            {selectedUnit}
           </Text>
         </View>
         <Text style={[styles.changeText, { color: selectedTone.fg }]}>
@@ -110,15 +114,17 @@ export function SegmentRow(props: {
             const remaining = props.remainingByKey.get(key) ?? 0;
             const insufficient = !selected && remaining < days;
             const tone = balance[key];
+            // 외출은 일이 아니라 횟수다(@leave/shared의 balanceUnitLabel).
+            const unit = balanceUnitLabel(key);
 
             return (
               <Pressable
                 key={key}
                 accessibilityRole="button"
-                accessibilityLabel={`${BALANCE_LABELS[key]}, 잔여 ${remaining}일`}
+                accessibilityLabel={`${BALANCE_LABELS[key]}, 잔여 ${remaining}${unit}`}
                 accessibilityHint={
                   insufficient
-                    ? `선택하면 ${days - remaining}일이 부족합니다. 개수를 줄이거나 다른 종류를 골라주세요`
+                    ? `선택하면 ${days - remaining}${unit}이 부족합니다. 개수를 줄이거나 다른 종류를 골라주세요`
                     : undefined
                 }
                 accessibilityState={{ selected }}
@@ -162,8 +168,8 @@ export function SegmentRow(props: {
                   numberOfLines={1}
                 >
                   {insufficient
-                    ? `${days - remaining}일 부족 · 조정 필요`
-                    : `잔여 ${remaining}일`}
+                    ? `${days - remaining}${unit} 부족 · 조정 필요`
+                    : `잔여 ${remaining}${unit}`}
                 </Text>
               </Pressable>
             );

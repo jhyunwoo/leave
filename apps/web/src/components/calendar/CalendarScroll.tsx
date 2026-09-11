@@ -19,10 +19,14 @@ import {
   CALENDAR_QUERY_PAST_MONTHS,
   cyclesInRange,
   monthBounds,
+  OUTING_KINDS,
+  outingCycleStartsInRange,
   shiftMonth,
   splitMonth,
   todayInSeoul,
   WEEKDAYS,
+  type OutingConfig,
+  type OutingKind,
   type RegularOvernightConfig,
   type RegularOvernightCycle,
 } from "@leave/shared";
@@ -42,7 +46,7 @@ import {
 } from "react";
 import { useCalendar, usePersonalEvents } from "@leave/client";
 import type { MyLeaveDay } from "@leave/client";
-import { MonthCalendar } from "./MonthCalendar";
+import { MonthCalendar, type OutingCycleStart } from "./MonthCalendar";
 import "./calendar.css";
 
 const INITIAL_SPAN = 2;
@@ -497,12 +501,18 @@ export const MonthScroll = memo(MonthScrollImpl);
 const CalendarScrollImpl = forwardRef<
   CalendarScrollHandle,
   {
-    unitId: string;
+    /**
+     * 소속 부대. **없을 수 있다** — 부대에 가입하지 않아도 달력을 쓴다.
+     * 그때는 출타율과 부대 일정만 빠지고 나머지는 그대로 그린다.
+     */
+    unitId: string | null;
     selectedDate: string | null;
     onSelectDate: (date: string) => void;
     myLeaveDays: Map<string, MyLeaveDay>;
     regularOvernight: RegularOvernightConfig | null;
     currentCycle: RegularOvernightCycle | null;
+    /** 갈래별 외출 설정. 주기 시작일 마커를 그리는 데 쓴다. */
+    outing: Map<OutingKind, OutingConfig>;
     /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
     dischargeAt: string | null;
   }
@@ -519,6 +529,7 @@ const CalendarScrollImpl = forwardRef<
         myLeaveDays={props.myLeaveDays}
         regularOvernight={props.regularOvernight}
         currentCycle={props.currentCycle}
+        outing={props.outing}
         dischargeAt={props.dischargeAt}
       />
     ),
@@ -527,6 +538,7 @@ const CalendarScrollImpl = forwardRef<
       props.dischargeAt,
       props.myLeaveDays,
       props.onSelectDate,
+      props.outing,
       props.regularOvernight,
       props.selectedDate,
       props.unitId,
@@ -539,13 +551,14 @@ const CalendarScrollImpl = forwardRef<
 export const CalendarScroll = memo(CalendarScrollImpl);
 
 const MonthBlock = memo(function MonthBlock(props: {
-  unitId: string;
+  unitId: string | null;
   month: string;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
   myLeaveDays: Map<string, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
+  outing: Map<OutingKind, OutingConfig>;
   dischargeAt: string | null;
 }) {
   const calendar = useCalendar(props.unitId, props.month);
@@ -554,6 +567,39 @@ const MonthBlock = memo(function MonthBlock(props: {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
   }, [props.month, props.regularOvernight]);
+  // 이 달에 **열리는** 외출 주기만. 넘어온 주기는 마커가 아니다(outing.ts 주석).
+  const outingCycleStarts = useMemo<OutingCycleStart[]>(() => {
+    const { start, end } = monthBounds(props.month);
+    return OUTING_KINDS.flatMap((kind) =>
+      outingCycleStartsInRange(
+        props.outing.get(kind),
+        start,
+        end,
+        props.dischargeAt,
+      ).map((cycle) => ({ kind, cycle })),
+    );
+  }, [props.month, props.outing, props.dischargeAt]);
+
+  const grid = (
+    <MonthCalendar
+      month={props.month}
+      days={calendar.data?.days}
+      unitEvents={calendar.data?.events}
+      selectedDate={props.selectedDate}
+      onSelectDate={props.onSelectDate}
+      hideWeekdays
+      myLeaveDays={props.myLeaveDays}
+      cycles={cycles}
+      currentCycle={props.currentCycle}
+      outingCycleStarts={outingCycleStarts}
+      dischargeAt={props.dischargeAt}
+      personalEvents={personalEvents.data?.events}
+    />
+  );
+
+  // 부대가 없으면 부대 달력을 부르지 않는다(useCalendar가 enabled로 이미 끈다).
+  // 기다릴 것도, 실패할 것도 없으므로 곧바로 그린다.
+  if (!props.unitId) return grid;
 
   if (calendar.isPending) {
     return (
@@ -574,17 +620,5 @@ const MonthBlock = memo(function MonthBlock(props: {
   if (calendar.isError || !calendar.data) {
     return <p className="cal-month-error">이 달을 불러오지 못했어요.</p>;
   }
-  return (
-    <MonthCalendar
-      calendar={calendar.data}
-      selectedDate={props.selectedDate}
-      onSelectDate={props.onSelectDate}
-      hideWeekdays
-      myLeaveDays={props.myLeaveDays}
-      cycles={cycles}
-      currentCycle={props.currentCycle}
-      dischargeAt={props.dischargeAt}
-      personalEvents={personalEvents.data?.events}
-    />
-  );
+  return grid;
 });

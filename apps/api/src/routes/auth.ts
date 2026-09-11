@@ -45,6 +45,7 @@ import {
   clearRegularOvernightForBranchChange,
   completeOnboarding,
   ensureDefaultAnnualGrant,
+  ensureDefaultOutingConfigs,
   PLACEHOLDER_PROFILE,
   readOnboardingStatus,
   saveOnboardingProfile,
@@ -185,7 +186,10 @@ export const authRoutes = app
     await db.insert(users).values(user);
 
     // 복무 정보를 함께 받은 경우에만 심는다. 나머지는 온보딩 완료 시점에 들어간다.
-    if (user.onboardingCompletedAt) await ensureDefaultAnnualGrant(db, user);
+    if (user.onboardingCompletedAt) {
+      await ensureDefaultAnnualGrant(db, user);
+      await ensureDefaultOutingConfigs(db, user);
+    }
 
     const token = await createSession(db, user.id);
     const onboardingCompleted = Boolean(user.onboardingCompletedAt);

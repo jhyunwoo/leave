@@ -11,6 +11,8 @@ import {
   regularOvernightPooledRemaining,
   todayInSeoul,
   type ISODate,
+  type OutingConfig,
+  type OutingKind,
 } from "@leave/shared";
 import {
   balanceCountedSegments,
@@ -340,6 +342,12 @@ export function CalendarPage(props: { me: Me }) {
     [myLeaves.data],
   );
   const regularOvernight = balances.data?.regularOvernight ?? null;
+  // 갈래별 외출 설정 — 달력이 주기 시작일 마커를 그리는 데 쓴다.
+  const outingConfigs = useMemo(() => {
+    const map = new Map<OutingKind, OutingConfig>();
+    for (const row of balances.data?.outing ?? []) map.set(row.kind, row);
+    return map;
+  }, [balances.data]);
   const currentCycle = useMemo(
     () => cycleForDisplay(regularOvernight, today, dischargeAt),
     [regularOvernight, today, dischargeAt],
@@ -451,7 +459,7 @@ export function CalendarPage(props: { me: Me }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}>
-          {(mode === "unit" && unit) ||
+          {mode === "unit" ||
           (mode === "friends" && selectedFriendIds.length > 0) ? (
             <button
               type="button"
@@ -472,7 +480,17 @@ export function CalendarPage(props: { me: Me }) {
               부대 일정 추가
             </button>
           ) : null}
-          {mode === "unit" && unit ? (
+          {/* 부대가 없으면 가입이 이 화면의 주 행동이다. 달력 자체는 그대로 쓰이므로
+              막지 않고, 부대가 있어야 열리는 것(출타율·명단)만 안내한다. */}
+          {mode === "unit" && !unit ? (
+            <button
+              className="btn btn-secondary"
+              onClick={() => void navigate("/units")}
+            >
+              부대 가입
+            </button>
+          ) : null}
+          {mode === "unit" ? (
             <button
               className="btn btn-primary"
               onMouseEnter={preloadLeaveFormModal}
@@ -494,148 +512,117 @@ export function CalendarPage(props: { me: Me }) {
       </header>
 
       {mode === "unit" ? (
-        unit ? (
+        <div
+          className="cal-layout"
+          style={{
+            display: "grid",
+            gridTemplateColumns: selectedDate
+              ? "minmax(0, 1fr) 340px"
+              : "minmax(0, 1fr)",
+            gap: "var(--sp-lg)",
+            alignItems: "start",
+          }}
+        >
           <div
-            className="cal-layout"
-            style={{
-              display: "grid",
-              gridTemplateColumns: selectedDate
-                ? "minmax(0, 1fr) 340px"
-                : "minmax(0, 1fr)",
-              gap: "var(--sp-lg)",
-              alignItems: "start",
-            }}
+            className="card"
+            style={{ padding: "var(--sp-md)", minWidth: 0 }}
           >
+            {currentCycle ? (
+              <p className="cal-cycle-banner">
+                정기외박 {currentCycle.index}주기{" "}
+                {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
+                {currentCycle.grantDays}일 중 {cycleUsage}일 사용 ·{" "}
+                {carryOver ? (
+                  <>누적 잔여 {Math.max(pooledRemaining, 0)}일</>
+                ) : (
+                  <>
+                    잔여 {Math.max(currentCycle.grantDays - cycleUsage, 0)}일 ·
+                    마감 D-{Math.max(diffDays(today, currentCycle.end), 0)}
+                  </>
+                )}
+              </p>
+            ) : pendingFirstGrant ? (
+              <p className="cal-cycle-banner is-pending">
+                정기외박 첫 적립 {fmtDateShort(pendingFirstGrant)} · D-
+                {Math.max(diffDays(today, pendingFirstGrant), 0)}
+              </p>
+            ) : null}
+            <CalendarScroll
+              ref={scrollRef}
+              unitId={unit?.id ?? null}
+              selectedDate={selectedDate}
+              myLeaveDays={myLeaveDays}
+              regularOvernight={regularOvernight}
+              currentCycle={currentCycle}
+              outing={outingConfigs}
+              dischargeAt={dischargeAt}
+              onSelectDate={selectDate}
+            />
             <div
-              className="card"
-              style={{ padding: "var(--sp-md)", minWidth: 0 }}
+              style={{
+                display: "flex",
+                gap: "var(--sp-lg)",
+                marginTop: "var(--sp-md)",
+                flexWrap: "wrap",
+              }}
             >
-              {currentCycle ? (
-                <p className="cal-cycle-banner">
-                  정기외박 {currentCycle.index}주기{" "}
-                  {fmtRangeTiny(currentCycle.start, currentCycle.end)} ·{" "}
-                  {currentCycle.grantDays}일 중 {cycleUsage}일 사용 ·{" "}
-                  {carryOver ? (
-                    <>누적 잔여 {Math.max(pooledRemaining, 0)}일</>
-                  ) : (
-                    <>
-                      잔여 {Math.max(currentCycle.grantDays - cycleUsage, 0)}일
-                      · 마감 D-{Math.max(diffDays(today, currentCycle.end), 0)}
-                    </>
-                  )}
-                </p>
-              ) : pendingFirstGrant ? (
-                <p className="cal-cycle-banner is-pending">
-                  정기외박 첫 적립 {fmtDateShort(pendingFirstGrant)} · D-
-                  {Math.max(diffDays(today, pendingFirstGrant), 0)}
-                </p>
-              ) : null}
-              <CalendarScroll
-                ref={scrollRef}
-                unitId={unit.id}
-                selectedDate={selectedDate}
-                myLeaveDays={myLeaveDays}
-                regularOvernight={regularOvernight}
-                currentCycle={currentCycle}
-                dischargeAt={dischargeAt}
-                onSelectDate={selectDate}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  gap: "var(--sp-lg)",
-                  marginTop: "var(--sp-md)",
-                  flexWrap: "wrap",
-                }}
-              >
+              {unit ? (
                 <span className="caption text-mute">
                   하루 최대 출타{" "}
                   <strong>{maxAllowedOut(unit.maxLeaveCount)}명</strong>
                 </span>
-                <span className="caption" style={{ color: "var(--brand)" }}>
-                  ◇ 테두리 표시는 나만 보는 개인 일정
+              ) : (
+                <span className="caption text-mute">
+                  부대에 가입하면 날짜별 출타율과 부대원 명단이 함께 보여요.
                 </span>
-              </div>
+              )}
+              <span className="caption" style={{ color: "var(--brand)" }}>
+                ◇ 테두리 표시는 나만 보는 개인 일정
+              </span>
             </div>
-            {selectedDate ? (
-              <div style={{ display: "grid", gap: "var(--sp-md)" }}>
-                {panelCalendar.data ? (
-                  <UnitItems
-                    events={panelCalendar.data.events ?? []}
-                    date={selectedDate}
-                    canManage={isUnitAdmin}
-                    onAdd={openNewUnitEvent}
-                    onEdit={(event) => {
-                      setEditingUnitEvent(event);
-                      setUnitEventOpen(true);
-                    }}
-                  />
-                ) : null}
-                <PersonalItems
-                  events={events.data?.events ?? []}
+          </div>
+          {selectedDate ? (
+            <div style={{ display: "grid", gap: "var(--sp-md)" }}>
+              {panelCalendar.data ? (
+                <UnitItems
+                  events={panelCalendar.data.events ?? []}
                   date={selectedDate}
-                  onAdd={openNewEvent}
+                  canManage={isUnitAdmin}
+                  onAdd={openNewUnitEvent}
                   onEdit={(event) => {
-                    setEditingEvent(event);
-                    setEventOpen(true);
+                    setEditingUnitEvent(event);
+                    setUnitEventOpen(true);
                   }}
                 />
-                {panelCalendar.data ? (
-                  <DayPanel
-                    calendar={panelCalendar.data}
-                    date={selectedDate}
-                    myUserId={props.me.user.id}
-                    cycle={cycleForDisplay(
-                      regularOvernight,
-                      selectedDate,
-                      dischargeAt,
-                    )}
-                    dischargeAt={dischargeAt}
-                    onOpenLeave={(leaveId) =>
-                      void navigate(`/leaves/${leaveId}`)
-                    }
-                    onPreloadAddLeave={preloadLeaveFormModal}
-                    onAddLeave={() => setLeaveOpen(true)}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div
-            className="card"
-            style={{
-              padding: "var(--sp-2xl)",
-              display: "grid",
-              gap: "var(--sp-lg)",
-            }}
-          >
-            <h2 className="display-xs">소속 그룹이 없어요</h2>
-            <p className="text-body">
-              부대 통계는 그룹에 참여한 뒤 볼 수 있어요. 개인 일정과 친구 달력은
-              지금 바로 사용할 수 있어요.
-            </p>
-            <div
-              style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}
-            >
-              <button
-                className="btn btn-primary"
-                onClick={() => switchMode("friends")}
-              >
-                친구 달력 보기
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => void navigate("/units")}
-              >
-                그룹 참여
-              </button>
-              <button className="btn btn-secondary" onClick={openNewEvent}>
-                개인 일정 추가
-              </button>
+              ) : null}
+              <PersonalItems
+                events={events.data?.events ?? []}
+                date={selectedDate}
+                onAdd={openNewEvent}
+                onEdit={(event) => {
+                  setEditingEvent(event);
+                  setEventOpen(true);
+                }}
+              />
+              {panelCalendar.data ? (
+                <DayPanel
+                  calendar={panelCalendar.data}
+                  date={selectedDate}
+                  myUserId={props.me.user.id}
+                  cycle={cycleForDisplay(
+                    regularOvernight,
+                    selectedDate,
+                    dischargeAt,
+                  )}
+                  dischargeAt={dischargeAt}
+                  onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
+                  onPreloadAddLeave={preloadLeaveFormModal}
+                  onAddLeave={() => setLeaveOpen(true)}
+                />
+              ) : null}
             </div>
-          </div>
-        )
+          ) : null}
+        </div>
       ) : selectedFriendIds.length === 0 ? (
         <div className="card" style={{ padding: "var(--sp-lg)" }}>
           <div style={{ padding: "var(--sp-2xl)", textAlign: "center" }}>

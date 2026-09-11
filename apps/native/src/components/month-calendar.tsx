@@ -5,6 +5,13 @@
  * 웹의 `MonthCalendar.tsx`와 같은 규칙으로 그린다 — 내 휴가가 있는 날은 재원 칩,
  * 그 밖의 날은 그룹 출타율 신호. 두 앱이 같은 날 같은 색을 보여야 한다.
  *
+ * 부대 달력(`calendar`)은 **없을 수 있다.** 부대에 가입하지 않아도 달력을 쓰기
+ * 때문이다 — 그때는 출타율·출타자·부대 일정만 빠지고 내 휴가·개인 일정·전역일·
+ * 주기 표시는 그대로 그린다.
+ *
+ * 외출 주기는 정기외박과 달리 기간을 칠하지 않는다. 주기가 열리는 날 하루에만
+ * 마커를 찍는다 — 한 칸에 색 체계가 둘이 되면 어느 색이 무엇인지 읽을 수 없다.
+ *
  * 칸 높이는 호출자가 정한다(`cellHeight`). 넓은 창에서는 한 달이 화면을 꽉 채우도록
  * 칸이 커지고, 남는 높이만큼 그날 함께 나가는 사람을 칸 안에 미리 보여준다
  * (`showAttendees`) — 달력에서 시트를 열지 않고도 "그날 누가 나가는지"를 훑을 수
@@ -15,7 +22,9 @@ import { availabilitySignal } from "@leave/shared/availability";
 import { buildMonthGrid, isWeekend, WEEKDAYS } from "@leave/shared/calendar";
 import { addDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import { getHoliday } from "@leave/shared/holidays";
-import { BALANCE_LABELS } from "@leave/shared/leave";
+import { BALANCE_LABELS, type OutingKind } from "@leave/shared/leave";
+import { type LeaveCycle } from "@leave/shared/leave-cycle";
+import { outingBalanceKey } from "@leave/shared/outing";
 import {
   cycleColor,
   type RegularOvernightCycle,
@@ -69,9 +78,14 @@ function buildAttendeePreview(
   return byDate;
 }
 
+/** 그 날짜에 열리는 외출 주기 하나. 갈래를 알아야 몇 회인지 말할 수 있다. */
+export type OutingCycleStart = { kind: OutingKind; cycle: LeaveCycle };
+
 /** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */
 export function MonthCalendar(props: {
-  calendar: Calendar;
+  month: string;
+  /** 부대 달력 응답. 부대가 없으면 넘기지 않는다 — 출타 관련 표시만 빠진다. */
+  calendar?: Calendar;
   selectedDate: ISODate | null;
   onSelectDate: (date: ISODate) => void;
   compact?: boolean;
@@ -87,6 +101,8 @@ export function MonthCalendar(props: {
   cycles?: RegularOvernightCycle[];
   /** 오늘이 속한 정기외박 주기. 해당 날짜 칸에 옅은 배경을 깐다. */
   currentCycle?: RegularOvernightCycle | null;
+  /** 이 달에 **시작하는** 외출 주기들. 그 날짜에만 마커를 찍는다. */
+  outingCycleStarts?: OutingCycleStart[];
   /** 내 전역일. 그날 칸에 배지를 달고, 다음 날부터는 주기 표시를 멈춘다. */
   dischargeAt?: ISODate | null;
   personalEvents?: PersonalEvent[];
@@ -97,6 +113,7 @@ export function MonthCalendar(props: {
   dragScrollGesture?: NativeGesture;
 }) {
   const {
+    month,
     calendar,
     selectedDate,
     onSelectDate,
@@ -105,26 +122,37 @@ export function MonthCalendar(props: {
     myLeaveDays,
     cycles,
     currentCycle,
+    outingCycleStarts,
     dischargeAt,
     personalEvents,
   } = props;
   const styles = useStyles();
-  const { colors } = useTheme();
+  const { colors, balance } = useTheme();
   const today = todayInSeoul();
-  const weeks = useMemo(() => buildMonthGrid(calendar.month), [calendar.month]);
+  const weeks = useMemo(() => buildMonthGrid(month), [month]);
   const statByDate = useMemo(
-    () => new Map(calendar.days.map((d) => [d.date, d])),
-    [calendar.days],
+    () => new Map((calendar?.days ?? []).map((d) => [d.date, d])),
+    [calendar?.days],
   );
+  /** 날짜 → 그날 열리는 외출 주기들. 한 날에 두 갈래가 함께 열릴 수 있다. */
+  const outingStartsByDate = useMemo(() => {
+    const map = new Map<string, OutingCycleStart[]>();
+    for (const entry of outingCycleStarts ?? []) {
+      const list = map.get(entry.cycle.start);
+      if (list) list.push(entry);
+      else map.set(entry.cycle.start, [entry]);
+    }
+    return map;
+  }, [outingCycleStarts]);
   const showAttendees = props.showAttendees ?? false;
   // 미리보기를 끈 크기에서는 아예 만들지 않는다 — 휴대폰에서 쓰지 않을 표를
   // 달마다 만들면 스크롤 중에 그만큼 손해다.
   const attendeePreview = useMemo(
     () =>
       showAttendees
-        ? buildAttendeePreview(calendar.attendees)
+        ? buildAttendeePreview(calendar?.attendees ?? [])
         : new Map<string, { initials: string[]; total: number }>(),
-    [showAttendees, calendar.attendees],
+    [showAttendees, calendar?.attendees],
   );
   // 한 칸의 높이. 달 블록 높이가 여기서 나오므로 칸은 이 높이에 **고정**이고,
   // 넘치는 내용은 잘린다(styles.cell의 overflow). 예산을 넘겨 칸이 자라면 그 주
@@ -142,7 +170,7 @@ export function MonthCalendar(props: {
   const dragPreview = useAtomValue(calendarDragPreviewAtom);
 
   return (
-    <View accessibilityLabel={`${calendar.month} 휴가 계획 달력`}>
+    <View accessibilityLabel={`${month} 휴가 계획 달력`}>
       {!hideWeekdays && (
         <View style={styles.weekRow}>
           {WEEKDAYS.map((w, i) => (
@@ -174,7 +202,7 @@ export function MonthCalendar(props: {
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const unitEvents = cell.inMonth
-              ? (calendar.events ?? []).filter(
+              ? (calendar?.events ?? []).filter(
                   (event) =>
                     event.startDate <= cell.date && cell.date <= event.endDate,
                 )
@@ -214,6 +242,11 @@ export function MonthCalendar(props: {
                     (c) => c.start <= cell.date && cell.date <= c.end,
                   )
                 : undefined;
+            // 이 날 열리는 외출 주기. 기간을 칠하지 않고 시작일에만 찍는다.
+            const outingStarts =
+              cell.inMonth && !pastDischarge && !compact
+                ? (outingStartsByDate.get(cell.date) ?? [])
+                : [];
             const preview =
               cell.inMonth && showAttendees
                 ? attendeePreview.get(cell.date)
@@ -274,27 +307,55 @@ export function MonthCalendar(props: {
               >
                 {cell.inMonth && (
                   <>
-                    <View
-                      style={[
-                        styles.dayNumWrap,
-                        isToday && styles.todayWrap,
-                        isSelected && styles.selectedWrap,
-                      ]}
-                    >
-                      <Text
+                    {/* 날짜 줄. 외출 주기 마커는 이 줄의 남는 자리를 쓴다 —
+                        칸 높이 예산이 꽉 차 있어 줄을 늘리면 마지막 주가 잘린다. */}
+                    <View style={styles.dayNumRow}>
+                      <View
                         style={[
-                          styles.dayNum,
-                          (weekend || holiday || hasUnitHoliday) && {
-                            color: colors.negative,
-                          },
-                          exceeded && { color: colors.negativeDeep },
-                          (isToday || isSelected) && {
-                            color: colors.onPrimary,
-                          },
+                          styles.dayNumWrap,
+                          isToday && styles.todayWrap,
+                          isSelected && styles.selectedWrap,
                         ]}
                       >
-                        {dayNum}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.dayNum,
+                            (weekend || holiday || hasUnitHoliday) && {
+                              color: colors.negative,
+                            },
+                            exceeded && { color: colors.negativeDeep },
+                            (isToday || isSelected) && {
+                              color: colors.onPrimary,
+                            },
+                          ]}
+                        >
+                          {dayNum}
+                        </Text>
+                      </View>
+                      {outingStarts.map((entry) => {
+                        const tone = balance[outingBalanceKey(entry.kind)];
+                        return (
+                          <View
+                            key={entry.kind}
+                            style={[
+                              styles.outingStart,
+                              { backgroundColor: tone.bg },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.outingStartText,
+                                { color: tone.fg },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {entry.kind === "weekend" ? "주말" : "외출"}
+                              {" +"}
+                              {entry.cycle.grantDays}
+                            </Text>
+                          </View>
+                        );
+                      })}
                     </View>
                     {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 아래 칸 높이
                         예산이 꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는
@@ -532,6 +593,27 @@ const useStyles = makeStyles(({ colors }) => ({
     borderWidth: 1,
     borderColor: "transparent",
     backgroundColor: "transparent",
+  },
+  // 날짜 숫자와 외출 마커가 한 줄을 나눠 쓴다. 마커가 없는 날은 지금까지처럼
+  // 숫자만 가운데에 놓인다.
+  dayNumRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    maxWidth: "100%",
+  },
+  outingStart: {
+    minHeight: 14,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm,
+    justifyContent: "center",
+    flexShrink: 1,
+  },
+  outingStartText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "700",
   },
   dayNumWrap: {
     minWidth: 26,

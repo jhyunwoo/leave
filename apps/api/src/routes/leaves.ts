@@ -3,7 +3,7 @@
  *
  * 마운트 위치: `/leaves` (apps/api/src/index.ts).
  * 명세는 ./leaves.contract.ts, 계산과 저장 규칙은 lib/leave-*.ts에 있다.
- * 다루는 것: 내 휴가 CRUD, 재원별 잔여 요약, 적립분 관리, 정기외박 설정.
+ * 다루는 것: 내 휴가 CRUD, 재원별 잔여 요약, 적립분 관리, 정기외박·외출 설정.
  *
  * 휴가를 저장하기 전에 반드시 두 가지를 확인한다.
  *  1) 구간들이 겹치지 않고 빈틈없이 이어지는가(스키마)
@@ -26,6 +26,7 @@ import { leaveRuleMessage } from "../lib/errors";
 import {
   foldSegmentRows,
   getLeaveBalanceSummary,
+  saveOutingConfig,
   saveRegularOvernightConfig,
   segmentsForLeaves,
   segmentsOfUserQuery,
@@ -50,6 +51,7 @@ import {
   deleteLeaveRoute,
   grantsRoute,
   mineRoute,
+  outingRoute,
   regularOvernightRoute,
   updateBalancesRoute,
   updateGrantRoute,
@@ -121,6 +123,17 @@ export const leaveRoutes = app
       return c.json({ error: message }, 400);
     }
   })
+  .openapi(outingRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    try {
+      return c.json(await saveOutingConfig(db, user, c.req.valid("json")), 200);
+    } catch (error) {
+      const message = leaveRuleMessage(error);
+      if (message === null) throw error;
+      return c.json({ error: message }, 400);
+    }
+  })
   .openapi(grantsRoute, async (c) => {
     const user = c.get("user");
     const db = drizzle(c.env.DB);
@@ -185,9 +198,9 @@ export const leaveRoutes = app
   .openapi(createLeaveRoute, async (c) => {
     const input = c.req.valid("json");
     const user = c.get("user");
-    if (!user.unitId) {
-      return c.json({ error: "먼저 부대에 가입해주세요" }, 400);
-    }
+    // 부대는 요구하지 않는다. 휴가·외출은 내 재원에서 빠지는 내 기록이고, 부대가
+    // 필요한 것은 출타 집계와 초과 알림뿐이다 — 그 둘만 아래에서 건너뛴다.
+    // 수정(PATCH) 쪽은 처음부터 이렇게 동작하고 있었다.
     const db = drizzle(c.env.DB);
     const segments = toSegments(input);
 
@@ -203,12 +216,14 @@ export const leaveRoutes = app
     });
     if (!saved.ok) return c.json({ error: saved.error }, 400);
 
-    const exceededDates = await checkOverageAndNotify({
-      db,
-      unitId: user.unitId,
-      changedLeave: saved.row,
-      waitUntil: (p) => c.executionCtx.waitUntil(p),
-    });
+    const exceededDates = user.unitId
+      ? await checkOverageAndNotify({
+          db,
+          unitId: user.unitId,
+          changedLeave: saved.row,
+          waitUntil: (p) => c.executionCtx.waitUntil(p),
+        })
+      : [];
 
     // 초안은 나만 보는 비공개 계획이라 존재 자체를 알리지 않는다.
     // 날짜는 저장 결과에서 읽는다 — 붙어 있는 휴가에 흡수되면 요청한 기간보다

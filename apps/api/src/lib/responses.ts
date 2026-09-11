@@ -15,6 +15,7 @@ import {
   FRIEND_RELATIONSHIPS,
   LEAVE_CATEGORIES,
   LEAVE_STATUSES,
+  OUTING_KINDS,
   OVERNIGHT_KINDS,
   RANKS,
 } from "@leave/shared";
@@ -106,6 +107,8 @@ export const myJoinRequestSchema = z
 export const leaveSegmentResponseSchema = z.object({
   category: z.enum(LEAVE_CATEGORIES),
   overnightKind: z.enum(OVERNIGHT_KINDS).optional(),
+  /** 외출의 갈래. 갈래가 생기기 전 구간은 비어 있고, 그때는 평일로 읽는다. */
+  outingKind: z.enum(OUTING_KINDS).optional(),
   startDate: z.string(),
   endDate: z.string(),
   days: z.number(),
@@ -424,6 +427,47 @@ export const regularOvernightCycleSchema = z
   })
   .openapi("RegularOvernightCycle");
 
+/**
+ * 외출 주기 한 칸. `regularOvernightCycleSchema`와 같은 모양이되 **색이 없다** —
+ * 외출 주기는 달력에서 색 선이 아니라 시작일 마커로 보여주기 때문이다
+ * (packages/shared/src/outing.ts 머리말).
+ */
+export const outingCycleSchema = z
+  .object({
+    index: z.number(),
+    start: z.string(),
+    end: z.string(),
+    grantDays: z.number(),
+    usedDays: z.number(),
+    usedToDateDays: z.number(),
+    remainingDays: z.number(),
+    remainingAsOfTodayDays: z.number(),
+    state: z.enum(["past", "current", "future"]),
+  })
+  .openapi("OutingCycle");
+
+/** 외출 갈래 하나의 자동 적립 설정과 그 주기들. */
+export const outingConfigResponseSchema = z
+  .object({
+    kind: z.enum(OUTING_KINDS),
+    enabled: z.boolean(),
+    startDate: z.string().nullable(),
+    /** 주기 길이. 일·개월 중 채워진 한쪽이 그 갈래의 주기 단위다. */
+    intervalDays: z.number().nullable(),
+    intervalMonths: z.number().nullable(),
+    /** 외출에서는 회당 **횟수**다 — 당일 복귀라 한 번이 하루다. */
+    daysPerGrant: z.number().nullable(),
+    /** 설정에서 파생한 다음 적립 예정일 (읽기 전용). */
+    nextGrantDate: z.string().nullable(),
+    carryOver: z.boolean(),
+  })
+  .openapi("OutingConfig");
+
+/** 보유 휴가 화면이 쓰는, 주기 목록까지 붙은 형태. */
+export const outingFundSchema = outingConfigResponseSchema
+  .extend({ cycles: z.array(outingCycleSchema) })
+  .openapi("OutingFund");
+
 export const leaveGrantsPageSchema = z
   .object({
     /** 서버가 본 한국 시간 오늘 — 클라이언트가 만료 판정을 서버와 맞추도록 내려준다. */
@@ -453,6 +497,8 @@ export const leaveGrantsPageSchema = z
       /** 주기 시작일부터 전역일까지의 모든 주기. 설정이 없으면 빈 배열. */
       cycles: z.array(regularOvernightCycleSchema),
     }),
+    /** 갈래(평일·주말)마다 한 벌. 꺼져 있어도 항목 자체는 온다. */
+    outing: z.array(outingFundSchema),
   })
   .openapi("LeaveGrantsPage");
 
@@ -471,6 +517,8 @@ export const leaveBalanceSummarySchema = z
       /** 켜면 주기가 끝나도 남은 몫이 사라지지 않고 하나의 누적 잔여로 쌓인다. */
       carryOver: z.boolean(),
     }),
+    /** 외출 설정 — 갈래마다 한 벌. 폼이 주기 잔여를 계산하는 데 쓴다. */
+    outing: z.array(outingConfigResponseSchema),
   })
   .openapi("LeaveBalanceSummary");
 

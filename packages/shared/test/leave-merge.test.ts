@@ -320,3 +320,30 @@ describe("planLeaveMerge — 제목·사유·살아남는 행", () => {
     expect(planLeaveMerge(incoming, [incoming]).kind).toBe("alone");
   });
 });
+
+describe("planLeaveMerge — 외출은 합치지 않는다", () => {
+  it("붙어 있는 외출 둘은 각각 한 건으로 남는다", () => {
+    // 합치면 이틀짜리 구간 하나가 되어 "몇 번 나갔는가"가 사라진다.
+    const before = leave("a", [seg("outing", "2026-02-03", "2026-02-03")]);
+    const incoming = leave("b", [seg("outing", "2026-02-04", "2026-02-04")]);
+    expect(planLeaveMerge(incoming, [before]).kind).toBe("alone");
+  });
+
+  it("외출은 붙어 있는 연가에도 흡수되지 않는다", () => {
+    // 합쳐진 휴가의 마지막 날이 외출이면 출타 집계가 복귀일로 보고 빼 버린다.
+    const annual = leave("a", [seg("annual", "2026-02-01", "2026-02-02")]);
+    const incoming = leave("b", [seg("outing", "2026-02-03", "2026-02-03")]);
+    expect(planLeaveMerge(incoming, [annual]).kind).toBe("alone");
+    // 반대 방향도 마찬가지 — 연가를 저장할 때 옆의 외출을 끌어오지 않는다.
+    const outing = leave("a", [seg("outing", "2026-02-01", "2026-02-01")]);
+    const newAnnual = leave("b", [seg("annual", "2026-02-02", "2026-02-03")]);
+    expect(planLeaveMerge(newAnnual, [outing]).kind).toBe("alone");
+  });
+
+  it("겹침은 그대로 막는다 — 같은 날 두 번 나갈 수는 없다", () => {
+    const before = leave("a", [seg("outing", "2026-02-03", "2026-02-03")]);
+    const incoming = leave("b", [seg("outing", "2026-02-03", "2026-02-03")]);
+    const plan = planLeaveMerge(incoming, [before]);
+    expect(plan.kind).toBe("conflict");
+  });
+});

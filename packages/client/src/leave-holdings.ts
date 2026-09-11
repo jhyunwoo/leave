@@ -13,7 +13,13 @@
  *    빼면 통장에 있는 휴가보다 적게 보인다 — 계획은 `planned`로 따로 알린다.
  *  - 그래서 주기 재원의 계획분은 `upcomingAsOfTodayDays - upcomingDays`, 즉
  *    "앞으로 받을 몫 중 미래 주기에 이미 잡아 둔 만큼"이다.
+ *  - **외출은 여기 들어가지 않는다.** 이 줄이 말하는 것은 "남은 휴가 N일"인데
+ *    외출은 일이 아니라 횟수다 — 당일 복귀라 일과가 사라지지 않는 것이 외출의
+ *    정의이고(@leave/shared의 duty-days), 월 2회를 2일로 더하면 화면이 없는 휴가를
+ *    있다고 말한다. 서버의 보유 휴가 합계도 같은 이유로 외출을 뺀다
+ *    (apps/api/src/lib/leave-grants.ts의 cycleSum). 두 화면이 갈리면 안 된다.
  */
+import { isOutingBalanceKey } from "@leave/shared";
 import type { LeaveBalanceSummary } from "./types";
 
 export type LeaveHoldings = {
@@ -28,19 +34,23 @@ export type LeaveHoldings = {
 export function summarizeHoldings(
   balances: LeaveBalanceSummary["balances"] | undefined,
 ): LeaveHoldings {
-  return (balances ?? []).reduce<LeaveHoldings>(
-    (sum, item) => ({
-      remaining:
-        sum.remaining +
-        item.remainingAsOfTodayDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
-      planned:
-        sum.planned +
-        item.plannedDays +
-        (item.cycleScoped ? item.upcomingAsOfTodayDays - item.upcomingDays : 0),
-      expiringSoon: sum.expiringSoon + item.expiringSoonDays,
-      expired: sum.expired + item.expiredDays,
-    }),
-    { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
-  );
+  return (balances ?? [])
+    .filter((item) => !isOutingBalanceKey(item.key))
+    .reduce<LeaveHoldings>(
+      (sum, item) => ({
+        remaining:
+          sum.remaining +
+          item.remainingAsOfTodayDays +
+          (item.cycleScoped ? item.upcomingAsOfTodayDays : 0),
+        planned:
+          sum.planned +
+          item.plannedDays +
+          (item.cycleScoped
+            ? item.upcomingAsOfTodayDays - item.upcomingDays
+            : 0),
+        expiringSoon: sum.expiringSoon + item.expiringSoonDays,
+        expired: sum.expired + item.expiredDays,
+      }),
+      { remaining: 0, planned: 0, expiringSoon: 0, expired: 0 },
+    );
 }
