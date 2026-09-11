@@ -21,7 +21,6 @@ import {
   eligibleRegularOvernightCycles,
   fitDraftsToTotal,
   inclusiveDays,
-  isCountedLeaveStatus,
   isRegularOvernightCycleBased,
   leaveCreateSchema,
   monthsSpanning,
@@ -52,6 +51,7 @@ import {
   useState,
   type SetStateAction,
 } from "react";
+import { balanceCountedSegments } from "../balance-segments";
 import { useCalendarDays } from "../hooks/calendar";
 import { useMe } from "../hooks/auth";
 import {
@@ -273,14 +273,13 @@ export function useLeaveForm(options: LeaveFormOptions) {
   }, [cycleBased, regularCycleChoices]);
 
   // 이미 저장된 내 정기외박 구간. 수정 중이면 그 휴가 몫은 빼야 자기 자신과 부딪히지 않는다.
+  // 기준은 서버의 잔여 계산과 같아야 한다(balance-segments.ts 주석 참고) — 예전에는
+  // 여기서 초안을 빼고 서버는 세어서, 칩은 여유가 있는데 저장은 400인 조합이 났다.
   const savedRegular = useMemo<SegmentLike[]>(
     () =>
-      (myLeaves.data?.leaves ?? [])
-        .filter(
-          (leave) =>
-            leave.id !== editing?.id && isCountedLeaveStatus(leave.status),
-        )
-        .flatMap((leave) => leave.segments),
+      balanceCountedSegments(myLeaves.data?.leaves, {
+        excludeLeaveId: editing?.id,
+      }),
     [myLeaves.data, editing],
   );
 

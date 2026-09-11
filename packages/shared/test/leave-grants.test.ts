@@ -543,3 +543,60 @@ describe("구버전 총량 API 매핑", () => {
     });
   });
 });
+
+/**
+ * 상태가 다른 두 휴가는 같은 날짜에 겹칠 수 있다 — 초안으로 시뮬레이션한 뒤 실제
+ * 휴가를 만드는 흐름이 그렇다(leave-merge의 겹침 검사는 같은 상태끼리만 본다).
+ * 하루에 두 번 나갈 수는 없으므로 그 날짜를 두 번 세면 안 된다.
+ */
+describe("겹치는 구간의 날짜는 한 번만 센다", () => {
+  it("같은 기간을 덮는 구간이 둘이면 5일 여행에서 5일만 빠진다", () => {
+    const allocation = allocateBalanceGrants(
+      "award",
+      [grant({ id: "base", days: 10 })],
+      [used("2026-08-01", "2026-08-05"), used("2026-08-01", "2026-08-05")],
+      TODAY,
+    );
+    expect(allocation.usedDays).toBe(5);
+    expect(allocation.remainingDays).toBe(5);
+    expect(allocation.unattributedDays).toBe(0);
+    expectBalanced(allocation);
+  });
+
+  it("일부만 겹쳐도 합집합만 센다", () => {
+    const allocation = allocateBalanceGrants(
+      "award",
+      [grant({ id: "base", days: 10 })],
+      [used("2026-08-01", "2026-08-03"), used("2026-08-03", "2026-08-05")],
+      TODAY,
+    );
+    expect(allocation.usedDays).toBe(5);
+    expect(allocation.remainingDays).toBe(5);
+  });
+
+  it("겹치지 않으면 예전과 같이 더한다", () => {
+    const allocation = allocateBalanceGrants(
+      "award",
+      [grant({ id: "base", days: 10 })],
+      [used("2026-08-01", "2026-08-02"), used("2026-08-04", "2026-08-05")],
+      TODAY,
+    );
+    expect(allocation.usedDays).toBe(4);
+  });
+
+  it("재원이 다르면 같은 날짜라도 각자 센다", () => {
+    const result = allocateAllGrants(
+      [
+        grant({ id: "a", days: 5 }),
+        grant({ id: "b", balanceKey: "annual", days: 5 }),
+      ],
+      [
+        used("2026-08-01", "2026-08-02"),
+        { category: "annual", startDate: "2026-08-01", endDate: "2026-08-02" },
+      ],
+      TODAY,
+    );
+    expect(result.award.usedDays).toBe(2);
+    expect(result.annual.usedDays).toBe(2);
+  });
+});

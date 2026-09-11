@@ -47,6 +47,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  balanceCountedSegments,
   buildMyLeaveDayMap,
   summarizeHoldings,
   useCalendar,
@@ -190,15 +191,15 @@ export function CalendarScreen() {
     () => cycleForDisplay(regularOvernight, today, dischargeAt),
     [regularOvernight, today, dischargeAt],
   );
+  // 잔여를 깎는 휴가만 센다. 예전에는 전체 구간을 그대로 넘겨서 취소·반려한 휴가가
+  // 주기 몫을 계속 잡아먹은 것처럼 보였다(balance-segments.ts 주석 참고).
+  const balanceSegments = useMemo(
+    () => balanceCountedSegments(myLeaves.data?.leaves),
+    [myLeaves.data],
+  );
   const cycleUsage = useMemo(
-    () =>
-      currentCycle
-        ? cycleUsedDays(
-            currentCycle,
-            (myLeaves.data?.leaves ?? []).flatMap((leave) => leave.segments),
-          )
-        : 0,
-    [currentCycle, myLeaves.data],
+    () => (currentCycle ? cycleUsedDays(currentCycle, balanceSegments) : 0),
+    [currentCycle, balanceSegments],
   );
   // 이월 중에는 마감이라는 것이 없고, 쓸 수 있는 몫도 이번 주기가 아니라 누적이다.
   const pooledRemaining = useMemo(
@@ -206,14 +207,12 @@ export function CalendarScreen() {
       regularOvernight?.carryOver
         ? regularOvernightPooledRemaining({
             config: regularOvernight,
-            used: (myLeaves.data?.leaves ?? []).flatMap(
-              (leave) => leave.segments,
-            ),
+            used: balanceSegments,
             dischargeAt,
             on: today,
           })
         : null,
-    [regularOvernight, myLeaves.data, dischargeAt, today],
+    [regularOvernight, balanceSegments, dischargeAt, today],
   );
   // 첫 적립 전에는 주기가 없다. 대신 첫 적립일을 알려준다. 다만 그 적립일이 전역일보다
   // 뒤면 끝내 받지 못하므로 기다리라고 하지 않는다.

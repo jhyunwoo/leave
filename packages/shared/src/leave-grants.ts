@@ -160,19 +160,26 @@ export function isExpiringSoon(
   return diffDays(today, grant.expiresOn) <= withinDays;
 }
 
-/** 구간들을 날짜 하나하나로 펼쳐 오름차순 정렬한다. 상한을 넘으면 잘라낸다. */
+/**
+ * 구간들을 날짜 하나하나로 펼쳐 오름차순 정렬한다. 상한을 넘으면 잘라낸다.
+ *
+ * **같은 날짜는 한 번만 센다.** 하루에 두 번 나갈 수는 없기 때문이다. 상태가 다른
+ * 두 휴가는 서로 겹칠 수 있는데(초안으로 시뮬레이션한 뒤 실제 휴가를 만드는 흐름이
+ * 그렇다 — `leave-merge.ts`의 겹침 검사는 같은 상태끼리만 본다), 중복을 그대로 세면
+ * 5일 여행에서 10일이 빠진다.
+ */
 function usageDates(usages: readonly SegmentLike[]): ISODate[] {
-  const dates: ISODate[] = [];
+  const dates = new Set<ISODate>();
   for (const usage of usages) {
     for (
       let date = usage.startDate;
-      date <= usage.endDate && dates.length < MAX_USAGE_DAYS;
+      date <= usage.endDate && dates.size < MAX_USAGE_DAYS;
       date = addDays(date, 1)
     ) {
-      dates.push(date);
+      dates.add(date);
     }
   }
-  return dates.sort();
+  return [...dates].sort();
 }
 
 /**

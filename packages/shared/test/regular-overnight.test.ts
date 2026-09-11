@@ -1040,3 +1040,102 @@ describe("달 단위 주기의 이월", () => {
     );
   });
 });
+
+/**
+ * 폼의 칩 숫자(`regularOvernightAvailableIn`)와 저장 판정(`checkRegularOvernight`)이
+ * 어긋나면 "칩은 0인데 저장은 성공"이 된다. 첫 적립일 경계가 그 자리였다 —
+ * `cyclesInRange`가 첫 적립 앞을 잘라내고 겹치는 주기를 돌려주기 때문이다.
+ */
+describe("첫 적립일을 걸치는 구간", () => {
+  const straddling: SegmentLike[] = [
+    {
+      category: "overnight",
+      overnightKind: "regular",
+      startDate: "2026-05-09",
+      endDate: "2026-05-12",
+    },
+  ];
+
+  it("칩과 저장 판정이 같은 답을 낸다", () => {
+    expect(
+      regularOvernightAvailableIn({
+        config,
+        used: [],
+        dischargeAt: "2027-12-31",
+        from: "2026-05-09",
+        to: "2026-05-12",
+      }),
+    ).toBe(0);
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: straddling,
+        dischargeAt: "2027-12-31",
+      }),
+    ).toEqual({ kind: "before_first_grant", firstGrantDate: "2026-05-11" });
+  });
+
+  it("첫 적립일부터 시작하면 그대로 통과한다", () => {
+    expect(
+      checkRegularOvernight({
+        config,
+        existing: [],
+        requested: [
+          {
+            category: "overnight",
+            overnightKind: "regular",
+            startDate: "2026-05-11",
+            endDate: "2026-05-12",
+          },
+        ],
+        dischargeAt: "2027-12-31",
+      }),
+    ).toBe(null);
+  });
+});
+
+/** 상태가 다른 두 휴가는 같은 날짜에 겹칠 수 있다. 주기 몫도 하루를 한 번만 센다. */
+describe("주기 사용량은 날짜 집합으로 센다", () => {
+  const cycle = cycleFor(config, "2026-05-20")!;
+
+  it("같은 기간을 덮는 구간이 둘이면 한 번만 센다", () => {
+    const segment: SegmentLike = {
+      category: "overnight",
+      overnightKind: "regular",
+      startDate: "2026-05-18",
+      endDate: "2026-05-19",
+    };
+    expect(cycleUsedDays(cycle, [segment, { ...segment }])).toBe(2);
+  });
+
+  it("주기를 명시한 구간이 겹쳐도 한 번만 센다", () => {
+    const segment: SegmentLike = {
+      category: "overnight",
+      overnightKind: "regular",
+      startDate: "2026-05-18",
+      endDate: "2026-05-19",
+      regularOvernightCycleStart: cycle.start,
+    };
+    expect(cycleUsedDays(cycle, [segment, { ...segment }])).toBe(2);
+  });
+
+  it("겹치지 않으면 예전과 같이 더한다", () => {
+    expect(
+      cycleUsedDays(cycle, [
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-05-18",
+          endDate: "2026-05-19",
+        },
+        {
+          category: "overnight",
+          overnightKind: "regular",
+          startDate: "2026-05-25",
+          endDate: "2026-05-25",
+        },
+      ]),
+    ).toBe(3);
+  });
+});

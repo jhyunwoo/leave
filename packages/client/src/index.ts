@@ -15,6 +15,7 @@ export * from "./my-leave-days";
 export * from "./my-leaves-sections";
 export * from "./next-leave-countdown";
 export * from "./leave-holdings";
+export * from "./balance-segments";
 
 export * from "./hooks/auth";
 export * from "./hooks/units";

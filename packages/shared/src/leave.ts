@@ -89,6 +89,31 @@ export function isCountedLeaveStatus(status: string): boolean {
   return (COUNTED_LEAVE_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * 내 잔여 휴가에서 빠지는 상태. 위의 출타 집계 목록과 **일부러 다르다.**
+ *
+ * 두 목록이 답하는 질문이 다르다.
+ *  - `COUNTED_LEAVE_STATUSES`: "그날 그룹에서 몇 명이 나가는가" — 초안은 나만 보는
+ *    계획이라 남의 출타율·명단에 들어가면 안 된다.
+ *  - 이 목록: "내 통장에서 며칠이 빠지는가" — 초안도 내가 잡아 둔 계획이므로 빠진다
+ *    (`plannedDays`가 바로 그 몫이다). 대신 `rejected`·`cancelled`는 실제로 나가지
+ *    않으므로 일수가 돌아와야 한다.
+ *
+ * 예전에는 서버의 잔여 계산에 상태 조건이 아예 없어서 취소한 휴가가 계속 잔여를
+ * 깎았고, 폼·달력은 `COUNTED_LEAVE_STATUSES`를 써서 층마다 다른 숫자가 나왔다.
+ */
+export const BALANCE_LEAVE_STATUSES: readonly LeaveStatus[] = [
+  "draft",
+  "shared",
+  "requested",
+  "approved",
+  "completed",
+];
+
+export function countsAgainstBalance(status: string): boolean {
+  return (BALANCE_LEAVE_STATUSES as readonly string[]).includes(status);
+}
+
 /** 확정(approved/completed)은 희망과 시각적으로 반드시 구분해야 한다. */
 export function isConfirmedLeaveStatus(status: string): boolean {
   return status === "approved" || status === "completed";

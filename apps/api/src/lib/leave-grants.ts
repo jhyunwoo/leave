@@ -9,6 +9,7 @@ import {
   allocateAllGrants,
   BALANCE_KEYS,
   BALANCE_LABELS,
+  BALANCE_LEAVE_STATUSES,
   clipSegmentsTo,
   cycleColor,
   cycleDateAfter,
@@ -25,7 +26,7 @@ import {
   type LeaveGrantCreateInput,
   type LeaveGrantUpdateInput,
 } from "@leave/shared";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   leaveGrants,
   leaves,
@@ -104,10 +105,22 @@ export function userSegmentsQuery(db: Db, userId: string) {
       overnightKind: leaveSegments.overnightKind,
       startDate: leaveSegments.startDate,
       endDate: leaveSegments.endDate,
+      // 사용자가 고른 주기가 있으면 그 주기에서 통째로 빼야 한다
+      // (`cycleUsedDays`의 명시 분기). 이 컬럼이 빠져 있던 동안 서버는 항상 레거시
+      // 겹침 계산을 탔고, /leaves/mine을 보는 폼과 귀속이 갈려 "칩은 여유가 있다는데
+      // 저장하면 400"이 났다.
+      regularOvernightCycleStart: leaveSegments.regularOvernightCycleStart,
     })
     .from(leaveSegments)
     .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-    .where(eq(leaves.userId, userId));
+    .where(
+      and(
+        eq(leaves.userId, userId),
+        // 취소·반려한 휴가는 실제로 나가지 않으므로 잔여가 돌아와야 한다.
+        // 초안은 내가 잡아 둔 계획이라 그대로 빠진다(shared의 주석 참고).
+        inArray(leaves.status, [...BALANCE_LEAVE_STATUSES]),
+      ),
+    );
 }
 
 export function regularOvernightConfigQuery(db: Db, userId: string) {

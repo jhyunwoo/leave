@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BALANCE_LEAVE_STATUSES,
+  COUNTED_LEAVE_STATUSES,
+  LEAVE_STATUSES,
+  countsAgainstBalance,
   segmentBalanceKey,
   shiftSegments,
   DEFAULT_ANNUAL_DAYS,
@@ -116,5 +120,40 @@ describe("shiftSegments", () => {
     expect(inclusiveDays(moved[0]!.startDate, moved[0]!.endDate)).toBe(
       inclusiveDays(long[0]!.startDate, long[0]!.endDate),
     );
+  });
+});
+
+/**
+ * 두 상태 집합은 서로 다른 질문에 답한다. 예전에는 서버의 잔여 계산에 상태 조건이
+ * 아예 없어서 취소한 휴가가 계속 잔여를 깎았다.
+ */
+describe("잔여를 깎는 상태", () => {
+  it("취소·반려는 잔여를 깎지 않는다", () => {
+    expect(countsAgainstBalance("cancelled")).toBe(false);
+    expect(countsAgainstBalance("rejected")).toBe(false);
+  });
+
+  it("초안은 내가 잡아 둔 계획이라 잔여에서 빠진다", () => {
+    expect(countsAgainstBalance("draft")).toBe(true);
+    // 반면 그룹 출타 집계에는 들어가지 않는다 — 나만 보는 계획이다.
+    expect(COUNTED_LEAVE_STATUSES).not.toContain("draft");
+  });
+
+  it("출타 집계에 들어가는 상태는 모두 잔여도 깎는다", () => {
+    for (const status of COUNTED_LEAVE_STATUSES) {
+      expect(countsAgainstBalance(status)).toBe(true);
+    }
+  });
+
+  it("두 집합의 차이는 초안·취소·반려 셋뿐이다", () => {
+    const balance = new Set<string>(BALANCE_LEAVE_STATUSES);
+    const counted = new Set<string>(COUNTED_LEAVE_STATUSES);
+    expect(
+      LEAVE_STATUSES.filter((s) => balance.has(s) !== counted.has(s)),
+    ).toEqual(["draft"]);
+    expect(LEAVE_STATUSES.filter((s) => !balance.has(s))).toEqual([
+      "rejected",
+      "cancelled",
+    ]);
   });
 });

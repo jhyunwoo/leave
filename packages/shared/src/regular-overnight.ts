@@ -35,6 +35,7 @@ import {
   addDays,
   addMonthsClamped,
   diffDays,
+  eachDate,
   fullMonthsBetween,
   type ISODate,
 } from "./dates";
@@ -301,17 +302,26 @@ function balanceKeyOf(segment: SegmentLike) {
   });
 }
 
-/** 주기와 겹치는 정기외박 구간 일수 합계. */
+/**
+ * 주기와 겹치는 정기외박 구간 일수 합계.
+ *
+ * 날짜 집합으로 센다 — `leave-grants.ts`의 `usageDates`와 같은 이유다. 상태가 다른 두
+ * 휴가는 같은 날짜에 겹칠 수 있고(초안 + 실제), 하루를 두 번 세면 주기 몫이 두 배로
+ * 소진된 것처럼 보인다.
+ */
 export function cycleUsedDays(
   cycle: RegularOvernightCycle,
   segments: readonly SegmentLike[],
 ): number {
-  let used = 0;
+  const used = new Set<ISODate>();
+  const add = (from: ISODate, through: ISODate) => {
+    for (const date of eachDate(from, through)) used.add(date);
+  };
   for (const segment of segments) {
     if (balanceKeyOf(segment) !== "regular_overnight") continue;
     if (segment.regularOvernightCycleStart) {
       if (segment.regularOvernightCycleStart === cycle.start) {
-        used += diffDays(segment.startDate, segment.endDate) + 1;
+        add(segment.startDate, segment.endDate);
       }
       continue;
     }
@@ -320,9 +330,9 @@ export function cycleUsedDays(
       segment.startDate > cycle.start ? segment.startDate : cycle.start;
     const end = segment.endDate < cycle.end ? segment.endDate : cycle.end;
     if (start > end) continue;
-    used += diffDays(start, end) + 1;
+    add(start, end);
   }
-  return used;
+  return used.size;
 }
 
 /**
@@ -532,7 +542,12 @@ export function checkRegularOvernight(input: {
       segment.startDate,
       segment.endDate,
     );
-    if (!overlapping.length) {
+    // `cyclesInRange`는 첫 적립 앞을 **잘라내고** 겹치는 주기를 돌려준다. 그래서
+    // 첫 적립일을 걸치는 구간(앞에서 시작해 뒤에서 끝나는)은 여기서 따로 막지 않으면
+    // 통과해 버리고, 그 전체 일수가 1주기에 얹힌다. 폼의 칩은 같은 경우를
+    // `regularOvernightAvailableIn`에서 이미 0으로 막으므로(그쪽 주석 참고)
+    // 두 판정이 어긋나 "칩은 0인데 저장은 성공"이 됐다.
+    if (!overlapping.length || segment.startDate < firstGrantOf(active)) {
       return {
         kind: "before_first_grant",
         firstGrantDate: firstGrantOf(active),
