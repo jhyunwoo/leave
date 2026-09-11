@@ -20,7 +20,6 @@
 import {
   AccessoryWidgetBackground,
   Gauge,
-  Spacer,
   Text,
   VStack,
 } from "@expo/ui/swift-ui";
@@ -29,6 +28,7 @@ import {
   containerBackground,
   font,
   foregroundStyle,
+  frame,
   gaugeStyle,
   lineLimit,
   minimumScaleFactor,
@@ -271,28 +271,42 @@ function LeaveMetricLayout(
 
   // 홈 화면 세 크기는 같은 배치(라벨 → 값 → 캡션)를 크기만 바꿔 쓴다. 라벨은
   // 라임 강조, 값은 흰색, 캡션은 연초록 — 값이 가장 밝고 크게 읽히도록 둔다.
+  //
+  // ## 안쪽 여백은 시스템에 맡긴다
+  //
+  // WidgetKit이 iOS 17부터 위젯 내용에 기본 여백 16pt를 이미 넣는다
+  // (`app.json`의 `contentMarginsDisabled: false`). 그 위에 padding을 또 얹으면
+  // 158pt짜리 소형 위젯에서 쓸 수 있는 폭이 98pt로 줄어 절반 넘게가 여백이었고,
+  // 높이는 더 빠듯해 캡션 두 줄까지 넣으면 값이 커질 자리가 없었다. 그래서 안쪽
+  // 여백은 시스템 것만 쓰고, 내용은 frame으로 남은 영역을 가로·세로 다 차지한다
+  // (꼬리 Spacer 대신 `topLeading`을 쓰는 이유도 같다 — Spacer의 기본 최소 간격이
+  // 값 글자가 쓸 높이를 또 먹는다).
+  //
+  // 되찾은 자리는 전부 값 글자에 준다. 대신 `minimumScaleFactor`의 바닥은 함께
+  // 내려 둔다 — "3시간 20분 05초"(복귀 타이머)처럼 긴 값은 예전만큼 작아질 수
+  // 있어야 잘리지 않는다. 짧은 값일수록 크게 나오고 긴 값은 알아서 줄어든다.
   if (family === "systemLarge") {
     return (
       <VStack
         alignment="leading"
         spacing={6}
         modifiers={[
-          padding({ top: 22, leading: 22, bottom: 22, trailing: 22 }),
           containerBackground(canvas, "widget"),
+          frame({ maxWidth: 1000, maxHeight: 1000, alignment: "topLeading" }),
           widgetURL(link),
           accessibilityLabel(`${metric.label}. ${metric.spoken}`),
         ]}
       >
-        <Text modifiers={[font({ size: 18, weight: "bold" }), ...tint(strong)]}>
+        <Text modifiers={[font({ size: 20, weight: "bold" }), ...tint(strong)]}>
           {metric.label}
         </Text>
         <Text
           timerInterval={timerInterval}
           modifiers={[
-            font({ size: 80, weight: "heavy" }),
+            font({ size: 112, weight: "heavy" }),
             ...tint(body),
             lineLimit(1),
-            minimumScaleFactor(0.4),
+            minimumScaleFactor(0.28),
           ]}
         >
           {metric.value}
@@ -309,7 +323,6 @@ function LeaveMetricLayout(
             {metric.caption}
           </Text>
         ) : null}
-        <Spacer />
       </VStack>
     );
   }
@@ -320,8 +333,8 @@ function LeaveMetricLayout(
         alignment="leading"
         spacing={4}
         modifiers={[
-          padding({ top: 18, leading: 18, bottom: 18, trailing: 18 }),
           containerBackground(canvas, "widget"),
+          frame({ maxWidth: 1000, maxHeight: 1000, alignment: "topLeading" }),
           widgetURL(link),
           accessibilityLabel(`${metric.label}. ${metric.spoken}`),
         ]}
@@ -332,10 +345,10 @@ function LeaveMetricLayout(
         <Text
           timerInterval={timerInterval}
           modifiers={[
-            font({ size: 56, weight: "heavy" }),
+            font({ size: 60, weight: "heavy" }),
             ...tint(body),
             lineLimit(1),
-            minimumScaleFactor(0.4),
+            minimumScaleFactor(0.32),
           ]}
         >
           {metric.value}
@@ -352,7 +365,6 @@ function LeaveMetricLayout(
             {metric.caption}
           </Text>
         ) : null}
-        <Spacer />
       </VStack>
     );
   }
@@ -364,8 +376,8 @@ function LeaveMetricLayout(
       alignment="leading"
       spacing={2}
       modifiers={[
-        padding({ top: 14, leading: 14, bottom: 14, trailing: 14 }),
         containerBackground(canvas, "widget"),
+        frame({ maxWidth: 1000, maxHeight: 1000, alignment: "topLeading" }),
         widgetURL(link),
         accessibilityLabel(`${metric.label}. ${metric.spoken}`),
       ]}
@@ -376,10 +388,10 @@ function LeaveMetricLayout(
       <Text
         timerInterval={timerInterval}
         modifiers={[
-          font({ size: 40, weight: "heavy" }),
+          font({ size: 54, weight: "heavy" }),
           ...tint(body),
           lineLimit(1),
-          minimumScaleFactor(0.5),
+          minimumScaleFactor(0.3),
         ]}
       >
         {metric.value}
@@ -387,7 +399,7 @@ function LeaveMetricLayout(
       {metric.caption ? (
         <Text
           modifiers={[
-            font({ size: 13 }),
+            font({ size: 12 }),
             ...tint(soft),
             lineLimit(2),
             minimumScaleFactor(0.8),
@@ -396,7 +408,6 @@ function LeaveMetricLayout(
           {metric.caption}
         </Text>
       ) : null}
-      <Spacer />
     </VStack>
   );
 }
