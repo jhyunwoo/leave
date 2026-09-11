@@ -1,7 +1,7 @@
 /**
  * 다음 휴가까지 며칠 남았는가 — 내 휴가 화면 맨 위의 D-day.
  *
- * 사용처: 네이티브 내 휴가 탭의 `NextLeaveCard`.
+ * 사용처: 웹·네이티브 내 휴가 탭의 `NextLeaveCard`, 네이티브 위젯.
  *
  * "언제 나가는가"는 목록의 날짜 범위를 읽고 오늘과 빼야 나오는 값이었다. 그 뺄셈을
  * 화면이 대신한다. 이미 나가 있으면 시작일은 지난 날이므로 **종료일까지** 센다 —
@@ -10,6 +10,10 @@
  * 정렬 규칙은 여기 다시 적지 않고 `partitionMyLeaves`를 그대로 쓴다. "종료일이
  * 오늘 이후인 것만, 시작일 가까운 순, 진행 중인 휴가가 맨 위"는 그쪽이 이미
  * 정의하고 테스트로 잠가 둔 규칙이라, 두 곳에 적히면 한쪽만 고쳐져 답이 갈린다.
+ *
+ * **화면은 휴가와 외출을 따로 센다**(`nextLeaveCountdowns`). 하나로 합치면 내일
+ * 나가는 외출이 다음 주 연가를 가려, 정작 며칠 뒤에 휴가를 나가는지 알 수 없다.
+ * 둘은 세는 단위부터 다르다 — 외출은 당일 복귀라 D-day가 언제나 며칠 안쪽이다.
  */
 // 도메인 하위 경로에서 직접 가져온다. 배럴(`@leave/shared`)은 zod 스키마까지 함께
 // 평가시킨다 — 자세한 배경은 packages/shared/src/index.ts 주석 참고.
@@ -77,6 +81,49 @@ export function nextLeaveCountdown(
     );
   }
   return result;
+}
+
+/**
+ * 이 휴가가 외출인가 — 구간이 **전부** 외출일 때만.
+ *
+ * `some`이 아니라 `every`인 이유: 외출을 다른 재원과 한 휴가에 섞지 못하게 막은 것은
+ * 나중에 생긴 규칙이라(`leaveCreateSchema`), 연가에 외출이 붙은 옛 행이 남아 있을 수
+ * 있다. 그런 건은 여러 날짜에 걸친 출타이므로 휴가 쪽에서 세는 편이 맞다.
+ * 구간이 아예 없는 옛 행도 휴가로 본다 — 빈 배열의 `every`는 참이라 따로 막는다.
+ */
+export function isOutingLeave(leave: MyLeave): boolean {
+  return (
+    leave.segments.length > 0 &&
+    leave.segments.every((segment) => segment.category === "outing")
+  );
+}
+
+/** 휴가와 외출 각각의 다음 카운트다운. 셀 것이 없는 쪽은 null이고 화면에서 사라진다. */
+export type NextLeaveCountdowns = {
+  /** 외출이 아닌 다음 휴가. */
+  leave: NextLeaveCountdown | null;
+  /** 다음 외출. */
+  outing: NextLeaveCountdown | null;
+};
+
+/**
+ * 휴가와 외출을 갈라 각각 카운트다운한다.
+ *
+ * 규칙은 `nextLeaveCountdown` 하나뿐이고 여기서는 목록만 나눈다 — 세는 규칙을 여기
+ * 다시 적으면 한쪽만 고쳐져 두 카드가 다른 기준으로 움직인다.
+ */
+export function nextLeaveCountdowns(
+  leaves: readonly MyLeave[] | undefined,
+  at: ISODate | Date = new Date(),
+): NextLeaveCountdowns {
+  const all = leaves ?? [];
+  return {
+    leave: nextLeaveCountdown(
+      all.filter((item) => !isOutingLeave(item)),
+      at,
+    ),
+    outing: nextLeaveCountdown(all.filter(isOutingLeave), at),
+  };
 }
 
 /** 24시간을 넘겨도 총 시간으로 표시한다. 웹·앱·위젯 공통 표기. */

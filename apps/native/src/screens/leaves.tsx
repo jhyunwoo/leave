@@ -30,7 +30,7 @@ import {
 } from "react-native";
 import type { MyLeave } from "@leave/client";
 import {
-  nextLeaveCountdown,
+  nextLeaveCountdowns,
   partitionMyLeaves,
   summarizeHoldings,
   useDeleteLeave,
@@ -96,7 +96,11 @@ export function LeavesScreen() {
 
   const myLeaves = leaves.data?.leaves ?? [];
   const sections = partitionMyLeaves(leaves.data?.leaves);
-  const countdown = nextLeaveCountdown(leaves.data?.leaves, new Date(now));
+  // 휴가와 외출을 따로 센다. 셀 것이 없는 쪽 카드는 그리지 않는다.
+  const { leave: nextLeave, outing: nextOuting } = nextLeaveCountdowns(
+    leaves.data?.leaves,
+    new Date(now),
+  );
   // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
   const selectedLeave =
     myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;
@@ -130,12 +134,20 @@ export function LeavesScreen() {
 
   const balanceColumn = (
     <View style={styles.stack}>
-      {/* 잔여가 아직 안 왔다고 D-day까지 사라지면 안 된다 — 이 카드가 기대는 것은
+      {/* 잔여가 아직 안 왔다고 D-day까지 사라지면 안 된다 — 이 카드들이 기대는 것은
           myLeaves 하나뿐이라 balances 조건 바깥에 둔다. */}
-      {countdown ? (
+      {nextLeave ? (
         <NextLeaveCard
-          countdown={countdown}
-          onPress={() => openLeave(countdown.leave)}
+          countdown={nextLeave}
+          kind="leave"
+          onPress={() => openLeave(nextLeave.leave)}
+        />
+      ) : null}
+      {nextOuting ? (
+        <NextLeaveCard
+          countdown={nextOuting}
+          kind="outing"
+          onPress={() => openLeave(nextOuting.leave)}
         />
       ) : null}
       {balances.data ? (

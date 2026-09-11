@@ -8,7 +8,9 @@
 import { describe, expect, it } from "vitest";
 import {
   formatLeaveRemainingTime,
+  isOutingLeave,
   nextLeaveCountdown,
+  nextLeaveCountdowns,
 } from "../src/next-leave-countdown";
 import type { MyLeave } from "../src/types";
 
@@ -30,6 +32,22 @@ function leave(
     status,
     segments: [{ category: "annual", startDate, endDate, days: 1 }],
     createdAt: "2026-01-01T00:00:00.000Z",
+  } as unknown as MyLeave;
+}
+
+function outing(id: string, date: string): MyLeave {
+  return {
+    ...leave(id, date, date),
+    title: "평일 외출",
+    segments: [
+      {
+        category: "outing",
+        outingKind: "weekday",
+        startDate: date,
+        endDate: date,
+        days: 1,
+      },
+    ],
   } as unknown as MyLeave;
 }
 
@@ -209,4 +227,94 @@ it("총 시간, 분, 초를 일관되게 표시한다", () => {
   expect(formatLeaveRemainingTime(3600)).toBe("1시간 00분 00초");
   expect(formatLeaveRemainingTime(59)).toBe("0시간 00분 59초");
   expect(formatLeaveRemainingTime(0)).toBe("0시간 00분 00초");
+});
+
+describe("isOutingLeave", () => {
+  it("구간이 전부 외출일 때만 외출이다", () => {
+    expect(isOutingLeave(outing("a", "2026-08-20"))).toBe(true);
+    expect(isOutingLeave(leave("b", "2026-08-20", "2026-08-22"))).toBe(false);
+  });
+
+  it("외출이 섞인 옛 휴가와 구간이 없는 옛 행은 휴가로 센다", () => {
+    const mixed = {
+      ...leave("mixed", "2026-08-20", "2026-08-21"),
+      segments: [
+        {
+          category: "annual",
+          startDate: "2026-08-20",
+          endDate: "2026-08-20",
+          days: 1,
+        },
+        {
+          category: "outing",
+          startDate: "2026-08-21",
+          endDate: "2026-08-21",
+          days: 1,
+        },
+      ],
+    } as unknown as MyLeave;
+    const bare = {
+      ...leave("bare", "2026-08-20", "2026-08-20"),
+      segments: [],
+    } as unknown as MyLeave;
+
+    expect(isOutingLeave(mixed)).toBe(false);
+    expect(isOutingLeave(bare)).toBe(false);
+  });
+});
+
+describe("nextLeaveCountdowns", () => {
+  it("가까운 외출이 있어도 휴가는 휴가대로 센다", () => {
+    const result = nextLeaveCountdowns(
+      [outing("o", "2026-08-18"), leave("v", "2026-08-25", "2026-08-27")],
+      TODAY,
+    );
+
+    expect(result.outing?.leave.id).toBe("o");
+    expect(result.outing?.days).toBe(2);
+    expect(result.leave?.leave.id).toBe("v");
+    expect(result.leave?.days).toBe(9);
+  });
+
+  it("한쪽이 없으면 그쪽만 null이다 — 화면은 그 카드를 지운다", () => {
+    const onlyOuting = nextLeaveCountdowns([outing("o", "2026-08-18")], TODAY);
+    expect(onlyOuting.outing?.leave.id).toBe("o");
+    expect(onlyOuting.leave).toBeNull();
+
+    const onlyLeave = nextLeaveCountdowns(
+      [leave("v", "2026-08-25", "2026-08-27")],
+      TODAY,
+    );
+    expect(onlyLeave.leave?.leave.id).toBe("v");
+    expect(onlyLeave.outing).toBeNull();
+  });
+
+  it("둘 다 없으면 둘 다 null이다", () => {
+    expect(nextLeaveCountdowns(undefined, TODAY)).toEqual({
+      leave: null,
+      outing: null,
+    });
+    expect(
+      nextLeaveCountdowns([leave("old", "2026-08-01", "2026-08-03")], TODAY),
+    ).toEqual({ leave: null, outing: null });
+  });
+
+  it("오늘 나가는 외출은 외출 중으로, 진행 중인 휴가와 함께 선다", () => {
+    const result = nextLeaveCountdowns(
+      [outing("o", TODAY), leave("v", "2026-08-14", "2026-08-18")],
+      TODAY,
+    );
+
+    expect(result.outing).toMatchObject({ phase: "onLeave", days: 0 });
+    expect(result.leave).toMatchObject({ phase: "onLeave", days: 2 });
+  });
+
+  it("초안·취소된 외출은 세지 않는다 — 휴가와 같은 기준이다", () => {
+    const draft = {
+      ...outing("draft", "2026-08-18"),
+      status: "draft",
+    } as unknown as MyLeave;
+
+    expect(nextLeaveCountdowns([draft], TODAY).outing).toBeNull();
+  });
 });

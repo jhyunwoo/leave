@@ -24,7 +24,7 @@ import {
   LazyLeaveFormModal,
   preloadLeaveFormModal,
 } from "../components/LazyLeaveFormModal";
-import { NextLeaveCard } from "../components/NextLeaveCard";
+import { NextLeaveCards } from "../components/NextLeaveCard";
 import { LeaveStatusControl } from "../components/LeaveStatusControl";
 
 /**
@@ -108,7 +108,7 @@ export function LeavesPage() {
         </button>
       </header>
 
-      <NextLeaveCard leaves={leaves.data?.leaves} />
+      <NextLeaveCards leaves={leaves.data?.leaves} />
 
       {balances.data && (
         <Link
