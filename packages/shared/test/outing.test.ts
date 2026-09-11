@@ -8,6 +8,7 @@ import {
   outingBlockMessage,
   outingCycleFor,
   outingCycleForDisplay,
+  outingCycleNoteFor,
   outingCycleStartsInRange,
   outingCyclesInRange,
   outingKindOfBalanceKey,
@@ -136,6 +137,48 @@ describe("주기 시작일 마커", () => {
     expect(
       outingCycleStartsInRange(weekday, "2026-03-01", "2026-03-31"),
     ).toEqual([]);
+  });
+});
+
+describe("날짜 상세가 할 말", () => {
+  it("주기 첫날이면 시작으로 알린다", () => {
+    expect(
+      outingCycleNoteFor("weekday", weekday, "2026-06-01", DISCHARGE),
+    ).toMatchObject({ kind: "weekday", isStart: true });
+  });
+
+  it("주기 안의 날이면 시작이 아니라 소속으로 알린다", () => {
+    const note = outingCycleNoteFor(
+      "weekday",
+      weekday,
+      "2026-06-15",
+      DISCHARGE,
+    );
+    expect(note).toMatchObject({ isStart: false });
+    expect(note?.cycle.start).toBe("2026-06-01");
+  });
+
+  it("첫 적립 전·설정 없음·전역 뒤에는 할 말이 없다", () => {
+    expect(
+      outingCycleNoteFor("weekday", weekday, "2026-03-15", DISCHARGE),
+    ).toBe(null);
+    expect(outingCycleNoteFor("weekday", null, "2026-06-01", DISCHARGE)).toBe(
+      null,
+    );
+    expect(
+      outingCycleNoteFor("weekday", weekday, "2027-09-15", DISCHARGE),
+    ).toBe(null);
+  });
+
+  it("꺼진 갈래는 할 말이 없다 — 해·공군의 주말 외출이 그렇다", () => {
+    expect(
+      outingCycleNoteFor(
+        "weekend",
+        { ...weekend, enabled: false },
+        "2026-06-01",
+        DISCHARGE,
+      ),
+    ).toBe(null);
   });
 });
 

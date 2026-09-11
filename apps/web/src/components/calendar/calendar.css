@@ -346,19 +346,22 @@
   flex: 0 1 auto;
   min-width: 0;
   /* 한 칸에 마커가 둘인 날(육군은 평일·주말 주기가 같은 날 열린다)에도 낱말이
-     남도록 촘촘하게 잡는다. 9px은 네이티브 마커와 같은 크기다. */
-  padding: 1px 3px;
+     남도록 촘촘하게 잡는다. */
+  padding: 2px 5px;
   border-radius: var(--r-pill);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.3;
   white-space: nowrap;
-  background: #e4e7e2;
-  color: #454745;
+  /* 재원 톤을 **뒤집어** 쓴다 — 옅은 칩은 날짜 숫자에 묻혀 안 보였다. 색을 새로
+     만들지는 않는다(외출 주기에 도는 팔레트를 두지 않는다는 규칙은 그대로다).
+     글자를 흰색으로 올려 대비를 확보한다. */
+  background: #454745;
+  color: #fff;
 }
 .cal-outing-start[data-balance="weekend_outing"] {
-  background: #e0e3f0;
-  color: #3f4668;
+  background: #3f4668;
+  color: #fff;
 }
 .cal-outing-word {
   font-style: normal;
@@ -366,9 +369,8 @@
 .cal-outing-count {
   font-weight: inherit;
 }
-.cal-cell.is-selected .cal-outing-start {
-  background: rgba(255, 255, 255, 0.72);
-}
+/* 고른 날 칸은 배경이 primary(연초록)라, 진한 알약은 그 위에서도 그대로 읽힌다.
+   예전처럼 흰색으로 덮으면 흰 글자가 사라진다. */
 
 /* 육군은 평일·주말 주기가 같은 날 함께 열려 한 칸에 마커가 둘이다. 날짜 상세를
    열어 그리드가 좁아지면 낱말까지 넣을 자리가 없으므로, 칸 너비를 기준으로 낱말만
@@ -388,10 +390,12 @@
 }
 .cal-outing-dot {
   display: block;
-  width: 5px;
-  height: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: var(--r-pill);
   background: #454745;
+  /* 흰 칸 위 7px 점은 테두리가 없으면 가장자리가 흐려 보인다. */
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 .cal-outing-dot[data-balance="weekend_outing"] {
   background: #3f4668;

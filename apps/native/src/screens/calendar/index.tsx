@@ -82,6 +82,7 @@ import {
   FirstGrantBanner,
 } from "./cycle-banner";
 import { DayPanel } from "./day-panel";
+import { OutingCycleNote } from "./outing-cycle-note";
 import { CalendarOverviewPanel } from "./overview-panel";
 import { useLeaveDrag } from "./use-leave-drag";
 
@@ -477,6 +478,14 @@ export function CalendarScreen() {
                 testID="calendar-clear-selection"
               />
             </View>
+            {/* 부대 달력 응답과 무관하게 그린다 — 외출 주기는 내 설정에서만 나오고,
+                DayPanel 안에 넣으면 부대가 없는 사람에게는 통째로 사라진다. */}
+            <OutingCycleNote
+              date={selectedDate}
+              outing={outingConfigs}
+              segments={balanceSegments}
+              dischargeAt={dischargeAt}
+            />
             {panelCalendar.data ? (
               <DayPanel
                 calendar={panelCalendar.data}
@@ -670,6 +679,14 @@ export function CalendarScreen() {
           // 여백을 본문 아래쪽에서 잡는다.
           extendsUnderBottomInset={SHEET_EXTENDS_UNDER_BOTTOM_INSET}
         >
+          {selectedDate ? (
+            <OutingCycleNote
+              date={selectedDate}
+              outing={outingConfigs}
+              segments={balanceSegments}
+              dischargeAt={dischargeAt}
+            />
+          ) : null}
           {selectedDate &&
             (panelCalendar.data ? (
               <DayPanel

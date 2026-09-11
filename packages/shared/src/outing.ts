@@ -124,6 +124,34 @@ export function outingCycleStartsInRange(
   );
 }
 
+/**
+ * 그 날짜에 대해 화면이 할 말. 없으면 null.
+ *
+ * 달력 마커는 "주기가 열리는 날"만 찍지만, 날짜를 눌러 상세를 열면 주기 **안의**
+ * 날에도 어느 주기인지 알려줘야 한다 — 마커가 없는 날에 "그래서 이번 달 외출은
+ * 몇 번 남았나"를 답할 자리가 거기밖에 없다.
+ */
+export type OutingCycleNote = {
+  kind: OutingKind;
+  cycle: LeaveCycle;
+  /** 이 날이 주기 첫날(적립일)인가. */
+  isStart: boolean;
+};
+
+/** 이 갈래에서 그 날짜가 속한 주기와, 그 날이 첫날인지. 전역 뒤·첫 적립 전이면 null. */
+export function outingCycleNoteFor(
+  kind: OutingKind,
+  config: OutingConfig | null | undefined,
+  date: ISODate,
+  dischargeAt: ISODate | null | undefined,
+): OutingCycleNote | null {
+  const cycle = outingCycleForDisplay(config, date, dischargeAt);
+  if (!cycle) return null;
+  // 적립일이 전역 뒤인 주기는 받지 못하므로 알릴 것도 없다(checkOuting과 같은 기준).
+  if (dischargeAt && cycle.start > dischargeAt) return null;
+  return { kind, cycle, isStart: cycle.start === date };
+}
+
 /** 자동 적립 설정이 살아 있어 이 갈래를 주기 단위로 다뤄야 하는지. */
 export function isOutingCycleBased(
   config: OutingConfig | null | undefined,

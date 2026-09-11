@@ -333,24 +333,26 @@ export function MonthCalendar(props: {
                         </Text>
                       </View>
                       {outingStarts.map((entry) => {
+                        // 재원 톤을 **뒤집어** 쓴다 — 옅은 칩은 날짜 숫자에 묻혀
+                        // 안 보였다. 색을 새로 만들지는 않고 대비만 올린다.
                         const tone = balance[outingBalanceKey(entry.kind)];
                         return (
                           <View
                             key={entry.kind}
                             style={[
                               styles.outingStart,
-                              { backgroundColor: tone.bg },
+                              { backgroundColor: tone.fg },
                             ]}
                           >
                             <Text
                               style={[
                                 styles.outingStartText,
-                                { color: tone.fg },
+                                { color: tone.bg },
                               ]}
                               numberOfLines={1}
                             >
                               {entry.kind === "weekend" ? "주말" : "외출"}
-                              {" +"}
+                              {"+"}
                               {entry.cycle.grantDays}
                             </Text>
                           </View>
@@ -604,15 +606,15 @@ const useStyles = makeStyles(({ colors }) => ({
     maxWidth: "100%",
   },
   outingStart: {
-    minHeight: 14,
-    paddingHorizontal: 4,
-    borderRadius: radius.sm,
+    minHeight: 15,
+    paddingHorizontal: 5,
+    borderRadius: radius.pill,
     justifyContent: "center",
     flexShrink: 1,
   },
   outingStartText: {
-    fontSize: 9,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: "700",
   },
   dayNumWrap: {

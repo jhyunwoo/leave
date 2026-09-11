@@ -35,6 +35,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { DayPanel } from "../components/calendar/DayPanel";
+import { OutingCycleNote } from "../components/calendar/OutingCycleNote";
 import {
   FriendCalendarScroll,
   friendPersonColor,
@@ -603,6 +604,14 @@ export function CalendarPage(props: { me: Me }) {
                   setEditingEvent(event);
                   setEventOpen(true);
                 }}
+              />
+              {/* 부대 달력 응답과 무관하게 그린다 — 외출 주기는 내 설정에서만 나오고,
+                  DayPanel 안에 넣으면 부대가 없는 사람에게는 통째로 사라진다. */}
+              <OutingCycleNote
+                date={selectedDate}
+                outing={outingConfigs}
+                segments={balanceSegments}
+                dischargeAt={dischargeAt}
               />
               {panelCalendar.data ? (
                 <DayPanel
