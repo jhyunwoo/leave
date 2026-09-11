@@ -395,12 +395,18 @@ export function buildWidgetTimeline(
   }
 
   // 자정 사이에 복귀하는 순간에는 끝난 휴가를 내리고 다음 일정으로 전환한다.
+  //
+  // 창 끝을 **루프 전에** 붙잡는다. 아래에서 같은 배열에 push하므로, 배열의 마지막
+  // 원소를 상한으로 읽으면 복귀 엔트리를 하나 넣는 순간 상한이 그 시각으로 내려앉는다.
+  // 그러면 그보다 늦은 휴가는 창 안에 있어도 전부 버려졌고, 두 번째 휴가에서
+  // 복귀해도 다음 한국시간 자정까지 위젯이 "휴가 중"에 머물렀다.
+  const windowEnd = entries[entries.length - 1]!.date;
   for (const leave of source.leaves) {
     const [hour, minute] = (leave.returnTime ?? "21:00").split(":").map(Number);
     const instant = new Date(
       kstMidnight(leave.endDate) + (hour! * 60 + minute!) * 60_000,
     );
-    if (instant <= now || instant > entries[entries.length - 1]!.date) continue;
+    if (instant <= now || instant > windowEnd) continue;
     const date = todayInSeoul(instant);
     entries.push({
       date: instant,

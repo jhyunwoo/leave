@@ -1,5 +1,10 @@
 /** Android renders resolved values only. Keep schema v1 compatible with installed builds. */
-import { addDays, kstMidnight, todayInSeoul } from "@leave/shared/dates";
+import {
+  addDays,
+  KST_OFFSET_MS,
+  kstMidnight,
+  todayInSeoul,
+} from "@leave/shared/dates";
 import {
   METRIC_KEYS,
   METRIC_LINKS,
@@ -77,24 +82,27 @@ export function buildAndroidWidgetTimeline(
   };
 }
 
-/** RemoteViews has no bounded WidgetKit timer. An absolute return time stays truthful offline. */
+/**
+ * RemoteViews has no bounded WidgetKit timer. An absolute return time stays truthful offline.
+ *
+ * 시각을 `Intl.DateTimeFormat(...).formatToParts`로 쪼개지 않는다. 이 저장소에서
+ * `formatToParts`를 쓰는 곳은 여기뿐이고(다른 자리는 모두 `.format()`),
+ * Hermes/Android의 Intl에서 검증된 적이 없다. 여기서 던지면
+ * `buildAndroidWidgetTimeline`이 던지고 네이티브 쓰기가 아예 나가지 않아 위젯이
+ * 마지막 값에 머문 채 조용히 낡는다 — 1.1.0(build 42)의 `gauge: null` 사고와 같은
+ * 모양이고 앱에는 아무 증상이 없다.
+ *
+ * 한국은 서머타임이 없어 고정 +9시간이 정확하다. `kstMidnight`이 같은 산술을 쓴다.
+ */
 function androidMetricValue(
   metric: MetricValue,
 ): Omit<MetricValue, "timerStartAt" | "timerEndAt"> {
   const { timerStartAt: _start, timerEndAt, ...value } = metric;
   if (timerEndAt === undefined) return value;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(timerEndAt));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((item) => item.type === type)!.value;
-  const date = `${part("month")}월 ${part("day")}일`;
-  const time = `${part("hour")}:${part("minute")}`;
+  const kst = new Date(timerEndAt + KST_OFFSET_MS);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const date = `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`;
+  const time = `${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())}`;
   return {
     label: "복귀 예정",
     value: time,

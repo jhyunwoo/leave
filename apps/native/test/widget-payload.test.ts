@@ -333,3 +333,76 @@ describe("위젯 props는 property list 로 저장할 수 있어야 한다", () 
     expect(entries.flatMap((e) => badTypes(e.props))).toEqual([]);
   });
 });
+
+/**
+ * 복귀 전환 엔트리는 휴가 수만큼 생겨야 한다. 예전에는 창 끝을 루프 **안에서**
+ * `entries[entries.length - 1]`로 읽었는데 그 루프가 같은 배열에 push해서, 첫 복귀
+ * 엔트리를 넣는 순간 상한이 그 시각으로 내려앉았다. 그 뒤 휴가는 창 안에 있어도
+ * 전부 버려졌고, 두 번째 휴가에서 복귀해도 다음 한국시간 자정까지 위젯이
+ * "휴가 중"에 머물렀다.
+ */
+describe("휴가가 여럿일 때 복귀 전환", () => {
+  const twoLeaves = source({
+    leaves: [
+      leave({
+        id: "leave-near",
+        startDate: "2026-06-17",
+        endDate: "2026-06-18",
+        returnTime: "21:00",
+      }),
+      leave({
+        id: "leave-far",
+        startDate: "2026-06-24",
+        endDate: "2026-06-25",
+        returnTime: "20:00",
+      }),
+    ],
+    leaveRanges: [
+      { startDate: "2026-06-17", endDate: "2026-06-18" },
+      { startDate: "2026-06-24", endDate: "2026-06-25" },
+    ],
+  });
+
+  it("가까운 휴가를 먼저 담아도 먼 휴가의 복귀 시각이 남는다", () => {
+    const instants = buildWidgetTimeline(twoLeaves, NOW).map((entry) =>
+      entry.date.toISOString(),
+    );
+    // 6/18 21:00 KST = 12:00Z, 6/25 20:00 KST = 11:00Z
+    expect(instants).toContain("2026-06-18T12:00:00.000Z");
+    expect(instants).toContain("2026-06-25T11:00:00.000Z");
+  });
+
+  it("순서를 뒤집어도 같은 타임라인이 나온다", () => {
+    const reversed = source({
+      ...twoLeaves,
+      leaves: [...twoLeaves.leaves].reverse(),
+    });
+    expect(
+      buildWidgetTimeline(reversed, NOW).map((entry) => entry.date.getTime()),
+    ).toEqual(
+      buildWidgetTimeline(twoLeaves, NOW).map((entry) => entry.date.getTime()),
+    );
+  });
+
+  it("창(14일) 밖에서 끝나는 휴가는 여전히 담지 않는다", () => {
+    const outside = source({
+      leaves: [
+        leave({
+          id: "leave-outside",
+          startDate: "2026-07-10",
+          endDate: "2026-07-12",
+          returnTime: "21:00",
+        }),
+      ],
+      leaveRanges: [{ startDate: "2026-07-10", endDate: "2026-07-12" }],
+    });
+    expect(buildWidgetTimeline(outside, NOW)).toHaveLength(TIMELINE_DAYS);
+  });
+
+  it("엔트리는 시간순이고 마지막은 창의 끝이다", () => {
+    const entries = buildWidgetTimeline(twoLeaves, NOW);
+    const times = entries.map((entry) => entry.date.getTime());
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+    expect(entries[entries.length - 1]!.props.date).toBe("2026-06-28");
+  });
+});

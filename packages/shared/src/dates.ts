@@ -80,7 +80,14 @@ export function monthBounds(month: string): { start: ISODate; end: ISODate } {
   };
 }
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+/**
+ * 한국 표준시의 UTC 오프셋. 서머타임이 없으므로 고정값이 정확하다.
+ *
+ * 내보내는 이유는 시각을 KST로 쪼개는 자리가 여기 말고도 있어서다
+ * (`apps/native/src/widgets/android-transport.ts`). 그쪽이 같은 상수를 쓰면
+ * "9시간"이 두 곳에 적히지 않는다.
+ */
+export const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const SEOUL_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul",
   year: "numeric",
