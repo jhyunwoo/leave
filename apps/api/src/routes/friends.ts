@@ -12,7 +12,9 @@
 
 import {
   COUNTED_LEAVE_STATUSES,
+  diffDays,
   isValidISODate,
+  MAX_DATE_RANGE_DAYS,
   monthBounds,
   normalizeUsername,
   SOCIAL_ERROR_CODES,
@@ -439,6 +441,15 @@ export const friendRoutes = app
       startDate > endDate
     )
       return c.json({ error: "조회 기간이 올바르지 않습니다" }, 400);
+    // 다른 모든 범위 조회에는 상한이 있다(달력은 9개월, 휴가는 366일). 여기만
+    // 비어 있어서 `0001-01-01~9999-12-31`이 그대로 통과했다.
+    if (diffDays(startDate, endDate) + 1 > MAX_DATE_RANGE_DAYS)
+      return c.json(
+        {
+          error: `조회 기간은 최대 ${MAX_DATE_RANGE_DAYS}일까지 지정할 수 있습니다`,
+        },
+        400,
+      );
     const db = drizzle(c.env.DB);
     // 매 요청마다 다시 판정한다. 캐시된 친구 목록은 권한이 아니다.
     const allowed = (await visibleRelations(db, user.id)).find(

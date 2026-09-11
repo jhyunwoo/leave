@@ -202,13 +202,26 @@ export function useUpdateLeaveStatus() {
       }
     },
     onSettled: () => {
-      // 동시에 바꾼 다른 행의 낙관적 상태를 중간 refetch가 덮지 않도록 마지막
-      // 상태 요청이 끝날 때 서버의 병합 결과를 한 번만 다시 받는다.
-      if (
-        queryClient.isMutating({ mutationKey: LEAVE_STATUS_MUTATION_KEY }) === 1
-      ) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.myLeaves });
-      }
+      /**
+       * 동시에 바꾼 다른 행의 낙관적 상태를 중간 refetch가 덮지 않도록, 마지막
+       * 상태 요청이 끝날 때 서버의 병합 결과를 한 번만 다시 받는다.
+       *
+       * 확인을 **다음 틱으로 미루는** 이유가 있다. `onSettled`는 자기 자신이 아직
+       * `pending`으로 세어지는 시점에 돌기 때문에(query-core가 `onSettled`를
+       * await한 뒤에야 success를 dispatch한다) "내가 마지막인가"를 개수로 판단하면,
+       * 같은 틱에 둘이 끝날 때 양쪽이 2를 읽고 **아무도** 다시 받지 않는다. 그러면
+       * 낙관적 상태가 서버 확인 없이 그대로 굳는다. 틱이 넘어간 뒤에는 끝난 것들이
+       * 이미 pending에서 빠져 있으므로 0인지만 보면 된다.
+       */
+      setTimeout(() => {
+        if (
+          queryClient.isMutating({
+            mutationKey: LEAVE_STATUS_MUTATION_KEY,
+          }) === 0
+        ) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.myLeaves });
+        }
+      }, 0);
     },
   });
 }

@@ -15,8 +15,9 @@
  */
 import {
   ApiError,
-  normalizeFriendIds,
   type FriendRequestCreateInput,
+  MAX_FRIEND_CALENDAR_SELECTION,
+  normalizeFriendIds,
 } from "@leave/shared";
 import {
   useMutation,
@@ -227,7 +228,11 @@ export function useFriendCalendar(friendIds: readonly string[], month: string) {
   const normalized = normalizeFriendIds(friendIds);
   return useQuery({
     queryKey: queryKeys.friendCalendar(normalized, month),
-    enabled: normalized.length >= 1 && normalized.length <= 10,
+    // 상한은 서버가 `friendIdsSchema`로 거절하는 값과 같아야 한다. 리터럴로 적어
+    // 두면 shared 상수를 올려도 앱이 조용히 옛 값에서 멈춘다.
+    enabled:
+      normalized.length >= 1 &&
+      normalized.length <= MAX_FRIEND_CALENDAR_SELECTION,
     staleTime: 0,
     queryFn: (context) =>
       enqueueFriendCalendar({

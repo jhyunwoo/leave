@@ -12,6 +12,7 @@
  */
 import { unitInvites } from "../db/schema";
 import { generateInviteCode, sha256Hex } from "./crypto";
+import { runBatch, type BatchItem } from "./d1";
 import type { Db } from "./db";
 
 /**
@@ -53,15 +54,44 @@ export function resolveInviteExpiry(explicit: string | undefined): string {
  * 않는 이유는 동시 요청 두 건 사이에서 반드시 깨지기 때문이다 — 유일성은
  * `unit_invites_code_hash_unique` 인덱스가 지키고, 여기서는 그 오류를 받아 다시 뽑는다.
  */
+export type InviteInput = {
+  unitId: string;
+  createdBy: string;
+  expiresAt: string;
+  maxUses: number;
+};
+
+export type IssuedInvite = {
+  code: string;
+  expiresAt: string;
+  maxUses: number;
+  usedCount: number;
+};
+
 export async function createInvite(
   db: Db,
-  input: {
-    unitId: string;
-    createdBy: string;
-    expiresAt: string;
-    maxUses: number;
-  },
-) {
+  input: InviteInput,
+): Promise<IssuedInvite> {
+  return createInviteWith(db, input, (insertInvite) => [insertInvite]);
+}
+
+/**
+ * 초대코드를 만들어 **다른 쓰기와 같은 batch로** 저장한다.
+ *
+ * 그룹 생성이 이것을 쓴다. 예전에는 그룹 insert → 초대 insert → 사용자 update를
+ * 따로 보냈는데, 중간에서 실패하면 `adminId`가 그 그룹에 없는 사람을 가리키는 행이
+ * 남는다. `checkUnitAdmin`은 `user.unitId !== unitId`를 먼저 보므로
+ * (`lib/unit-access.ts`) **아무도 관리하거나 지울 수 없는 그룹**이 되고,
+ * 만든 사람은 "현재 그룹에서 나간 뒤"라는 409에 막혀 새로 만들 수도 없다.
+ *
+ * 코드 충돌은 유니크 인덱스가 던지는 오류로만 알 수 있어 batch 전체를 다시 돌린다.
+ * D1 batch는 한 트랜잭션이라 실패한 시도는 아무 행도 남기지 않는다.
+ */
+export async function createInviteWith(
+  db: Db,
+  input: InviteInput,
+  statements: (insertInvite: BatchItem) => BatchItem[],
+): Promise<IssuedInvite> {
   for (let attempt = 0; ; attempt += 1) {
     const code = generateInviteCode();
     const row = {
@@ -77,7 +107,7 @@ export async function createInvite(
       createdAt: new Date().toISOString(),
     };
     try {
-      await db.insert(unitInvites).values(row);
+      await runBatch(db, statements(db.insert(unitInvites).values(row)));
     } catch (caught) {
       if (attempt < CODE_COLLISION_RETRIES && isCodeCollision(caught)) continue;
       throw caught;

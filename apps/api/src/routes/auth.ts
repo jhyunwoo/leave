@@ -294,12 +294,19 @@ export const authRoutes = app
       await db.insert(userPasskeys).values(row);
       return c.json({ passkey: passkeyDto(row) }, 201);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "패스키를 등록하지 못했습니다";
+      // 원문 메시지를 그대로 내보내지 않는다. 여기서 던지는 것은
+      // `@simplewebauthn`의 검증 문장이거나 D1의 SQLite 오류인데, 둘 다 사용자가
+      // 고칠 수 있는 내용이 아니고 인프라 사정이 클라이언트로 새는 경로가 된다
+      // (`lib/errors.ts`가 세운 경계와 같은 이유다).
+      const message = error instanceof Error ? error.message : "";
       const duplicate =
         message.includes("UNIQUE") || message.includes("unique");
       return c.json(
-        { error: duplicate ? "이미 등록된 패스키입니다" : message },
+        {
+          error: duplicate
+            ? "이미 등록된 패스키입니다"
+            : "패스키를 등록하지 못했습니다. 다시 시도해주세요.",
+        },
         duplicate ? 409 : 400,
       );
     }
@@ -376,14 +383,10 @@ export const authRoutes = app
         },
         200,
       );
-    } catch (error) {
+    } catch {
+      // 등록과 같은 이유로 원문을 내보내지 않는다(위 주석 참고).
       return c.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "패스키를 확인하지 못했습니다",
-        },
+        { error: "패스키를 확인하지 못했습니다. 다시 시도해주세요." },
         400,
       );
     }

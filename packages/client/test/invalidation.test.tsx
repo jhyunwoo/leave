@@ -557,3 +557,61 @@ describe("내 정보 수정", () => {
     );
   });
 });
+
+/**
+ * 낙관적 상태는 서버 확인으로 닫혀야 한다. `onSettled`는 자기 자신이 아직 pending으로
+ * 세어지는 시점에 돌기 때문에, 개수로 "내가 마지막인가"를 판단하면 같은 틱에 둘이
+ * 끝날 때 양쪽이 2를 읽고 아무도 다시 받지 않았다.
+ */
+describe("휴가 상태를 연달아 바꿀 때", () => {
+  it("마지막 요청이 끝나면 내 휴가를 반드시 다시 받는다", async () => {
+    const client = {
+      leaves: {
+        ":id": {
+          status: {
+            $patch: ({ param }: { param: { id: string } }) =>
+              Promise.resolve({
+                leave: {
+                  id: param.id,
+                  startDate: "2026-09-01",
+                  endDate: "2026-09-02",
+                  status: "approved",
+                },
+                exceededDates: [],
+              }),
+          },
+        },
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.myLeaves, {
+      leaves: [
+        {
+          id: "a",
+          startDate: "2026-09-01",
+          endDate: "2026-09-02",
+          status: "shared",
+        },
+        {
+          id: "b",
+          startDate: "2026-09-03",
+          endDate: "2026-09-04",
+          status: "shared",
+        },
+      ],
+    });
+    const { result } = renderHook(() => useUpdateLeaveStatus(), { wrapper });
+
+    // 같은 틱에 둘을 보낸다 — 예전에는 이 조합에서 재조회가 영영 돌지 않았다.
+    await Promise.all([
+      result.current.mutateAsync({ id: "a", status: "approved" } as never),
+      result.current.mutateAsync({ id: "b", status: "approved" } as never),
+    ]);
+
+    await waitFor(() =>
+      expect(staleKeys(queryClient)).toContain(
+        JSON.stringify(queryKeys.myLeaves),
+      ),
+    );
+  });
+});

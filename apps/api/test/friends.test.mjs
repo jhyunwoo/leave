@@ -463,3 +463,33 @@ test("계정 삭제는 친구 관계와 요청을 제거하고 이름을 놓아�
   const reclaimed = await signup({ username: "leaving.soon" });
   assert.equal(reclaimed.username, "leaving.soon");
 });
+
+/**
+ * 다른 모든 범위 조회에는 상한이 있다(달력 9개월, 휴가 366일). 여기만 비어 있어서
+ * `0001-01-01~9999-12-31`이 그대로 통과했다 — `MAX_DATE_RANGE_DAYS`가 존재하는 이유가
+ * 바로 그런 요청 하나로 워커 메모리를 넘기는 일이었다.
+ */
+test("친구 일정 조회에도 날짜 범위 상한이 있다", async () => {
+  const viewer = await signup({ name: "보는쪽" });
+  const friend = await signup({ name: "친구쪽" });
+  assert.equal((await requestFriend(viewer, friend)).status, 200);
+  assert.equal((await acceptFriend(friend, viewer)).status, 200);
+
+  const range = (startDate, endDate) =>
+    req(
+      "GET",
+      `/friends/${friend.data.user.id}/schedule?startDate=${startDate}&endDate=${endDate}`,
+      { token: viewer.token },
+    );
+
+  // 366일(윤년 포함 1년)은 통과한다.
+  assert.equal((await range("2026-01-01", "2026-12-31")).status, 200);
+  assert.equal((await range("2028-01-01", "2028-12-31")).status, 200);
+  // 367일부터 막는다 (2026은 평년이라 2026-01-01~2027-01-01이 정확히 366일이다).
+  assert.equal((await range("2026-01-01", "2027-01-01")).status, 200);
+  const tooLong = await range("2026-01-01", "2027-01-02");
+  assert.equal(tooLong.status, 400);
+  assert.match(tooLong.data.error, /366/);
+  // 전체 달력을 훑는 요청도 막힌다.
+  assert.equal((await range("0001-01-01", "9999-12-31")).status, 400);
+});

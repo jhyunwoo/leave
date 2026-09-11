@@ -27,6 +27,7 @@ import {
 } from "../lib/calendar";
 import {
   createInvite,
+  createInviteWith,
   DEFAULT_INVITE_MAX_USES,
   resolveInviteExpiry,
 } from "../lib/invites";
@@ -147,17 +148,22 @@ export const unitRoutes = app
       adminId: user.id,
       createdAt: now,
     };
-    await db.insert(units).values(unit);
-    const invite = await createInvite(db, {
-      unitId: unit.id,
-      createdBy: user.id,
-      expiresAt: inviteExpiresAt,
-      maxUses: input.inviteMaxUses ?? DEFAULT_INVITE_MAX_USES,
-    });
-    await db
-      .update(users)
-      .set({ unitId: unit.id })
-      .where(eq(users.id, user.id));
+    // 셋을 한 batch로 넣는다. 나눠 보내면 중간 실패가 "관리자가 그 그룹에 없는"
+    // 행을 남기고, 그 그룹은 아무도 관리·삭제할 수 없다(createInviteWith 주석 참고).
+    const invite = await createInviteWith(
+      db,
+      {
+        unitId: unit.id,
+        createdBy: user.id,
+        expiresAt: inviteExpiresAt,
+        maxUses: input.inviteMaxUses ?? DEFAULT_INVITE_MAX_USES,
+      },
+      (insertInvite) => [
+        db.insert(units).values(unit),
+        insertInvite,
+        db.update(users).set({ unitId: unit.id }).where(eq(users.id, user.id)),
+      ],
+    );
     // 만든 사람이 곧 첫 구성원이므로 인원수는 1이다.
     return c.json({ unit: serializeUnit(unit, 1), invite }, 201);
   })
