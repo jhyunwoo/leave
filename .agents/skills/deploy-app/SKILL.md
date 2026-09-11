@@ -1,6 +1,6 @@
 ---
 name: deploy-app
-description: Ship the Expo native app (apps/native) — decide between an OTA update and a full EAS build, then publish and verify it reached users. Use when asked to deploy, ship, release, or update the mobile app; to publish an OTA/expo-update; to run an EAS build or submit; or to check whether the last app deploy actually reached store users. Covers the fingerprint runtimeVersion policy that decides OTA vs rebuild, why local `eas update` fails on this machine, and the verification steps that avoid false positives.
+description: Ship the Expo native app (apps/native) — decide between an OTA update and a full EAS build, then publish and verify it reached users. Use when asked to deploy, ship, release, or update the mobile app; to publish an OTA/expo-update; to run an EAS build or submit; or to check whether the last app deploy actually reached store users. Covers the fingerprint runtimeVersion policy that decides OTA vs rebuild, the EAS free-plan CI/CD minute limit that silently blocks the workflow path, the working-tree hazard when several agent sessions share the repo, and the verification steps that avoid false positives.
 ---
 
 # 네이티브 앱 배포 (EAS)
@@ -67,14 +67,79 @@ npx eas build:list --platform all --status finished --limit 8 \
 
 ## 2. OTA 발행
 
+### 발행 직전에 `git status`부터 본다
+
 ```bash
-cd apps/native && npx eas workflow:run publish-update.yml
+git status --short   # 비어 있어야 한다
 ```
 
-**로컬 `eas update` / `pnpm eas:update:production`은 이 머신에서 안 된다.** 호스트가 aarch64인데
-`hermes-compiler`가 linux용으로 x86-64 바이너리(`hermesc/linux64-bin`)만 담고 있어 export 단계가
-`hermesc: 1: ELF: not found`로 죽는다. 그래서 발행을 EAS 서버에 맡긴다
-(`.eas/workflows/publish-update.yml`, `type: update`, `channel: production`, `platform: all`).
+**`eas update`는 커밋이 아니라 워킹 트리를 번들한다.** 이 레포에서는 여러 에이전트 세션이
+같은 트리를 동시에 쓰므로, 내 커밋이 깨끗해도 **남의 미커밋 변경이 내 OTA에 실려 나간다.**
+실제로 그렇게 나간 적이 있다 — 발행 로그의 `Commit <sha>` 뒤에 붙는 **`*`가 그 신호**이고,
+그때는 이미 늦다(되돌리려면 `eas update:republish`로 직전 그룹을 다시 포인트해야 한다).
+`git status`가 안 비어 있으면 **누구 것인지 확인하기 전에는 발행하지 않는다.**
+
+### 두 경로가 있고, 무료 플랜에서는 wrapper가 기본이다
+
+```bash
+pnpm native:eas:update:production          # ① 로컬 발행 (기본)
+cd apps/native && npx eas workflow:run publish-update.yml   # ② EAS 서버 (CI/CD 분 소모)
+```
+
+**② 워크플로는 EAS 무료 플랜의 CI/CD 분을 쓴다. 한도(월 60분)가 차면 잡이 0.2초 만에
+시작도 못 하고 실패한다:**
+
+```
+Failed to start job
+Free plan CI/CD 60 minute limit reached. CI/CD minutes reset on <날짜>.
+```
+
+`workflow:runs`로만 보이는 실패라 `update:list`를 아무리 봐도 "왜 안 올라오지"가 된다.
+**발행이 안 보이면 먼저 `npx eas workflow:runs`로 잡 상태를 본다.**
+
+```bash
+npx eas workflow:runs            # Status FAILURE면 아래로 원인 확인
+npx eas workflow:view <run-id>   # Errors에 사유가 찍힌다
+```
+
+① wrapper는 로컬에서 번들하므로 CI/CD 분을 쓰지 않는다. `docs/native-observability.md`가
+정본으로 지정한 경로이고, 워크플로와 같은 일을 한다(preflight → update → 소스맵 업로드).
+
+> 예전 이 문서는 "호스트가 aarch64라 로컬 `eas update`가 `hermesc: ELF: not found`로 죽으니
+> 워크플로가 유일한 경로"라고 적고 있었다. **지금 호스트는 x86_64이고 번들된
+> `hermesc/linux64-bin`이 정상 실행된다** — 그 제약은 이 머신에 없다. 다른 머신으로 옮겼을 때만
+> 다시 확인하면 된다(`uname -m`).
+
+### wrapper가 CLI 문법에 묶여 있다
+
+`eas-cli`는 이 레포 어디에도 고정돼 있지 않다(`package.json`·lockfile 모두 없음).
+그래서 설치된 CLI가 바뀌면 wrapper가 조용히 깨진다. 실제로 겪은 것:
+
+- `eas env:exec`는 환경을 **위치 인자**로 받는다(`eas env:exec production "<명령>"`).
+  `--environment`로 주면 `Nonexistent flag`로 **preflight에서 즉사**한다.
+  같은 값을 `eas update`는 **플래그**로 받는다 — 둘을 같은 모양으로 맞추고 싶어지지만 맞추면 깨진다.
+- 비대화형 셸에서 `eas update`는 `--message` 없이는 시작하지 않는다. `--auto`는 메시지를
+  만들어 주지만 **EAS 브랜치까지 git 브랜치 이름으로 잡아** 채널에 묶인 브랜치를 벗어난다.
+
+둘 다 `scripts/eas-update-native.mjs`가 이미 처리한다. **`eas update`를 맨손으로 부르지 말고
+wrapper를 쓴다.** CLI를 올렸다가 `Nonexistent flag`가 나오면 여기부터 의심한다.
+
+### 메모리 — 한 번에 한 플랫폼씩, 포그라운드로
+
+이 머신은 5.8GB다. **두 플랫폼을 한 번에 번들하면 Metro가 죽는다.** 백그라운드로 돌리면
+에이전트 하니스의 메모리 감시가 회수해 `[killed]`만 남고 이유가 안 보인다. 실제로 세 번 죽었다.
+
+```bash
+cd apps/native && rm -rf dist
+npx eas update --channel production --environment production --platform ios     --message "<커밋 제목>"
+npx eas env:exec production "node ../../scripts/upload-sentry-update-artifacts.mjs dist"
+rm -rf dist
+npx eas update --channel production --environment production --platform android --message "<커밋 제목>"
+npx eas env:exec production "node ../../scripts/upload-sentry-update-artifacts.mjs dist"
+```
+
+**소스맵 업로드는 플랫폼마다 `dist`가 덮이기 전에** 돌린다. fingerprint 정책이라 어차피
+플랫폼별 별도 그룹이므로 나눠 발행해도 결과는 같다.
 
 실패한 export는 `apps/native/dist/`와 **이름이 깨진 0바이트 파일**을 남긴다. 남아 있으면 다음
 `workflow:run`이 압축 단계에서 `ENOENT ... lstat '…/<깨진이름>'`로 죽는다. 지우고 다시 돌린다:
@@ -85,18 +150,17 @@ rm -rf apps/native/dist
 
 `eas build`는 EAS 서버가 직접 번들하므로 이 문제와 무관하다.
 
-### 소스맵은 이 워크플로가 같이 올린다
+### 소스맵
 
 워크플로 잡은 `environment: production`으로 EAS 환경변수를 받고
 `upload_sentry_sourcemaps: true`로 Sentry 소스맵을 함께 올린다. **업로드가 실패하면 잡도 실패한다.**
 이 값이 없으면 업로드 실패를 경고만 남기고 잡이 성공으로 끝나 고아 소스맵이 생긴다.
+wrapper도 같은 순서로 올리고, 업로드가 실패하면 "발행은 됐지만 심볼이 없다"고 알리며 멈춘다.
 
-`docs/native-observability.md`가 정본으로 지정한 `pnpm native:eas:update:*` wrapper는 같은 일을
-(preflight → update → 업로드) 하지만 위의 hermesc 문제로 **이 머신에서는 못 돌린다.** 워크플로가
-그 대체 경로다. 발행 전에 환경변수가 있는지 먼저 본다:
+발행 전에 환경변수가 있는지 먼저 본다:
 
 ```bash
-eas env:list --environment production   # DSN·SENTRY_ORG·SENTRY_PROJECT·SENTRY_AUTH_TOKEN
+npx eas env:list --environment production   # DSN·SENTRY_ORG·SENTRY_PROJECT·SENTRY_AUTH_TOKEN
 ```
 
 없으면 OTA는 나가도 스택 트레이스가 안 풀린다.
@@ -165,6 +229,10 @@ OTA 6cb16632 · 08-22 12:41 (production)
 - 인증은 EAS `jhyunwoo` 계정으로 되어 있다.
 - **`closed-test`는 EAS 커스텀 환경이라 현재 플랜에서 변수를 못 넣는다**(Production/Enterprise 전용).
   `closed` 프로파일과 `pnpm native:eas:update:closed`는 Sentry 변수 preflight에서 막힌다.
+- **`eas-cli`가 레포에 고정돼 있지 않다.** 설치된 버전이 바뀌면 wrapper의 CLI 문법이 조용히
+  깨진다(§2). 재현되면 고정하는 것을 검토한다.
+- **여러 에이전트 세션이 한 트리를 공유한다.** 발행은 커밋이 아니라 트리를 번들하므로
+  `git status`를 발행 직전에 본다(§2). 커밋 해시 뒤의 `*`가 더티 트리 신호다.
 
 Cloudflare 워커(web·api·admin) 배포는 **`deploy-web`** 을 쓴다. `packages/shared`나
 `packages/client`를 고쳤으면 **양쪽 다** 배포 대상이다.
