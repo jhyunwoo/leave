@@ -99,6 +99,16 @@ export function inviteLink(code: string): string {
 }
 
 /**
+ * 같은 초대의 커스텀 스킴 주소. **공유하지 않는다.**
+ *
+ * `profileAppLink`와 같은 자리에서만 쓴다 — 이미 브라우저가 열려 버린 뒤에 앱을
+ * 한 번 찔러 보는 용도다. 이유는 `profileAppLink` 주석과 docs/deep-links.md에 있다.
+ */
+export function inviteAppLink(code: string): string {
+  return `leave://invite/${code}`;
+}
+
+/**
  * 링크에서 초대코드를 뽑는다. 못 뽑으면 null.
  *
  * 세 가지 모양을 모두 받는다(`profileUsernameFromUrl`과 같은 규칙이다).

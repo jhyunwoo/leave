@@ -175,6 +175,21 @@ export function profileLink(username: string): string {
 }
 
 /**
+ * 같은 프로필의 커스텀 스킴 주소. **공유하지 않는다.**
+ *
+ * 쓸 자리는 하나뿐이다: 브라우저가 이미 정본 HTTPS 주소를 열어 버린 뒤에 앱을 한 번
+ * 찔러 보는 것. 메신저 인앱 브라우저는 Universal Link / App Link를 가로채지 않아서
+ * OS 딥링크만으로는 앱이 열리지 않고, 그 자리에서 앱으로 넘어갈 방법이 이것뿐이다
+ * (`apps/web/src/lib/app-handoff.ts`, docs/deep-links.md).
+ *
+ * 이 모양은 `profileUsernameFromUrl`이 이미 되읽는다 — 만드는 쪽과 읽는 쪽이
+ * 갈라지지 않게 두 함수를 나란히 둔다.
+ */
+export function profileAppLink(username: string): string {
+  return `leave://u/${username}`;
+}
+
+/**
  * 링크에서 사용자 이름을 뽑는다. 못 뽑으면 null.
  *
  * 세 가지 모양을 모두 받는다.

@@ -17,15 +17,26 @@
  * 이어받지 않고 비우고 새로 그린다. 그 잠깐의 랜딩 노출은 문서 head의 인라인
  * 스크립트가 남기는 `<html data-session>`과 global.css 규칙이 첫 페인트 전에
  * 막는다.
+ *
+ * ## 프로필 링크로 들어왔으면 앱에 먼저 기회를 준다
+ *
+ * 맨 아래에서 한 번, 앱으로 넘겨 본다. 이 자리인 이유는 `app-handoff.ts`에 있다 —
+ * 요약하면 **문서 진입에서만** 해야 하기 때문이다. `/u/:username`은 웹 안에서도
+ * 링크로 오가는 주소라(친구 목록, "내 공개 프로필 보기"), 라우트 쪽에 두면 웹에서
+ * 친구를 누를 때마다 앱으로 튕긴다. 로그인 여부와는 무관해서 인증 분기보다 위에
+ * 둘 수 있다. 미리 그리는 진입점(entry-prerender.tsx)에는 `window`가 없으므로
+ * 이 판단이 그쪽으로 새지 않는다.
  */
 
 import { watchFriendAccessRevocation } from "@leave/client";
+import { profileAppLink, profileUsernameFromUrl } from "@leave/shared";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import { getAuthToken } from "./api/client";
 import { ApiProvider } from "./api/provider";
 import { App } from "./App";
+import { openAppIfMobile } from "./lib/app-handoff";
 import { createWebQueryClient } from "./query-client";
 import { normalizePath } from "./seo/routes";
 import "./styles/global.css";
@@ -65,4 +76,11 @@ if (canHydrate) {
 } else {
   container.replaceChildren();
   createRoot(container).render(tree);
+}
+
+// 공유된 프로필 주소로 직접 들어온 경우에만 앱을 찔러 본다. 렌더를 예약한 뒤라
+// 앱이 없으면 이 화면이 그대로 그려진다.
+const sharedProfile = profileUsernameFromUrl(currentPath);
+if (sharedProfile) {
+  openAppIfMobile(profileAppLink(sharedProfile));
 }

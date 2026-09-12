@@ -42,6 +42,11 @@ import { Avatar } from "../components/Avatar";
  * 공유하는 것은 커스텀 스킴이 아니라 언제나 HTTPS 정본 주소다. 앱이 깔려 있으면
  * Universal Link/App Link가 앱을 열고, 아니면 이 웹 화면이 열린다 — 받는 사람이
  * 앱을 깔았는지 보낸 사람이 알 수 없으므로 둘 다 되는 주소여야 한다.
+ *
+ * 공유 시트에 `title`을 주지 않는다. 대상 앱에 따라 그 값이 본문 앞에 붙어
+ * `@hyunwoo https://…`가 되고, 그러면 붙여넣은 결과가 주소로 성립하지 않는다.
+ * 클립보드 대체 경로와 같은 것이 나가야 한다(앱도 같은 판단 —
+ * apps/native/src/components/profile-share-button.tsx).
  */
 function ShareProfile(props: { username: string }) {
   const [copied, setCopied] = useState(false);
@@ -50,7 +55,7 @@ function ShareProfile(props: { username: string }) {
   const share = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: `@${props.username}`, url });
+        await navigator.share({ url });
         return;
       } catch {
         // 사용자가 공유 시트를 닫은 경우다. 복사로 넘어간다.

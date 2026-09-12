@@ -12,6 +12,10 @@
  * `leave://invite/{코드}`로 한 번 이동을 시도하는 것이다. 앱이 없으면 아무 일도
  * 일어나지 않으므로, 잠깐 기다렸다가 웹 참여 화면을 그린다.
  *
+ * 시도 여부를 판단하는 곳은 `lib/app-handoff.ts` 한 곳이다(프로필 링크도 같은 것을
+ * 쓴다). 데스크톱처럼 애초에 시도하지 않은 경우에는 기다릴 이유가 없으므로 흰
+ * 화면을 건너뛰고 곧바로 웹 흐름으로 간다.
+ *
  * ## 주소에서 코드를 지운다
  *
  * 코드를 잡자마자 주소를 `/invite`로 바꾼다. 그러지 않으면 방문 기록에 남고,
@@ -21,10 +25,11 @@
  */
 
 import { useJoinUnit, useMe } from "@leave/client";
-import { inviteCodeFromUrl } from "@leave/shared";
+import { inviteAppLink, inviteCodeFromUrl } from "@leave/shared";
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
+import { openAppIfMobile } from "../lib/app-handoff";
 import { isAuthedAtom } from "../state/auth";
 import { withNext } from "../state/next-destination";
 import { rememberPendingInvite } from "../state/pending-invite";
@@ -73,8 +78,9 @@ export function InviteJoinPage() {
     rememberPendingInvite(code);
     window.history.replaceState(null, "", "/invite");
     // 앱이 있으면 여기서 넘어간다. 없으면 아무 일도 일어나지 않는다.
-    window.location.href = `leave://invite/${code}`;
-    const timer = window.setTimeout(() => setHandoffDone(true), APP_HANDOFF_MS);
+    // 시도조차 하지 않았으면(데스크톱) 기다릴 이유가 없으므로 대기를 0으로 둔다.
+    const wait = openAppIfMobile(inviteAppLink(code)) ? APP_HANDOFF_MS : 0;
+    const timer = window.setTimeout(() => setHandoffDone(true), wait);
     return () => window.clearTimeout(timer);
   }, [code]);
 

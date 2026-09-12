@@ -4,6 +4,12 @@
  * 공유 시트만 열면 사용자가 시트를 닫은 뒤 주소를 다시 찾을 수 없다. 그래서
  * 정본 HTTPS 주소를 먼저 클립보드에 넣고, 그 다음 시스템 공유 시트를 연다.
  * 커스텀 스킴은 앱이 없는 기기에서 막히므로 공유하지 않는다.
+ *
+ * **나가는 것은 주소 하나뿐이다.** 예전에는 `@아이디`를 함께 실었는데, 받는 쪽에
+ * 붙는 결과가 `@hyunwoo https://leave.moveto.kr/u/hyunwoo`가 되어 그대로 주소창에
+ * 넣거나 다시 옮겨 붙일 수 없었다. 누가 보냈는지는 대화창이 이미 말해 준다.
+ * 안드로이드의 `title`도 같은 이유로 비운다 — 메일 앱이 제목으로 가져가고, 일부
+ * 앱은 본문에 덧붙인다.
  */
 
 import * as Clipboard from "expo-clipboard";
@@ -41,12 +47,8 @@ export function ProfileShareButton(props: {
 
     try {
       await Share.share(
-        process.env.EXPO_OS === "ios"
-          ? { url, message: `@${props.username}` }
-          : {
-              title: `@${props.username}`,
-              message: `@${props.username}\n${url}`,
-            },
+        // 안드로이드는 `url`을 보지 않는다. 주소를 `message`에 실어야 나간다.
+        process.env.EXPO_OS === "ios" ? { url } : { message: url },
         process.env.EXPO_OS === "android"
           ? { dialogTitle: "프로필 링크 공유" }
           : undefined,

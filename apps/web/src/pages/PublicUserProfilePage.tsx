@@ -4,6 +4,12 @@
  * 앱이 설치된 기기에서는 운영체제의 Universal Link/App Link가 같은 주소를 앱으로
  * 연다. 웹에 남은 방문자에게는 별칭과 사용자 이름만 보여주며, 관계·일정·내부 id는
  * 인증 프로필 API와 화면에서만 다룬다.
+ *
+ * 그 가로채기가 없는 자리(메신저 인앱 브라우저)를 위해 `main.tsx`가 문서 진입 때
+ * 앱을 한 번 찔러 보지만, 사용자 제스처 없는 외부 스킴 이동은 브라우저가 막을 수
+ * 있다. 그래서 모바일에는 **직접 누를 수 있는 경로**를 하나 남긴다 — 링크 클릭은
+ * 제스처라 막히지 않는다. 앱이 없는 방문자에게는 이 화면이 목적지이므로, 그
+ * 버튼은 로그인 CTA 아래 보조 자리에 둔다.
  */
 
 import { usePublicUserProfile } from "@leave/client";
@@ -12,11 +18,13 @@ import {
   formatUsername,
   isCanonicalUsername,
   normalizeUsername,
+  profileAppLink,
 } from "@leave/shared";
 import { Link, useParams } from "react-router";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 import { LegalLinks } from "../components/LegalLinks";
+import { isMobileWeb } from "../lib/app-handoff";
 import { withNext } from "../state/next-destination";
 import "./public-user-profile.css";
 
@@ -115,6 +123,15 @@ export function PublicUserProfilePage() {
               >
                 로그인하고 친구 추가
               </Link>
+              {isMobileWeb() ? (
+                <a
+                  href={profileAppLink(profile.data.username)}
+                  className="btn btn-secondary"
+                  data-testid="public-profile-open-app"
+                >
+                  앱에서 열기
+                </a>
+              ) : null}
               <p className="caption text-mute">
                 공개 프로필에는 이름과 사용자 이름만 표시돼요.
               </p>

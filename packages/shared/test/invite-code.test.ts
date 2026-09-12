@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   INVITE_CODE_ALPHABET,
   INVITE_CODE_LENGTH,
+  inviteAppLink,
   inviteCodeFromUrl,
   inviteLink,
   isInviteCodeFormat,
@@ -64,6 +65,11 @@ describe("isInviteCodeFormat", () => {
 describe("inviteLink / inviteCodeFromUrl", () => {
   it("정본 주소를 만든다", () => {
     expect(inviteLink("A2C4D5")).toBe("https://leave.moveto.kr/invite/A2C4D5");
+  });
+
+  it("앱 스킴 주소는 같은 경로를 커스텀 스킴으로만 바꾼 것이다", () => {
+    expect(inviteAppLink("A2C4D5")).toBe("leave://invite/A2C4D5");
+    expect(inviteCodeFromUrl(inviteAppLink("A2C4D5"))).toBe("A2C4D5");
   });
 
   it("세 가지 링크 모양에서 코드를 꺼낸다", () => {
