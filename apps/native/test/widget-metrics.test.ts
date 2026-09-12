@@ -6,6 +6,7 @@
  * 되어 위젯이 조용히 빈 화면을 그린다 — 실행해 보기 전에는 드러나지 않는 종류의
  * 어긋남이라 여기서 잡는다.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appConfig from "../app.json";
 import {
@@ -15,6 +16,7 @@ import {
   METRIC_KEYS,
   METRIC_LINKS,
   METRIC_TITLES,
+  METRICS_PENDING_IOS_MENU,
   SUMMARY_METRIC_MAX,
   SUMMARY_METRIC_MIN,
   isMetricKey,
@@ -60,13 +62,37 @@ describe("위젯 설정", () => {
     (widget) => widget.name === "LeaveMetric",
   );
 
-  it("지표 위젯의 편집 목록이 METRIC_KEYS와 같다", () => {
+  /**
+   * 편집 목록은 여전히 **정확히 일치**해야 한다 — 다만 기준이 METRIC_KEYS 전체가
+   * 아니라 "다음 빌드 대기분을 뺀 것"이다.
+   *
+   * 부분집합 검사로 느슨하게 풀지 않는 이유: 그러면 app.json을 **진짜로 빠뜨린**
+   * 경우를 영영 못 잡는다. 대기분을 `METRICS_PENDING_IOS_MENU`에 손으로 적게 해
+   * "지금은 일부러 뒤처져 있다"를 코드에 남기고, 적지 않으면 빌드에서 깨지게 둔다.
+   */
+  it("지표 위젯의 편집 목록이 METRIC_KEYS와 같다(다음 빌드 대기분 제외)", () => {
+    const listed = METRIC_KEYS.filter(
+      (key) => !METRICS_PENDING_IOS_MENU.includes(key),
+    );
     const values = metricWidget!.configuration!.parameters.metric.values;
-    expect(values.map((item) => item.value)).toEqual([...METRIC_KEYS]);
+    expect(values.map((item) => item.value)).toEqual(listed);
     // 이름도 한 곳에서만 온다 — 편집 메뉴와 설정 화면이 다른 말을 쓰면 안 된다.
     expect(values.map((item) => item.name)).toEqual(
-      METRIC_KEYS.map((key) => METRIC_TITLES[key]),
+      listed.map((key) => METRIC_TITLES[key]),
     );
+  });
+
+  it("편집 메뉴 대기 목록은 실재하는 지표만 담는다", () => {
+    // 지표를 지우거나 이름을 바꾼 뒤 이 목록만 남으면 조용히 뜻을 잃는다.
+    for (const key of METRICS_PENDING_IOS_MENU) {
+      expect(isMetricKey(key)).toBe(true);
+      expect(METRIC_KEYS).toContain(key);
+    }
+    expect(new Set(METRICS_PENDING_IOS_MENU).size).toBe(
+      METRICS_PENDING_IOS_MENU.length,
+    );
+    // 기본 지표가 대기 중이면 iOS 위젯이 첫 화면부터 고를 수 없는 값을 가리킨다.
+    expect(METRICS_PENDING_IOS_MENU).not.toContain(DEFAULT_METRIC);
   });
 
   it("편집 목록의 기본값이 코드의 기본 지표와 같다", () => {
@@ -121,6 +147,36 @@ describe("위젯 설정", () => {
       // 위젯 전용 라우트를 만들지 않기로 했다 — 전부 `leave://` 스킴이어야 한다.
       expect(METRIC_LINKS[key]).toMatch(/^leave:\/\/\//);
     }
+  });
+
+  /**
+   * 지표 위젯의 레이아웃 함수는 바깥 스코프를 볼 수 없어(`'widget'` 지시어 —
+   * leave-metric.widget.tsx 머리주석) 대체 순서와 착지점 표를 함수 안에 리터럴로
+   * 다시 적는다. 여기가 METRIC_KEYS와 갈라지면 새 지표가 대체 후보에서 빠지거나
+   * 눌러도 홈으로 떨어지는데, iOS 위젯을 실제로 붙여 보기 전에는 드러나지 않는다.
+   * app.json 표와 같은 이유로 같은 장치를 둔다.
+   */
+  const widgetSource = readFileSync(
+    new URL("../src/widgets/leave-metric.widget.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("지표 위젯 안에 다시 적힌 대체 순서가 METRIC_KEYS와 같다", () => {
+    const order = widgetSource.match(/const order = \[([^\]]*)\]/)![1]!;
+    expect([...order.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual([
+      ...METRIC_KEYS,
+    ]);
+  });
+
+  it("지표 위젯 안에 다시 적힌 착지점이 METRIC_LINKS와 같다", () => {
+    const links = widgetSource.match(
+      /const links: Record<string, string> = \{([^}]*)\}/,
+    )![1]!;
+    expect(
+      Object.fromEntries(
+        [...links.matchAll(/(\w+): "([^"]+)"/g)].map((m) => [m[1], m[2]]),
+      ),
+    ).toEqual(METRIC_LINKS);
   });
 
   it("요약 위젯 기본 구성이 고를 수 있는 범위 안이다", () => {

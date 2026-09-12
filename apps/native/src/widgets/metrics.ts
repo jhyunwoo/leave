@@ -15,6 +15,7 @@ export const METRIC_KEYS = [
   "dutyDays",
   "progress",
   "nextLeave",
+  "nextOuting",
   "headroom",
   "balance",
   "promotion",
@@ -29,12 +30,29 @@ export function isMetricKey(value: unknown): value is MetricKey {
   );
 }
 
+/**
+ * iOS 위젯 편집 메뉴(`app.json`)에 아직 올리지 않은 지표.
+ *
+ * `app.json`은 fingerprint 소스라, 한 줄만 고쳐도 runtimeVersion이 바뀌어
+ * **기존 스토어 사용자 전원에게 OTA가 끊긴다**(apps/native/AGENTS.md). 그래서 지표를
+ * JS로 먼저 내보내고, 편집 메뉴는 다음 네이티브 빌드에서 따라붙게 열어 둔다.
+ *
+ * 여기 적혀 있는 동안 iOS에서는 위젯을 길게 눌러 그 지표를 고를 수 없다. 대신 인앱
+ * 위젯 설정(기본 지표·요약 구성)으로 고를 수 있고, Android는 편집 메뉴 자체가 없어
+ * 아무 영향이 없다.
+ *
+ * **다음 네이티브 빌드를 낼 때 `app.json`에 넣고 이 목록을 비운다.**
+ * 비우지 않아도 위젯은 동작하지만, 그만큼 iOS 편집 메뉴가 계속 뒤처진다.
+ */
+export const METRICS_PENDING_IOS_MENU: readonly MetricKey[] = ["nextOuting"];
+
 /** 위젯 편집 메뉴와 설정 화면에 쓰는 이름. 문장이 아니라 항목 이름이다. */
 export const METRIC_TITLES: Record<MetricKey, string> = {
   discharge: "전역일 D-Day",
   dutyDays: "남은 일과일",
   progress: "복무율",
   nextLeave: "다음 휴가 D-Day",
+  nextOuting: "다음 외출 D-Day",
   headroom: "다음 휴가일 출타 여유",
   balance: "남은 총 휴가일수",
   promotion: "진급까지 남은 날",
@@ -45,7 +63,9 @@ export const METRIC_DESCRIPTIONS: Record<MetricKey, string> = {
   discharge: "전역 예정일까지 남은 날",
   dutyDays: "평일에서 휴일·휴가를 뺀, 실제로 일과가 있는 날",
   progress: "입대일부터 전역일까지 지나온 비율",
-  nextLeave: "다음에 나가는 휴가까지 남은 날. 휴가 중이면 복귀까지",
+  nextLeave:
+    "다음에 나가는 휴가까지 남은 날. 휴가 중이면 복귀까지. 외출은 빼고 센다",
+  nextOuting: "다음에 나가는 외출까지 남은 날. 외출 중이면 복귀까지",
   headroom: "그날 그룹에서 몇 명이 더 나갈 수 있는지",
   balance: "지금 기준으로 앞으로 쓸 수 있는 휴가 일수",
   promotion: "다음 진급일까지 남은 날",
@@ -66,6 +86,7 @@ export const METRIC_LINKS: Record<MetricKey, string> = {
   dutyDays: "leave:///service-progress",
   progress: "leave:///service-progress",
   nextLeave: "leave:///leaves",
+  nextOuting: "leave:///leaves",
   headroom: "leave:///",
   balance: "leave:///leave-grants",
   promotion: "leave:///service-progress",

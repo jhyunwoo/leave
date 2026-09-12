@@ -26,6 +26,29 @@ function leave(over: Partial<Record<string, unknown>> = {}) {
   } as unknown as WidgetSource["leaves"][number];
 }
 
+/**
+ * 외출 한 건. 구간이 **전부** 외출일 때만 외출로 센다(`isOutingLeave`).
+ * 위의 `leave()`는 구간이 비어 있어 휴가 쪽에 남는다.
+ */
+function outing(over: Partial<Record<string, unknown>> = {}) {
+  return leave({
+    id: "outing-1",
+    title: "평일 외출",
+    startDate: "2026-06-17",
+    endDate: "2026-06-17",
+    segments: [
+      {
+        category: "outing",
+        outingKind: "weekday",
+        startDate: "2026-06-17",
+        endDate: "2026-06-17",
+        days: 1,
+      },
+    ],
+    ...over,
+  });
+}
+
 function source(over: Partial<WidgetSource> = {}): WidgetSource {
   return {
     state: "ready",
@@ -158,6 +181,41 @@ describe("위젯 타임라인", () => {
     expect(returnEntry?.props.metrics.nextLeave).toBeUndefined();
     // 다음 날에도 셀 것이 없다.
     expect(entries[8]!.props.metrics.nextLeave).toBeUndefined();
+  });
+
+  it("다음 휴가와 다음 외출을 따로 센다", () => {
+    // 6/17 외출이 6/20 휴가보다 먼저다. 합쳐 세면 휴가 D-day가 외출에 가려진다.
+    const entries = dailyEntries(source({ leaves: [leave(), outing()] }));
+    expect(entries[0]!.props.metrics.nextLeave).toMatchObject({
+      label: "다음 휴가",
+      value: "D-5",
+    });
+    expect(entries[0]!.props.metrics.nextOuting).toMatchObject({
+      label: "다음 외출",
+      value: "D-2",
+      compact: "외출 D-2",
+    });
+  });
+
+  it("외출 중에는 외출 지표만 복귀까지로 바뀐다", () => {
+    const entries = dailyEntries(source({ leaves: [leave(), outing()] }));
+    // 6/17 당일 — 외출은 그날 복귀(기본 21:00)라 남은 시간으로 센다.
+    expect(entries[2]!.props.metrics.nextOuting).toMatchObject({
+      label: "외출 중",
+      value: "21시간 00분 00초",
+      spoken: "복귀까지 21시간 00분 00초 남았어요",
+    });
+    // 그 사이에도 휴가는 제 날짜 그대로 센다.
+    expect(entries[2]!.props.metrics.nextLeave?.value).toBe("D-3");
+    // 복귀한 다음 날에는 셀 외출이 없다.
+    expect(entries[3]!.props.metrics.nextOuting).toBeUndefined();
+    expect(entries[3]!.props.metrics.nextLeave?.value).toBe("D-2");
+  });
+
+  it("외출뿐이면 다음 휴가 지표는 아예 없다", () => {
+    const entries = dailyEntries(source({ leaves: [outing()] }));
+    expect(entries[0]!.props.metrics.nextLeave).toBeUndefined();
+    expect(entries[0]!.props.metrics.nextOuting?.value).toBe("D-2");
   });
 
   it("초안·반려 휴가는 세지 않는다", () => {

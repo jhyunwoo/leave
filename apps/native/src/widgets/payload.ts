@@ -8,8 +8,8 @@
  * ## 왜 타임라인인가
  *
  * 위젯은 새로고침 시점에 JS를 돌릴 수 없다 — 저장된 props만 그린다. 그래서
- * "앱을 켜야 숫자가 맞는 위젯"이 되기 쉬운데, 일곱 지표 중 다섯(전역 D-Day·
- * 일과일·복무율·다음 휴가 D-Day·진급)은 **날짜만 알면 정해지는 값**이다.
+ * "앱을 켜야 숫자가 맞는 위젯"이 되기 쉬운데, 여덟 지표 중 여섯(전역 D-Day·
+ * 일과일·복무율·다음 휴가 D-Day·다음 외출 D-Day·진급)은 **날짜만 알면 정해지는 값**이다.
  * 앞으로 14일치 한국시간 자정을 미리 계산해 넣어 두면, 앱을 한 번도 켜지 않아도
  * 매일 0시에 정확한 숫자로 바뀐다.
  *
@@ -35,7 +35,8 @@ import {
 } from "@leave/shared/rank";
 import {
   formatLeaveRemainingTime,
-  nextLeaveCountdown,
+  nextLeaveCountdowns,
+  type NextLeaveCountdown,
 } from "@leave/client/next-leave-countdown";
 import type { LeaveHoldings } from "@leave/client/leave-holdings";
 import type { MyLeave } from "@leave/client/types";
@@ -142,7 +143,7 @@ export type WidgetSource = {
   } | null;
   /** 서버가 센 오늘의 남은 일과일. 미래 날짜는 여기서 빼서 구한다. */
   dutyDaysToday: number | null;
-  /** 내 휴가 전부. 다음 휴가 D-Day가 여기서 나온다. */
+  /** 내 휴가 전부. 외출도 여기 섞여 있고, 두 D-Day가 여기서 갈라져 나온다. */
   leaves: readonly MyLeave[];
   /** 일과일 차감에 쓰는 구간. 부대 휴일과 집계 대상 휴가. */
   unitHolidays: readonly DateRange[];
@@ -237,15 +238,25 @@ function dutyDays(
   };
 }
 
-function nextLeave(
-  date: ISODate,
-  leaves: readonly MyLeave[],
+/**
+ * 다음 출타까지의 카운트다운 한 칸. 휴가와 외출이 같은 모양을 쓰고 말만 갈린다.
+ *
+ * 두 지표로 나눈 이유는 `nextLeaveCountdowns`(@leave/client) 주석에 있다 — 하나로
+ * 합치면 내일 나가는 외출이 다음 주 연가를 가려, 정작 휴가가 며칠 뒤인지 알 수 없다.
+ * 화면(`next-leave-card.tsx`)이 이미 그렇게 세고 있고, 위젯만 합쳐 세고 있었다.
+ *
+ * 세는 규칙은 여기 없다. 목록을 가르는 것도 `nextLeaveCountdowns`가 한다 — 규칙을
+ * 위젯에 다시 적으면 앱과 위젯이 서로 다른 D-day를 말하게 된다.
+ */
+function departure(
+  countdown: NextLeaveCountdown | null,
+  kind: "leave" | "outing",
   at: Date,
 ): MetricValue | undefined {
-  const countdown = nextLeaveCountdown(leaves, at);
   if (!countdown) return undefined;
 
   const { leave, phase, days } = countdown;
+  const noun = kind === "outing" ? "외출" : "휴가";
   const onLeave = phase === "onLeave";
   const hoursText = formatLeaveRemainingTime(countdown.remainingSeconds ?? 0);
   const [returnHour, returnMinute] = (leave.returnTime ?? "21:00")
@@ -255,13 +266,13 @@ function nextLeave(
     kstMidnight(leave.endDate) + (returnHour * 60 + returnMinute) * 60_000;
   const range = fmtRangeTiny(leave.startDate, leave.endDate);
   return {
-    label: onLeave ? "휴가 중" : "다음 휴가",
+    label: onLeave ? `${noun} 중` : `다음 ${noun}`,
     value: onLeave ? hoursText : dday(days),
     caption: `${leave.title} · ${range}`,
     spoken: onLeave
       ? `복귀까지 ${hoursText} 남았어요`
-      : `다음 휴가까지 ${days}일 남았어요`,
-    compact: `${onLeave ? "복귀" : "휴가"} ${onLeave ? hoursText : dday(days)}`,
+      : `다음 ${noun}까지 ${days}일 남았어요`,
+    compact: `${onLeave ? "복귀" : noun} ${onLeave ? hoursText : dday(days)}`,
     ...(onLeave ? { timerStartAt: at.getTime(), timerEndAt: returnAt } : {}),
   };
 }
@@ -347,8 +358,11 @@ function metricsOn(source: WidgetSource, date: ISODate, at: Date) {
     }
   }
 
-  const upcoming = nextLeave(date, source.leaves, at);
+  const countdowns = nextLeaveCountdowns(source.leaves, at);
+  const upcoming = departure(countdowns.leave, "leave", at);
   if (upcoming) metrics.nextLeave = upcoming;
+  const outing = departure(countdowns.outing, "outing", at);
+  if (outing) metrics.nextOuting = outing;
 
   const held = balance(source.snapshot.holdings);
   if (held) metrics.balance = held;
