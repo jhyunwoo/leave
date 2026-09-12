@@ -232,29 +232,67 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   await page.goto("/leaves");
   await page.getByRole("button", { name: "휴가 등록" }).click();
   await page.getByPlaceholder("예: 제주도 가족여행").fill("복합 휴가");
+
+  /*
+   * 시작일은 **다음 달 1일**이다.
+   *
+   * 달을 고정해 두면 그 달이 지나간 순간 아래 루프가 끝나지 않는다 — 달력은
+   * 앞으로만 넘어가고 지난 달로는 돌아가지 않는다. 1일을 쓰는 것은 5일치가 달을
+   * 넘지 않아 기대 문구를 한 달로 적을 수 있기 때문이다. 기기 시계가 서울보다
+   * 뒤에 있어도 상관없다 — 그때는 패널이 이미 목표 달에서 열리고 루프가 한 번도
+   * 돌지 않을 뿐이다.
+   */
+  const nextMonth = new Date();
+  nextMonth.setDate(1);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+  const monthNumber = nextMonth.getMonth() + 1;
+  const targetMonth = `${nextMonth.getFullYear()}-${String(monthNumber).padStart(2, "0")}`;
+  const dayId = (date: number) =>
+    `leave-date-range-calendar-day-${targetMonth}-${String(date).padStart(2, "0")}`;
+
   // 휴가 기간은 자체 달력으로 고른다. `input[type="date"]`로 잡으면 구간 편집기의
   // 종료일 칸에 걸려 조용히 엉뚱한 값이 들어간다.
   const range = page.getByTestId("leave-date-range");
   await range.getByTestId("leave-date-range-start").click();
   const panel = page.getByTestId("leave-date-range-calendar");
-  // 패널은 오늘이 속한 달에서 열린다. 클릭 횟수를 오늘 날짜로 역산하면 시간이
-  // 지나며 깨지므로, 달 표시를 보고 맞을 때까지 넘긴다.
-  while ((await panel.getAttribute("data-month")) !== "2026-09") {
+  await expect(panel).toBeVisible();
+  while ((await panel.getAttribute("data-month")) !== targetMonth) {
     await page.getByTestId("leave-date-range-calendar-next").click();
   }
-  await page.getByTestId("leave-date-range-calendar-day-2026-09-01").click();
-  // 시작일을 고르면 종료일 선택으로 넘어가고 달도 9월로 따라온다.
-  await page.getByTestId("leave-date-range-calendar-day-2026-09-05").click();
-  // 5일짜리 기본 연가 구간을 3일/2일로 나눈 뒤 둘째 재원을 포상휴가로 바꾼다.
+  await page.getByTestId(dayId(1)).click();
+
+  /*
+   * 시작일을 고르면 달력이 닫힌다. 종료일을 고르는 단계는 없다.
+   *
+   * 휴가 폼은 DateRangePicker에 `onChangeStart`를 넘기고, 그러면 시작일 선택이
+   * 종료일을 건드리지 않는다(DateRangePicker의 그 prop 주석). 이 폼에서 기간은
+   * 파생값이기 때문이다 — 구간마다 며칠 쓸지 고르면 종료일이 그 합에서 나온다.
+   * 예전에는 종료일도 달력에서 골랐고, 이 테스트는 사라진 두 번째 달력 클릭을
+   * 계속 기다리다 타임아웃했다.
+   *
+   * 그래서 5일을 개수로 적는다: 기본 연가 구간을 3일로 늘리고 포상휴가 구간을
+   * 2일 이어 붙인다. 이어 붙는 구간은 하루로 시작하므로 개수를 따로 넣어야 한다.
+   */
+  await expect(panel).toBeHidden();
+  await page
+    .getByRole("spinbutton", { name: "1번째 구간 사용 일수" })
+    .fill("3");
   await page.getByRole("button", { name: "구간 추가" }).click();
   await page
     .getByRole("combobox", { name: "2번째 구간 휴가 재원" })
     .selectOption("award");
+  await page
+    .getByRole("spinbutton", { name: "2번째 구간 사용 일수" })
+    .fill("2");
   await page.getByRole("button", { name: "휴가 등록" }).last().click();
 
   const savedLeave = page.getByRole("listitem").filter({
     has: page.getByRole("link", { name: "복합 휴가" }),
   });
-  await expect(savedLeave).toContainText("연가 9/1–9/3");
-  await expect(savedLeave).toContainText("포상휴가 9/4–9/5");
+  await expect(savedLeave).toContainText(
+    `연가 ${monthNumber}/1–${monthNumber}/3`,
+  );
+  await expect(savedLeave).toContainText(
+    `포상휴가 ${monthNumber}/4–${monthNumber}/5`,
+  );
 });
