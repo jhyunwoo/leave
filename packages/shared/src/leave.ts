@@ -180,6 +180,20 @@ export const BALANCE_LABELS: Record<BalanceKey, string> = {
 };
 
 /**
+ * 재원 이름. 앱이 모르는 재원은 "기타"로 접는다.
+ *
+ * `BALANCE_LABELS[key]`로 바로 색인하면, 재원이 새로 생긴 뒤 **먼저 배포된 서버가 그
+ * 키를 실어 보내는 동안** 구버전 앱에서 이름 자리가 빈칸으로 남는다. 이름이 없는 칩은
+ * 무엇인지 알 수 없다 — 색이 사라지는 것과 같은 사고이고(apps/native의
+ * `balance-tone.ts`), 응답에서 온 키를 그릴 때는 이 함수로 읽는다.
+ * `BALANCE_KEYS`를 직접 훑는 자리(선택기 목록)는 키가 늘 알려진 값이라 해당하지 않는다.
+ */
+export function balanceLabel(key: BalanceKey): string {
+  const known: Partial<Record<BalanceKey, string>> = BALANCE_LABELS;
+  return known[key] ?? BALANCE_LABELS.other;
+}
+
+/**
  * 이 재원을 세는 단위.
  *
  * 외출은 **일이 아니라 횟수**다 — 당일 복귀라 하루가 통째로 사라지지 않고, 부대도

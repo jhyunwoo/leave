@@ -7,7 +7,7 @@
 import { fmtRange } from "@leave/shared/calendar";
 import { type ISODate } from "@leave/shared/dates";
 import {
-  BALANCE_LABELS,
+  balanceLabel,
   isConfirmedLeaveStatus,
   LEAVE_STATUS_LABELS,
   segmentBalanceKey,
@@ -17,7 +17,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Calendar } from "@leave/client";
 import { Avatar } from "@/components/avatar";
 import { ContentPanel } from "@/components/content-panel";
-import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";
+import {
+  balanceTone,
+  makeStyles,
+  radius,
+  spacing,
+  useBalanceColors,
+} from "@/theme";
 
 /**
  * 하루의 출타 명단. 날짜 상세 시트와 휴가 상세 화면이 함께 쓴다.
@@ -65,7 +71,7 @@ export function DayRoster(props: {
         // 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.
         const segment = segmentOnDate(attendee.segments, date);
         const key = segment ? segmentBalanceKey(segment) : null;
-        const tone = key ? balance[key] : null;
+        const tone = key ? balanceTone(balance, key) : null;
         const isMine = attendee.userId === props.myUserId;
         const openLeave = isMine ? props.onOpenLeave : undefined;
         // 눌리는 행과 그냥 보는 행이 같은 크기여야 한다. 태그만 바뀌고 스타일은 같다.
@@ -93,7 +99,7 @@ export function DayRoster(props: {
                 {key && tone && (
                   <View style={[styles.typeChip, { backgroundColor: tone.bg }]}>
                     <Text style={[styles.typeChipText, { color: tone.fg }]}>
-                      {BALANCE_LABELS[key]}
+                      {balanceLabel(key)}
                     </Text>
                   </View>
                 )}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BALANCE_KEYS,
+  BALANCE_LABELS,
+  balanceLabel,
+  type BalanceKey,
   BALANCE_LEAVE_STATUSES,
   COUNTED_LEAVE_STATUSES,
   LEAVE_STATUSES,
@@ -11,6 +15,20 @@ import {
   isOutingSegments,
   leaveCreateSchema,
 } from "../src";
+
+describe("재원 이름", () => {
+  it.each(BALANCE_KEYS)("%s의 이름을 돌려준다", (key) => {
+    expect(balanceLabel(key)).toBe(BALANCE_LABELS[key]);
+  });
+
+  /**
+   * 재원이 새로 생기면 서버가 먼저 배포되고, 그 사이 구버전 앱·열려 있던 웹 탭에는
+   * 모르는 키가 내려온다. 이름 자리가 빈칸으로 남으면 무슨 칩인지 알 수 없다.
+   */
+  it("모르는 재원은 기타로 접는다", () => {
+    expect(balanceLabel("shore_leave" as BalanceKey)).toBe("기타");
+  });
+});
 
 describe("휴가 재원", () => {
   it("군별 연가 규정값은 수정 가능한 초기 제안값으로 제공", () => {

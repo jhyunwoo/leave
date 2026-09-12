@@ -15,7 +15,7 @@
 import { fmtRangeTiny } from "@leave/shared/calendar";
 import type { ISODate } from "@leave/shared/dates";
 import {
-  BALANCE_LABELS,
+  balanceLabel,
   OUTING_KINDS,
   type OutingKind,
   type SegmentLike,
@@ -28,7 +28,7 @@ import {
 } from "@leave/shared/outing";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ContentPanel } from "@/components/content-panel";
-import { makeStyles, radius, spacing, useTheme } from "@/theme";
+import { balanceTone, makeStyles, radius, spacing, useTheme } from "@/theme";
 
 export function OutingCycleNote(props: {
   date: ISODate;
@@ -61,7 +61,7 @@ export function OutingCycleNote(props: {
       </Text>
       {notes.map((note) => {
         const key = outingBalanceKey(note.kind);
-        const tone = balance[key];
+        const tone = balanceTone(balance, key);
         const remaining = outingRemainingDays(
           note.kind,
           note.cycle,
@@ -72,7 +72,7 @@ export function OutingCycleNote(props: {
             {/* 달력 마커와 같은 뒤집힌 톤 — 상세에서도 같은 것으로 읽히게 한다. */}
             <View style={[styles.pill, { backgroundColor: tone.fg }]}>
               <Text style={[styles.pillText, { color: tone.bg }]}>
-                {BALANCE_LABELS[key]}
+                {balanceLabel(key)}
               </Text>
             </View>
             <Text style={styles.line} selectable>

@@ -15,6 +15,7 @@
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
+  balanceLabel,
   balanceUnitLabel,
   fmtDateShort,
   type BalanceKey,
@@ -23,7 +24,13 @@ import {
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";
+import {
+  balanceTone,
+  makeStyles,
+  radius,
+  spacing,
+  useBalanceColors,
+} from "@/theme";
 
 /**
  * 휴가 구간 한 줄. 개수를 바꾸면 이 행과 뒤 행들의 날짜가 함께 다시 계산된다.
@@ -40,7 +47,7 @@ export function SegmentRow(props: {
   const styles = useStyles();
   const balance = useBalanceColors();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const selectedTone = balance[props.draft.key];
+  const selectedTone = balanceTone(balance, props.draft.key);
   const selectedRemaining = props.remainingByKey.get(props.draft.key) ?? 0;
   // 외출은 일이 아니라 횟수다(@leave/shared의 balanceUnitLabel).
   const selectedUnit = balanceUnitLabel(props.draft.key);
@@ -59,7 +66,7 @@ export function SegmentRow(props: {
         {props.removable ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${BALANCE_LABELS[props.draft.key]} 구간 삭제`}
+            accessibilityLabel={`${balanceLabel(props.draft.key)} 구간 삭제`}
             onPress={props.onRemove}
             hitSlop={6}
             style={({ pressed }) => [
@@ -75,7 +82,7 @@ export function SegmentRow(props: {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`휴가 종류 ${BALANCE_LABELS[props.draft.key]}, 사용 후 잔여 ${selectedRemaining}${selectedUnit}`}
+        accessibilityLabel={`휴가 종류 ${balanceLabel(props.draft.key)}, 사용 후 잔여 ${selectedRemaining}${selectedUnit}`}
         accessibilityHint="휴가 종류를 변경하려면 누르세요. 순서를 바꾸려면 길게 누른 채 끌어주세요"
         accessibilityState={{ expanded: pickerOpen }}
         onPress={() => setPickerOpen((open) => !open)}
@@ -91,7 +98,7 @@ export function SegmentRow(props: {
         />
         <View style={styles.balanceText}>
           <Text style={[styles.balanceLabel, { color: selectedTone.fg }]}>
-            {BALANCE_LABELS[props.draft.key]}
+            {balanceLabel(props.draft.key)}
           </Text>
           <Text style={[styles.balanceMeta, { color: selectedTone.fg }]}>
             이 구간 사용 후 잔여 {selectedRemaining}
@@ -113,7 +120,7 @@ export function SegmentRow(props: {
             const selected = key === props.draft.key;
             const remaining = props.remainingByKey.get(key) ?? 0;
             const insufficient = !selected && remaining < days;
-            const tone = balance[key];
+            const tone = balanceTone(balance, key);
             // 외출은 일이 아니라 횟수다(@leave/shared의 balanceUnitLabel).
             const unit = balanceUnitLabel(key);
 
@@ -178,7 +185,7 @@ export function SegmentRow(props: {
       ) : null}
 
       <DaysStepper
-        label={BALANCE_LABELS[props.draft.key]}
+        label={balanceLabel(props.draft.key)}
         days={days}
         onChange={props.onChangeDays}
       />

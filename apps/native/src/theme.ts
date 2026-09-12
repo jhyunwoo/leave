@@ -25,7 +25,13 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import type { BalanceKey } from "@leave/shared";
+import { type BalancePalette } from "./balance-tone";
+
+export {
+  balanceTone,
+  type BalancePalette,
+  type BalanceTone,
+} from "./balance-tone";
 
 export type ColorScheme = "light" | "dark";
 
@@ -137,9 +143,6 @@ const darkColors: Palette = {
   cycleTint: "#17202a",
 };
 
-export type BalanceTone = { readonly fg: string; readonly bg: string };
-export type BalancePalette = Readonly<Record<BalanceKey, BalanceTone>>;
-
 /**
  * 휴가 재원별 색. 달력에서 내 휴가가 어떤 재원인지 한눈에 구분하는 용도라
  * 서로 충분히 다른 색조를 쓴다. bg는 칩 배경, fg는 그 위의 글자색.
@@ -148,6 +151,9 @@ export type BalancePalette = Readonly<Record<BalanceKey, BalanceTone>>;
  * 글자로 직접 쓴다. 그래서 다크 fg는 canvas(#1c1c1e) 위에서도 읽혀야 한다.
  *
  * Record<BalanceKey, _>로 묶어서 한쪽 스킴에서 키가 빠지면 빌드가 깨지게 한다.
+ *
+ * 읽을 때는 `palette[key]`가 아니라 `balanceTone(palette, key)`를 쓴다 — 이유는
+ * `balance-tone.ts` 머리주석에 있다.
  */
 const lightBalance: BalancePalette = {
   annual: { fg: "#1f5e10", bg: "#d8f3c4" },

@@ -7,6 +7,7 @@
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
+  balanceLabel,
   leaveGrantCreateSchema,
   todayInSeoul,
   type BalanceKey,
@@ -224,7 +225,7 @@ export async function confirmGrantDelete(
   const confirmed = await confirmAction({
     title: "적립분 삭제",
     message:
-      `${BALANCE_LABELS[grant.balanceKey]} ${grant.days}일을 지울까요?` +
+      `${balanceLabel(grant.balanceKey)} ${grant.days}일을 지울까요?` +
       (grant.usedDays > 0
         ? `\n이미 ${grant.usedDays}일을 쓴 적립분이라, 지우면 그만큼 설명되지 않는 사용분이 생겨요.`
         : ""),

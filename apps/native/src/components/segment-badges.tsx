@@ -4,10 +4,16 @@
  */
 
 import { fmtRangeTiny } from "@leave/shared/calendar";
-import { BALANCE_LABELS, segmentBalanceKey } from "@leave/shared/leave";
+import { balanceLabel, segmentBalanceKey } from "@leave/shared/leave";
 import { Text, View } from "react-native";
 import type { MyLeave } from "@leave/client";
-import { makeStyles, radius, spacing, useBalanceColors } from "@/theme";
+import {
+  balanceTone,
+  makeStyles,
+  radius,
+  spacing,
+  useBalanceColors,
+} from "@/theme";
 
 /** 휴가 한 건이 어떤 재원을 며칠씩 썼는지 보여주는 배지 줄. */
 export function SegmentBadges(props: { segments: MyLeave["segments"] }) {
@@ -17,14 +23,14 @@ export function SegmentBadges(props: { segments: MyLeave["segments"] }) {
     <View style={styles.badges}>
       {props.segments.map((segment) => {
         const key = segmentBalanceKey(segment);
-        const tone = balance[key];
+        const tone = balanceTone(balance, key);
         return (
           <View
             key={`${key}-${segment.startDate}`}
             style={[styles.badge, { backgroundColor: tone.bg }]}
           >
             <Text style={[styles.badgeText, { color: tone.fg }]} selectable>
-              {BALANCE_LABELS[key]}{" "}
+              {balanceLabel(key)}{" "}
               {fmtRangeTiny(segment.startDate, segment.endDate)}
             </Text>
           </View>

@@ -37,6 +37,7 @@ import {
   useWindowSizeClass,
 } from "@/adaptive";
 import {
+  balanceTone,
   layout,
   makeStyles,
   radius,
@@ -189,7 +190,7 @@ export function LeaveGrantsScreen() {
           </Text>
           <View style={styles.chips}>
             {empty.map((fund) => {
-              const tone = balance[fund.key];
+              const tone = balanceTone(balance, fund.key);
               return (
                 <Pressable
                   key={fund.key}
@@ -290,7 +291,7 @@ function FundCard(props: {
   const styles = useStyles();
   const balance = useBalanceColors();
   const { fund } = props;
-  const tone = balance[fund.key];
+  const tone = balanceTone(balance, fund.key);
 
   return (
     <ContentPanel style={styles.fundCard}>

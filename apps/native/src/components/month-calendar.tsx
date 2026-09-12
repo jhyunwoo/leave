@@ -22,7 +22,7 @@ import { availabilitySignal } from "@leave/shared/availability";
 import { buildMonthGrid, isWeekend, WEEKDAYS } from "@leave/shared/calendar";
 import { addDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import { getHoliday } from "@leave/shared/holidays";
-import { BALANCE_LABELS, type OutingKind } from "@leave/shared/leave";
+import { balanceLabel, type OutingKind } from "@leave/shared/leave";
 import { type LeaveCycle } from "@leave/shared/leave-cycle";
 import { outingBalanceKey } from "@leave/shared/outing";
 import {
@@ -46,7 +46,7 @@ import {
   calendarDragPreviewAtom,
   type LeaveDragDay,
 } from "@/state/calendar-drag";
-import { makeStyles, radius, spacing, useTheme } from "@/theme";
+import { balanceTone, makeStyles, radius, spacing, useTheme } from "@/theme";
 
 /** 칸 안에 미리 보여줄 출타자 수. 넘치면 "+N"으로 접는다. */
 const PREVIEW_ATTENDEES = 3;
@@ -263,7 +263,7 @@ export function MonthCalendar(props: {
                         cycle ? `, 정기외박 ${cycle.index}주기` : ""
                       }${
                         mine
-                          ? `, 내 ${BALANCE_LABELS[mine.key]} ${
+                          ? `, 내 ${balanceLabel(mine.key)} ${
                               mine.isDraft
                                 ? "초안"
                                 : mine.isConfirmed
@@ -335,7 +335,10 @@ export function MonthCalendar(props: {
                       {outingStarts.map((entry) => {
                         // 재원 톤을 **뒤집어** 쓴다 — 옅은 칩은 날짜 숫자에 묻혀
                         // 안 보였다. 색을 새로 만들지는 않고 대비만 올린다.
-                        const tone = balance[outingBalanceKey(entry.kind)];
+                        const tone = balanceTone(
+                          balance,
+                          outingBalanceKey(entry.kind),
+                        );
                         return (
                           <View
                             key={entry.kind}
@@ -518,7 +521,7 @@ function MyLeaveChip(props: {
   const conflict = props.preview?.verdict === "conflict";
   const merging = props.preview?.verdict === "merge";
   const saving = props.preview?.phase === "saving";
-  const tone = balance[day.key];
+  const tone = balanceTone(balance, day.key);
   // 겹쳐서 놓을 수 없는 자리는 재원 색을 버리고 경고색으로 그린다.
   const fg = conflict ? colors.negativeDeep : tone.fg;
   const bg = conflict ? colors.negativeBg : tone.bg;
@@ -563,7 +566,7 @@ function MyLeaveChip(props: {
             ellipsizeMode="clip"
           >
             {day.isDraft ? "초안 " : ""}
-            {BALANCE_LABELS[day.key]}
+            {balanceLabel(day.key)}
           </Text>
         )}
       </Pressable>
