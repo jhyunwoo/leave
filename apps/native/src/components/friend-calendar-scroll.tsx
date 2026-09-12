@@ -20,7 +20,11 @@ import {
   todayInSeoul,
   type ISODate,
 } from "@leave/shared";
-import { useFriendCalendar, usePersonalEvents } from "@leave/client";
+import {
+  friendDayPeople,
+  useFriendCalendar,
+  usePersonalEvents,
+} from "@leave/client";
 import {
   forwardRef,
   memo,
@@ -48,12 +52,39 @@ import {
   ROW_GAP,
   useMonthScrollWindow,
 } from "@/components/month-scroll-window";
-import { makeStyles, radius, spacing, useColors } from "@/theme";
+import {
+  makeStyles,
+  radius,
+  spacing,
+  useAppColorScheme,
+  useColors,
+  type ColorScheme,
+} from "@/theme";
 
-export function friendPersonColor(userId: string): string {
+function personHue(userId: string): number {
   let hash = 0;
   for (const char of userId) hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  return `hsl(${hash} 58% 38%)`;
+  return hash;
+}
+
+export function friendPersonColor(userId: string): string {
+  return `hsl(${personHue(userId)} 58% 38%)`;
+}
+
+/**
+ * 속이 빈 외출 알약에 쓰는 색.
+ *
+ * `friendPersonColor`는 흰 글자를 얹는 **채움**이라 두 스킴에서 같은 어두운 값이어도
+ * 됐다. 테두리와 글자로 쓰는 순간 이야기가 달라진다 — 다크에서 그 값은 칸 배경과
+ * 거의 붙어 보이지 않는다. 색조는 그대로 두고 명도만 올려 같은 사람으로 읽히게 한다.
+ */
+export function friendPersonOutlineColor(
+  userId: string,
+  scheme: ColorScheme,
+): string {
+  return scheme === "dark"
+    ? `hsl(${personHue(userId)} 62% 70%)`
+    : friendPersonColor(userId);
 }
 
 export interface FriendCalendarScrollHandle {
@@ -216,6 +247,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
 }) {
   const styles = useStyles();
   const colors = useColors();
+  const scheme = useAppColorScheme();
   const weeks = useMemo(() => buildMonthGrid(props.month), [props.month]);
   const personById = useMemo(
     () => new Map(props.people.map((person) => [person.userId, person])),
@@ -227,17 +259,10 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
       {weeks.map((week, weekIndex) => (
         <View key={weekIndex} style={styles.week}>
           {week.map((cell) => {
-            const people = [
-              ...new Set(
-                props.leaves
-                  .filter(
-                    (leave) =>
-                      leave.startDate <= cell.date &&
-                      cell.date <= leave.endDate,
-                  )
-                  .map((leave) => leave.userId),
-              ),
-            ];
+            const people = friendDayPeople(props.leaves, cell.date);
+            const outings = people.filter(
+              (person) => person.kind === "outing",
+            ).length;
             const personalCount = props.events.filter(
               (event) =>
                 event.startDate <= cell.date && cell.date <= event.endDate,
@@ -254,7 +279,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                 }}
                 accessibilityLabel={
                   cell.inMonth
-                    ? `${Number(cell.date.slice(8))}일, 휴가 ${people.length}명${personalCount ? `, 개인 일정 ${personalCount}개` : ""}`
+                    ? `${Number(cell.date.slice(8))}일, 휴가 ${people.length - outings}명${outings ? `, 외출 ${outings}명` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}`
                     : undefined
                 }
                 onPress={() => props.onSelectDate(cell.date)}
@@ -283,17 +308,26 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                       </Text>
                     ) : null}
                     <View style={styles.people}>
-                      {people.slice(0, 3).map((userId) => {
+                      {people.slice(0, 3).map(({ userId, kind }) => {
                         const person = personById.get(userId);
+                        const outing = kind === "outing";
+                        const color = outing
+                          ? friendPersonOutlineColor(userId, scheme)
+                          : friendPersonColor(userId);
                         return (
                           <View
                             key={userId}
                             style={[
                               styles.person,
-                              { backgroundColor: friendPersonColor(userId) },
+                              outing
+                                ? { borderColor: color }
+                                : { backgroundColor: color },
+                              outing && styles.outingPerson,
                             ]}
                           >
-                            <Text style={styles.personText}>
+                            <Text
+                              style={[styles.personText, outing && { color }]}
+                            >
                               {person?.isViewer
                                 ? "나"
                                 : person?.name.slice(0, 1)}
@@ -378,6 +412,8 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  /** 외출은 당일 복귀라 채우지 않는다 — 채운 알약(휴가)과 한눈에 갈려야 한다. */
+  outingPerson: { borderWidth: 1.5, backgroundColor: "transparent" },
   personText: { color: "white", fontSize: 8, fontWeight: "900" },
   more: { fontSize: 9, color: colors.mute },
   personal: {

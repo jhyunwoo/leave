@@ -1,25 +1,20 @@
 import {
-  isConfirmedLeaveStatus,
   normalizeFriendIds,
   todayInSeoul,
   WEEKDAYS,
   type ISODate,
 } from "@leave/shared";
-import {
-  useFriendCalendar,
-  usePersonalEvents,
-  type FriendCalendar,
-  type PersonalEvent,
-} from "@leave/client";
+import { useFriendCalendar, usePersonalEvents } from "@leave/client";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
@@ -38,6 +33,7 @@ import {
   SheetScaffold,
 } from "@/components/sheet-scaffold";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
+import { FriendDayPanel } from "./day-panel";
 
 const LEGEND_HEIGHT = 42;
 const WEEK_ROW_HEIGHT = 32;
@@ -152,6 +148,10 @@ export function FriendCalendarScreen() {
                 </View>
               ))}
               <View style={styles.legendItem}>
+                <View style={styles.outingLegend} />
+                <Text style={styles.legendText}>외출</Text>
+              </View>
+              <View style={styles.legendItem}>
                 <View style={styles.personalLegend} />
                 <Text style={styles.legendText}>개인 일정</Text>
               </View>
@@ -177,21 +177,25 @@ export function FriendCalendarScreen() {
     </View>
   );
 
-  const dayPanel = selectedDate ? (
-    <FriendDayPanel
-      date={selectedDate}
-      calendar={calendar.data}
-      events={events.data?.events ?? []}
-      onAdd={() => pushPersonalNavigation({ kind: "new", date: selectedDate })}
-      onEdit={(event) =>
-        pushPersonalNavigation({
-          kind: "edit",
-          eventId: event.id,
-          month: selectedDate.slice(0, 7),
-        })
-      }
-    />
-  ) : null;
+  const dayPanel = (style?: StyleProp<ViewStyle>) =>
+    selectedDate ? (
+      <FriendDayPanel
+        date={selectedDate}
+        calendar={calendar.data}
+        events={events.data?.events ?? []}
+        style={style}
+        onAdd={() =>
+          pushPersonalNavigation({ kind: "new", date: selectedDate })
+        }
+        onEdit={(event) =>
+          pushPersonalNavigation({
+            kind: "edit",
+            eventId: event.id,
+            month: selectedDate.slice(0, 7),
+          })
+        }
+      />
+    ) : null;
 
   const inspectorPane = (
     <View style={styles.inspectorPane} testID="friend-calendar-day-inspector">
@@ -219,7 +223,7 @@ export function FriendCalendarScreen() {
         {calendar.isPending ? (
           <ActivityIndicator color={colors.ink} />
         ) : (
-          dayPanel
+          dayPanel(styles.panelInInspector)
         )}
       </ScrollView>
     </View>
@@ -287,101 +291,15 @@ export function FriendCalendarScreen() {
           extendsUnderBottomInset={SHEET_EXTENDS_UNDER_BOTTOM_INSET}
         >
           {calendar.isPending ? (
-            <ActivityIndicator color={colors.ink} />
+            <View style={styles.sheetLoading}>
+              <ActivityIndicator color={colors.ink} />
+            </View>
           ) : (
-            dayPanel
+            dayPanel()
           )}
         </SheetScaffold>
       </NativeBottomSheet>
     </>
-  );
-}
-
-function FriendDayPanel(props: {
-  date: ISODate;
-  calendar?: FriendCalendar;
-  events: PersonalEvent[];
-  onAdd: () => void;
-  onEdit: (event: PersonalEvent) => void;
-}) {
-  const styles = useStyles();
-  const leaves = props.calendar?.leaves.filter(
-    (leave) => leave.startDate <= props.date && props.date <= leave.endDate,
-  );
-  const personalEvents = props.events.filter(
-    (event) => event.startDate <= props.date && props.date <= event.endDate,
-  );
-  const personById = new Map(
-    (props.calendar?.people ?? []).map((person) => [person.userId, person]),
-  );
-
-  return (
-    <View style={styles.dayPanel}>
-      <Text style={styles.dayTitle}>{props.date}</Text>
-      <ContentPanel style={styles.detailCard}>
-        <Text style={styles.sectionTitle}>공유 휴가</Text>
-        {leaves?.length ? (
-          leaves.map((leave) => {
-            const person = personById.get(leave.userId);
-            return (
-              <View
-                key={leave.leaveId}
-                style={[
-                  styles.item,
-                  { borderLeftColor: friendPersonColor(leave.userId) },
-                ]}
-              >
-                <Text style={styles.itemTitle}>
-                  {person?.isViewer ? "나" : person?.name}
-                </Text>
-                <Text style={styles.caption}>
-                  {isConfirmedLeaveStatus(leave.status)
-                    ? "확정 휴가"
-                    : "공유 휴가"}
-                </Text>
-              </View>
-            );
-          })
-        ) : (
-          <Text style={styles.body}>이 날의 공유 휴가가 없어요.</Text>
-        )}
-      </ContentPanel>
-
-      <ContentPanel style={styles.detailCard}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>개인 일정</Text>
-          <Button
-            title="추가"
-            variant="secondary"
-            size="sm"
-            onPress={props.onAdd}
-          />
-        </View>
-        {personalEvents.length ? (
-          personalEvents.map((event) => (
-            <Pressable
-              key={event.id}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.item,
-                styles.personalItem,
-                pressed && styles.itemPressed,
-              ]}
-              onPress={() => props.onEdit(event)}
-            >
-              <Text style={styles.itemTitle}>◇ {event.title}</Text>
-              <Text style={styles.caption}>
-                나만 보는 개인 일정
-                {event.startTime ? ` · ${event.startTime}` : ""}
-                {event.endTime ? `–${event.endTime}` : ""}
-              </Text>
-            </Pressable>
-          ))
-        ) : (
-          <Text style={styles.body}>이 날의 개인 일정이 없어요.</Text>
-        )}
-      </ContentPanel>
-    </View>
   );
 }
 
@@ -427,6 +345,14 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: 5,
   },
   legendDot: { width: 12, height: 12, borderRadius: radius.pill },
+  /** 칸의 외출 알약과 같은 모양 — 속이 빈 것이 외출이라는 말을 여기서 한다. */
+  outingLegend: {
+    width: 12,
+    height: 12,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.body,
+  },
   legendText: { fontSize: 12, fontWeight: "700", color: colors.ink },
   personalLegend: {
     width: 11,
@@ -468,27 +394,9 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "700",
     color: colors.ink,
   },
-  sheetContent: { padding: 0 },
-  dayPanel: { gap: spacing.lg },
-  dayTitle: { fontSize: 20, fontWeight: "800", color: colors.ink },
-  detailCard: { padding: spacing.lg, gap: spacing.md },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  sectionTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
-  item: {
-    padding: spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.brand,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceCard,
-    gap: 3,
-  },
-  personalItem: { borderLeftWidth: 1, borderColor: colors.hairline },
-  itemPressed: { opacity: 0.72 },
-  itemTitle: { color: colors.ink, fontWeight: "700" },
-  caption: { color: colors.mute, fontSize: 12 },
+  /** 여백은 패널이 들고 있다(day-panel.tsx) — 시트는 자리만 내준다. */
+  sheetContent: { padding: 0, gap: 0 },
+  sheetLoading: { padding: spacing.xxxl, alignItems: "center" },
+  /** 인스펙터는 이미 양옆 여백과 머리글을 갖고 있어 패널의 여백을 덜어 낸다. */
+  panelInInspector: { paddingHorizontal: 0, paddingTop: 0 },
 }));
