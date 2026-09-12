@@ -685,6 +685,7 @@ export function CalendarScreen() {
               outing={outingConfigs}
               segments={balanceSegments}
               dischargeAt={dischargeAt}
+              style={styles.daySheetNote}
             />
           ) : null}
           {selectedDate &&
@@ -869,5 +870,12 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "600",
     color: colors.mute,
   },
+  // DayPanel이 자기 여백을 스스로 잡으므로 시트 본문은 여백 없이 둔다.
   daySheetContent: { padding: 0, gap: 0 },
+  /**
+   * 그래서 외출 주기 카드의 여백은 여기서 잡아준다. 그냥 두면 시트 헤더와 양옆에
+   * 붙어 카드가 아니라 헤더의 일부처럼 읽힌다. 가로 여백은 카드 안쪽 여백과 더해
+   * DayPanel의 여백(`spacing.xl`)과 같아져, 글줄이 아래 패널과 한 줄로 맞는다.
+   */
+  daySheetNote: { marginTop: spacing.lg, marginHorizontal: spacing.md },
 }));

@@ -26,7 +26,7 @@ import {
   outingRemainingDays,
   type OutingConfig,
 } from "@leave/shared/outing";
-import { Text, View } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ContentPanel } from "@/components/content-panel";
 import { makeStyles, radius, spacing, useTheme } from "@/theme";
 
@@ -37,6 +37,8 @@ export function OutingCycleNote(props: {
   /** 잔여를 깎는 내 구간 전부. 남은 횟수를 세는 데 쓴다. */
   segments: readonly SegmentLike[];
   dischargeAt?: ISODate | null;
+  /** 담는 그릇에 따라 바깥 여백만 바꾼다 — 시트는 스스로, 인스펙터는 열이 잡아준다. */
+  style?: StyleProp<ViewStyle>;
 }) {
   const styles = useStyles();
   const { balance } = useTheme();
@@ -53,7 +55,7 @@ export function OutingCycleNote(props: {
   if (!notes.length) return null;
 
   return (
-    <ContentPanel style={styles.card}>
+    <ContentPanel style={[styles.card, props.style]}>
       <Text style={styles.heading} selectable>
         외출 주기
       </Text>
