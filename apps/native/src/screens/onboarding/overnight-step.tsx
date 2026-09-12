@@ -23,7 +23,6 @@ import {
   type ISODate,
   type RegularOvernightIntervalForm,
 } from "@leave/shared";
-import * as Linking from "expo-linking";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -32,6 +31,7 @@ import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Input } from "@/components/field";
 import { NativeCheckbox } from "@/components/native-checkbox";
+import { openExternalLink } from "@/lib/external-link";
 import { makeStyles, radius, spacing } from "@/theme";
 import { StepError, StepNext, StepShell, StepSkip } from "./step-shell";
 
@@ -156,7 +156,7 @@ export function OvernightStep(props: {
                 title={source.label}
                 variant="ghost"
                 size="sm"
-                onPress={() => void Linking.openURL(source.url)}
+                onPress={() => void openExternalLink(source.url, source.label)}
               />
             ))}
             <Text style={styles.fineprint}>
