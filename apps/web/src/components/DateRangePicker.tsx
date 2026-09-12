@@ -1,7 +1,7 @@
 /**
- * 웹 휴가 기간 선택기.
+ * 웹 기간 선택기.
  *
- * 사용처: LeaveFormModal(휴가 등록/수정).
+ * 사용처: LeaveFormModal(휴가 등록/수정), PersonalEventModal·UnitEventModal(일정 기간).
  *
  * `<input type="date">`를 쓰지 않는 이유는 두 가지다. 하나는 기간 — 시작일과 종료일을
  * 각각 고르게 하면 "언제부터 언제까지"가 한눈에 보이지 않는다. 다른 하나는 공휴일 —
@@ -179,6 +179,11 @@ export function DateRangePicker(props: {
    * 주지 않으면 기존대로 종료일을 함께 보정한다(제한 기간 등록).
    */
   onChangeStart?: (startDate: string) => void;
+  /** 머리글 제목. 일정 폼은 "일정 기간"으로 바꿔 단다. */
+  label?: string;
+  /** 달력 위 안내 문구. 무엇을 고르는 자리인지 폼마다 다르다. */
+  startInstruction?: string;
+  endInstruction?: string;
   testId?: string;
 }) {
   const [active, setActive] = useState<"start" | "end" | null>(null);
@@ -216,7 +221,7 @@ export function DateRangePicker(props: {
       }}
     >
       <div className="dp-header">
-        <span className="dp-title">휴가 기간</span>
+        <span className="dp-title">{props.label ?? "휴가 기간"}</span>
         {duration > 0 && <span className="dp-duration">{duration}일</span>}
       </div>
 
@@ -272,8 +277,8 @@ export function DateRangePicker(props: {
           rangeEnd={props.endDate}
           instruction={
             active === "start"
-              ? "휴가가 시작하는 날을 선택해주세요."
-              : "마지막 휴가 날짜를 선택해주세요."
+              ? (props.startInstruction ?? "휴가가 시작하는 날을 선택해주세요.")
+              : (props.endInstruction ?? "마지막 휴가 날짜를 선택해주세요.")
           }
           onChangeMonth={setMonth}
           onSelect={(date) => {

@@ -24,6 +24,10 @@ import { DateRangePicker } from "./DateRangePicker";
 import { Field } from "./Field";
 import { Modal } from "./Modal";
 import { OfficialDisclaimer } from "./OfficialDisclaimer";
+import { TimeField } from "./TimeField";
+
+/** 복귀 시각으로 가장 자주 적히는 값들. 그 밖의 시각은 드롭다운으로 고른다. */
+const RETURN_TIME_PRESETS = ["18:00", "20:00", "21:00", "22:00"] as const;
 
 /** 웹에서 사용자가 직접 고를 수 있는 계획 상태. */
 const STATUS_OPTIONS = [
@@ -107,15 +111,16 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
           testId="leave-date-range"
         />
 
-        <Field label="복귀 시간" hint="휴가 종료일의 복귀 예정 시각이에요.">
-          <input
-            className="input"
-            type="time"
-            value={form.returnTime}
-            onChange={(event) => form.setReturnTime(event.target.value)}
-            data-testid="leave-return-time"
-          />
-        </Field>
+        {/* 복귀 시각은 부대가 정해 둔 몇 개 중 하나인 경우가 대부분이라 칩을
+            먼저 놓는다. 그 밖의 시각은 시·분 드롭다운으로 고른다. */}
+        <TimeField
+          label="복귀 시간"
+          hint="휴가 종료일의 복귀 예정 시각이에요."
+          value={form.returnTime}
+          onChange={form.setReturnTime}
+          presets={RETURN_TIME_PRESETS}
+          testId="leave-return-time"
+        />
 
         <Field label="계획 상태" hint={statusHint(form.status)}>
           <select

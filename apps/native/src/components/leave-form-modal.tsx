@@ -48,6 +48,10 @@ import { SegmentReorderList } from "./segment-reorder-list";
 import { SegmentRow } from "./segment-row";
 import { NativeSegmentedControl } from "./segmented-control";
 import { SheetScaffold } from "./sheet-scaffold";
+import { TimePickerRow } from "./time-picker";
+
+/** 복귀 시각으로 가장 자주 적히는 값들. 그 밖의 시각은 시·분을 눌러 고른다. */
+const RETURN_TIME_PRESETS = ["18:00", "20:00", "21:00", "22:00"] as const;
 
 /** 계획 상태가 무슨 뜻인지 한 줄로 설명한다. */
 function statusHint(status: LeaveStatus): string {
@@ -191,16 +195,18 @@ export function LeaveFormModal(props: {
             testID="leave-date-range"
           />
 
-          <Field label="복귀 시간" hint="휴가 종료일의 복귀 예정 시각이에요.">
-            <Input
-              value={form.returnTime}
-              onChangeText={form.setReturnTime}
-              placeholder="21:00"
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-              testID="leave-return-time"
-            />
-          </Field>
+          {/* 복귀 시각은 부대가 정해 둔 몇 개 중 하나인 경우가 대부분이라 칩을
+              먼저 놓는다. 그 밖의 시각은 시·분을 눌러 고른다. */}
+          <TimePickerRow
+            label="복귀 시간"
+            value={form.returnTime}
+            onChange={form.setReturnTime}
+            presets={RETURN_TIME_PRESETS}
+            testID="leave-return-time"
+          />
+          <Text style={styles.returnHint}>
+            휴가 종료일의 복귀 예정 시각이에요.
+          </Text>
 
           <View style={sheet.isCompact ? styles.stack : styles.pairRow}>
             <View
@@ -386,6 +392,13 @@ const useStyles = makeStyles(({ colors }) => ({
     textAlign: "center",
   },
   footerHintBlocked: { color: colors.body },
+  /** 복귀 시간 아래 한 줄. `Field`의 hint와 같은 크기·색을 쓴다. */
+  returnHint: {
+    marginTop: -spacing.xs,
+    paddingHorizontal: spacing.xs,
+    fontSize: 12,
+    color: colors.mute,
+  },
   segmentCard: {
     backgroundColor: colors.primaryPale,
     borderRadius: radius.xl,

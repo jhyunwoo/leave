@@ -379,8 +379,24 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   await page.getByRole("button", { name: "개인 일정 추가" }).click();
   const create = page.getByRole("dialog", { name: "개인 일정 추가" });
   await create.getByLabel("제목").fill("개인 운동");
-  await create.getByLabel("시작일").fill(today);
-  await create.getByLabel("종료일").fill(today);
+  /*
+   * 날짜는 휴가 등록과 같은 기간 선택기로 고른다. `input[type="date"]`를 채우던
+   * 예전 폼과 달리 시작일 버튼 → 달력 칸 → 종료일 칸 순으로 눌러야 한다.
+   *
+   * 이 폼은 `onChangeStart`를 넘기지 않으므로 시작일을 고르면 달력이 종료일
+   * 선택으로 이어진다(DateRangePicker의 그 prop 주석). 오늘 하루짜리 일정이라
+   * 같은 칸을 한 번 더 누른다.
+   */
+  await create.getByTestId("personal-event-range-start").click();
+  const createCalendar = create.getByTestId("personal-event-range-calendar");
+  await expect(createCalendar).toBeVisible();
+  await create
+    .getByTestId(`personal-event-range-calendar-day-${today}`)
+    .click();
+  await create
+    .getByTestId(`personal-event-range-calendar-day-${today}`)
+    .click();
+  await expect(createCalendar).toBeHidden();
   await create.getByRole("button", { name: "저장" }).click();
   await expect(create).toBeHidden();
 

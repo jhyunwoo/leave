@@ -305,8 +305,10 @@ export function DatePickerRow(props: {
 }
 
 /**
- * 휴가 등록 전용 날짜 범위 입력. 달력은 하나만 열리고 시작일을 고르면
- * 종료일 선택으로 이어져, 작은 화면에서도 두 피커가 겹치지 않는다.
+ * 날짜 범위 입력. 달력은 하나만 열리고 시작일을 고르면 종료일 선택으로 이어져,
+ * 작은 화면에서도 두 피커가 겹치지 않는다.
+ *
+ * 휴가 등록과 일정(개인·부대) 폼이 함께 쓴다. 문구만 폼마다 갈린다.
  */
 export function DateRangePicker(props: {
   startDate: ISODate | "";
@@ -322,6 +324,11 @@ export function DateRangePicker(props: {
   onChangeStart?: (startDate: ISODate) => void;
   /** 달력에 함께 표시할 부대 일정. 없으면 공휴일만 그린다. */
   unitEvents?: readonly CalendarDayEvent[];
+  /** 머리글 제목. 일정 폼은 "일정 기간"으로 바꿔 단다. */
+  label?: string;
+  /** 달력 위 안내 문구. 무엇을 고르는 자리인지 폼마다 다르다. */
+  startInstruction?: string;
+  endInstruction?: string;
   testID?: string;
 }) {
   const styles = useStyles();
@@ -350,7 +357,7 @@ export function DateRangePicker(props: {
   return (
     <View style={styles.rangeField} testID={props.testID}>
       <View style={styles.rangeHeader}>
-        <Text style={styles.rangeTitle}>휴가 기간</Text>
+        <Text style={styles.rangeTitle}>{props.label ?? "휴가 기간"}</Text>
         {duration > 0 ? (
           <View style={styles.durationBadge}>
             <Text style={styles.durationText}>{duration}일</Text>
@@ -438,8 +445,8 @@ export function DateRangePicker(props: {
           unitEvents={props.unitEvents}
           instruction={
             active === "start"
-              ? "휴가가 시작하는 날을 선택해주세요."
-              : "마지막 휴가 날짜를 선택해주세요."
+              ? (props.startInstruction ?? "휴가가 시작하는 날을 선택해주세요.")
+              : (props.endInstruction ?? "마지막 휴가 날짜를 선택해주세요.")
           }
           onChangeMonth={setMonth}
           onSelect={(date) => {

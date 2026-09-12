@@ -1,3 +1,17 @@
+/**
+ * 웹 개인 일정 등록/수정 모달.
+ *
+ * 사용처: CalendarPage(날짜 상세의 "개인 일정 추가", 일정 줄 클릭).
+ *
+ * 날짜는 휴가 등록과 같은 기간 선택기를 쓴다(DateRangePicker). `<input type="date">`
+ * 두 개였을 때는 같은 달력 화면에서 연 폼인데도 공휴일이 보이지 않았고, 기간이
+ * 며칠인지도 두 값을 눈으로 빼야 알 수 있었다.
+ *
+ * 시간은 기본적으로 없는 값이다 — 대부분의 개인 일정은 하루 단위라 시·분을 물어
+ * 봐야 빈칸 두 개만 남는다. 그래서 "시간 지정"을 켠 사람에게만 시각 선택기를
+ * 보여주고, 끄면 저장 전에 값을 비운다.
+ */
+
 import { personalEventCreateSchema } from "@leave/shared";
 import {
   useCreatePersonalEvent,
@@ -6,7 +20,10 @@ import {
   type PersonalEvent,
 } from "@leave/client";
 import { useState } from "react";
+import { DateRangePicker } from "./DateRangePicker";
+import { Field } from "./Field";
 import { Modal } from "./Modal";
+import { TimeField } from "./TimeField";
 
 export function PersonalEventModal(props: {
   initialDate: string;
@@ -22,6 +39,10 @@ export function PersonalEventModal(props: {
   );
   const [startTime, setStartTime] = useState(props.event?.startTime ?? "");
   const [endTime, setEndTime] = useState(props.event?.endTime ?? "");
+  // 이미 시각이 붙어 있던 일정은 열자마자 그 값이 보여야 한다.
+  const [timed, setTimed] = useState(
+    Boolean(props.event?.startTime || props.event?.endTime),
+  );
   const [note, setNote] = useState(props.event?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const createEvent = useCreatePersonalEvent();
@@ -35,8 +56,9 @@ export function PersonalEventModal(props: {
       title,
       startDate,
       endDate,
-      startTime: startTime || null,
-      endTime: endTime || null,
+      // 스위치를 끈 채 저장하면 화면에 없는 시각이 따라가지 않는다.
+      startTime: timed ? startTime || null : null,
+      endTime: timed ? endTime || null : null,
       note: note || null,
     });
     if (!parsed.success) {
@@ -66,59 +88,80 @@ export function PersonalEventModal(props: {
       title={props.event ? "개인 일정 수정" : "개인 일정 추가"}
       onClose={props.onClose}
     >
-      <div style={{ display: "grid", gap: "var(--sp-lg)" }}>
-        <label className="field">
-          <span className="field-label">제목</span>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+        style={{ display: "grid", gap: "var(--sp-lg)" }}
+      >
+        <Field label="제목">
           <input
             className="input"
             autoFocus
             maxLength={80}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            placeholder="예: 외박 중 병원 진료"
+            data-testid="personal-event-title"
           />
-        </label>
-        <div className="field-pair">
-          <label className="field">
-            <span className="field-label">시작일</span>
+        </Field>
+
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onChange={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+          }}
+          label="일정 기간"
+          startInstruction="일정이 시작하는 날을 선택해주세요."
+          endInstruction="일정의 마지막 날을 선택해주세요."
+          testId="personal-event-range"
+        />
+
+        <div className="field">
+          <label className="check-field">
             <input
-              className="input"
-              type="date"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
+              type="checkbox"
+              checked={timed}
+              onChange={(event) => {
+                const next = event.target.checked;
+                setTimed(next);
+                if (!next) {
+                  setStartTime("");
+                  setEndTime("");
+                }
+              }}
+              data-testid="personal-event-timed"
             />
-          </label>
-          <label className="field">
-            <span className="field-label">종료일</span>
-            <input
-              className="input"
-              type="date"
-              value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
+            <span>
+              <strong>시간 지정</strong>
+              <small>끄면 날짜만 있는 하루 종일 일정으로 저장돼요.</small>
+            </span>
           </label>
         </div>
-        <div className="field-pair">
-          <label className="field">
-            <span className="field-label">시작 시간 (선택)</span>
-            <input
-              className="input"
-              type="time"
+
+        {timed ? (
+          <div className="tf-pair">
+            <TimeField
+              label="시작 시간"
               value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
+              onChange={setStartTime}
+              optional
+              testId="personal-event-start-time"
             />
-          </label>
-          <label className="field">
-            <span className="field-label">종료 시간 (선택)</span>
-            <input
-              className="input"
-              type="time"
+            <TimeField
+              label="종료 시간"
               value={endTime}
-              onChange={(event) => setEndTime(event.target.value)}
+              onChange={setEndTime}
+              optional
+              testId="personal-event-end-time"
             />
-          </label>
-        </div>
-        <label className="field">
-          <span className="field-label">메모 (선택)</span>
+          </div>
+        ) : null}
+
+        <Field label="메모 (선택)">
           <textarea
             className="input"
             rows={3}
@@ -126,7 +169,8 @@ export function PersonalEventModal(props: {
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
-        </label>
+        </Field>
+
         <p className="field-hint">
           개인 일정은 나만 볼 수 있고 휴가 집계나 잔여량에 영향을 주지 않아요.
         </p>
@@ -135,6 +179,7 @@ export function PersonalEventModal(props: {
             {error}
           </p>
         ) : null}
+
         <div
           style={{
             display: "flex",
@@ -174,15 +219,15 @@ export function PersonalEventModal(props: {
             취소
           </button>
           <button
-            type="button"
+            type="submit"
             className="btn btn-primary"
             disabled={pending}
-            onClick={() => void save()}
+            data-testid="personal-event-save"
           >
             {pending ? "저장 중…" : "저장"}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }

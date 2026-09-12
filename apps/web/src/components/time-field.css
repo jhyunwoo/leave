@@ -1,0 +1,94 @@
+/* 시각 선택기(TimeField) 전용.
+ *
+ * 기간 선택기(date-range-picker.css)와 같은 폼 안에 나란히 서므로 테두리·반경·
+ * 색은 그쪽 `.dp-*`와 같은 토큰을 쓴다. 클래스를 나눠 두는 이유도 같다 — 한쪽의
+ * 여백을 고칠 때 다른 쪽이 따라 움직이면 안 된다.
+ */
+
+.tf-root {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tf-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.tf-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tf-clear:hover {
+  color: var(--ink);
+}
+
+/* 자주 쓰는 시각 */
+
+.tf-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+}
+
+.tf-preset {
+  padding: 6px var(--sp-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--surface-card);
+  color: var(--body);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.tf-preset:hover {
+  border-color: var(--brand);
+}
+
+.tf-preset.is-active {
+  border-color: var(--brand);
+  background: var(--primary-pale);
+  color: var(--ink-deep);
+}
+
+/* 시·분 드롭다운 */
+
+.tf-selects {
+  display: grid;
+  /* `1fr`은 min-content 아래로 못 줄어든다. 좁은 화면에서 두 칸이 겹치지 않게
+     바닥을 풀어 준다 — global.css의 `.field-pair` 주석과 같은 이유다. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-sm);
+}
+
+.tf-selects .input {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 시작·종료처럼 짝으로 서는 두 선택기.
+ *
+ * `.field-pair`로 나란히 세우면 폭 480px 모달에서 드롭다운 넷이 한 줄에 들어가
+ * "지정 안 함"이 잘린다. 들어갈 자리가 있을 때만 두 열이 되게 한다. */
+.tf-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-lg);
+}

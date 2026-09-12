@@ -12,11 +12,14 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   View,
 } from "react-native";
 import { Button } from "@/components/button";
+import { DateRangePicker } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
+import { TimePickerRow } from "@/components/time-picker";
 import { confirmAction } from "@/lib/dialog";
 import { layout, makeStyles, spacing, useColors } from "@/theme";
 
@@ -68,6 +71,7 @@ function PersonalEventEditor(props: {
   onClose: () => void;
 }) {
   const styles = useStyles();
+  const colors = useColors();
   const [title, setTitle] = useState(props.existing?.title ?? "");
   const [startDate, setStartDate] = useState(
     props.existing?.startDate ?? props.initialDate,
@@ -77,6 +81,10 @@ function PersonalEventEditor(props: {
   );
   const [startTime, setStartTime] = useState(props.existing?.startTime ?? "");
   const [endTime, setEndTime] = useState(props.existing?.endTime ?? "");
+  // 이미 시각이 붙어 있던 일정은 열자마자 그 값이 보여야 한다.
+  const [timed, setTimed] = useState(
+    Boolean(props.existing?.startTime || props.existing?.endTime),
+  );
   const [note, setNote] = useState(props.existing?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const createEvent = useCreatePersonalEvent();
@@ -90,8 +98,9 @@ function PersonalEventEditor(props: {
       title,
       startDate,
       endDate,
-      startTime: startTime || null,
-      endTime: endTime || null,
+      // 스위치를 끈 채 저장하면 화면에 없는 시각이 따라가지 않는다.
+      startTime: timed ? startTime || null : null,
+      endTime: timed ? endTime || null : null,
       note: note || null,
     });
     if (!parsed.success) {
@@ -152,38 +161,58 @@ function PersonalEventEditor(props: {
             testID="personal-event-title"
           />
         </Field>
-        <View style={styles.pair}>
-          <Field label="시작일" hint="YYYY-MM-DD">
-            <Input
-              value={startDate}
-              onChangeText={setStartDate}
-              autoCapitalize="none"
-            />
-          </Field>
-          <Field label="종료일" hint="YYYY-MM-DD">
-            <Input
-              value={endDate}
-              onChangeText={setEndDate}
-              autoCapitalize="none"
-            />
-          </Field>
+        {/* 날짜를 손으로 적던 자리. 달력을 쓰면 공휴일이 보이고 기간이 며칠인지도
+            배지로 바로 읽힌다 — 웹 개인 일정 모달과 같은 부품이다. */}
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onChange={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+          }}
+          label="일정 기간"
+          startInstruction="일정이 시작하는 날을 선택해주세요."
+          endInstruction="일정의 마지막 날을 선택해주세요."
+          testID="personal-event-range"
+        />
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchLabel}>시간 지정</Text>
+            <Text style={styles.switchHint}>
+              끄면 날짜만 있는 하루 종일 일정으로 저장돼요
+            </Text>
+          </View>
+          <Switch
+            value={timed}
+            onValueChange={(next) => {
+              setTimed(next);
+              if (!next) {
+                setStartTime("");
+                setEndTime("");
+              }
+            }}
+            trackColor={{ true: colors.primary, false: colors.hairline }}
+            testID="personal-event-timed"
+          />
         </View>
-        <View style={styles.pair}>
-          <Field label="시작 시간 (선택)" hint="HH:mm">
-            <Input
+        {timed ? (
+          <>
+            <TimePickerRow
+              label="시작 시간"
               value={startTime}
-              onChangeText={setStartTime}
-              autoCapitalize="none"
+              onChange={setStartTime}
+              optional
+              testID="personal-event-start-time"
             />
-          </Field>
-          <Field label="종료 시간 (선택)" hint="HH:mm">
-            <Input
+            <TimePickerRow
+              label="종료 시간"
               value={endTime}
-              onChangeText={setEndTime}
-              autoCapitalize="none"
+              onChange={setEndTime}
+              optional
+              testID="personal-event-end-time"
             />
-          </Field>
-        </View>
+          </>
+        ) : null}
         <Field label="메모 (선택)" error={error}>
           <Input
             value={note}
@@ -296,7 +325,9 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  pair: { gap: spacing.md },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  switchLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  switchHint: { fontSize: 12, color: colors.mute },
   // 저장은 폭을 꽉 채워 가운데에 놓고, 삭제는 그 아래 같은 폭으로 쌓는다.
   // 한 줄에 나란히 두면 저장이 내용 폭만큼만 줄어 왼쪽에 치우친다.
   actions: { width: "100%", gap: spacing.sm, marginTop: spacing.sm },
