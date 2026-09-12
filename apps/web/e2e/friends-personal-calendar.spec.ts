@@ -406,9 +406,11 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
     .click();
   await expect(page.getByText("이 날의 개인 일정이 없어요.")).toBeVisible();
 
+  // 부대가 없어도 달력은 열린다(93d7d22) — 빈 화면 대신 "부대 가입"이 주 행동으로 남는다.
   await page.getByRole("button", { name: "부대" }).click();
-  await expect(page.getByText("소속 그룹이 없어요")).toBeVisible();
-  await page.getByRole("button", { name: "친구 달력 보기" }).click();
+  await expect(page.getByRole("button", { name: "부대 가입" })).toBeVisible();
+  // 모드만 오가도 고른 친구(?friends=)는 그대로다.
+  await page.getByRole("button", { name: "친구", exact: true }).click();
   await expect(
     page.getByRole("grid", { name: /친구 달력/ }).first(),
   ).toBeVisible();
