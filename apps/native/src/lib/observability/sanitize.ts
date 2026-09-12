@@ -8,18 +8,27 @@ const SECRET_ASSIGNMENT =
   /\b(access.?token|refresh.?token|api.?key|password|passcode|otp|verification.?code|secret)\b\s*[:=]\s*[^\s,;]+/gi;
 const URL_IN_TEXT = /[a-z][a-z\d+.-]*:\/\/[^\s)\]}>,]+/gi;
 
+/**
+ * 응답 경로에서 **그대로 남겨도 되는** 낱말. 여기 없는 segment는 전부 `[param]`이 된다.
+ *
+ * 빠뜨리면 서로 다른 엔드포인트가 한 템플릿으로 뭉친다 — 패스키 경로가
+ * `/auth/[param]/[param]/[param]`으로 보여, 504가 어느 요청에서 났는지 이슈만 보고는
+ * 알 수 없었다(Sentry LEAVE-NATIVE-2). 새 라우트를 만들면 그 literal도 여기 넣는다.
+ */
 const STATIC_API_SEGMENTS = new Set([
   "accept",
   "account",
   "activity",
   "api",
   "auth",
+  "authentication",
   "balances",
   "blackouts",
   "bootstrap",
   "calendar",
   "calendars",
   "complete",
+  "duty-days",
   "friends",
   "grants",
   "incoming",
@@ -34,13 +43,16 @@ const STATIC_API_SEGMENTS = new Set([
   "mine",
   "notifications",
   "onboarding",
+  "options",
   "outgoing",
+  "passkeys",
   "password",
   "personal-events",
   "preferences",
   "profile",
   "public",
   "read",
+  "registration",
   "regular-overnight",
   "remove",
   "requests",
@@ -51,6 +63,7 @@ const STATIC_API_SEGMENTS = new Set([
   "transfer",
   "units",
   "users",
+  "verify",
 ]);
 
 function safeString(value: unknown): string {

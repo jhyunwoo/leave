@@ -30,6 +30,26 @@ describe("observability sanitization", () => {
     ).toBe("/leaves/[param]");
   });
 
+  /**
+   * literal이 빠지면 서로 다른 엔드포인트가 한 템플릿으로 뭉쳐, 이슈만 보고는 어느
+   * 요청이 실패했는지 알 수 없다(Sentry LEAVE-NATIVE-2의 504가 그랬다).
+   */
+  it("keeps literal route words so failing endpoints stay identifiable", () => {
+    expect(
+      sanitizeEndpoint(
+        "https://api.leave.moveto.kr/auth/passkeys/authentication/options",
+      ),
+    ).toBe("/auth/passkeys/authentication/options");
+    expect(
+      sanitizeEndpoint(
+        "https://api.leave.moveto.kr/auth/passkeys/registration/verify",
+      ),
+    ).toBe("/auth/passkeys/registration/verify");
+    expect(
+      sanitizeEndpoint("https://api.leave.moveto.kr/auth/me/duty-days"),
+    ).toBe("/auth/me/duty-days");
+  });
+
   it("removes identifiers and secrets from diagnostic and deep-link URLs", () => {
     expect(
       sanitizeDiagnosticUrl(

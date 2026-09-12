@@ -28,6 +28,8 @@ const recentReports = new Map<string, number>();
 const REPORT_WINDOW_MS = 30_000;
 let networkOnline: boolean | null = null;
 let networkType: string | null = null;
+let appInForeground = true;
+let leftForegroundAt: number | null = null;
 
 type FetchInput =
   string | URL | { readonly url: string; readonly method?: string };
@@ -115,22 +117,31 @@ export const instrumentedFetch: typeof globalThis.fetch = async (
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     const cancellation = isIntentionalCancellation(error);
+    // 요청이 나가 있는 동안 앱이 앞에서 내려갔으면 OS가 연결을 끊는다.
+    // 지금 배경에 있는 것만으로는 모자란다 — 이미 돌아온 뒤에 실패가 도착할 수 있다.
+    const suspended =
+      !appInForeground ||
+      (leftForegroundAt !== null && leftForegroundAt >= startedAt);
     addObservabilityBreadcrumb({
       category: "http.client",
       message: cancellation
         ? `${method} ${endpoint} cancelled`
         : `${method} ${endpoint} transport failure`,
-      level: cancellation || networkOnline === false ? "info" : "warning",
+      level:
+        cancellation || suspended || networkOnline === false
+          ? "info"
+          : "warning",
       data: {
         method,
         endpoint,
         duration_ms: durationMs,
         ...(networkOnline === null ? {} : { online: networkOnline }),
+        ...(suspended ? { left_foreground: true } : {}),
       },
     });
 
     if (
-      shouldReportTransportFailure(error, networkOnline) &&
+      shouldReportTransportFailure(error, networkOnline, suspended) &&
       shouldReportOnce(`transport:${method}:${endpoint}`)
     ) {
       captureException(error, {
@@ -197,6 +208,21 @@ export function captureApiResponseError(
   } catch {
     // Reporting an HTTP failure must not alter the HTTP failure itself.
   }
+}
+
+/**
+ * 마지막으로 확인된 연결 상태. NetInfo가 아직 아무 말도 하지 않았으면 null이라
+ * "오프라인임이 확인된" 상태와 구분된다 — 모르는 것을 오프라인으로 접으면 시작
+ * 직후의 실패가 조용히 사라진다.
+ */
+export function isNetworkKnownOffline(): boolean {
+  return networkOnline === false;
+}
+
+/** 앱이 앞에 있는지. `query-persistence.ts`의 AppState 배선에서 함께 알려준다. */
+export function updateAppForegroundState(active: boolean): void {
+  appInForeground = active;
+  if (!active) leftForegroundAt = Date.now();
 }
 
 export function updateNetworkState(

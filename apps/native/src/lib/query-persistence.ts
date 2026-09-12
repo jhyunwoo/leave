@@ -18,7 +18,10 @@ import type {
 } from "@tanstack/react-query-persist-client";
 import { AppState, type AppStateStatus } from "react-native";
 import { queryCacheStorage } from "./query-cache-storage";
-import { updateNetworkState } from "./observability/http";
+import {
+  updateAppForegroundState,
+  updateNetworkState,
+} from "./observability/http";
 
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 
@@ -178,10 +181,16 @@ export function configureQueryOnlineManager(): void {
    * 연결하면 둘 다 제자리를 찾는다 — 백그라운드에서는 폴링이 멈추고, 돌아오는
    * 순간 낡은 쿼리만 한 번 새로 받는다.
    */
+  updateAppForegroundState(AppState.currentState === "active");
   focusManager.setEventListener((handleFocus) => {
     const subscription = AppState.addEventListener(
       "change",
-      (status: AppStateStatus) => handleFocus(status === "active"),
+      (status: AppStateStatus) => {
+        // 같은 신호를 관측에도 넘긴다. 앱이 앞에서 내려가는 순간 OS가 열려 있던
+        // 연결을 끊고, 그 실패는 고칠 것이 없다(observability/classification.ts).
+        updateAppForegroundState(status === "active");
+        handleFocus(status === "active");
+      },
     );
     return () => subscription.remove();
   });
