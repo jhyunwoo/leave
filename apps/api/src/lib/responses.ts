@@ -14,6 +14,7 @@ import {
   BRANCHES,
   FRIEND_RELATIONSHIPS,
   LEAVE_CATEGORIES,
+  LEAVE_KINDS,
   LEAVE_STATUSES,
   OUTING_KINDS,
   OVERNIGHT_KINDS,
@@ -284,6 +285,12 @@ export const friendCalendarLeaveSchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   status: z.enum(LEAVE_STATUSES),
+  /**
+   * 휴가인가 외출인가. 여기까지만 말한다 — 연가·병가 같은 세부 종류(`category`)는
+   * 친구에게 공개하지 않는다. 화면이 알아야 하는 것은 "그날 하루 나갔다 오는가,
+   * 며칠 나가 있는가"이고 그 답에는 이 두 갈래면 충분하다.
+   */
+  kind: z.enum(LEAVE_KINDS),
 });
 
 export const friendCalendarSchema = z

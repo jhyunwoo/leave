@@ -23,7 +23,7 @@ import {
   todayInSeoul,
   type ISODate,
 } from "@leave/shared/dates";
-import { isCountedLeaveStatus } from "@leave/shared/leave";
+import { isCountedLeaveStatus, isOutingSegments } from "@leave/shared/leave";
 import { partitionMyLeaves } from "./my-leaves-sections";
 import type { MyLeave } from "./types";
 
@@ -83,19 +83,9 @@ export function nextLeaveCountdown(
   return result;
 }
 
-/**
- * 이 휴가가 외출인가 — 구간이 **전부** 외출일 때만.
- *
- * `some`이 아니라 `every`인 이유: 외출을 다른 재원과 한 휴가에 섞지 못하게 막은 것은
- * 나중에 생긴 규칙이라(`leaveCreateSchema`), 연가에 외출이 붙은 옛 행이 남아 있을 수
- * 있다. 그런 건은 여러 날짜에 걸친 출타이므로 휴가 쪽에서 세는 편이 맞다.
- * 구간이 아예 없는 옛 행도 휴가로 본다 — 빈 배열의 `every`는 참이라 따로 막는다.
- */
+/** 이 휴가가 외출인가. 판정 규칙은 서버와 함께 쓰는 `isOutingSegments` 하나뿐이다. */
 export function isOutingLeave(leave: MyLeave): boolean {
-  return (
-    leave.segments.length > 0 &&
-    leave.segments.every((segment) => segment.category === "outing")
-  );
+  return isOutingSegments(leave.segments);
 }
 
 /** 휴가와 외출 각각의 다음 카운트다운. 셀 것이 없는 쪽은 null이고 화면에서 사라진다. */

@@ -493,3 +493,51 @@ test("친구 일정 조회에도 날짜 범위 상한이 있다", async () => {
   // 전체 달력을 훑는 요청도 막힌다.
   assert.equal((await range("0001-01-01", "9999-12-31")).status, 400);
 });
+
+test("친구 달력은 휴가와 외출을 갈라 알려주되 세부 종류는 감춘다", async () => {
+  const viewer = await signup({ name: "보는이" });
+  const friend = await signup({ name: "나가는이" });
+  await createUnit(viewer.token);
+  await createUnit(friend.token);
+  await requestFriend(viewer, friend);
+  await acceptFriend(friend, viewer);
+
+  for (const segment of [
+    { category: "outing", startDate: "2026-10-05", endDate: "2026-10-05" },
+    { category: "annual", startDate: "2026-10-12", endDate: "2026-10-14" },
+  ]) {
+    const created = await req("POST", "/leaves", {
+      token: friend.token,
+      body: {
+        title: `비밀 제목 ${segment.category}`,
+        status: "shared",
+        segments: [segment],
+      },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.data));
+  }
+
+  const calendar = await req(
+    "GET",
+    `/friends/calendar?friendIds=${friend.data.user.id}&month=2026-10`,
+    { token: viewer.token },
+  );
+  assert.equal(calendar.status, 200, JSON.stringify(calendar.data));
+  assert.deepEqual(
+    calendar.data.leaves.map((row) => `${row.startDate}:${row.kind}`).sort(),
+    ["2026-10-05:outing", "2026-10-12:leave"],
+  );
+  // 갈래는 알려주지만 그 갈래를 만든 구간·재원은 그대로 감춘다 — 연가인지 병가인지는
+  // 친구가 알 일이 아니다.
+  const body = JSON.stringify(calendar.data);
+  assert.ok(!body.includes("segments") && !body.includes("category"));
+  assert.ok(!body.includes("annual") && !body.includes("비밀 제목"));
+
+  const schedule = await scheduleOf(viewer, friend);
+  assert.equal(schedule.status, 200);
+  assert.deepEqual(
+    schedule.data.leaves.map((row) => row.kind),
+    ["outing", "leave"],
+    "같은 스키마를 쓰는 일정 조회도 갈래를 싣는다",
+  );
+});

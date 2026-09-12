@@ -13,6 +13,7 @@
 import {
   COUNTED_LEAVE_STATUSES,
   diffDays,
+  isOutingSegments,
   isValidISODate,
   MAX_DATE_RANGE_DAYS,
   monthBounds,
@@ -21,7 +22,13 @@ import {
 } from "@leave/shared";
 import { and, asc, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { friendships, leaves, userBlocks, users } from "../db/schema";
+import {
+  friendships,
+  leaves,
+  leaveSegments,
+  userBlocks,
+  users,
+} from "../db/schema";
 import { createApp } from "../lib/app";
 import type { Db } from "../lib/db";
 import { codedError } from "../lib/responses";
@@ -113,6 +120,49 @@ async function visibleRelations(db: Db, viewerId: string) {
   return relations.filter((row) => !blocked.has(row.otherUserId));
 }
 
+/**
+ * 이 사람들의 이 기간 출타 중 **외출인 것**의 id.
+ *
+ * 친구에게 보이는 것은 휴가/외출 두 갈래뿐이고(`friendCalendarLeaveSchema.kind`),
+ * 판정은 서버·앱이 함께 쓰는 `isOutingSegments`가 한다.
+ *
+ * 휴가 id를 먼저 모아 `IN(...)`에 넣지 않고 구간을 휴가와 조인해 읽는다 —
+ * 왕복이 한 번 줄고, 바인드 파라미터 상한에 걸리지 않는다(`segmentsOfUnitDuring`이
+ * 같은 이유로 조인을 쓴다). 여기 `userIds`는 최대 11명(나 + 친구 10)이다.
+ */
+async function outingLeaveIds(
+  db: Db,
+  input: { userIds: string[]; start: string; end: string },
+) {
+  const rows = await db
+    .select({
+      leaveId: leaveSegments.leaveId,
+      category: leaveSegments.category,
+    })
+    .from(leaveSegments)
+    .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+    .where(
+      and(
+        inArray(leaves.userId, input.userIds),
+        inArray(leaves.status, COUNTED_LEAVE_STATUSES),
+        lte(leaves.startDate, input.end),
+        gte(leaves.endDate, input.start),
+      ),
+    )
+    .all();
+  const byLeave = new Map<string, (typeof rows)[number][]>();
+  for (const row of rows) {
+    const segments = byLeave.get(row.leaveId) ?? [];
+    segments.push(row);
+    byLeave.set(row.leaveId, segments);
+  }
+  return new Set(
+    [...byLeave]
+      .filter(([, segments]) => isOutingSegments(segments))
+      .map(([leaveId]) => leaveId),
+  );
+}
+
 async function buildFriendCalendars(input: {
   db: Db;
   viewer: { id: string; name: string; username: string | null };
@@ -169,11 +219,23 @@ async function buildFriendCalendars(input: {
       ),
     )
     .all();
+  const outings = await outingLeaveIds(db, {
+    userIds,
+    start: rangeStart,
+    end: rangeEnd,
+  });
 
   return ranges.map(({ month, start, end }) => ({
     month,
     people,
-    leaves: rows.filter((row) => row.startDate <= end && row.endDate >= start),
+    leaves: rows
+      .filter((row) => row.startDate <= end && row.endDate >= start)
+      .map((row) => ({
+        ...row,
+        kind: outings.has(row.leaveId)
+          ? ("outing" as const)
+          : ("leave" as const),
+      })),
   }));
 }
 
@@ -491,6 +553,11 @@ export const friendRoutes = app
       )
       .orderBy(asc(leaves.startDate))
       .all();
+    const outings = await outingLeaveIds(db, {
+      userIds: [otherId],
+      start: startDate,
+      end: endDate,
+    });
     return c.json(
       {
         people: [
@@ -501,7 +568,12 @@ export const friendRoutes = app
             isViewer: false,
           },
         ],
-        leaves: rows,
+        leaves: rows.map((row) => ({
+          ...row,
+          kind: outings.has(row.leaveId)
+            ? ("outing" as const)
+            : ("leave" as const),
+        })),
       },
       200,
     );

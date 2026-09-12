@@ -8,6 +8,7 @@ import {
   shiftSegments,
   DEFAULT_ANNUAL_DAYS,
   inclusiveDays,
+  isOutingSegments,
   leaveCreateSchema,
 } from "../src";
 
@@ -155,5 +156,29 @@ describe("잔여를 깎는 상태", () => {
       "rejected",
       "cancelled",
     ]);
+  });
+});
+
+/**
+ * 친구 달력의 `kind`와 앱의 "다음 외출" 카운트다운이 같은 판정을 써야 한다.
+ * 한쪽만 고쳐지면 달력에는 외출인데 카운트다운에는 휴가로 잡힌다.
+ */
+describe("외출 한 건 판정", () => {
+  it("구간이 전부 외출일 때만 외출이다", () => {
+    expect(isOutingSegments([{ category: "outing" }])).toBe(true);
+    expect(
+      isOutingSegments([{ category: "outing" }, { category: "outing" }]),
+    ).toBe(true);
+  });
+
+  // 외출을 다른 재원과 섞지 못하게 막은 것은 나중에 생긴 규칙이라 옛 행이 남아 있다.
+  it("연가가 섞인 옛 행은 휴가로 본다", () => {
+    expect(
+      isOutingSegments([{ category: "annual" }, { category: "outing" }]),
+    ).toBe(false);
+  });
+
+  it("구간이 없는 행도 휴가로 본다", () => {
+    expect(isOutingSegments([])).toBe(false);
   });
 });

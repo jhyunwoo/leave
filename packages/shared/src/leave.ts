@@ -42,6 +42,21 @@ export const OUTING_KINDS = ["weekday", "weekend"] as const;
 export type OutingKind = (typeof OUTING_KINDS)[number];
 
 /**
+ * 출타 한 건을 밖에서 부르는 이름 — 나갔다 자고 오는가(휴가), 그날 돌아오는가(외출).
+ *
+ * 재원(`BalanceKey`)보다 거칠다. 남에게 보여주는 자리는 이 두 갈래까지만 말한다 —
+ * 친구 달력이 그렇다. 연가인지 병가인지는 본인과 같은 그룹 안에서만 뜻이 있고,
+ * 친구에게는 "언제 나가고 언제 오는가"만 있으면 된다.
+ */
+export const LEAVE_KINDS = ["leave", "outing"] as const;
+export type LeaveKind = (typeof LEAVE_KINDS)[number];
+
+export const LEAVE_KIND_LABELS: Record<LeaveKind, string> = {
+  leave: "휴가",
+  outing: "외출",
+};
+
+/**
  * 휴가 한 건의 진행 상태.
  *
  * `draft`는 나만 보는 시뮬레이션이라 그룹 집계에도, 출타 명단에도 들어가지 않는다.
@@ -234,6 +249,25 @@ export function segmentBalanceKey(
     return segment.outingKind === "weekend" ? "weekend_outing" : "outing";
   }
   return segment.category;
+}
+
+/**
+ * 이 구간들이 외출 한 건인가 — 구간이 **전부** 외출일 때만.
+ *
+ * `some`이 아니라 `every`인 이유: 외출을 다른 재원과 한 휴가에 섞지 못하게 막은 것은
+ * 나중에 생긴 규칙이라(`leaveCreateSchema`), 연가에 외출이 붙은 옛 행이 남아 있을 수
+ * 있다. 그런 건은 여러 날짜에 걸친 출타이므로 휴가 쪽에서 세는 편이 맞다.
+ * 구간이 아예 없는 옛 행도 휴가로 본다 — 빈 배열의 `every`는 참이라 따로 막는다.
+ *
+ * 서버(친구 달력의 `kind`)와 앱(다음 외출 카운트다운)이 같은 답을 내야 해서 여기 둔다.
+ */
+export function isOutingSegments(
+  segments: readonly Pick<LeaveSegment, "category">[],
+): boolean {
+  return (
+    segments.length > 0 &&
+    segments.every((segment) => segment.category === "outing")
+  );
 }
 
 export function inclusiveDays(startDate: string, endDate: string): number {
