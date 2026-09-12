@@ -8,6 +8,17 @@
  *
  * 부대 달력과 달리 볼 수 있는 달을 공유 달력의 조회 범위(과거 12개월 ~ 미래
  * 24개월)로 제한한다. 그 밖의 달은 서버가 어차피 돌려주지 않는다.
+ *
+ * ## 칸을 여백이 아니라 선으로 나눈다
+ *
+ * 부대 달력은 모든 날에 출타율 알약이 들어 있어 여백만으로도 칸이 보인다. 친구
+ * 달력은 아무도 나가지 않는 날이 대부분이라 같은 규칙을 쓰면 숫자만 떠 있고
+ * 어디까지가 하루인지 읽히지 않는다. 그래서 칸 사이 여백을 걷어내고 hairline
+ * 격자를 깐다 — 웹 달력(`.cal-cell`의 구분선)과 같은 말이다.
+ *
+ * 선은 칸 **안쪽**에 그린다. 네 변 모두 1px 테두리를 두되 위·왼쪽만 투명이라,
+ * 고른 날에 테두리 색만 바꿔도 칸 높이가 그대로다 — 테두리 굵기가 바뀌면 고를
+ * 때마다 안쪽 내용이 1px씩 밀린다.
  */
 
 import {
@@ -49,7 +60,6 @@ import {
   monthBlockHeight,
   monthLabel,
   resolveCellHeight,
-  ROW_GAP,
   useMonthScrollWindow,
 } from "@/components/month-scroll-window";
 import {
@@ -258,7 +268,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
     <View accessibilityLabel={`${props.month} 친구 달력`}>
       {weeks.map((week, weekIndex) => (
         <View key={weekIndex} style={styles.week}>
-          {week.map((cell) => {
+          {week.map((cell, dayIndex) => {
             const people = friendDayPeople(props.leaves, cell.date);
             const outings = people.filter(
               (person) => person.kind === "outing",
@@ -286,6 +296,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                 style={({ pressed }) => [
                   styles.cell,
                   { height: props.cellHeight },
+                  dayIndex === 6 && styles.lastColumn,
                   props.selectedDate === cell.date && styles.selected,
                   pressed && styles.pressed,
                 ]}
@@ -358,11 +369,13 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1 },
   list: { flex: 1 },
+  // 이 줄이 곧 격자의 윗변이다. 아래 칸들이 긋는 선과 같은 색이어야 한 장으로
+  // 읽힌다.
   monthHeading: {
     height: LABEL_H,
     justifyContent: "center",
     borderBottomWidth: 1,
-    borderBottomColor: colors.canvasSoft,
+    borderBottomColor: colors.hairline,
   },
   monthLabel: {
     fontSize: 24,
@@ -372,22 +385,39 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   monthLoading: { flex: 1, alignItems: "center", justifyContent: "center" },
   monthError: { paddingVertical: spacing.lg, color: colors.body },
-  week: { flexDirection: "row", gap: 2, marginBottom: ROW_GAP },
+  // 격자가 끊기지 않도록 주 사이에도 여백을 두지 않는다. 한 달 블록 높이
+  // (monthBlockHeight)는 주마다 ROW_GAP을 포함한 값이라, 6주 달이라도 아래로
+  // 12px 남을 뿐 블록을 넘치지 않는다.
+  week: { flexDirection: "row" },
   cell: {
     flex: 1,
     alignItems: "center",
     paddingTop: 6,
     gap: 3,
     overflow: "hidden",
-    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: "transparent",
+    borderRightColor: colors.hairline,
+    borderBottomColor: colors.hairline,
   },
+  /** 격자의 바깥 오른쪽 끝. 왼쪽 끝에 선이 없으므로 여기도 비운다. */
+  lastColumn: { borderRightColor: "transparent" },
+  /**
+   * 네 변을 모두 적어 준다. RN의 스타일 합치기는 키 단위라, borderColor 하나만
+   * 두면 아래 칸의 borderRightColor·borderBottomColor(격자선)가 그대로 남는다.
+   */
   selected: {
     borderColor: colors.brand,
+    borderRightColor: colors.brand,
+    borderBottomColor: colors.brand,
+    borderRadius: radius.sm,
     backgroundColor: colors.primaryPale,
   },
-  pressed: { transform: [{ scale: 0.97 }] },
+  /**
+   * 눌린 표시를 축소가 아니라 배경으로 준다. 칸이 줄어들면 그 칸이 맡고 있던
+   * 격자선도 함께 안으로 들어가 누르는 동안 격자에 구멍이 뚫린다.
+   */
+  pressed: { backgroundColor: colors.canvasSoft },
   day: { fontSize: 14, fontWeight: "700", color: colors.ink },
   holiday: {
     maxWidth: "100%",
