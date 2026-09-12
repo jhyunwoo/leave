@@ -19,6 +19,7 @@ import {
   useDeclineFriendRequest,
   useFriends,
   useIncomingFriendRequests,
+  useMe,
   useOutgoingFriendRequests,
   useRemoveFriend,
 } from "@leave/client";
@@ -44,6 +45,7 @@ export function FriendsScreen() {
   const styles = useStyles();
   const colors = useColors();
   const router = useRouter();
+  const me = useMe();
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
   const outgoing = useOutgoingFriendRequests();
@@ -70,6 +72,17 @@ export function FriendsScreen() {
     if (!username) return;
     router.push({ pathname: "/u/[username]", params: { username } });
   };
+  /**
+   * 내 공개 프로필 — 친구 목록의 이름을 누를 때와 **같은 화면**으로 간다.
+   * 프로필 탭은 내 계정 설정이고, 여기서 보고 싶은 것은 "친구에게 이렇게 보인다"
+   * 쪽이다. 그 화면이 링크 공유까지 들고 있어 @아이디를 건네는 자리이기도 하다.
+   *
+   * 이름이 없으면 열 주소가 없다. 탭에 들어온 이상 이름은 이미 있지만
+   * (루트 레이아웃의 hasUsername 관문), 아직 `me`를 받지 못한 첫 프레임에는
+   * 비어 있다 — 그동안은 버튼을 감춘다.
+   */
+  const myUsername = me.data?.user.username ?? null;
+  const openMyProfile = () => openProfile(myUsername);
   const compare = () =>
     router.push({
       pathname: "/(tabs)/(calendar)/friend-calendar",
@@ -101,6 +114,13 @@ export function FriendsScreen() {
     >
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
+          icon="person.crop.circle"
+          hidden={!myUsername}
+          onPress={openMyProfile}
+        >
+          내 프로필
+        </Stack.Toolbar.Button>
+        <Stack.Toolbar.Button
           icon="person.badge.plus"
           variant="prominent"
           tintColor={colors.brand}
@@ -114,6 +134,13 @@ export function FriendsScreen() {
       ) : null}
       <WebScreenActions
         actions={[
+          {
+            id: "my-profile",
+            title: "내 프로필",
+            onPress: openMyProfile,
+            disabled: !myUsername,
+            testID: "friends-open-my-profile",
+          },
           {
             id: "add-friend",
             title: "친구 찾기",

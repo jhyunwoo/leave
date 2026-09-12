@@ -16,6 +16,7 @@ import {
   useOutgoingFriendRequests,
   useRemoveFriend,
   useUserSearch,
+  type Me,
   type UserProfile,
 } from "@leave/client";
 import {
@@ -138,7 +139,7 @@ function SearchResults(props: { query: string }) {
   );
 }
 
-export function FriendsPage() {
+export function FriendsPage(props: { me: Me }) {
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
   const outgoing = useOutgoingFriendRequests();
@@ -183,11 +184,33 @@ export function FriendsPage() {
         gap: "var(--sp-lg)",
       }}
     >
-      <header>
-        <h1 className="display-md">친구</h1>
-        <p className="text-body" style={{ marginTop: "var(--sp-sm)" }}>
-          서로 수락한 친구끼리 공유 상태의 휴가 날짜만 비교해요.
-        </p>
+      {/* 제목 옆에 내 공개 프로필로 가는 길을 둔다. 앱의 친구 탭과 같은 자리·같은
+          목적지다 — 프로필 메뉴는 내 계정 설정이고, 여기서 보고 싶은 것은 "친구에게
+          이렇게 보인다" 쪽이다. 그 화면이 링크 공유까지 들고 있다. */}
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "var(--sp-md)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1 className="display-md">친구</h1>
+          <p className="text-body" style={{ marginTop: "var(--sp-sm)" }}>
+            서로 수락한 친구끼리 공유 상태의 휴가 날짜만 비교해요.
+          </p>
+        </div>
+        {props.me.user.username ? (
+          <Link
+            to={`/u/${props.me.user.username}`}
+            className="btn btn-secondary btn-sm"
+            data-testid="friends-open-my-profile"
+          >
+            내 프로필
+          </Link>
+        ) : null}
       </header>
       {message ? (
         <p

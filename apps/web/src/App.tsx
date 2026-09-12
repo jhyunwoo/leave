@@ -192,7 +192,7 @@ function CompletedApp() {
         <Route path="units" element={<UnitsPage me={me.data} />} />
         <Route path="units/manage" element={<UnitManagePage me={me.data} />} />
         <Route path="leaves" element={<LeavesPage />} />
-        <Route path="friends" element={<FriendsPage />} />
+        <Route path="friends" element={<FriendsPage me={me.data} />} />
         {/* 내부 id를 쓰던 옛 주소. 정본 `/u/{username}`으로 넘긴다. */}
         <Route path="friends/:userId" element={<FriendDetailPage />} />
         <Route path="u/:username" element={<UserProfilePage />} />
