@@ -5,9 +5,11 @@ import {
   type ISODate,
 } from "@leave/shared";
 import {
+  friendDayPeople,
   useFriendCalendar,
   usePersonalEvents,
   type FriendCalendar,
+  type FriendDayPerson,
   type PersonalEvent,
 } from "@leave/client";
 import {
@@ -40,6 +42,10 @@ export const FriendCalendarLegend = memo(function FriendCalendarLegend(props: {
           <strong>{person.isViewer ? "나" : person.name}</strong>
         </span>
       ))}
+      <span className="friend-calendar-legend-item">
+        <i aria-hidden="true" className="friend-calendar-legend-outing" />
+        <strong>외출</strong>
+      </span>
       <span className="friend-calendar-legend-item">
         <i aria-hidden="true" className="friend-calendar-legend-personal" />
         <strong>개인 일정</strong>
@@ -140,20 +146,10 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
     [props.calendar.people],
   );
   const leavesByDate = useMemo(() => {
-    const result = new Map<ISODate, string[]>();
+    const result = new Map<ISODate, FriendDayPerson[]>();
     for (const cell of weeks.flat()) {
       if (!cell.inMonth) continue;
-      const people = [
-        ...new Set(
-          props.calendar.leaves
-            .filter(
-              (leave) =>
-                leave.startDate <= cell.date && cell.date <= leave.endDate,
-            )
-            .map((leave) => leave.userId),
-        ),
-      ];
-      result.set(cell.date, people);
+      result.set(cell.date, friendDayPeople(props.calendar.leaves, cell.date));
     }
     return result;
   }, [props.calendar.leaves, weeks]);
@@ -190,7 +186,14 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                   cell.inMonth
                     ? `${Number(cell.date.slice(8))}일, 휴가 ${
                         people
-                          .map((id) => personById.get(id)?.name)
+                          .map((person) => {
+                            const name = personById.get(person.userId)?.name;
+                            if (!name) return null;
+                            // 외출도 같은 목록에 두되 무엇으로 나가는지는 밝힌다.
+                            return person.kind === "outing"
+                              ? `${name}(외출)`
+                              : name;
+                          })
                           .filter(Boolean)
                           .join(", ") || "없음"
                       }, 개인 일정 ${personalCount}개`
@@ -218,14 +221,24 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                   </span>
                 ) : null}
                 <span className="friend-calendar-people">
-                  {people.slice(0, 4).map((userId) => {
+                  {people.slice(0, 4).map(({ userId, kind }) => {
                     const person = personById.get(userId);
+                    const color = friendPersonColor(userId);
+                    const outing = kind === "outing";
                     return (
                       <span
                         key={userId}
-                        title={person?.name}
-                        className="friend-calendar-person"
-                        style={{ background: friendPersonColor(userId) }}
+                        title={
+                          person && outing
+                            ? `${person.name} 외출`
+                            : person?.name
+                        }
+                        className={`friend-calendar-person${outing ? " is-outing" : ""}`}
+                        style={
+                          outing
+                            ? { borderColor: color, color }
+                            : { background: color }
+                        }
                       >
                         {person?.isViewer ? "나" : person?.name.slice(0, 1)}
                       </span>

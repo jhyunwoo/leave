@@ -627,6 +627,55 @@
   font-weight: 800;
 }
 
+/* 외출은 당일 복귀라 채우지 않는다 — 채운 알약(휴가)과 한눈에 갈려야 한다.
+   색은 사람 색이 인라인으로 들어오므로 여기서는 모양만 정한다. */
+.friend-calendar-person.is-outing {
+  border: 1.5px solid currentcolor;
+  background: transparent;
+}
+
+.friend-calendar-legend-outing {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--body);
+  border-radius: 50%;
+}
+
+/* 날짜 상세의 출타 한 줄. 왼쪽 색 띠가 격자의 사람 색과 같은 말을 한다. */
+.friend-day-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--r-lg);
+  background: var(--surface-card);
+}
+.friend-day-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+/* 확정만 테두리 색으로 도드라지게 한다 — 희망·신청함과 반드시 갈려야 한다. */
+.friend-day-status {
+  padding: 1px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 600;
+}
+.friend-day-status.is-confirmed {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.friend-day-mark {
+  color: var(--brand);
+  font-weight: 700;
+}
+
 .unit-event-card {
   display: grid;
   gap: 4px;

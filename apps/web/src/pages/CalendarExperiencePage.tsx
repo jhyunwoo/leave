@@ -4,8 +4,11 @@ import {
   diffDays,
   firstGrantDate,
   fmtDateShort,
+  fmtRange,
   fmtRangeTiny,
   isConfirmedLeaveStatus,
+  LEAVE_KIND_LABELS,
+  LEAVE_STATUS_LABELS,
   maxAllowedOut,
   normalizeFriendIds,
   regularOvernightPooledRemaining,
@@ -17,6 +20,7 @@ import {
 import {
   balanceCountedSegments,
   buildMyLeaveDayMap,
+  friendDayLeaves,
   useCalendar,
   useFriendCalendar,
   useFriends,
@@ -24,6 +28,7 @@ import {
   useMyLeaves,
   usePersonalEvents,
   type FriendCalendar,
+  type FriendDayLeave,
   type LeaveResult,
   type Me,
   type PersonalEvent,
@@ -108,52 +113,109 @@ function PersonalItems(props: {
   );
 }
 
+/**
+ * 고른 날의 공유 휴가 — 누가, 무엇으로(휴가·외출), 어떤 상태로, 언제부터 언제까지.
+ *
+ * 이름과 "확정 휴가/공유 휴가" 한 줄만 있던 자리다. 그것만으로는 "그래서 언제 나와
+ * 있는가"에 답하지 못해 달력을 다시 훑어 색 이니셜이 이어진 칸을 눈으로 세야 했다.
+ * 정리 규칙은 앱과 함께 쓰는 `friendDayLeaves` 한 벌이다.
+ */
 function SharedLeaveItems(props: { calendar?: FriendCalendar; date: string }) {
   const dayLeaves = useMemo(
-    () =>
-      (props.calendar?.leaves ?? []).filter(
-        (leave) => leave.startDate <= props.date && props.date <= leave.endDate,
-      ),
-    [props.calendar?.leaves, props.date],
+    () => friendDayLeaves(props.calendar, props.date),
+    [props.calendar, props.date],
   );
-  const personById = useMemo(
-    () =>
-      new Map(
-        (props.calendar?.people ?? []).map((person) => [person.userId, person]),
-      ),
-    [props.calendar?.people],
-  );
+  const people = new Set(dayLeaves.map((leave) => leave.userId)).size;
+  const outings = dayLeaves.filter((leave) => leave.kind === "outing").length;
 
   return (
     <section
       className="card"
       style={{ padding: "var(--sp-lg)", display: "grid", gap: "var(--sp-sm)" }}
     >
-      <h2 className="display-xs">공유 휴가</h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: "var(--sp-sm)",
+        }}
+      >
+        <h2 className="display-xs">공유 휴가</h2>
+        {people ? (
+          <span className="caption text-mute">
+            {people}명{outings ? ` · 외출 ${outings}` : ""}
+          </span>
+        ) : null}
+      </div>
       {dayLeaves.length ? (
-        dayLeaves.map((leave) => {
-          const person = personById.get(leave.userId);
-          return (
-            <div
-              key={leave.leaveId}
-              style={{
-                borderLeft: `4px solid ${friendPersonColor(leave.userId)}`,
-                padding: "var(--sp-sm) var(--sp-md)",
-              }}
-            >
-              <strong>{person?.isViewer ? "나" : person?.name}</strong>
-              <p className="caption text-mute">
-                {isConfirmedLeaveStatus(leave.status)
-                  ? "확정 휴가"
-                  : "공유 휴가"}
-              </p>
-            </div>
-          );
-        })
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "grid",
+            gap: "var(--sp-xs)",
+          }}
+        >
+          {dayLeaves.map((leave) => (
+            <SharedLeaveRow key={leave.leaveId} leave={leave} />
+          ))}
+        </ul>
       ) : (
-        <p className="text-body">이 날의 공유 휴가가 없어요.</p>
+        <p className="text-body">이 날 나가는 사람이 없어요.</p>
       )}
     </section>
+  );
+}
+
+function SharedLeaveRow(props: { leave: FriendDayLeave }) {
+  const { leave } = props;
+  const name = leave.isViewer ? "나" : leave.name;
+  const color = friendPersonColor(leave.userId);
+  const outing = leave.kind === "outing";
+  const confirmed = isConfirmedLeaveStatus(leave.status);
+  const span =
+    leave.totalDays === 1
+      ? fmtRange(leave.startDate, leave.endDate)
+      : `${fmtRange(leave.startDate, leave.endDate)} · ${leave.totalDays}일 중 ${leave.dayIndex}일째`;
+  // 하루짜리(외출)는 기간 줄이 이미 그날 하루라고 말한다 — 출발·복귀를 덧붙이지 않는다.
+  const mark =
+    leave.totalDays === 1
+      ? null
+      : leave.isFirstDay
+        ? "이 날 출발"
+        : leave.isLastDay
+          ? "이 날 복귀"
+          : null;
+
+  return (
+    <li className="friend-day-row" style={{ borderLeftColor: color }}>
+      <span
+        aria-hidden="true"
+        className={`friend-calendar-person${outing ? " is-outing" : ""}`}
+        style={outing ? { borderColor: color, color } : { background: color }}
+      >
+        {name.slice(0, 1)}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <p className="body-sm strong friend-day-title">
+          {name}
+          <span
+            className={`badge ${outing ? "badge-neutral" : "badge-positive"}`}
+          >
+            {LEAVE_KIND_LABELS[leave.kind]}
+          </span>
+          <span
+            className={`friend-day-status${confirmed ? " is-confirmed" : ""}`}
+          >
+            {LEAVE_STATUS_LABELS[leave.status]}
+          </span>
+        </p>
+        <p className="caption text-body">{span}</p>
+        {mark ? <p className="caption friend-day-mark">{mark}</p> : null}
+      </div>
+    </li>
   );
 }
 
