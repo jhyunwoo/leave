@@ -175,7 +175,9 @@ export function Modal(props: {
             className="btn-icon"
             aria-label="닫기"
             onClick={props.onClose}
-            style={{ width: 36, height: 36, border: "none" }}
+            /* 테두리는 `.btn-icon`이 준 것을 그대로 둔다. 예전에는 여기서 껐는데
+               배경이 --canvas(모달과 같은 흰색)라 남는 것이 ×자 하나뿐이었다. */
+            style={{ width: 36, height: 36 }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <path

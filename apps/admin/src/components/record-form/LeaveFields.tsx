@@ -132,7 +132,7 @@ export function LeaveFields({
                   <div>
                     <button
                       type="button"
-                      className="btn-ghost"
+                      className="button compact secondary"
                       disabled={index === 0}
                       onClick={() =>
                         onDraftsChange((current) =>
@@ -144,7 +144,7 @@ export function LeaveFields({
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost"
+                      className="button compact secondary"
                       disabled={index === resolvedDrafts.length - 1}
                       onClick={() =>
                         onDraftsChange((current) =>
@@ -158,7 +158,7 @@ export function LeaveFields({
                 </div>
                 <button
                   type="button"
-                  className="btn-ghost"
+                  className="button compact secondary"
                   disabled={resolvedDrafts.length <= 1}
                   onClick={() =>
                     onDraftsChange((current) => removeDraft(current, index))
@@ -170,7 +170,7 @@ export function LeaveFields({
             ))}
             <button
               type="button"
-              className="btn-ghost"
+              className="button compact secondary"
               onClick={() =>
                 onDraftsChange((current) => [
                   ...current,

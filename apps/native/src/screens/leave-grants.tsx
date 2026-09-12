@@ -469,12 +469,18 @@ function CycleList(props: {
         </Text>
       )}
 
+      {/* 웹의 같은 자리(LeaveGrantsPage)와 마찬가지로 테두리를 가진 작은 버튼이다.
+          예전에는 brand 색 글자 한 줄이라 주기 목록의 설명문과 구분되지 않았다. */}
       {hidden > 0 && (
-        <Pressable accessibilityRole="button" onPress={props.onToggle}>
-          <Text style={styles.disclosure}>
-            {props.expanded ? "지난 주기 접기" : `지난 주기 ${hidden}개 보기`}
-          </Text>
-        </Pressable>
+        <Button
+          title={
+            props.expanded ? "지난 주기 접기" : `지난 주기 ${hidden}개 보기`
+          }
+          variant="secondary"
+          size="sm"
+          onPress={props.onToggle}
+          style={styles.disclosure}
+        />
       )}
 
       {shown.map((cycle) => (
@@ -636,7 +642,7 @@ const useStyles = makeStyles(({ colors }) => ({
     borderRadius: radius.pill,
   },
   chipText: { fontSize: 13, fontWeight: "600" },
-  disclosure: { fontSize: 13, fontWeight: "600", color: colors.brand },
+  disclosure: { alignSelf: "flex-start" },
 
   cycleRow: {
     flexDirection: "row",

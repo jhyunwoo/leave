@@ -24,6 +24,13 @@ export function Button(props: {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * 부모가 폭을 정한다(예: `flex: 1`로 나눠 가지는 한 줄). 그러면 라벨 폭
+   * 어림값을 깔지 않는다 — `estimateLabelWidth`가 만든 `minWidth`는 Yoga에서
+   * 부모 폭을 이기므로, 한 줄에 셋을 넣으면 합이 칸보다 넓어져 카드 밖으로
+   * 밀린다. 폭이 이미 정해져 있으면 어림값 자체가 필요 없다.
+   */
+  flexible?: boolean;
   systemImage?: string;
   testID?: string;
 }) {
@@ -41,13 +48,13 @@ export function Button(props: {
       : props.loading
         ? "처리 중…"
         : "계속";
-  const nativeVariant =
-    variant === "primary"
-      ? "filled"
-      : variant === "ghost"
-        ? "text"
-        : "outlined";
-  const minimumLabelWidth = estimateLabelWidth(label, windowWidth);
+  // ghost도 테두리를 가진다(`text`가 아니라 `outlined`). 배경도 테두리도 없는
+  // 글자는 그 변형만 놓인 자리("닫기", "선택 해제")에서 누를 수 있는 것으로
+  // 읽히지 않았다. iOS 구현도 같은 이유로 모든 변형이 캡슐을 가진다.
+  const nativeVariant = variant === "primary" ? "filled" : "outlined";
+  const minimumLabelWidth = props.flexible
+    ? undefined
+    : estimateLabelWidth(label, windowWidth);
 
   return (
     <Host

@@ -298,6 +298,7 @@ export function NotificationsScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`${latest.title} 휴가 상세 보기`}
                     onPress={() => openNotification(latest)}
+                    style={styles.detailButton}
                   >
                     <Text style={styles.detailLink}>자세히</Text>
                   </Pressable>
@@ -391,6 +392,7 @@ export function NotificationsScreen() {
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => openNotification(selected)}
+                        style={styles.detailButton}
                       >
                         <Text style={styles.detailLink}>자세히</Text>
                       </Pressable>
@@ -612,6 +614,23 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingTop: spacing.xs,
   },
   detailLink: { fontSize: 13, fontWeight: "700", color: colors.brand },
+  /**
+   * 혼자 서 있는 "자세히"에만 붙인다. 글자만 있을 때는 카드 안의 다른 brand 색
+   * 문구와 구분되지 않아 누를 수 있다는 것이 드러나지 않았다.
+   *
+   * 걸린 날짜 줄의 "열기"에는 붙이지 않는다 — 거기서는 줄 전체가 이미 버튼이고,
+   * 그 안의 글자는 눌린다는 신호일 뿐이라 껍데기를 씌우면 버튼 속 버튼이 된다.
+   */
+  detailButton: {
+    alignSelf: "flex-start",
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.canvas,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: "700",

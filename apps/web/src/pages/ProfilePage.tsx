@@ -324,22 +324,16 @@ export function ProfilePage(props: { me: Me }) {
         <LegalLinks />
       </section>
 
-      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공) */}
+      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공).
+          밑줄 친 글자였던 자리다 — 이 화면에서 유일하게 되돌릴 수 없는 동작인데
+          버튼으로 보이지 않아 안내문의 일부로 읽혔다. 위험 변형을 쓰되 폭은
+          글자에 맞춰, 눈에 걸리되 실수로 눌리지는 않게 둔다. */}
       <button
         type="button"
+        className="btn btn-danger btn-sm"
         onClick={onDeleteAccount}
         disabled={deleteAccount.isPending}
-        style={{
-          alignSelf: "center",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "var(--negative-deep, #a72027)",
-          fontSize: 14,
-          fontWeight: 600,
-          textDecoration: "underline",
-          padding: "var(--sp-md)",
-        }}
+        style={{ alignSelf: "center" }}
       >
         {deleteAccount.isPending ? "삭제 중…" : "계정 삭제"}
       </button>

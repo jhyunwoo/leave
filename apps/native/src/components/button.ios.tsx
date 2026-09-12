@@ -32,6 +32,13 @@ export function Button(props: {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * 부모가 폭을 정한다(예: `flex: 1`로 나눠 가지는 한 줄). 그러면 라벨 폭
+   * 어림값을 깔지 않는다 — `estimateLabelWidth`가 만든 `minWidth`는 Yoga에서
+   * 부모 폭을 이기므로, 한 줄에 셋을 넣으면 합이 칸보다 넓어져 카드 밖으로
+   * 밀린다. 폭이 이미 정해져 있으면 어림값 자체가 필요 없다.
+   */
+  flexible?: boolean;
   systemImage?: string;
   testID?: string;
 }) {
@@ -50,21 +57,17 @@ export function Button(props: {
       : props.loading
         ? "처리 중…"
         : "계속";
-  const minimumLabelWidth = estimateLabelWidth(label, windowWidth);
-  const nativeVariant =
-    variant === "primary"
-      ? "filled"
-      : variant === "ghost"
-        ? "text"
-        : "outlined";
+  const minimumLabelWidth = props.flexible
+    ? undefined
+    : estimateLabelWidth(label, windowWidth);
+  // 주 동작만 채운 캡슐이고 나머지는 전부 `bordered` — 즉 모든 변형이 캡슐을
+  // 가진다. 예전에는 ghost가 `text`/`plain`, tertiary가 `plain`이라 배경도
+  // 테두리도 없는 글자로 그려졌고, 그 변형만 놓인 자리("닫기", "선택 해제",
+  // "정기외박 설정 저장")에서는 누를 수 있는 것인지가 드러나지 않았다.
+  // 무게 차이는 tint와 채움 여부가 계속 말해 준다.
+  const nativeVariant = variant === "primary" ? "filled" : "outlined";
   const modifiers = [
-    buttonStyle(
-      variant === "primary"
-        ? "borderedProminent"
-        : variant === "ghost" || variant === "tertiary"
-          ? "plain"
-          : "bordered",
-    ),
+    buttonStyle(variant === "primary" ? "borderedProminent" : "bordered"),
     controlSize(size === "sm" ? "regular" : "large"),
     buttonBorderShape("capsule"),
     frame({ minHeight: size === "sm" ? 44 : 48, maxWidth: Infinity }),
