@@ -3,6 +3,7 @@ import {
   buildMonthGrid,
   CALENDAR_QUERY_FUTURE_MONTHS,
   CALENDAR_QUERY_PAST_MONTHS,
+  fmtDateFullK,
   fmtDateTimeFull,
   fmtDateTimeShort,
   fmtRange,
@@ -73,6 +74,18 @@ describe("fmtRange", () => {
   it("같은 날은 단일 표기, 다른 날은 범위 표기", () => {
     expect(fmtRange("2026-07-18", "2026-07-18")).toBe("7월 18일");
     expect(fmtRange("2026-07-18", "2026-07-20")).toContain("–");
+  });
+});
+
+describe("fmtDateFullK", () => {
+  it("연도·월·일·요일을 모두 밝힌다", () => {
+    expect(fmtDateFullK("2026-09-18")).toBe("2026년 9월 18일 (금)");
+  });
+
+  // 날짜 문자열은 UTC 접근자로 읽는다 — 연말 경계에서 해가 밀리면 안 된다.
+  it("연말·연초 경계에서도 해가 밀리지 않는다", () => {
+    expect(fmtDateFullK("2025-12-31")).toBe("2025년 12월 31일 (수)");
+    expect(fmtDateFullK("2026-01-01")).toBe("2026년 1월 1일 (목)");
   });
 });
 

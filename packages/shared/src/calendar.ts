@@ -40,6 +40,17 @@ export function fmtDateK(date: ISODate): string {
   return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAYS[d.getUTCDay()]})`;
 }
 
+/**
+ * "2026년 9월 18일 (금)" — 연도까지 밝히는 표기.
+ *
+ * 친구 달력처럼 해를 넘겨 스크롤하는 화면의 상세 제목에 쓴다. 거기서는 고른 날이
+ * 올해인지 내년인지가 곧 "그때 같이 나갈 수 있는가"의 답이라 연도를 지울 수 없다.
+ */
+export function fmtDateFullK(date: ISODate): string {
+  const d = parseISODate(date);
+  return `${d.getUTCFullYear()}년 ${fmtDateK(date)}`;
+}
+
 export function fmtDateShort(date: ISODate): string {
   const d = parseISODate(date);
   return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
