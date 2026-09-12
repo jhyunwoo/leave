@@ -560,7 +560,7 @@ export function CalendarPage(props: { me: Me }) {
               onFocus={preloadLeaveFormModal}
               onClick={() => setLeaveOpen(true)}
             >
-              휴가 등록
+              출타 등록
             </button>
           ) : null}
           {mode === "friends" ? (

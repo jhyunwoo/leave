@@ -343,7 +343,7 @@ test("초과 등록 토스트가 페이지가 아니라 화면 아래에 붙는�
   }, mine);
 
   await page.goto("/calendar");
-  await page.getByRole("button", { name: "휴가 등록" }).click();
+  await page.getByRole("button", { name: "출타 등록" }).click();
   const dialog = page.getByRole("dialog", { name: "휴가 등록" });
   await dialog.getByPlaceholder("예: 제주도 가족여행").fill("초과 테스트");
   await dialog.getByRole("button", { name: "휴가 등록" }).click();
