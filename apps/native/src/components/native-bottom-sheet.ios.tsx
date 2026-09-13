@@ -15,7 +15,7 @@
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui";
 import {
   frame,
-  ignoreSafeArea,
+  presentationBackground,
   presentationDetents,
   presentationDragIndicator,
   type ModifierConfig,
@@ -23,6 +23,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import type { ReactElement } from "react";
 import { View } from "react-native";
+import { useColors } from "@/theme";
 import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
 
 function toDetent(snapPoint: SnapPoint): PresentationDetent {
@@ -41,6 +42,7 @@ export function NativeBottomSheet(props: {
   testID?: string;
   children: ReactElement;
 }) {
+  const colors = useColors();
   const snapPoints = props.snapPoints ?? [];
   // 여백을 SwiftUI 쪽에 두지 않는다. Group에 padding을 걸면 RN 트리가 시트보다
   // 작아지고, 시트가 깎아주는 둥근 모서리 대신 직각 사각형이 시트 안에 얹힌 꼴이
@@ -48,7 +50,8 @@ export function NativeBottomSheet(props: {
   // 대신 RN 콘텐츠가 시트를 가득 채우게 두고(시트가 모서리를 알아서 클리핑한다),
   // 드래그 인디케이터 자리는 콘텐츠 '안쪽' 여백(SHEET_GRABBER_INSET)으로 잡는다.
   const fitToContents = snapPoints.length === 0;
-  const pinned = pinnedSheetHeight(props.snapPoints);
+  // SwiftUI 시트는 자기 높이를 RN 트리에 내려준다. 못 박지 않는다(sheet-snap-point.ts).
+  const pinned = pinnedSheetHeight(props.snapPoints, "detent");
   const modifiers: ModifierConfig[] = [
     frame({
       maxWidth: Infinity,
@@ -59,14 +62,21 @@ export function NativeBottomSheet(props: {
       alignment: "topLeading",
     }),
     presentationDragIndicator("visible"),
+    // 시트 자체의 배경을 콘텐츠와 같은 색으로 칠한다.
+    //
+    // RN 표면은 시트를 끝까지 채우지 못한다 — 시트 안쪽에 아래 안전 영역이 잡혀
+    // 있어 표면이 홈 인디케이터 높이(약 34pt)만큼 위에서 끝난다. 예전에는
+    // `ignoreSafeArea`로 표면을 시트 바닥까지 끌어내렸는데, 화면 가장자리에서 떠
+    // 있는 카드로 그려지는 iOS 26 시트에서는 그 방법이 더는 먹지 않아 바닥에
+    // 반투명한 시스템 배경이 그대로 비쳤다.
+    //
+    // 시트가 표면에 얼마를 내주든 남는 자리가 콘텐츠와 같은 색이면 틈으로 보이지
+    // 않는다. `presentationBackground`는 보통의 `background`가 닿지 못하는 시트
+    // 크롬(드래그 인디케이터 자리와 안전 영역 여백)까지 칠하므로, OS 판이 시트
+    // 모양을 또 바꾸더라도 이 규칙은 그대로 선다.
+    presentationBackground(colors.canvasSoft),
   ];
   if (!fitToContents) {
-    // 시트 안쪽에도 아래 안전 영역이 잡혀 있다. 그대로 두면 RN 콘텐츠가 시트
-    // 바닥에서 홈 인디케이터 높이만큼 떠, 위·옆은 시트에 딱 붙는데 아래만
-    // 벌어져 그 틈으로 시스템 시트 배경이 비친다. 표면은 시트 바닥까지 내리고,
-    // 안쪽 여백은 RN 쪽(SheetScaffold의 bottomSafeInset)에서 잡는다.
-    // 키보드 영역까지 무시하면 입력칸이 키보드에 가리므로 컨테이너만 무시한다.
-    modifiers.push(ignoreSafeArea({ regions: "container", edges: "bottom" }));
     modifiers.push(presentationDetents(snapPoints.map(toDetent)));
   }
 
@@ -87,7 +97,6 @@ export function NativeBottomSheet(props: {
             {pinned === null ? (
               props.children
             ) : (
-              // 시트 높이를 RN 쪽에도 못 박는다(pinnedSheetHeight 주석 참고).
               <View style={{ height: pinned }}>{props.children}</View>
             )}
           </RNHostView>

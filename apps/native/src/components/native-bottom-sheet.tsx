@@ -31,8 +31,9 @@ export function NativeBottomSheet(props: {
     return point.height;
   });
 
-  // 시트 높이를 RN 쪽에도 못 박는다(pinnedSheetHeight 주석 참고).
-  const pinned = pinnedSheetHeight(props.snapPoints);
+  // 웹 시트는 콘텐츠 높이로 커진다 — 시트 높이를 RN 쪽에서 정해 줘야 한다
+  // (sheet-snap-point.ts).
+  const pinned = pinnedSheetHeight(props.snapPoints, "content");
 
   return (
     <BottomSheet

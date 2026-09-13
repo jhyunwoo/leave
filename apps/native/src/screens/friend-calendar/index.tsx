@@ -28,7 +28,6 @@ import {
 import { LiquidGlassSurface } from "@/components/liquid-glass-surface";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
 import {
-  SHEET_EXTENDS_UNDER_BOTTOM_INSET,
   SHEET_GRABBER_INSET,
   SheetScaffold,
 } from "@/components/sheet-scaffold";
@@ -288,7 +287,6 @@ export function FriendCalendarScreen() {
           onClose={() => setSelectedDate(null)}
           contentContainerStyle={styles.sheetContent}
           headerTopInset={SHEET_GRABBER_INSET}
-          extendsUnderBottomInset={SHEET_EXTENDS_UNDER_BOTTOM_INSET}
         >
           {calendar.isPending ? (
             <View style={styles.sheetLoading}>

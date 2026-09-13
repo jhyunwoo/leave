@@ -20,7 +20,9 @@ export function NativeBottomSheet(props: {
   children: ReactElement;
 }) {
   useSheetClosed(props.isPresented, props.onClosed);
-  const pinned = pinnedSheetHeight(props.snapPoints);
+  // Material `ModalBottomSheet`은 콘텐츠 높이로 커진다 — 시트 높이를 RN 쪽에서
+  // 정해 줘야 한다(sheet-snap-point.ts).
+  const pinned = pinnedSheetHeight(props.snapPoints, "content");
 
   return (
     <BottomSheet
@@ -33,7 +35,6 @@ export function NativeBottomSheet(props: {
         {pinned === null ? (
           props.children
         ) : (
-          // 시트 높이를 RN 쪽에도 못 박는다(pinnedSheetHeight 주석 참고).
           <View style={{ height: pinned }}>{props.children}</View>
         )}
       </RNHostView>
