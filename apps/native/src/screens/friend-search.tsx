@@ -30,13 +30,12 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
-  StyleSheet,
 } from "react-native";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
+import { UsernameInput } from "@/components/username-input";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
 
 const RELATIONSHIP_LABEL: Record<UserProfile["relationship"], string> = {
@@ -111,7 +110,6 @@ function SearchResults(props: { query: string }) {
 
 export function FriendSearchScreen() {
   const styles = useStyles();
-  const colors = useColors();
   const router = useRouter();
   const outgoing = useOutgoingFriendRequests();
   const cancel = useCancelFriendRequest();
@@ -150,25 +148,14 @@ export function FriendSearchScreen() {
         <Text style={styles.label} accessibilityRole="header">
           사용자 이름으로 찾기
         </Text>
-        <View style={styles.inputRow}>
-          <Text style={styles.at}>@</Text>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="hyunwoo 또는 현우"
-            placeholderTextColor={colors.mute}
-            selectionColor={colors.brand}
-            cursorColor={colors.brand}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            autoComplete="off"
-            returnKeyType="search"
-            accessibilityLabel="사용자 이름 검색"
-            style={styles.input}
-            testID="friend-search-input"
-          />
-        </View>
+        <UsernameInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="hyunwoo 또는 현우"
+          returnKeyType="search"
+          accessibilityLabel="사용자 이름 검색"
+          testID="friend-search-input"
+        />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {query.trim() ? <SearchResults query={debouncedQuery} /> : null}
       </ContentPanel>
@@ -225,27 +212,6 @@ const useStyles = makeStyles(({ colors }) => ({
   card: { padding: spacing.lg, gap: spacing.md },
   heading: { fontSize: 20, fontWeight: "800", color: colors.ink },
   label: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  inputRow: { position: "relative", justifyContent: "center" },
-  at: {
-    position: "absolute",
-    left: spacing.lg,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.mute,
-  },
-  input: {
-    backgroundColor: colors.surfaceCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    borderRadius: radius.md,
-    borderCurve: "continuous",
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg + 18,
-    paddingRight: spacing.lg,
-    fontSize: 16,
-    color: colors.ink,
-    minHeight: 48,
-  },
   row: {
     minHeight: 56,
     flexDirection: "row",

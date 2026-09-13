@@ -42,7 +42,11 @@ export function Input(props: TextInputProps) {
       selectionColor={colors.brand}
       cursorColor={colors.brand}
       {...props}
-      style={[styles.input, props.style]}
+      style={[
+        styles.input,
+        props.multiline ? styles.multiline : styles.singleLine,
+        props.style,
+      ]}
     />
   );
 }
@@ -58,10 +62,21 @@ const useStyles = makeStyles(({ colors }) => ({
     borderColor: colors.hairline,
     borderRadius: radius.md,
     borderCurve: "continuous",
-    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     fontSize: 16,
     color: colors.ink,
     minHeight: 48,
   },
+  // 한 줄 입력에는 세로 padding을 주지 않는다. iOS는 padding을 UITextField의
+  // `textContainerInset`으로 넘기는데, 그 값이 이미 세로 가운데로 잡힌 글자
+  // 사각형에 다시 적용돼 글자가 padding만큼 아래로 밀린다(RCTUITextField의
+  // `textRectForBounds:`). 높이는 `minHeight`가 잡고 글자는 가운데 정렬에 맡긴다.
+  singleLine: {
+    paddingVertical: 0,
+    // 안드로이드: 칸 높이 안에서 글자를 가운데로, 기본 글꼴 여백은 끈다.
+    textAlignVertical: "center",
+    includeFontPadding: false,
+  },
+  // 여러 줄은 UITextView라 padding이 제대로 먹는다 — 글자는 위에서 시작해야 한다.
+  multiline: { paddingVertical: spacing.md },
 }));

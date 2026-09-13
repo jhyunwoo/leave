@@ -18,8 +18,9 @@ import {
   USERNAME_MAX_LENGTH,
 } from "@leave/shared";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
-import { makeStyles, radius, spacing, useColors } from "@/theme";
+import { Text, View } from "react-native";
+import { UsernameInput } from "@/components/username-input";
+import { makeStyles } from "@/theme";
 
 /** 타이핑이 멎고 나서야 서버에 묻는다 — 글자마다 왕복하면 rate limit에 걸린다. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -89,7 +90,6 @@ export function UsernameField(props: {
   testID?: string;
 }) {
   const styles = useStyles();
-  const colors = useColors();
   const { draft } = props;
   const status = statusOf(draft, props.serverError);
 
@@ -98,29 +98,18 @@ export function UsernameField(props: {
       <Text style={styles.label} accessibilityRole="header">
         {props.label ?? "사용자 이름"}
       </Text>
-      <View style={styles.inputRow}>
-        <Text style={styles.at}>@</Text>
-        <TextInput
-          value={draft.raw}
-          onChangeText={draft.setRaw}
-          onSubmitEditing={props.onSubmit}
-          placeholder="hyunwoo"
-          placeholderTextColor={colors.mute}
-          selectionColor={colors.brand}
-          cursorColor={colors.brand}
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          autoComplete="off"
-          maxLength={60}
-          autoFocus={props.autoFocus}
-          returnKeyType="done"
-          accessibilityLabel={props.label ?? "사용자 이름"}
-          accessibilityHint="친구가 나를 찾는 공개 이름이에요"
-          style={styles.input}
-          testID={props.testID ?? "username-input"}
-        />
-      </View>
+      <UsernameInput
+        value={draft.raw}
+        onChangeText={draft.setRaw}
+        onSubmitEditing={props.onSubmit}
+        placeholder="hyunwoo"
+        maxLength={60}
+        autoFocus={props.autoFocus}
+        returnKeyType="done"
+        accessibilityLabel={props.label ?? "사용자 이름"}
+        accessibilityHint="친구가 나를 찾는 공개 이름이에요"
+        testID={props.testID ?? "username-input"}
+      />
       <Text
         accessibilityLiveRegion="polite"
         style={[
@@ -141,27 +130,6 @@ export function UsernameField(props: {
 const useStyles = makeStyles(({ colors }) => ({
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  inputRow: { position: "relative", justifyContent: "center" },
-  at: {
-    position: "absolute",
-    left: spacing.lg,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.mute,
-  },
-  input: {
-    backgroundColor: colors.surfaceCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    borderRadius: radius.md,
-    borderCurve: "continuous",
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg + 18,
-    paddingRight: spacing.lg,
-    fontSize: 16,
-    color: colors.ink,
-    minHeight: 48,
-  },
   status: { fontSize: 12, color: colors.mute },
   statusError: { fontWeight: "600", color: colors.negativeDeep },
   statusOk: { fontWeight: "600", color: colors.brand },
