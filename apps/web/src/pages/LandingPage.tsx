@@ -320,7 +320,7 @@ export function LandingPage() {
               </h1>
               <p className="lp-sub">
                 하루 최대 출타 인원에 맞춰 비어 있는 날을 한눈에 보고, 초과되는
-                날은 미리 조율하세요. 웹과 iOS·Android 앱에서 무료로 씁니다.
+                날은 미리 조율하세요. Web, Android, iOS, iPad OS를 지원합니다.
               </p>
               <div className="lp-cta-row">
                 <Link
