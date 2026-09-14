@@ -70,6 +70,11 @@ export type Palette = {
   negativeTint: string;
   /** 달력에서 현재 정기외박 주기 범위를 아주 옅게 깔아주는 배경. */
   cycleTint: string;
+  /**
+   * 달력에서 고른 날의 숫자를 감싸는 반투명 원. 숫자를 덮지 않고 비쳐 보이게
+   * 두는 것이 요점이라 채움은 옅게, 대신 같은 잉크색 테두리로 고른 티를 낸다.
+   */
+  selectedTint: string;
 };
 
 /**
@@ -109,6 +114,7 @@ const lightColors: Palette = {
   onNegativeBg: "#ffffff",
   negativeTint: "#fff0f0",
   cycleTint: "#f5f8fb",
+  selectedTint: "rgba(14, 15, 12, 0.16)",
 };
 
 const darkColors: Palette = {
@@ -141,6 +147,7 @@ const darkColors: Palette = {
   onNegativeBg: "#ffffff",
   negativeTint: "#3d1517",
   cycleTint: "#17202a",
+  selectedTint: "rgba(242, 244, 240, 0.16)",
 };
 
 /**

@@ -314,9 +314,19 @@ export function MonthCalendar(props: {
                         style={[
                           styles.dayNumWrap,
                           isToday && styles.todayWrap,
-                          isSelected && styles.selectedWrap,
+                          // 오늘이면 primary 채움을 그대로 두고 테두리만 더한다.
+                          isSelected && !isToday && styles.selectedWrap,
                         ]}
                       >
+                        {/* 고른 날의 테두리는 칸 안에 겹쳐 그린다. borderWidth를
+                            주면 글자 자리가 그만큼 좁아져 두 자리 날짜에서 원이
+                            커졌다 작아졌다 한다. */}
+                        {isSelected && (
+                          <View
+                            pointerEvents="none"
+                            style={styles.selectedRing}
+                          />
+                        )}
                         <Text
                           style={[
                             styles.dayNum,
@@ -324,9 +334,9 @@ export function MonthCalendar(props: {
                               color: colors.negative,
                             },
                             exceeded && { color: colors.negativeDeep },
-                            (isToday || isSelected) && {
-                              color: colors.onPrimary,
-                            },
+                            // 고른 날은 채움이 옅어 숫자가 제 색(주말이면 빨강)을
+                            // 그대로 쓴다. 오늘만 진한 primary 위라 글자를 뒤집는다.
+                            isToday && { color: colors.onPrimary },
                           ]}
                         >
                           {dayNum}
@@ -629,7 +639,20 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingHorizontal: 4,
   },
   todayWrap: { backgroundColor: colors.primary },
-  selectedWrap: { backgroundColor: colors.ink },
+  // 예전에는 ink로 꽉 채웠는데, 그 위의 글자색이 라이트에서 ink와 같은 값이라
+  // 날짜가 검은 원에 통째로 먹혔다. 이제는 반투명으로 깔고 테두리로 세운다.
+  // 오늘이면서 고른 날이면 primary 채움 위에 테두리만 얹혀 둘 다 보인다.
+  selectedWrap: { backgroundColor: colors.selectedTint },
+  selectedRing: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+  },
   dayNum: { fontSize: 14, fontWeight: "600", color: colors.ink },
   calendarLabel: {
     fontSize: 9,
