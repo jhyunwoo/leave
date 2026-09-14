@@ -149,6 +149,7 @@ export function PersonalEventModal(props: {
               value={startTime}
               onChange={setStartTime}
               optional
+              defaultTime="09:00"
               testId="personal-event-start-time"
             />
             <TimeField
@@ -156,6 +157,8 @@ export function PersonalEventModal(props: {
               value={endTime}
               onChange={setEndTime}
               optional
+              // 시작을 이미 골랐으면 거기서 시작한다 — 굴릴 거리가 짧다.
+              defaultTime={startTime || "18:00"}
               testId="personal-event-end-time"
             />
           </div>

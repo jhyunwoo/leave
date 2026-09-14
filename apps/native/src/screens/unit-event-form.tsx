@@ -239,6 +239,7 @@ function UnitEventEditor(props: {
               value={startTime}
               onChange={setStartTime}
               optional
+              defaultTime="09:00"
               testID="unit-event-start-time"
             />
             <TimePickerRow
@@ -246,6 +247,8 @@ function UnitEventEditor(props: {
               value={endTime}
               onChange={setEndTime}
               optional
+              // 시작을 이미 골랐으면 거기서 시작한다 — 굴릴 거리가 짧다.
+              defaultTime={startTime || "18:00"}
               testID="unit-event-end-time"
             />
           </>
