@@ -391,7 +391,7 @@ export function LandingPage() {
 
         <section
           className="lp-cta"
-          style={{ paddingTop: 0 }}
+          style={{ paddingTop: 12 }}
           aria-labelledby="alert-title"
         >
           <div className="lp-wrap">
