@@ -6,47 +6,12 @@
 // 지웠는지는 모른다. 마지막 테스트는 동의를 내린 사용자의 요청이 애초에 기록되지
 // 않는지 본다 — 관리자 화면의 동의 토글이 표시용으로만 남으면 안 된다.
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { req, signup, uniq } from "./helpers.mjs";
-
-const BASE = process.env.API_URL ?? "http://localhost:8799";
-const apiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-/** run-tests.mjs가 만든 격리 D1 파일. 러너와 같은 상태를 직접 들여다본다. */
-function openTestDb() {
-  const dir = path.join(
-    apiDir,
-    ".wrangler",
-    "test-state",
-    "v3",
-    "d1",
-    "miniflare-D1DatabaseObject",
-  );
-  const file = readdirSync(dir).find(
-    (name) => name.endsWith(".sqlite") && name !== "metadata.sqlite",
-  );
-  assert.ok(file, `D1 파일을 찾지 못했다: ${dir}`);
-  const db = new DatabaseSync(path.join(dir, file));
-  // wrangler dev가 같은 파일을 쥐고 있다 — 잠깐 잠겨 있어도 기다린다.
-  db.exec("PRAGMA busy_timeout = 20000");
-  return db;
-}
+import { openTestDb, req, runScheduled, signup, uniq } from "./helpers.mjs";
 
 /** days일 전 시각의 ISO 문자열. */
 function daysAgo(days) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
-/** cron 트리거를 로컬에서 실행시키는 wrangler dev의 진입점. */
-async function runScheduled() {
-  const res = await fetch(`${BASE}/cdn-cgi/handler/scheduled`);
-  assert.equal(res.status, 200, "scheduled 핸들러 호출 실패");
-  // waitUntil 안에서 도는 작업이라 응답 뒤에도 잠깐 이어진다.
-  await new Promise((r) => setTimeout(r, 800));
 }
 
 test("보관 기간이 지난 접속 기록·푸시 로그와 만료 세션을 지운다", async () => {

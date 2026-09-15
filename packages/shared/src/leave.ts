@@ -95,6 +95,48 @@ export function isUserEditableLeaveStatus(
   );
 }
 
+/**
+ * 복귀일이 지나면 저절로 "복귀 완료"가 되는 상태.
+ *
+ * `draft`가 빠진 것은 표기 취향이 아니다 — `completed`는 `COUNTED_LEAVE_STATUSES`에
+ * 들어 있어서, 초안이 여기로 넘어가면 나만 보던 계획이 **이름·계급과 함께** 그룹
+ * 출타 명단에 뜬다. `rejected`·`cancelled`는 실제로 나가지 않았으니 복귀할 것도 없다.
+ *
+ * 이 목록은 서버의 굳히기 작업에서 SQL에도 그대로 바인딩된다
+ * (apps/api/src/lib/leave-completion.ts). 두 벌로 적지 않는다.
+ */
+export const AUTO_COMPLETED_LEAVE_STATUSES = [
+  "shared",
+  "requested",
+  "approved",
+] as const satisfies readonly LeaveStatus[];
+
+/**
+ * 이 휴가를 지금 읽었을 때의 상태 — 복귀일이 지난 계획은 "복귀 완료"로 읽는다.
+ *
+ * 경계는 **날짜**다(`endDate < today`). 복귀시각(21:00)으로 잡지 않는 이유가 둘.
+ *  - 이 값을 DB에 굳히는 cron이 하루 한 번(12:10 KST) 돈다. 시각 기준이면 21:00부터
+ *    다음 날 12:10까지 저장된 값과 응답이 다른 답을 낸다 — 두 경로가 같은 함수를
+ *    부르는 뜻이 사라진다.
+ *  - 클라이언트의 `partitionMyLeaves`가 "지난 휴가"를 이미 `endDate < today`로 가른다.
+ *    같은 경계를 쓰면 "다가오는 목록에 복귀 완료가 섞이는" 상태가 생길 수 없다.
+ * 복귀일 당일 21시~자정 사이에 아직 "확정"으로 보이는 것은 받아들인다 — 그 구간은
+ * D-day 카드(`next-leave-countdown.ts`의 `returnAt`)가 이미 초 단위로 답하고 있다.
+ *
+ * `today`에 기본값을 두지 않는다. 한 응답 안의 모든 행이 같은 오늘을 봐야 하고,
+ * 행마다 오늘을 새로 구하면 포매터가 행 수만큼 돈다.
+ */
+export function settledLeaveStatus(
+  status: LeaveStatus,
+  endDate: ISODate,
+  today: ISODate,
+): LeaveStatus {
+  return endDate < today &&
+    (AUTO_COMPLETED_LEAVE_STATUSES as readonly LeaveStatus[]).includes(status)
+    ? "completed"
+    : status;
+}
+
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
   draft: "초안(나만 보기)",
   shared: "희망",

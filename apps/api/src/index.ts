@@ -8,8 +8,8 @@
  *  2) CORS       — 허용 오리진은 환경변수로 받는다.
  *  3) 최소 버전  — 출타 계산 규칙이 바뀐 뒤의 구버전 앱을 끊는다.
  *
- * fetch 말고 `scheduled`도 내보낸다 — 보관 기간이 지난 로그와 만료 세션을 지우는
- * 정리 작업이다(wrangler.jsonc의 cron 트리거).
+ * fetch 말고 `scheduled`도 내보낸다 — 보관 기간이 지난 로그와 만료 세션을 지우고,
+ * 복귀일이 지난 계획을 "복귀 완료"로 굳힌다(wrangler.jsonc의 cron 트리거).
  *
  * 마지막에 체이닝된 `routes`의 타입이 그대로 `AppType`이 되고, 웹/앱이
  * `hc<AppType>()`으로 가져가 컴파일 타임에 경로·입력·응답을 맞춘다.
@@ -20,6 +20,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { drizzle } from "drizzle-orm/d1";
 import { cors } from "hono/cors";
 import { createApp, type AppBindings } from "./lib/app";
+import { completePastLeaves } from "./lib/leave-completion";
 import { pruneExpiredData, resolveRetentionDays } from "./lib/retention";
 import { accessLogMiddleware } from "./middleware/access-log";
 import { minVersionMiddleware } from "./middleware/min-version";
@@ -128,26 +129,44 @@ app.get("/docs", Scalar({ url: "/openapi.json", pageTitle: "Leave API 문서" })
 /** Hono Stack RPC용 앱 타입 — 웹/앱에서 hc<AppType>()으로 사용. */
 export type AppType = typeof routes;
 
+/**
+ * 정기 작업 한 단계. 실패해도 던지지 않는다 — 다음 실행이 이어서 하면 되고,
+ * 던지면 Cloudflare가 재시도하는데 여기서 재시도가 도움이 되는 상황이 없다.
+ * 요약을 남기지 않으면 작업이 실제로 돌았는지 알 방법이 없다.
+ */
+async function runScheduledStep(
+  name: string,
+  run: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    console.log(name, JSON.stringify(await run()));
+  } catch (err) {
+    console.error(`${name} 실패`, err);
+  }
+}
+
 export default {
   fetch: app.fetch,
 
   /**
-   * 정기 정리 — 보관 기간이 지난 접속 기록·푸시 로그와 만료된 세션을 지운다.
+   * 매일 도는 정기 작업.
    *
-   * 실패해도 다음 실행이 이어서 하면 되므로 던지지 않고 기록만 남긴다.
-   * 던지면 Cloudflare가 실패로 재시도하는데, 여기서 재시도가 도움이 되는 상황이 없다.
+   *  1) 보관 기간이 지난 접속 기록·푸시 로그와 만료된 세션을 지운다.
+   *  2) 복귀일이 지난 계획을 "복귀 완료"로 굳힌다.
+   *
+   * 둘은 서로에게 기댈 것이 없다. 한 try로 묶으면 앞의 실패가 뒤를 통째로 건너뛰므로
+   * 단계마다 따로 감싼다. 순차로 도는 것은 D1 왕복을 겹치지 않게 하려는 것이다.
    */
   async scheduled(
     _event: ScheduledController,
     env: AppBindings,
   ): Promise<void> {
-    try {
-      const summary = await pruneExpiredData(drizzle(env.DB), {
+    const db = drizzle(env.DB);
+    await runScheduledStep("retention", () =>
+      pruneExpiredData(db, {
         retentionDays: resolveRetentionDays(env.LOG_RETENTION_DAYS),
-      });
-      console.log("retention", JSON.stringify(summary));
-    } catch (err) {
-      console.error("보관 기간 정리 실패", err);
-    }
+      }),
+    );
+    await runScheduledStep("leave-completion", () => completePastLeaves(db));
   },
 };

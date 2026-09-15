@@ -14,7 +14,10 @@
 import {
   inclusiveDays,
   isUserEditableLeaveStatus,
+  settledLeaveStatus,
   sortSegments,
+  todayInSeoul,
+  type ISODate,
   type LeaveCreateInput,
   type LeaveSegment,
 } from "@leave/shared";
@@ -67,9 +70,18 @@ function toSegments(input: LeaveCreateInput): LeaveSegment[] {
   }));
 }
 
+/**
+ * 휴가 한 건을 응답 모양으로 바꾼다.
+ *
+ * 상태는 저장값을 그대로 내보내지 않고 `settledLeaveStatus`를 한 번 거친다 —
+ * 복귀일이 지난 계획은 "복귀 완료"로 읽힌다. 굳히기 cron이 DB도 같은 규칙으로
+ * 맞추지만, 그 전에 읽히는 옛 행과 오늘 막 지나간 행까지 여기서 답이 맞는다.
+ * `today`를 밖에서 받는 것은 한 응답의 모든 행이 같은 오늘을 봐야 하기 때문이다.
+ */
 function serializeLeave(
   row: LeaveRow,
   segmentsByLeave: Map<string, LeaveSegment[]>,
+  today: ISODate,
 ) {
   return {
     id: row.id,
@@ -79,7 +91,7 @@ function serializeLeave(
     endDate: row.endDate,
     returnTime: row.returnTime,
     reason: row.reason,
-    status: row.status,
+    status: settledLeaveStatus(row.status, row.endDate, today),
     segments: segmentsByLeave.get(row.id) ?? [],
     createdAt: row.createdAt,
   };
@@ -190,8 +202,10 @@ export const leaveRoutes = app
       segmentsOfUserQuery(db, user.id),
     ]);
     const segments = foldSegmentRows(segmentRows);
+    // 목록 전체가 같은 오늘을 봐야 한다. 행마다 구하면 포매터가 행 수만큼 돈다.
+    const today = todayInSeoul();
     return c.json(
-      { leaves: rows.map((row) => serializeLeave(row, segments)) },
+      { leaves: rows.map((row) => serializeLeave(row, segments, today)) },
       200,
     );
   })
@@ -245,6 +259,7 @@ export const leaveRoutes = app
         leave: serializeLeave(
           saved.row,
           new Map([[saved.row.id, saved.segments]]),
+          todayInSeoul(),
         ),
         exceededDates,
       },
@@ -265,7 +280,15 @@ export const leaveRoutes = app
     if (!existing) {
       return c.json({ error: "휴가를 찾을 수 없습니다" }, 404);
     }
-    if (!isUserEditableLeaveStatus(existing.status)) {
+    // 저장값이 아니라 **파생된** 상태로 판정한다. 굳히기 cron이 DB도 하루 안에
+    // 같은 값으로 맞추므로, 저장값을 보면 잠기는 시점만 예측할 수 없어진다.
+    // 그리고 빠른 변경의 네 선택지는 전부 복귀 전 상태라, 복귀한 휴가를 되돌려
+    // 봐야 직렬화가 곧바로 다시 "복귀 완료"로 파생해 아무 일도 하지 않는다.
+    if (
+      !isUserEditableLeaveStatus(
+        settledLeaveStatus(existing.status, existing.endDate, todayInSeoul()),
+      )
+    ) {
       return c.json(
         { error: "종료된 휴가는 수정 화면에서 상태를 변경해주세요" },
         400,
@@ -302,6 +325,7 @@ export const leaveRoutes = app
         leave: serializeLeave(
           saved.row,
           new Map([[saved.row.id, saved.segments]]),
+          todayInSeoul(),
         ),
         exceededDates,
       },
@@ -353,6 +377,7 @@ export const leaveRoutes = app
         leave: serializeLeave(
           saved.row,
           new Map([[saved.row.id, saved.segments]]),
+          todayInSeoul(),
         ),
         exceededDates,
       },

@@ -12,6 +12,8 @@ import {
   fmtDateShort,
   planLeaveMerge,
   segmentsRange,
+  settledLeaveStatus,
+  todayInSeoul,
   type Branch,
   type LeaveSegment,
   type LeaveStatus,
@@ -96,10 +98,26 @@ export async function saveLeaveWithMerge(
   incoming: MergeCandidate,
   options: { existingId?: string } = {},
 ): Promise<SaveLeaveResult> {
+  // 응답이 "복귀 완료"라고 말할 행을 DB에는 "확정"으로 넣으면, 병합·겹침 판정이
+  // 상태로 나누는 후보 풀이 화면과 갈린다 — 굳히기 cron이 도는 12:10을 경계로
+  // "어제 다녀온 휴가 위에 하나가 더 저장되는" 창이 매일 생긴다. 읽는 쪽과 같은
+  // 함수로 먼저 굳힌 뒤 저장한다. 구간이 없는 입력은 어차피 아래에서 걸린다.
+  const incomingRange = segmentsRange(incoming.segments);
+  const settled: MergeCandidate = incomingRange
+    ? {
+        ...incoming,
+        status: settledLeaveStatus(
+          incoming.status,
+          incomingRange.endDate,
+          todayInSeoul(),
+        ),
+      }
+    : incoming;
+
   const plan = planLeaveMerge(
-    incoming,
+    settled,
     await loadMergeCandidates(db, user.id, {
-      status: incoming.status,
+      status: settled.status,
       excludeLeaveId: options.existingId,
     }),
   );
@@ -120,20 +138,20 @@ export async function saveLeaveWithMerge(
           reason: plan.reason,
           returnTime: plan.returnTime,
           segments: plan.segments,
-          // incoming이 아직 행이 없는 등록일 때만 지울 대상에서 뺀다. 수정(PATCH)이면
-          // incoming.id는 이미 있는 행이라 다른 이웃에 흡수될 수 있고, 그때는
+          // 들어온 휴가가 아직 행이 없는 등록일 때만 지울 대상에서 뺀다. 수정(PATCH)이면
+          // 그 id는 이미 있는 행이라 다른 이웃에 흡수될 수 있고, 그때는
           // absorbedIds에 그대로 남아야 옛 구간이 지워지고 옛 행도 삭제된다.
           absorbedIds: options.existingId
             ? plan.absorbedIds
-            : plan.absorbedIds.filter((id) => id !== incoming.id),
+            : plan.absorbedIds.filter((id) => id !== settled.id),
         }
       : {
-          id: incoming.id,
-          createdAt: incoming.createdAt,
-          title: incoming.title,
-          reason: incoming.reason,
-          returnTime: incoming.returnTime ?? "21:00",
-          segments: incoming.segments,
+          id: settled.id,
+          createdAt: settled.createdAt,
+          title: settled.title,
+          reason: settled.reason,
+          returnTime: settled.returnTime ?? "21:00",
+          segments: settled.segments,
           absorbedIds: [] as string[],
         };
 
@@ -146,7 +164,7 @@ export async function saveLeaveWithMerge(
     endDate: range.endDate,
     returnTime: saved.returnTime,
     reason: saved.reason,
-    status: incoming.status,
+    status: settled.status,
     createdAt: saved.createdAt,
   };
 
@@ -160,7 +178,7 @@ export async function saveLeaveWithMerge(
     // host를 두 번 세어(위 주석 참고) 잔여가 모자란다고 잘못 막는다.
     await assertSegmentsAvailable(db, user, saved.segments, [
       ...clearIds,
-      incoming.id,
+      settled.id,
       ...(options.existingId ? [options.existingId] : []),
     ]);
   } catch (error) {
@@ -172,7 +190,7 @@ export async function saveLeaveWithMerge(
   }
 
   // 살아남는 행이 이미 DB에 있는지. 등록인데 host가 자기 자신이면 그때만 insert다.
-  const inserting = !options.existingId && saved.id === incoming.id;
+  const inserting = !options.existingId && saved.id === settled.id;
 
   // 아래 문장들은 모두 한 batch = 한 트랜잭션에 들어간다. 중간에 실패하면 전부 되돌아가야
   // 한다 — 옛 구간만 지워지고 새 구간이 안 들어가면 휴가가 통째로 빈 껍데기가 된다.

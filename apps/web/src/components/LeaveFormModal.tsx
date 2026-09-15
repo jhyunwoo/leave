@@ -16,6 +16,7 @@ import {
   fmtRangeTiny,
   isConfirmedLeaveStatus,
   LEAVE_STATUS_LABELS,
+  LEAVE_STATUSES,
   MAX_DATE_RANGE_DAYS,
   type BalanceKey,
   type LeaveStatus,
@@ -29,21 +30,14 @@ import { TimeField } from "./TimeField";
 /** 복귀 시각으로 가장 자주 적히는 값들. 그 밖의 시각은 드롭다운으로 고른다. */
 const RETURN_TIME_PRESETS = ["18:00", "20:00", "21:00", "22:00"] as const;
 
-/** 웹에서 사용자가 직접 고를 수 있는 계획 상태. */
-const STATUS_OPTIONS = [
-  "draft",
-  "shared",
-  "requested",
-  "approved",
-  "rejected",
-  "cancelled",
-  "completed",
-] as const satisfies readonly LeaveStatus[];
-
 /** 계획 상태가 무슨 뜻인지 한 줄로 설명한다. */
 function statusHint(status: LeaveStatus): string {
   if (status === "draft") {
     return "초안은 나만 볼 수 있고 그룹 집계와 출타 명단에 들어가지 않아요.";
+  }
+  // 확정 분기보다 먼저 본다 — isConfirmedLeaveStatus는 completed도 확정으로 센다.
+  if (status === "completed") {
+    return "복귀한 일정이에요. 복귀일이 지나면 자동으로 이 상태가 돼요.";
   }
   if (isConfirmedLeaveStatus(status)) {
     return "확정된 일정이에요. 달력 출타 명단에 이름과 함께 보이고, 희망 일정과 구분해 표시됩니다.";
@@ -129,7 +123,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
             onChange={(e) => form.setStatus(e.target.value as LeaveStatus)}
             data-testid="leave-status"
           >
-            {STATUS_OPTIONS.map((value) => (
+            {LEAVE_STATUSES.map((value) => (
               <option key={value} value={value}>
                 {LEAVE_STATUS_LABELS[value]}
               </option>

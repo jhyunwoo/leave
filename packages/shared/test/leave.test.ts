@@ -4,10 +4,13 @@ import {
   BALANCE_LABELS,
   balanceLabel,
   type BalanceKey,
+  AUTO_COMPLETED_LEAVE_STATUSES,
   BALANCE_LEAVE_STATUSES,
   COUNTED_LEAVE_STATUSES,
   LEAVE_STATUSES,
   countsAgainstBalance,
+  isCountedLeaveStatus,
+  settledLeaveStatus,
   segmentBalanceKey,
   shiftSegments,
   DEFAULT_ANNUAL_DAYS,
@@ -198,5 +201,85 @@ describe("외출 한 건 판정", () => {
 
   it("구간이 없는 행도 휴가로 본다", () => {
     expect(isOutingSegments([])).toBe(false);
+  });
+});
+
+/**
+ * 복귀일이 지난 계획을 "복귀 완료"로 읽는 규칙.
+ *
+ * 서버의 응답 직렬화와 매일 도는 굳히기 작업이 **같은 이 함수**를 부른다. 여기가
+ * 깨지면 화면과 저장된 값이 갈린다.
+ */
+describe("복귀 완료 자동 판정", () => {
+  const TODAY = "2026-09-14";
+  const YESTERDAY = "2026-09-13";
+  const TOMORROW = "2026-09-15";
+
+  it.each(AUTO_COMPLETED_LEAVE_STATUSES)(
+    "%s은 복귀일이 지나면 복귀 완료가 된다",
+    (status) => {
+      expect(settledLeaveStatus(status, YESTERDAY, TODAY)).toBe("completed");
+    },
+  );
+
+  // 경계. 오늘 끝나는 휴가는 아직 복귀 전이다 — partitionMyLeaves와 같은 경계를 쓴다.
+  it.each(AUTO_COMPLETED_LEAVE_STATUSES)(
+    "%s은 오늘 끝나면 아직 그대로다",
+    (status) => {
+      expect(settledLeaveStatus(status, TODAY, TODAY)).toBe(status);
+    },
+  );
+
+  it.each(AUTO_COMPLETED_LEAVE_STATUSES)(
+    "%s은 앞으로 끝날 예정이면 그대로다",
+    (status) => {
+      expect(settledLeaveStatus(status, TOMORROW, TODAY)).toBe(status);
+    },
+  );
+
+  /**
+   * 초안이 넘어가면 안 되는 이유는 라벨이 어색해서가 아니다. `completed`는 출타
+   * 집계 상태라, 나만 보던 계획이 이름·계급과 함께 그룹 명단에 뜬다.
+   */
+  it("지난 초안은 초안 그대로다", () => {
+    expect(settledLeaveStatus("draft", YESTERDAY, TODAY)).toBe("draft");
+    expect(
+      isCountedLeaveStatus(settledLeaveStatus("draft", YESTERDAY, TODAY)),
+    ).toBe(false);
+  });
+
+  it.each(["rejected", "cancelled"] as const)(
+    "실제로 나가지 않은 %s은 복귀할 것도 없다",
+    (status) => {
+      expect(settledLeaveStatus(status, YESTERDAY, TODAY)).toBe(status);
+    },
+  );
+
+  // 굳히기 작업이 자기가 쓴 행을 다시 읽는다. 두 번 적용해도 같은 답이어야 한다.
+  it("이미 복귀 완료인 것은 그대로다", () => {
+    expect(settledLeaveStatus("completed", YESTERDAY, TODAY)).toBe("completed");
+  });
+
+  /**
+   * 이 변경이 잔여·출타 집계에 대해 중립이라는 것이 전제다 — `completed`가
+   * 두 목록 모두에 `shared`/`requested`/`approved`와 함께 들어 있기 때문에 성립한다.
+   * 나중에 누가 AUTO_COMPLETED_LEAVE_STATUSES에 다른 상태를 더해 숫자를 조용히
+   * 바꾸는 것을 여기서 막는다.
+   */
+  it.each(LEAVE_STATUSES)(
+    "%s의 집계·잔여 판정은 전환 뒤에도 같다",
+    (status) => {
+      const settled = settledLeaveStatus(status, YESTERDAY, TODAY);
+      expect(isCountedLeaveStatus(settled)).toBe(isCountedLeaveStatus(status));
+      expect(countsAgainstBalance(settled)).toBe(countsAgainstBalance(status));
+    },
+  );
+
+  it("전환 대상은 집계·잔여 목록 양쪽에 모두 들어 있는 상태뿐이다", () => {
+    for (const status of AUTO_COMPLETED_LEAVE_STATUSES) {
+      expect(COUNTED_LEAVE_STATUSES).toContain(status);
+      expect(BALANCE_LEAVE_STATUSES).toContain(status);
+    }
+    expect(AUTO_COMPLETED_LEAVE_STATUSES).not.toContain("draft");
   });
 });

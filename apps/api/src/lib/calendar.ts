@@ -18,6 +18,8 @@ import {
   isCountedLeaveStatus,
   monthBounds,
   outingDatesOfSegments,
+  settledLeaveStatus,
+  todayInSeoul,
 } from "@leave/shared";
 import { and, asc, eq, gte, lte } from "drizzle-orm";
 import {
@@ -177,6 +179,11 @@ export async function buildCalendarPayloads(input: {
     members.map((m) => [m.id, serializeMember(m)] as const),
   );
   const serializedUnit = serializeUnit(unit, members.length);
+  // 복귀일이 지난 계획은 "복귀 완료"로 읽는다 — 규칙은 shared의 settledLeaveStatus
+  // 하나뿐이고 /leaves/mine도 같은 것을 쓴다. 여기서 빠뜨리면 같은 휴가가 내 휴가
+  // 화면에서는 복귀 완료, 달력에서는 희망으로 갈린다. 여러 달을 한 번에 만들므로
+  // 오늘은 바깥에서 한 번만 구한다.
+  const today = todayInSeoul();
 
   return monthRanges.map(({ month, start, end }) => {
     const monthRows = rows.filter(
@@ -234,7 +241,7 @@ export async function buildCalendarPayloads(input: {
         endDate: leave.endDate,
         returnTime: leave.returnTime,
         reason: leave.reason,
-        status: leave.status,
+        status: settledLeaveStatus(leave.status, leave.endDate, today),
         segments: segmentMap.get(leave.id) ?? [],
       }));
 
@@ -250,7 +257,7 @@ export async function buildCalendarPayloads(input: {
           rankLabel: member.rankLabel,
           startDate: leave.startDate,
           endDate: leave.endDate,
-          status: leave.status,
+          status: settledLeaveStatus(leave.status, leave.endDate, today),
           segments: segmentMap.get(leave.id) ?? [],
         },
       ];

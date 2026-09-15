@@ -27,6 +27,7 @@ import {
   fmtRangeTiny,
   isConfirmedLeaveStatus,
   isDerivedTitle,
+  isUserEditableLeaveStatus,
   LEAVE_STATUS_LABELS,
   titleFromDrafts,
   todayInSeoul,
@@ -53,10 +54,28 @@ import { TimePickerRow } from "./time-picker";
 /** 복귀 시각으로 가장 자주 적히는 값들. 그 밖의 시각은 시·분을 눌러 고른다. */
 const RETURN_TIME_PRESETS = ["18:00", "20:00", "21:00", "22:00"] as const;
 
+/**
+ * 세그먼트에 보여 줄 상태 목록 — 고를 수 있는 것 + 지금 상태.
+ *
+ * 지난 휴가는 서버가 "복귀 완료"로 내려주는데, 그 값이 목록에 없으면
+ * `values.indexOf(value)`가 -1이 되고 `NativeSegmentedControl`이 `Math.max(0, -1)`로
+ * 깎아 **엉뚱하게 "초안"이 선택된 것처럼 보인다.** 종료 상태는 보이기만 하고
+ * 여기서 되돌릴 수 없다(되돌리는 길은 웹 수정 폼의 전체 목록이다).
+ */
+function statusOptions(current: LeaveStatus): readonly LeaveStatus[] {
+  return isUserEditableLeaveStatus(current)
+    ? USER_EDITABLE_LEAVE_STATUSES
+    : [...USER_EDITABLE_LEAVE_STATUSES, current];
+}
+
 /** 계획 상태가 무슨 뜻인지 한 줄로 설명한다. */
 function statusHint(status: LeaveStatus): string {
   if (status === "draft") {
     return "초안은 나만 볼 수 있고 그룹 집계와 출타 명단에 들어가지 않아요.";
+  }
+  // 확정 분기보다 먼저 본다 — isConfirmedLeaveStatus는 complete도 확정으로 센다.
+  if (status === "completed") {
+    return "복귀한 일정이에요. 복귀일이 지나면 자동으로 이 상태가 돼요.";
   }
   if (isConfirmedLeaveStatus(status)) {
     return "확정된 일정이에요. 달력 출타 명단에 이름과 함께 보이고, 희망 일정과 구분해 표시됩니다.";
@@ -219,11 +238,9 @@ export function LeaveFormModal(props: {
                 계획 상태
               </Text>
               <NativeSegmentedControl
-                values={USER_EDITABLE_LEAVE_STATUSES}
+                values={statusOptions(form.status)}
                 labels={LEAVE_STATUS_LABELS}
-                value={
-                  form.status as (typeof USER_EDITABLE_LEAVE_STATUSES)[number]
-                }
+                value={form.status}
                 onValueChange={form.setStatus}
                 testID="leave-status"
               />

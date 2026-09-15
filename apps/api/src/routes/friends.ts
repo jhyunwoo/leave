@@ -18,7 +18,9 @@ import {
   MAX_DATE_RANGE_DAYS,
   monthBounds,
   normalizeUsername,
+  settledLeaveStatus,
   SOCIAL_ERROR_CODES,
+  todayInSeoul,
 } from "@leave/shared";
 import { and, asc, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -225,6 +227,10 @@ async function buildFriendCalendars(input: {
     end: rangeEnd,
   });
 
+  // 상태 표기는 내 휴가·부대 달력과 같은 규칙을 쓴다 — 복귀일이 지난 계획은
+  // "복귀 완료"다. 친구 화면만 옛 상태를 말하면 같은 휴가가 두 이름을 갖는다.
+  const today = todayInSeoul();
+
   return ranges.map(({ month, start, end }) => ({
     month,
     people,
@@ -232,6 +238,7 @@ async function buildFriendCalendars(input: {
       .filter((row) => row.startDate <= end && row.endDate >= start)
       .map((row) => ({
         ...row,
+        status: settledLeaveStatus(row.status, row.endDate, today),
         kind: outings.has(row.leaveId)
           ? ("outing" as const)
           : ("leave" as const),
@@ -558,6 +565,8 @@ export const friendRoutes = app
       start: startDate,
       end: endDate,
     });
+    // 목록 전체가 같은 오늘을 본다.
+    const today = todayInSeoul();
     return c.json(
       {
         people: [
@@ -570,6 +579,7 @@ export const friendRoutes = app
         ],
         leaves: rows.map((row) => ({
           ...row,
+          status: settledLeaveStatus(row.status, row.endDate, today),
           kind: outings.has(row.leaveId)
             ? ("outing" as const)
             : ("leave" as const),

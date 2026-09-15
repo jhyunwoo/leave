@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createUnit, req, signup } from "./helpers.mjs";
+import { createUnit, isoDaysFromToday, req, signup } from "./helpers.mjs";
 
 /** 공개 사용자 이름으로 친구를 요청한다. 대소문자·공백·@는 서버가 정규화한다. */
 async function requestFriend(sender, receiver) {
@@ -285,6 +285,12 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
   await createUnit(first.token);
   await createUnit(second.token);
 
+  // 이 테스트가 보는 것은 "어떤 상태가 친구에게 새는가"이지 날짜가 아니다.
+  // 지난 달로 잡으면 복귀일이 지난 계획이 전부 복귀 완료로 굳어(그리고 붙어 있으면
+  // 한 건으로 병합돼) 상태별 구분 자체가 사라진다. 40일 뒤가 속한 달의 10~15일은
+  // 오늘이 그 달의 며칠이든 언제나 미래다.
+  const month = isoDaysFromToday(40).slice(0, 7);
+
   for (const [status, day] of [
     ["shared", "10"],
     ["approved", "11"],
@@ -302,8 +308,8 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
         segments: [
           {
             category: "annual",
-            startDate: `2026-09-${day}`,
-            endDate: `2026-09-${day}`,
+            startDate: `${month}-${day}`,
+            endDate: `${month}-${day}`,
           },
         ],
       },
@@ -314,14 +320,14 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
     token: second.token,
     body: {
       title: "친구의 비밀 일정",
-      startDate: "2026-09-10",
-      endDate: "2026-09-10",
+      startDate: `${month}-10`,
+      endDate: `${month}-10`,
     },
   });
 
   const unauthorized = await req(
     "GET",
-    `/friends/calendar?friendIds=${second.data.user.id}&month=2026-09`,
+    `/friends/calendar?friendIds=${second.data.user.id}&month=${month}`,
     { token: first.token },
   );
   assert.equal(unauthorized.status, 403);
@@ -330,7 +336,7 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
 
   const calendar = await req(
     "GET",
-    `/friends/calendar?friendIds=${second.data.user.id}&month=2026-09`,
+    `/friends/calendar?friendIds=${second.data.user.id}&month=${month}`,
     { token: first.token },
   );
   assert.equal(calendar.status, 200, JSON.stringify(calendar.data));
@@ -352,7 +358,7 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
   const arbitrary = await signup();
   const rejected = await req(
     "GET",
-    `/friends/calendar?friendIds=${second.data.user.id},${arbitrary.data.user.id}&month=2026-09`,
+    `/friends/calendar?friendIds=${second.data.user.id},${arbitrary.data.user.id}&month=${month}`,
     { token: first.token },
   );
   assert.equal(rejected.status, 403);
@@ -374,7 +380,7 @@ test("친구 달력은 수락·상태·필드 최소화·차단 권한을 서버
     (
       await req(
         "GET",
-        `/friends/calendar?friendIds=${second.data.user.id}&month=2026-09`,
+        `/friends/calendar?friendIds=${second.data.user.id}&month=${month}`,
         { token: first.token },
       )
     ).status,
