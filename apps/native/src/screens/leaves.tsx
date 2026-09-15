@@ -17,6 +17,11 @@
  */
 
 import { fmtRange } from "@leave/shared/calendar";
+import {
+  LEAVE_KIND_LABELS,
+  LEAVE_KINDS,
+  type LeaveKind,
+} from "@leave/shared/leave";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -31,7 +36,7 @@ import {
 import type { MyLeave } from "@leave/client";
 import {
   nextLeaveCountdowns,
-  partitionMyLeaves,
+  partitionMyLeavesByKind,
   summarizeHoldings,
   useDeleteLeave,
   useLeaveBalances,
@@ -44,6 +49,7 @@ import { ContentPanel } from "@/components/content-panel";
 import { LeaveStatusControl } from "@/components/leave-status-control";
 import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { NextLeaveCard } from "@/components/next-leave-card";
+import { NativeSegmentedControl } from "@/components/segmented-control";
 import { SegmentBadges } from "@/components/segment-badges";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
@@ -95,13 +101,18 @@ export function LeavesScreen() {
   );
 
   const myLeaves = leaves.data?.leaves ?? [];
-  const sections = partitionMyLeaves(leaves.data?.leaves);
+  // 탭은 화면 안의 사적인 필터다 — 선택한 휴가와 마찬가지로 라우트로 만들지 않는다.
+  const [kind, setKind] = useState<LeaveKind>("leave");
+  const byKind = partitionMyLeavesByKind(leaves.data?.leaves);
+  const sections = byKind[kind];
+  const kindTotal = byKind[kind].upcoming.length + byKind[kind].past.length;
   // 휴가와 외출을 따로 센다. 셀 것이 없는 쪽 카드는 그리지 않는다.
   const { leave: nextLeave, outing: nextOuting } = nextLeaveCountdowns(
     leaves.data?.leaves,
     new Date(now),
   );
-  // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다.
+  // 선택해 둔 휴가가 사라졌으면(삭제·기간 변경) 선택도 함께 비운다. 갈래로 거르지
+  // 않은 myLeaves에서 찾으므로 탭을 바꿔도 상세 열은 그대로 남는다 — 의도다.
   const selectedLeave =
     myLeaves.find((leave) => leave.id === selectedLeaveId) ?? null;
 
@@ -295,22 +306,43 @@ export function LeavesScreen() {
         </ContentPanel>
       ) : (
         <>
-          {sections.upcoming.length > 0 ? (
-            <ContentPanel style={styles.leaveList}>
-              <Text style={styles.sectionTitle} selectable>
-                다가오는 휴가 {sections.upcoming.length}건
+          <NativeSegmentedControl
+            values={LEAVE_KINDS}
+            labels={LEAVE_KIND_LABELS}
+            value={kind}
+            onValueChange={setKind}
+            testID="my-leaves-kind"
+          />
+          {kindTotal === 0 ? (
+            <ContentPanel style={styles.empty}>
+              <Text style={styles.emptyTitle}>
+                등록한 {LEAVE_KIND_LABELS[kind]} 기록이 없어요
               </Text>
-              {sections.upcoming.map(renderLeaveRow)}
-            </ContentPanel>
-          ) : null}
-          {sections.past.length > 0 ? (
-            <ContentPanel style={styles.leaveList}>
-              <Text style={styles.sectionTitle} selectable>
-                지난 휴가 {sections.past.length}건
+              <Text style={styles.emptyCaption}>
+                다른 탭에서 나머지 출타를 볼 수 있어요.
               </Text>
-              {sections.past.map(renderLeaveRow)}
             </ContentPanel>
-          ) : null}
+          ) : (
+            <>
+              {sections.upcoming.length > 0 ? (
+                <ContentPanel style={styles.leaveList}>
+                  <Text style={styles.sectionTitle} selectable>
+                    다가오는 {LEAVE_KIND_LABELS[kind]}{" "}
+                    {sections.upcoming.length}건
+                  </Text>
+                  {sections.upcoming.map(renderLeaveRow)}
+                </ContentPanel>
+              ) : null}
+              {sections.past.length > 0 ? (
+                <ContentPanel style={styles.leaveList}>
+                  <Text style={styles.sectionTitle} selectable>
+                    지난 {LEAVE_KIND_LABELS[kind]} {sections.past.length}건
+                  </Text>
+                  {sections.past.map(renderLeaveRow)}
+                </ContentPanel>
+              ) : null}
+            </>
+          )}
         </>
       )}
     </View>

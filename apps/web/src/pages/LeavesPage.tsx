@@ -1,20 +1,24 @@
 /**
  * 내 휴가 목록 화면.
- * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약을 함께 보여준다.
+ * 휴가/외출 탭으로 갈래를 고르고, 그 안에서 다가오는 일정과 지난 일정을 나눈다.
+ * 재원별 잔여 요약도 함께 보여준다.
  */
 
 import {
   BALANCE_LABELS,
   fmtRange,
   fmtRangeTiny,
+  LEAVE_KIND_LABELS,
+  LEAVE_KINDS,
   segmentBalanceKey,
   todayInSeoul,
+  type LeaveKind,
 } from "@leave/shared";
 import { memo, useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import type { MyLeave } from "@leave/client";
 import {
-  partitionMyLeaves,
+  partitionMyLeavesByKind,
   summarizeHoldings,
   useDeleteLeave,
   useLeaveBalances,
@@ -55,10 +59,16 @@ export function LeavesPage() {
       item.expiredDays > 0,
   );
 
-  const sections = useMemo(
-    () => partitionMyLeaves(leaves.data?.leaves, today),
+  // 탭은 화면 안의 사적인 필터다 — 주소로 만들지 않는다. 달력이 search param을
+  // 쓰는 것은 그쪽이 딥링크되는 화면이기 때문이고, 여기는 그럴 이유가 없다.
+  const [kind, setKind] = useState<LeaveKind>("leave");
+  const byKind = useMemo(
+    () => partitionMyLeavesByKind(leaves.data?.leaves, today),
     [leaves.data?.leaves, today],
   );
+  const sections = byKind[kind];
+  const kindTotal = (value: LeaveKind) =>
+    byKind[value].upcoming.length + byKind[value].past.length;
   const onDelete = useCallback(
     (leave: MyLeave) => {
       if (confirm(`"${leave.title}" 휴가를 삭제할까요?`)) {
@@ -209,22 +219,70 @@ export function LeavesPage() {
             gap: "var(--sp-xl)",
           }}
         >
-          <LeaveSection
-            id="upcoming-leaves"
-            title="다가오는 휴가"
-            leaves={sections.upcoming}
-            deleting={deleting}
-            onEdit={setEditing}
-            onDelete={onDelete}
-          />
-          <LeaveSection
-            id="past-leaves"
-            title="지난 휴가"
-            leaves={sections.past}
-            deleting={deleting}
-            onEdit={setEditing}
-            onDelete={onDelete}
-          />
+          {/* 건수를 라벨에 함께 적는다 — 빈 탭이라는 것을 누르기 전에 알 수 있다. */}
+          <div className="segmented-toggle" role="group" aria-label="출타 종류">
+            {LEAVE_KINDS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                className="segmented-toggle__option"
+                aria-pressed={value === kind}
+                aria-controls="my-leave-sections"
+                onClick={() => setKind(value)}
+              >
+                {LEAVE_KIND_LABELS[value]} {kindTotal(value)}
+              </button>
+            ))}
+          </div>
+
+          <div
+            id="my-leave-sections"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-xl)",
+            }}
+          >
+            {kindTotal(kind) === 0 ? (
+              <div
+                className="card-sage"
+                style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
+              >
+                <p className="body-lg strong">
+                  등록한 {LEAVE_KIND_LABELS[kind]} 기록이 없어요
+                </p>
+                <p
+                  className="body-sm text-body"
+                  style={{ marginTop: "var(--sp-sm)" }}
+                >
+                  다른 탭에서 나머지 출타를 볼 수 있어요.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* 탭을 바꾸면 "더 보기"로 펼쳐 둔 몫도 처음으로 돌아가야 한다.
+                    key로 다시 마운트하는 편이 effect로 되돌리는 것보다 낫다. */}
+                <LeaveSection
+                  key={`${kind}-upcoming`}
+                  id="upcoming-leaves"
+                  title={`다가오는 ${LEAVE_KIND_LABELS[kind]}`}
+                  leaves={sections.upcoming}
+                  deleting={deleting}
+                  onEdit={setEditing}
+                  onDelete={onDelete}
+                />
+                <LeaveSection
+                  key={`${kind}-past`}
+                  id="past-leaves"
+                  title={`지난 ${LEAVE_KIND_LABELS[kind]}`}
+                  leaves={sections.past}
+                  deleting={deleting}
+                  onEdit={setEditing}
+                  onDelete={onDelete}
+                />
+              </>
+            )}
+          </div>
         </div>
       )}
 

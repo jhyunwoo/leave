@@ -2,6 +2,13 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { handleSafe } from "./helpers";
 
 const SECTION_SIZE = 200;
+
+/** 오늘(KST) 기준 n일 뒤의 달력 날짜. 고정 날짜 fixture는 그 날이 지나면 뜻이 뒤집힌다. */
+function isoDaysFromToday(days: number): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000 + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
 const INITIAL_VISIBLE_PER_SECTION = 20;
 
 async function createAccount(request: APIRequestContext): Promise<string> {
@@ -100,11 +107,74 @@ test("400건 목록은 섹션별로 점진 렌더링한다", async ({ page, requ
   );
 });
 
+/**
+ * 휴가/외출 탭.
+ *
+ * 외출은 당일 복귀라 세는 단위부터 다르다 — 한 목록에 쌓이면 "다음에 언제 나가는가"가
+ * 묻힌다. 여기서 확인하는 것은 셋이다: 고른 갈래만 보이는가, 빈 갈래가 고장처럼
+ * 보이지 않는가, 탭을 오가도 "더 보기"로 펼친 몫이 처음으로 돌아가는가.
+ */
+test("휴가/외출 탭은 목록을 갈래로 가르고 펼친 몫을 되돌린다", async ({
+  page,
+  request,
+}) => {
+  const token = await createAccount(request);
+  const upcoming = Array.from({ length: SECTION_SIZE }, (_, index) =>
+    fakeLeave(`upcoming-${index}`, "2027-01-01"),
+  );
+  const past = Array.from({ length: SECTION_SIZE }, (_, index) =>
+    fakeLeave(`past-${index}`, "2026-01-01"),
+  );
+
+  await page.route("**/leaves/mine", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "http://localhost:5173" },
+      body: JSON.stringify({ leaves: [...upcoming, ...past] }),
+    }),
+  );
+  await page.addInitScript((value) => {
+    localStorage.setItem("leave.token", value);
+  }, token);
+  await page.goto("/leaves");
+
+  const tabs = page.getByRole("group", { name: "출타 종류" });
+  const leaveTab = tabs.getByRole("button", { name: "휴가 400" });
+  const outingTab = tabs.getByRole("button", { name: "외출 0" });
+  await expect(leaveTab).toHaveAttribute("aria-pressed", "true");
+
+  // 지난 몫을 한 번 더 펼쳐 둔다 — 탭을 오간 뒤 이 상태가 남으면 안 된다.
+  const pastMore = page.locator('button[aria-controls="past-leaves"]');
+  await pastMore.click();
+  await expect(page.locator(".content-row")).toHaveCount(
+    INITIAL_VISIBLE_PER_SECTION * 3,
+  );
+
+  // 외출이 하나도 없어도 화면이 비어 고장처럼 보이면 안 된다.
+  await outingTab.click();
+  await expect(outingTab).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".content-row")).toHaveCount(0);
+  await expect(page.getByText("등록한 외출 기록이 없어요")).toBeVisible();
+
+  await leaveTab.click();
+  await expect(page.locator(".content-row")).toHaveCount(
+    INITIAL_VISIBLE_PER_SECTION * 2,
+  );
+  await expect(pastMore).toHaveAccessibleName(
+    "지난 휴가 20건 더 보기 · 180건 남음",
+  );
+});
+
 test("내 휴가 목록에서 진행 상태를 바로 바꾸고 새로고침 후에도 유지한다", async ({
   page,
   request,
 }) => {
   const token = await createAccount(request);
+  // 빠른 상태 변경은 복귀 전 휴가에서만 뜬다 — 복귀일이 지나면 서버가 "복귀 완료"로
+  // 내려주고 컨트롤 자리에는 안내 문구가 들어간다. 고정 날짜를 쓰면 그 날이 지나는
+  // 순간 이 테스트가 조용히 다른 것을 확인하게 된다.
+  const start = isoDaysFromToday(10);
+  const end = isoDaysFromToday(12);
   const created = await request.post("http://localhost:8787/leaves", {
     headers: { Authorization: `Bearer ${token}` },
     data: {
@@ -113,8 +183,8 @@ test("내 휴가 목록에서 진행 상태를 바로 바꾸고 새로고침 후
       segments: [
         {
           category: "annual",
-          startDate: "2026-09-01",
-          endDate: "2026-09-03",
+          startDate: start,
+          endDate: end,
         },
       ],
     },
