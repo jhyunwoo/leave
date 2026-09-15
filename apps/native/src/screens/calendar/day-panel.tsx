@@ -195,6 +195,7 @@ export function DayPanel(props: {
       <View style={styles.actions}>
         <View style={styles.addRow}>
           <Button
+            icon="calendarAdd"
             title="휴가 등록"
             onPress={props.onAddLeave}
             flexible
@@ -202,6 +203,7 @@ export function DayPanel(props: {
           />
           {props.onAddPersonalEvent ? (
             <Button
+              icon="calendarAdd"
               title="개인 일정"
               variant="secondary"
               onPress={props.onAddPersonalEvent}
@@ -211,6 +213,7 @@ export function DayPanel(props: {
           ) : null}
           {props.onAddUnitEvent ? (
             <Button
+              icon="calendarAdd"
               title="부대 일정"
               variant="secondary"
               onPress={props.onAddUnitEvent}
@@ -224,6 +227,7 @@ export function DayPanel(props: {
           <>
             <View style={styles.actionsDivider} />
             <Button
+              icon="calendar"
               title="개인 일정 전체 보기"
               variant="ghost"
               onPress={props.onOpenPersonalEvents}
@@ -413,13 +417,9 @@ const useStyles = makeStyles(({ colors }) => ({
    * 가로 간격에는 `ACTION_GAP` 보정을 쓰지 않는다 — 그 보정은 iOS 버튼이 자기
    * 상자보다 **세로로** 크게 그려지는 문제를 메우는 값이라 여기서는 뜻이 없다.
    */
-  addRow: { flexDirection: "row", gap: spacing.sm },
-  /**
-   * 폭은 부모가 나눠 준다. 그래서 `flexible`을 함께 넘겨 라벨 폭 어림값을 끈다 —
-   * `button.ios.tsx`가 깔아 주는 `minWidth`는 Yoga에서 부모 폭을 이기므로,
-   * 5자짜리 라벨 셋(어림 111pt)이 좁은 화면의 카드 폭을 넘겨 밖으로 밀린다.
-   */
-  addRowItem: { flex: 1, minWidth: 0 },
+  addRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  // 아이콘과 라벨이 함께 들어갈 폭을 확보하고 좁은 화면에서는 다음 줄로 보낸다.
+  addRowItem: { flexGrow: 1, flexBasis: 130, minWidth: 130 },
   /** 아래 링크는 생성이 아니라 이동이다. 구분선이 그 차이를 말해 준다. */
   actionsDivider: {
     height: StyleSheet.hairlineWidth,

@@ -116,6 +116,7 @@ export function LeaveGrantModal(props: {
           closeTestID="leave-grant-close"
           footer={
             <Button
+              icon={editing ? "save" : "plus"}
               title={editing ? "적립분 수정" : "적립분 추가"}
               loading={pending}
               onPress={() => void submit()}

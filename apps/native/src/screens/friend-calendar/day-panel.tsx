@@ -111,6 +111,7 @@ export function FriendDayPanel(props: {
             <Text style={styles.sectionCaption}>나만 볼 수 있어요</Text>
           </View>
           <Button
+            icon="plus"
             title="추가"
             variant="secondary"
             size="sm"

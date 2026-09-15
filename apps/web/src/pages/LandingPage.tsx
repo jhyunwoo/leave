@@ -13,6 +13,8 @@
  * `components/LeaveLimitFields.tsx`). 공식성·소속을 암시하는 표현도 쓰지 않는다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { BrandLockup } from "../components/BrandLockup";
@@ -330,6 +332,7 @@ export function LandingPage() {
                   무료로 시작하기
                 </Link>
                 <Link to="/login" className="lp-btn lp-btn--ghost lp-btn--lg">
+                  <ActionIcon name="login" />
                   로그인
                 </Link>
               </div>
@@ -525,6 +528,7 @@ export function LandingPage() {
                   무료로 시작하기
                 </Link>
                 <Link to="/login" className="lp-btn lp-btn--ghost lp-btn--lg">
+                  <ActionIcon name="login" />
                   로그인
                 </Link>
               </div>

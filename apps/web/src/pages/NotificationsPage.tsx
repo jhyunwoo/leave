@@ -2,6 +2,8 @@
  * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useState, type KeyboardEvent } from "react";
 import { FriendLeaveNotificationModal } from "../components/FriendLeaveNotificationModal";
 import { Link, useNavigate } from "react-router";
@@ -94,6 +96,7 @@ export function NotificationsPage() {
         remove(notification);
       }}
     >
+      <ActionIcon name="trash" />
       삭제
     </button>
   );
@@ -183,6 +186,7 @@ export function NotificationsPage() {
               disabled={markRead.isPending}
               onClick={() => void markRead.mutateAsync()}
             >
+              <ActionIcon name="check" />
               모두 읽음
             </button>
           )}

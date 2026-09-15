@@ -17,6 +17,7 @@ import {
   UserPlus,
   Users,
   Zap,
+  FileClock,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { formatDateTime } from "../lib/format";
@@ -179,6 +180,7 @@ export function OverviewPage() {
                 type="button"
                 onClick={() => void navigate("/access-logs")}
               >
+                <FileClock size={17} aria-hidden="true" />
                 전체 로그 보기
               </button>
             </div>

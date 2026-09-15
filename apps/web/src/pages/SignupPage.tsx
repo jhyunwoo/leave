@@ -4,6 +4,8 @@
  * (@leave/shared의 rank 규칙). 사용자는 그 값을 확인만 하면 된다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { signupSchema } from "@leave/shared";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
@@ -193,6 +195,7 @@ export function SignupPage() {
           disabled={signup.isPending || !canSubmit}
           data-testid="signup-next"
         >
+          <ActionIcon name="userAdd" />
           {signup.isPending ? "가입 중…" : "가입하고 시작"}
         </button>
 

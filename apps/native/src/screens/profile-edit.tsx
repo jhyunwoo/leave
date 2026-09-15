@@ -155,12 +155,14 @@ export function ProfileEditScreen() {
               있습니다.
             </Text>
             <Button
+              icon="key"
               title="비밀번호 변경"
               variant="secondary"
               onPress={() => setChangingPassword(true)}
               testID="change-password"
             />
             <Button
+              icon="key"
               title="패스키 관리"
               variant="secondary"
               onPress={() => setManagingPasskeys(true)}
@@ -169,6 +171,7 @@ export function ProfileEditScreen() {
             />
             <LegalLinks />
             <Button
+              icon="trash"
               title={
                 deleteAccount.isPending ? "삭제 중…" : "계정과 데이터 삭제"
               }
@@ -247,6 +250,7 @@ function UsernameCard(props: { username: string | null }) {
             testID="profile-username-input"
           />
           <Button
+            icon="save"
             title="저장"
             disabled={!draft.valid}
             loading={setUsername.isPending}
@@ -266,6 +270,7 @@ function UsernameCard(props: { username: string | null }) {
       ) : (
         <>
           <Button
+            icon="edit"
             title="사용자 이름 바꾸기"
             variant="secondary"
             onPress={() => setEditing(true)}
@@ -445,6 +450,7 @@ function EditProfileCard(props: { user: Me["user"] }) {
         </Text>
       ) : null}
       <Button
+        icon="save"
         title="저장"
         loading={update.isPending}
         onPress={() => void submit()}
@@ -511,6 +517,7 @@ function PasskeySheet(props: { onClose: () => void }) {
                 {new Date(passkey.createdAt).toLocaleDateString("ko-KR")} 등록
               </Text>
               <Button
+                icon="trash"
                 title="삭제"
                 variant="danger"
                 onPress={() => void deleteOne(passkey.id)}
@@ -536,6 +543,7 @@ function PasskeySheet(props: { onClose: () => void }) {
             </Text>
           ) : null}
           <Button
+            icon="key"
             title={register.isPending ? "등록 중…" : "이 기기에 패스키 등록"}
             onPress={() => void add()}
             disabled={!name.trim() || !currentPassword}
@@ -596,6 +604,7 @@ function ChangePasswordSheet(props: { onClose: () => void }) {
           closeTestID="change-password-close"
           footer={
             <Button
+              icon="key"
               title="비밀번호 변경"
               loading={change.isPending}
               onPress={() => void submit()}

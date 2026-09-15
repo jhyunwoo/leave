@@ -124,6 +124,7 @@ export function LoginScreen() {
           </Field>
           {error && <Text style={styles.error}>{error}</Text>}
           <Button
+            icon="login"
             title={login.isPending ? "로그인 중…" : "로그인"}
             onPress={() => void submit()}
             disabled={!email || !password}
@@ -132,6 +133,7 @@ export function LoginScreen() {
           />
           {passkeysSupported ? (
             <Button
+              icon="key"
               title={
                 passkeyLogin.isPending ? "패스키 확인 중…" : "패스키로 로그인"
               }

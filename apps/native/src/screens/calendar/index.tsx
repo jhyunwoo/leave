@@ -295,6 +295,7 @@ export function CalendarScreen() {
             서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해주세요.
           </Text>
           <Button
+            icon="refresh"
             title="다시 시도"
             onPress={() => {
               void me.refetch();

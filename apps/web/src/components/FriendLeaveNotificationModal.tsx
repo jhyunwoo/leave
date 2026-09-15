@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import {
   useNotificationLeaveDetails,
   type FriendLeaveNotification,
@@ -30,6 +31,7 @@ export function FriendLeaveNotificationModal(props: {
             disabled={!detail.canPrevious}
             onClick={detail.previous}
           >
+            <ActionIcon name="left" />
             이전
           </button>
           <strong>{detail.date}</strong>
@@ -39,6 +41,7 @@ export function FriendLeaveNotificationModal(props: {
             disabled={!detail.canNext}
             onClick={detail.next}
           >
+            <ActionIcon name="right" />
             다음
           </button>
         </div>
@@ -51,6 +54,7 @@ export function FriendLeaveNotificationModal(props: {
               className="btn btn-secondary"
               onClick={() => void detail.retry()}
             >
+              <ActionIcon name="refresh" />
               다시 시도
             </button>
           </div>

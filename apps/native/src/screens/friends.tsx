@@ -136,6 +136,7 @@ export function FriendsScreen() {
         actions={[
           {
             id: "my-profile",
+            icon: "users" as const,
             title: "내 프로필",
             onPress: openMyProfile,
             disabled: !myUsername,
@@ -143,6 +144,7 @@ export function FriendsScreen() {
           },
           {
             id: "add-friend",
+            icon: "userAdd" as const,
             title: "친구 찾기",
             variant: "primary",
             onPress: openAdd,
@@ -176,12 +178,14 @@ export function FriendsScreen() {
               </Pressable>
               <View style={styles.actions}>
                 <Button
+                  icon="check"
                   title="수락"
                   size="sm"
                   disabled={pending}
                   onPress={() => void run(accept.mutateAsync(request.userId))}
                 />
                 <Button
+                  icon="close"
                   title="거절"
                   size="sm"
                   variant="secondary"
@@ -254,6 +258,7 @@ export function FriendsScreen() {
                   </View>
                 </Pressable>
                 <Button
+                  icon="userRemove"
                   title="삭제"
                   size="sm"
                   variant="danger"
@@ -270,6 +275,7 @@ export function FriendsScreen() {
               여기에서 달력을 함께 볼 수 있어요.
             </Text>
             <Button
+              icon="userAdd"
               title="친구 추가"
               onPress={openAdd}
               testID="friends-empty-add"
@@ -283,6 +289,7 @@ export function FriendsScreen() {
         ) : null}
         {friends.data?.friends.length ? (
           <Button
+            icon="calendar"
             title="선택한 친구와 달력 보기"
             disabled={selected.length === 0}
             onPress={compare}
@@ -297,6 +304,7 @@ export function FriendsScreen() {
             상대가 수락하면 내 친구 목록에 들어와요.
           </Text>
           <Button
+            icon="users"
             title="보낸 요청 보기"
             variant="secondary"
             onPress={openAdd}

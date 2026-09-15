@@ -7,6 +7,8 @@
  * 찾는다 — 애초에 공개하려고 만든 식별자다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   useAcceptFriendRequest,
   useCancelFriendRequest,
@@ -271,6 +273,7 @@ export function FriendsPage(props: { me: Me }) {
                     )
                   }
                 >
+                  <ActionIcon name="check" />
                   수락
                 </button>
                 <button
@@ -283,6 +286,7 @@ export function FriendsPage(props: { me: Me }) {
                     )
                   }
                 >
+                  <ActionIcon name="close" />
                   거절
                 </button>
               </div>
@@ -352,6 +356,7 @@ export function FriendsPage(props: { me: Me }) {
                   void navigate(`/?mode=friends&friends=${selected.join(",")}`)
                 }
               >
+                <ActionIcon name="calendar" />
                 선택한 친구와 달력 보기
               </button>
             </div>
@@ -392,6 +397,7 @@ export function FriendsPage(props: { me: Me }) {
                         void navigate(`/?mode=friends&friends=${friend.userId}`)
                       }
                     >
+                      <ActionIcon name="calendar" />
                       비교
                     </button>
                     <button
@@ -409,6 +415,7 @@ export function FriendsPage(props: { me: Me }) {
                           );
                       }}
                     >
+                      <ActionIcon name="userRemove" />
                       삭제
                     </button>
                   </div>

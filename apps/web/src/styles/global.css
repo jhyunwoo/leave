@@ -1052,3 +1052,9 @@ a.friend-row:hover,
 a.friend-row:focus-visible {
   border-color: var(--primary-active);
 }
+
+/* Keep action pictograms legible in compact button rows. */
+.action-icon {
+  flex: 0 0 auto;
+  vertical-align: middle;
+}

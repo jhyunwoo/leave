@@ -204,6 +204,7 @@ function OutingKindFields(props: { branch: Branch; fund: OutingFund }) {
       )}
 
       <Button
+        icon="save"
         title={`${label} 설정 저장`}
         variant="tertiary"
         loading={update.isPending}

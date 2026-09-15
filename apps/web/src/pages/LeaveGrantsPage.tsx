@@ -5,6 +5,8 @@
  * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { fmtRangeTiny, type BalanceKey } from "@leave/shared";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -182,11 +184,13 @@ export function LeaveGrantsPage(props: { me: Me }) {
             {empty.map((fund) => (
               <button
                 key={fund.key}
+                aria-label={`${fund.label} 추가`}
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setEditing({ newKey: fund.key })}
               >
-                + {fund.label}
+                <ActionIcon name="plus" />
+                {fund.label}
               </button>
             ))}
           </div>
@@ -282,7 +286,8 @@ function FundCard(props: {
         className="btn btn-tertiary btn-sm"
         onClick={props.onAdd}
       >
-        + 적립분 추가
+        <ActionIcon name="plus" />
+        적립분 추가
       </button>
     </section>
   );
@@ -356,6 +361,7 @@ function GrantRow(props: {
           className="btn btn-secondary btn-sm"
           onClick={props.onEdit}
         >
+          <ActionIcon name="edit" />
           수정
         </button>
         <button
@@ -363,6 +369,7 @@ function GrantRow(props: {
           className="btn btn-danger btn-sm"
           onClick={props.onDelete}
         >
+          <ActionIcon name="trash" />
           삭제
         </button>
       </div>

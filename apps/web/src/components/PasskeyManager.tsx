@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { useState } from "react";
 import {
   useDeletePasskey,
@@ -77,6 +78,7 @@ export function PasskeyManager() {
             disabled={remove.isPending}
             onClick={() => void deleteOne(passkey.id)}
           >
+            <ActionIcon name="trash" />
             삭제
           </button>
         </div>
@@ -108,6 +110,7 @@ export function PasskeyManager() {
             disabled={!name.trim() || !password || register.isPending}
             onClick={() => void add()}
           >
+            <ActionIcon name="key" />
             {register.isPending ? "등록 중…" : "이 기기에 패스키 등록"}
           </button>
         </>

@@ -98,6 +98,7 @@ export function ProfileScreen() {
               actions={[
                 {
                   id: "logout",
+                  icon: "logout" as const,
                   title: "로그아웃",
                   variant: "danger",
                   disabled: logout.isPending,
@@ -154,6 +155,7 @@ export function ProfileScreen() {
               />
             </View>
             <Button
+              icon="edit"
               title="내 정보 수정"
               variant="secondary"
               onPress={() => router.push("/(tabs)/profile/edit")}
@@ -194,6 +196,7 @@ export function ProfileScreen() {
           <ContentPanel style={styles.card}>
             <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
             <Button
+              icon="users"
               title="그룹 참여·관리"
               variant="secondary"
               onPress={() => router.push("/units")}
@@ -216,6 +219,7 @@ export function ProfileScreen() {
             있어요. 어떤 지표를 보여줄지 여기서 고릅니다.
           </Text>
           <Button
+            icon="settings"
             title="위젯 설정"
             variant="secondary"
             onPress={() => router.push("/widget-settings")}

@@ -3,6 +3,8 @@
  * 구간별 재원과 기간, 그 기간의 그룹 출타 현황을 함께 보여주고 수정·삭제를 제공한다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   availabilitySignal,
   BALANCE_LABELS,
@@ -199,6 +201,7 @@ export function LeaveDetailPage(props: { me: Me }) {
             onFocus={preloadLeaveFormModal}
             onClick={() => setEditing(true)}
           >
+            <ActionIcon name="edit" />
             수정
           </button>
           <button
@@ -214,6 +217,7 @@ export function LeaveDetailPage(props: { me: Me }) {
               );
             }}
           >
+            <ActionIcon name="trash" />
             삭제
           </button>
         </div>

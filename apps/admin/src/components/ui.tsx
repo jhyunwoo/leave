@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Search,
   X,
+  ShieldAlert,
 } from "lucide-react";
 import {
   createContext,
@@ -446,7 +447,13 @@ function ConfirmDialogBody({
             disabled={disabled}
             onClick={onConfirm}
           >
-            {pending ? <LoaderCircle className="spin" size={17} /> : null}
+            {pending ? (
+              <LoaderCircle className="spin" size={17} aria-hidden="true" />
+            ) : destructive ? (
+              <ShieldAlert size={17} aria-hidden="true" />
+            ) : (
+              <Check size={17} aria-hidden="true" />
+            )}
             {confirmLabel}
           </button>
         </div>

@@ -11,6 +11,8 @@
  * 달력을 빨갛게 물들이므로 기간 위에 남겨 먼저 읽히게 한다.
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import { unitEventCreateSchema } from "@leave/shared";
 import {
   useCreateUnitEvent,
@@ -243,6 +245,7 @@ export function UnitEventModal(props: {
                     );
               }}
             >
+              <ActionIcon name="trash" />
               삭제
             </button>
           ) : null}
@@ -260,6 +263,7 @@ export function UnitEventModal(props: {
             disabled={pending}
             data-testid="unit-event-save"
           >
+            <ActionIcon name="save" />
             {pending ? "저장 중…" : "저장"}
           </button>
         </div>

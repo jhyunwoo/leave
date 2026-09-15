@@ -7,6 +7,8 @@
  * `useLeaveForm`에 있고, 이 파일은 그 결과를 HTML로 그리기만 한다. 같은 규칙을
  * 네이티브 앱도 쓴다(apps/native/src/components/leave-form-modal.tsx).
  */
+
+import { ActionIcon } from "./ActionIcon";
 import { useLeaveForm, type LeaveResult, type MyLeave } from "@leave/client";
 import {
   BALANCE_KEYS,
@@ -336,6 +338,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
                   form.suggestedAddKey && form.addDraft(form.suggestedAddKey)
                 }
               >
+                <ActionIcon name="plus" />
                 구간 추가
               </button>
             </div>
@@ -383,6 +386,7 @@ export function LeaveFormModal(props: LeaveFormModalProps) {
             style={{ flex: 2 }}
             disabled={form.pending || !form.canSubmit}
           >
+            <ActionIcon name="save" />
             {form.pending
               ? "저장 중…"
               : editing

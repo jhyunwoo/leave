@@ -237,6 +237,7 @@ function PersonalEventEditor(props: {
         */}
         <View style={styles.actions}>
           <Button
+            icon="save"
             title="저장"
             loading={pending}
             onPress={() => void save()}
@@ -244,6 +245,7 @@ function PersonalEventEditor(props: {
           />
           {props.existing ? (
             <Button
+              icon="trash"
               title="삭제"
               variant="danger"
               disabled={pending}

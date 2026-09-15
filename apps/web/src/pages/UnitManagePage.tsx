@@ -4,6 +4,8 @@
  * 관리자 이관까지 그룹 운영에 필요한 조작을 한 화면에 모은다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   fmtDateTimeFull,
   blackoutCreateSchema,
@@ -63,7 +65,8 @@ export function UnitManagePage(props: { me: Me }) {
           onClick={() => void navigate("/units")}
           style={{ marginBottom: "var(--sp-sm)" }}
         >
-          ← 공유 그룹
+          <ActionIcon name="left" />
+          공유 그룹
         </button>
         <h1 className="display-md">그룹 관리</h1>
         <p className="body-lg text-body" style={{ marginTop: "var(--sp-sm)" }}>
@@ -230,6 +233,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
         onClick={() => void submit()}
         style={{ alignSelf: "flex-start" }}
       >
+        <ActionIcon name="save" />
         {update.isPending ? "저장 중…" : "변경사항 저장"}
       </button>
     </section>
@@ -286,6 +290,7 @@ function InviteSection({ unit }: { unit: Unit }) {
         onClick={() => void issue()}
         style={{ alignSelf: "flex-start" }}
       >
+        <ActionIcon name="refresh" />
         {rotate.isPending ? "발급 중…" : "새 코드 발급·기존 코드 폐기"}
       </button>
     </section>
@@ -414,6 +419,7 @@ function MembersSection(props: { me: Me; unit: Unit }) {
                       disabled={transfer.isPending}
                       onClick={() => doTransfer(m.id, m.name)}
                     >
+                      <ActionIcon name="users" />
                       관리자 위임
                     </button>
                     <button
@@ -422,6 +428,7 @@ function MembersSection(props: { me: Me; unit: Unit }) {
                       disabled={report.isPending}
                       onClick={() => doReport(m.id, m.name)}
                     >
+                      <ActionIcon name="flag" />
                       신고
                     </button>
                     <button
@@ -430,6 +437,7 @@ function MembersSection(props: { me: Me; unit: Unit }) {
                       disabled={block.isPending}
                       onClick={() => doBlock(m.id, m.name)}
                     >
+                      <ActionIcon name="block" />
                       차단
                     </button>
                     <button
@@ -438,6 +446,7 @@ function MembersSection(props: { me: Me; unit: Unit }) {
                       disabled={remove.isPending}
                       onClick={() => doRemove(m.id, m.name)}
                     >
+                      <ActionIcon name="userRemove" />
                       내보내기
                     </button>
                   </div>
@@ -539,6 +548,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
         onClick={() => void submit()}
         style={{ alignSelf: "flex-start" }}
       >
+        <ActionIcon name="calendarAdd" />
         {create.isPending ? "등록 중…" : "제한 기간 등록"}
       </button>
 
@@ -575,6 +585,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
                 disabled={remove.isPending}
                 onClick={() => void remove.mutateAsync(b.id)}
               >
+                <ActionIcon name="trash" />
                 삭제
               </button>
             </li>
@@ -653,6 +664,7 @@ function ReportSection({ unit }: { unit: Unit }) {
         onClick={() => void submit()}
         style={{ alignSelf: "flex-start" }}
       >
+        <ActionIcon name="flag" />
         {report.isPending ? "접수 중…" : "신고하기"}
       </button>
     </section>

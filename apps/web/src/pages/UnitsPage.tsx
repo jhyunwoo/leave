@@ -5,6 +5,8 @@
  * 되기 때문이다. 초대코드로만 들어올 수 있고, 새로 만들면 코드가 한 번 노출된다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   LEGACY_INVITE_CODE_MIN_LENGTH,
   unitCreateSchema,
@@ -145,6 +147,7 @@ export function UnitsPage(props: { me: Me }) {
               className="btn btn-primary btn-sm"
               onClick={() => void navigate("/")}
             >
+              <ActionIcon name="calendar" />
               달력 보기
             </button>
             {isAdmin && (
@@ -153,6 +156,7 @@ export function UnitsPage(props: { me: Me }) {
                 className="btn btn-secondary btn-sm"
                 onClick={() => void navigate("/units/manage")}
               >
+                <ActionIcon name="users" />
                 그룹 관리·초대
               </button>
             )}
@@ -162,6 +166,7 @@ export function UnitsPage(props: { me: Me }) {
               disabled={leaveUnit.isPending}
               onClick={() => void doLeave()}
             >
+              <ActionIcon name="logout" />
               그룹 나가기
             </button>
           </div>
@@ -203,6 +208,7 @@ export function UnitsPage(props: { me: Me }) {
               onClick={() => void doJoin()}
               data-testid="unit-join-submit"
             >
+              <ActionIcon name="users" />
               {join.isPending ? "확인 중…" : "그룹 참여"}
             </button>
           </div>
@@ -226,7 +232,7 @@ export function UnitsPage(props: { me: Me }) {
               onClick={() => setCreateOpen(true)}
               data-testid="create-unit-open"
             >
-              새 공유 그룹 만들기
+              <ActionIcon name="plus" />새 공유 그룹 만들기
             </button>
           </div>
         </>
@@ -367,6 +373,7 @@ function CreateUnitModal(props: {
           disabled={create.isPending}
           data-testid="create-unit-submit"
         >
+          <ActionIcon name="plus" />
           {create.isPending ? "만드는 중…" : "그룹 만들기"}
         </button>
       </form>

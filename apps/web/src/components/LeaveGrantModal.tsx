@@ -3,6 +3,8 @@
  * 사용처: 보유 휴가 화면(LeaveGrantsPage).
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
@@ -179,6 +181,7 @@ export function LeaveGrantModal(props: {
             onClick={() => void submit()}
             style={{ flex: 1 }}
           >
+            <ActionIcon name={editing ? "save" : "plus"} />
             {pending ? "저장 중…" : editing ? "수정" : "추가"}
           </button>
           <button

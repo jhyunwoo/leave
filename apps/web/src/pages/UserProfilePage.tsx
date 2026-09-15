@@ -13,6 +13,8 @@
  * 휴가가 없다"는 잘못된 정보가 된다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   useAcceptFriendRequest,
   useCancelFriendRequest,
@@ -78,6 +80,7 @@ function ShareProfile(props: { username: string }) {
         onClick={() => void share()}
         data-testid="profile-share"
       >
+        <ActionIcon name="share" />
         프로필 링크 공유
       </button>
       <p className="caption text-mute" role="status" aria-live="polite">
@@ -125,7 +128,7 @@ function SharedSchedule(props: { userId: string }) {
             void navigate(`/?mode=friends&friends=${props.userId}`)
           }
         >
-          내 달력과 비교
+          <ActionIcon name="calendar" />내 달력과 비교
         </button>
       </div>
       {schedule.isPending ? (
@@ -193,6 +196,7 @@ function RelationshipActions(props: {
       <div style={{ display: "grid", gap: "var(--sp-sm)" }}>
         <p className="text-body">내 프로필이에요.</p>
         <Link to="/profile" className="btn btn-secondary">
+          <ActionIcon name="settings" />
           프로필 관리
         </Link>
         <ShareProfile username={profile.username} />
@@ -213,6 +217,7 @@ function RelationshipActions(props: {
         }
         data-testid="profile-add-friend"
       >
+        <ActionIcon name="userAdd" />
         친구 추가
       </button>
     ),
@@ -229,6 +234,7 @@ function RelationshipActions(props: {
           }
           data-testid="profile-cancel-request"
         >
+          <ActionIcon name="close" />
           요청 취소
         </button>
       </>
@@ -243,6 +249,7 @@ function RelationshipActions(props: {
           }
           data-testid="profile-accept"
         >
+          <ActionIcon name="check" />
           수락
         </button>
         <button
@@ -253,6 +260,7 @@ function RelationshipActions(props: {
           }
           data-testid="profile-decline"
         >
+          <ActionIcon name="close" />
           거절
         </button>
       </>
@@ -272,6 +280,7 @@ function RelationshipActions(props: {
           }}
           data-testid="profile-remove-friend"
         >
+          <ActionIcon name="userRemove" />
           친구 삭제
         </button>
       </>

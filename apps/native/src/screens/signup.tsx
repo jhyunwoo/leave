@@ -171,6 +171,7 @@ export function SignupScreen() {
           ) : null}
 
           <Button
+            icon="userAdd"
             title={signup.isPending ? "가입 중…" : "가입하고 시작"}
             onPress={() => void submit()}
             loading={signup.isPending}

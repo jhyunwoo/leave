@@ -11,11 +11,13 @@
 
 import { View } from "react-native";
 import { makeStyles, spacing } from "@/theme";
+import type { ButtonIcon } from "./button-icons";
 import { Button } from "./button";
 
 export type WebScreenAction = {
   id: string;
   title: string;
+  icon?: ButtonIcon;
   onPress: () => void;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
@@ -31,6 +33,7 @@ export function WebScreenActions(props: { actions: WebScreenAction[] }) {
       {props.actions.map((action) => (
         <Button
           key={action.id}
+          icon={action.icon}
           title={action.title}
           onPress={action.onPress}
           variant={action.variant ?? "secondary"}

@@ -220,7 +220,7 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   await expect(editGrant).toBeHidden();
   await expect(annualFund).toContainText("총 32일");
 
-  await page.getByRole("button", { name: "+ 포상휴가" }).click();
+  await page.getByRole("button", { name: "포상휴가 추가" }).click();
   const addGrant = page.getByRole("dialog", { name: "적립분 추가" });
   await addGrant.getByLabel("일수").fill("5");
   await addGrant.getByRole("button", { name: "추가" }).click();

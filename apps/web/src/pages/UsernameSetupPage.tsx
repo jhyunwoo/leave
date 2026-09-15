@@ -13,6 +13,8 @@
  * 정작 친구 탭은 계속 쓸 수 없다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useSetUsername } from "@leave/client";
 import { useState } from "react";
 import { BrandLockup } from "../components/BrandLockup";
@@ -80,6 +82,7 @@ export function UsernameSetupPage() {
           onClick={() => void submit()}
           data-testid="username-setup-submit"
         >
+          <ActionIcon name="save" />
           {setUsername.isPending ? "저장 중…" : "이 이름으로 시작하기"}
         </button>
       </section>

@@ -13,8 +13,15 @@ import { spacing } from "@/theme";
  * 그대로 쓰면 "8/10 ~ 8/10 · 최고 20%" 같은 긴 라벨이 화면보다 넓은 값을 만들어
  * 버튼이 카드와 화면 밖으로 밀려난다. 화면 폭으로 잘라 그 일을 막는다.
  */
-export function estimateLabelWidth(label: string, windowWidth: number): number {
-  const estimate = Math.max(72, [...label].length * 15 + 36);
+export function estimateLabelWidth(
+  label: string,
+  windowWidth: number,
+  hasIcon = false,
+): number {
+  const estimate = Math.max(
+    72,
+    [...label].length * 15 + 36 + (hasIcon ? 26 : 0),
+  );
   // 가장 바깥 화면 여백(양쪽 spacing.xl)을 뺀 만큼이 실제로 쓸 수 있는 최대 폭이다.
   const usable = Math.max(72, windowWidth - spacing.xl * 2);
   return Math.min(estimate, usable);

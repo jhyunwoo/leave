@@ -4,6 +4,9 @@
  * 라벨 폭 어림 계산이 필요한 이유는 ./button-width.ts 주석 참고.
  */
 
+import { Label } from "@expo/ui/swift-ui";
+import { type ButtonIcon, buttonIcons } from "./button-icons";
+
 import { Button as NativeButton, Host } from "@expo/ui";
 import {
   buttonBorderShape,
@@ -39,6 +42,7 @@ export function Button(props: {
    * 밀린다. 폭이 이미 정해져 있으면 어림값 자체가 필요 없다.
    */
   flexible?: boolean;
+  icon?: ButtonIcon;
   systemImage?: string;
   testID?: string;
 }) {
@@ -59,7 +63,11 @@ export function Button(props: {
         : "계속";
   const minimumLabelWidth = props.flexible
     ? undefined
-    : estimateLabelWidth(label, windowWidth);
+    : estimateLabelWidth(
+        label,
+        windowWidth,
+        Boolean(props.icon && !props.loading),
+      );
   // 주 동작만 채운 캡슐이고 나머지는 전부 `bordered` — 즉 모든 변형이 캡슐을
   // 가진다. 예전에는 ghost가 `text`/`plain`, tertiary가 `plain`이라 배경도
   // 테두리도 없는 글자로 그려졌고, 그 변형만 놓인 자리("닫기", "선택 해제",
@@ -94,7 +102,11 @@ export function Button(props: {
         disabled={disabled}
         modifiers={modifiers}
         testID={props.testID}
-      />
+      >
+        {props.icon && !props.loading ? (
+          <Label title={label} systemImage={buttonIcons[props.icon].symbol} />
+        ) : undefined}
+      </NativeButton>
     </Host>
   );
 }

@@ -24,6 +24,8 @@
  * 일이지 받은 사람의 주소창이 대신 정할 일이 아니다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useJoinUnit, useMe } from "@leave/client";
 import { inviteAppLink, inviteCodeFromUrl } from "@leave/shared";
 import { useAtomValue } from "jotai";
@@ -172,7 +174,7 @@ function AuthedInviteJoin(props: { code: string }) {
           className="btn btn-primary"
           onClick={() => void navigate("/units", { replace: true })}
         >
-          내 그룹 보기
+          <ActionIcon name="users" />내 그룹 보기
         </button>
       </Shell>
     );

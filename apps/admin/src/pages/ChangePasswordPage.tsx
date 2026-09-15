@@ -5,7 +5,7 @@
  * 나갈 수 없고(App.tsx가 라우트를 막는다) 변경을 마쳐야 운영 API가 열린다.
  */
 
-import { KeyRound, LoaderCircle } from "lucide-react";
+import { KeyRound, LoaderCircle, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, ApiError, type AdminAccount } from "../api/client";
@@ -94,6 +94,7 @@ function AdminPasskeys() {
             type="button"
             onClick={() => void remove(item.id)}
           >
+            <Trash2 size={17} aria-hidden="true" />
             삭제
           </button>
         </div>
@@ -123,6 +124,7 @@ function AdminPasskeys() {
             disabled={pending || !password || !name.trim()}
             onClick={() => void add()}
           >
+            <KeyRound size={17} aria-hidden="true" />
             {pending ? "처리 중…" : "패스키 등록"}
           </button>
         </div>
@@ -245,7 +247,11 @@ export function ChangePasswordPage({
               </button>
             ) : null}
             <button className="button primary" type="submit" disabled={pending}>
-              {pending ? <LoaderCircle className="spin" size={17} /> : null}
+              {pending ? (
+                <LoaderCircle className="spin" size={17} aria-hidden="true" />
+              ) : (
+                <KeyRound size={17} aria-hidden="true" />
+              )}
               비밀번호 변경
             </button>
           </div>

@@ -267,6 +267,7 @@ function UnitEventEditor(props: {
         </Text>
         <View style={styles.actions}>
           <Button
+            icon="save"
             title="저장"
             loading={pending}
             onPress={() => void save()}
@@ -274,6 +275,7 @@ function UnitEventEditor(props: {
           />
           {props.existing ? (
             <Button
+              icon="trash"
               title="삭제"
               variant="danger"
               disabled={pending}

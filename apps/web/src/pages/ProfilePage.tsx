@@ -2,6 +2,8 @@
  * 프로필 화면 — 내 정보와 복무 진행률, 로그아웃·회원 탈퇴.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Me } from "@leave/client";
@@ -81,6 +83,7 @@ function UsernameCard(props: { username: string | null }) {
             onClick={() => setEditing(true)}
             data-testid="profile-edit-username"
           >
+            <ActionIcon name="edit" />
             바꾸기
           </button>
         )}
@@ -106,6 +109,7 @@ function UsernameCard(props: { username: string | null }) {
               onClick={() => void submit()}
               data-testid="profile-save-username"
             >
+              <ActionIcon name="save" />
               {setUsername.isPending ? "저장 중…" : "저장"}
             </button>
             <button
@@ -293,6 +297,7 @@ export function ProfilePage(props: { me: Me }) {
           style={{ flex: 1 }}
           onClick={() => void navigate("/units")}
         >
+          <ActionIcon name="users" />
           공유 그룹
         </button>
         <button
@@ -304,6 +309,7 @@ export function ProfilePage(props: { me: Me }) {
             void logout.mutateAsync().then(() => navigate("/login"));
           }}
         >
+          <ActionIcon name="logout" />
           로그아웃
         </button>
       </section>
@@ -335,6 +341,7 @@ export function ProfilePage(props: { me: Me }) {
         disabled={deleteAccount.isPending}
         style={{ alignSelf: "center" }}
       >
+        <ActionIcon name="trash" />
         {deleteAccount.isPending ? "삭제 중…" : "계정 삭제"}
       </button>
     </div>

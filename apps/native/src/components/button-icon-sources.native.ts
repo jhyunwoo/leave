@@ -1,0 +1,30 @@
+import type { ImageSourcePropType } from "react-native";
+import type { ButtonIcon } from "./button-icons";
+
+export const buttonIconSources: Record<ButtonIcon, ImageSourcePropType> = {
+  plus: require("../../assets/button-icons/plus.xml"),
+  edit: require("../../assets/button-icons/edit.xml"),
+  trash: require("../../assets/button-icons/trash.xml"),
+  save: require("../../assets/button-icons/save.xml"),
+  check: require("../../assets/button-icons/check.xml"),
+  close: require("../../assets/button-icons/close.xml"),
+  calendar: require("../../assets/button-icons/calendar.xml"),
+  calendarAdd: require("../../assets/button-icons/calendarAdd.xml"),
+  userAdd: require("../../assets/button-icons/userAdd.xml"),
+  userRemove: require("../../assets/button-icons/userRemove.xml"),
+  users: require("../../assets/button-icons/users.xml"),
+  share: require("../../assets/button-icons/share.xml"),
+  copy: require("../../assets/button-icons/copy.xml"),
+  refresh: require("../../assets/button-icons/refresh.xml"),
+  key: require("../../assets/button-icons/key.xml"),
+  login: require("../../assets/button-icons/login.xml"),
+  logout: require("../../assets/button-icons/logout.xml"),
+  flag: require("../../assets/button-icons/flag.xml"),
+  block: require("../../assets/button-icons/block.xml"),
+  settings: require("../../assets/button-icons/settings.xml"),
+  bell: require("../../assets/button-icons/bell.xml"),
+  left: require("../../assets/button-icons/left.xml"),
+  right: require("../../assets/button-icons/right.xml"),
+  up: require("../../assets/button-icons/up.xml"),
+  down: require("../../assets/button-icons/down.xml"),
+};

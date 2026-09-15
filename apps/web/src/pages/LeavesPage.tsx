@@ -4,6 +4,8 @@
  * 재원별 잔여 요약도 함께 보여준다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   BALANCE_LABELS,
   fmtRange,
@@ -114,6 +116,7 @@ export function LeavesPage() {
           onFocus={preloadLeaveFormModal}
           onClick={() => setCreating(true)}
         >
+          <ActionIcon name="calendarAdd" />
           휴가 등록
         </button>
       </header>
@@ -349,6 +352,7 @@ function LeaveRow(props: {
             onFocus={preloadLeaveFormModal}
             onClick={() => props.onEdit(l)}
           >
+            <ActionIcon name="edit" />
             수정
           </button>
           <button
@@ -357,6 +361,7 @@ function LeaveRow(props: {
             disabled={props.deleting}
             onClick={() => props.onDelete(l)}
           >
+            <ActionIcon name="trash" />
             삭제
           </button>
         </div>

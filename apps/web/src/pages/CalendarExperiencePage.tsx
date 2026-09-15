@@ -1,3 +1,4 @@
+import { ActionIcon } from "../components/ActionIcon";
 import {
   cycleForDisplay,
   cycleUsedDays,
@@ -77,6 +78,7 @@ function PersonalItems(props: {
       >
         <h2 className="display-xs">개인 일정</h2>
         <button className="btn btn-secondary btn-sm" onClick={props.onAdd}>
+          <ActionIcon name="plus" />
           추가
         </button>
       </div>
@@ -244,6 +246,7 @@ function UnitItems(props: {
         <h2 className="display-xs">부대 일정</h2>
         {props.canManage ? (
           <button className="btn btn-secondary btn-sm" onClick={props.onAdd}>
+            <ActionIcon name="plus" />
             추가
           </button>
         ) : null}
@@ -532,14 +535,17 @@ export function CalendarPage(props: { me: Me }) {
                 scrollRef.current?.scrollToToday();
               }}
             >
+              <ActionIcon name="calendar" />
               오늘
             </button>
           ) : null}
           <button className="btn btn-secondary" onClick={openNewEvent}>
+            <ActionIcon name="calendarAdd" />
             개인 일정 추가
           </button>
           {mode === "unit" && unit && isUnitAdmin ? (
             <button className="btn btn-secondary" onClick={openNewUnitEvent}>
+              <ActionIcon name="calendarAdd" />
               부대 일정 추가
             </button>
           ) : null}
@@ -550,6 +556,7 @@ export function CalendarPage(props: { me: Me }) {
               className="btn btn-secondary"
               onClick={() => void navigate("/units")}
             >
+              <ActionIcon name="users" />
               부대 가입
             </button>
           ) : null}
@@ -560,6 +567,7 @@ export function CalendarPage(props: { me: Me }) {
               onFocus={preloadLeaveFormModal}
               onClick={() => setLeaveOpen(true)}
             >
+              <ActionIcon name="calendarAdd" />
               출타 등록
             </button>
           ) : null}
@@ -568,6 +576,7 @@ export function CalendarPage(props: { me: Me }) {
               className="btn btn-primary"
               onClick={() => setSelectorOpen(true)}
             >
+              <ActionIcon name="users" />
               친구 선택 · {selectedFriendIds.length}/10
             </button>
           ) : null}
@@ -708,6 +717,7 @@ export function CalendarPage(props: { me: Me }) {
               className="btn btn-primary"
               onClick={() => setSelectorOpen(true)}
             >
+              <ActionIcon name="users" />
               친구 선택
             </button>
           </div>

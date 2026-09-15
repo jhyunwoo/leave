@@ -12,6 +12,8 @@
  * 버튼은 로그인 CTA 아래 보조 자리에 둔다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { usePublicUserProfile } from "@leave/client";
 import {
   ApiError,
@@ -60,6 +62,7 @@ export function PublicUserProfilePage() {
             <BrandLockup iconSize={30} />
           </Link>
           <Link to={loginPath} className="btn btn-secondary btn-sm">
+            <ActionIcon name="login" />
             로그인
           </Link>
         </div>
@@ -92,6 +95,7 @@ export function PublicUserProfilePage() {
                 className="btn btn-secondary"
                 onClick={() => void profile.refetch()}
               >
+                <ActionIcon name="refresh" />
                 다시 시도
               </button>
             }
@@ -121,6 +125,7 @@ export function PublicUserProfilePage() {
                 className="btn btn-primary"
                 data-testid="public-profile-login"
               >
+                <ActionIcon name="userAdd" />
                 로그인하고 친구 추가
               </Link>
               {isMobileWeb() ? (

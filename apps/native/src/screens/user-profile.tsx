@@ -77,6 +77,7 @@ function SharedSchedule(props: { userId: string }) {
             </View>
           ))}
           <Button
+            icon="calendar"
             title="내 달력과 비교"
             onPress={() =>
               router.push({
@@ -140,6 +141,7 @@ function RelationshipActions(props: {
       <View style={styles.actions}>
         <Text style={styles.body}>내 프로필이에요.</Text>
         <Button
+          icon="settings"
           title="프로필 관리"
           variant="secondary"
           onPress={() => router.push("/(tabs)/profile")}
@@ -157,6 +159,7 @@ function RelationshipActions(props: {
     <View style={styles.actions}>
       {profile.relationship === "none" ? (
         <Button
+          icon="userAdd"
           title="친구 추가"
           disabled={pending}
           onPress={() =>
@@ -172,6 +175,7 @@ function RelationshipActions(props: {
         <>
           <Text style={styles.pendingLabel}>요청함 · 수락 대기</Text>
           <Button
+            icon="close"
             title="요청 취소"
             variant="secondary"
             disabled={pending}
@@ -185,6 +189,7 @@ function RelationshipActions(props: {
       {profile.relationship === "incoming" ? (
         <>
           <Button
+            icon="check"
             title="수락"
             disabled={pending}
             onPress={() =>
@@ -193,6 +198,7 @@ function RelationshipActions(props: {
             testID="profile-accept"
           />
           <Button
+            icon="close"
             title="거절"
             variant="secondary"
             disabled={pending}
@@ -208,6 +214,7 @@ function RelationshipActions(props: {
       ) : null}
       {profile.relationship === "friends" ? (
         <Button
+          icon="userRemove"
           title="친구 삭제"
           variant="danger"
           disabled={pending}

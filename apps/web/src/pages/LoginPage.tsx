@@ -1,5 +1,7 @@
 /** 로그인 화면. 성공하면 토큰이 저장되고 App.tsx가 달력으로 넘긴다. */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useLogin, usePasskeyLogin } from "@leave/client";
@@ -111,6 +113,7 @@ export function LoginPage() {
           className="btn btn-primary"
           disabled={login.isPending || !email || !password}
         >
+          <ActionIcon name="login" />
           {login.isPending ? "로그인 중…" : "로그인"}
         </button>
         {passkeysSupported ? (
@@ -120,6 +123,7 @@ export function LoginPage() {
             disabled={passkeyLogin.isPending}
             onClick={() => void submitPasskey()}
           >
+            <ActionIcon name="key" />
             {passkeyLogin.isPending ? "패스키 확인 중…" : "패스키로 로그인"}
           </button>
         ) : null}

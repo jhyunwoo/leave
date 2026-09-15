@@ -157,6 +157,7 @@ export function LeaveFormModal(props: {
                   `${fmtDateShort(startDate)}부터 ${fmtDateShort(endDate)}까지 · ${duration}일`}
               </Text>
               <Button
+                icon="save"
                 title={
                   form.pending
                     ? "저장 중…"
@@ -359,6 +360,7 @@ export function LeaveFormModal(props: {
             {validRange && form.suggestedAddKey ? (
               <View style={styles.splitActions}>
                 <Button
+                  icon="plus"
                   title="다른 휴가 종류 이어 쓰기"
                   variant="secondary"
                   size="sm"

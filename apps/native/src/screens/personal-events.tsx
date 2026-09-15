@@ -42,6 +42,7 @@ export function PersonalEventsScreen() {
       </Stack.Toolbar>
       <View style={styles.nav}>
         <Button
+          icon="left"
           title="이전"
           size="sm"
           variant="secondary"
@@ -51,6 +52,7 @@ export function PersonalEventsScreen() {
           {parts.year}년 {parts.monthNum}월
         </Text>
         <Button
+          icon="right"
           title="다음"
           size="sm"
           variant="secondary"
@@ -94,7 +96,7 @@ export function PersonalEventsScreen() {
           <Text style={styles.body}>
             휴가가 아닌 약속과 계획을 별도로 기록할 수 있어요.
           </Text>
-          <Button title="개인 일정 추가" onPress={add} />
+          <Button icon="calendarAdd" title="개인 일정 추가" onPress={add} />
         </ContentPanel>
       )}
     </ScrollView>

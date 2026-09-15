@@ -10,6 +10,8 @@
  * 운영자는 보통 "언제까지"를 먼저 알고 오기 때문에 그 입구를 남겨 둔다.
  */
 
+import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
+
 import {
   BALANCE_KEYS,
   BALANCE_LABELS,
@@ -140,6 +142,7 @@ export function LeaveFields({
                         )
                       }
                     >
+                      <ArrowUp size={17} aria-hidden="true" />
                       위로
                     </button>
                     <button
@@ -152,6 +155,7 @@ export function LeaveFields({
                         )
                       }
                     >
+                      <ArrowDown size={17} aria-hidden="true" />
                       아래로
                     </button>
                   </div>
@@ -164,6 +168,7 @@ export function LeaveFields({
                     onDraftsChange((current) => removeDraft(current, index))
                   }
                 >
+                  <Trash2 size={17} aria-hidden="true" />
                   구간 삭제
                 </button>
               </div>
@@ -178,6 +183,7 @@ export function LeaveFields({
                 ])
               }
             >
+              <Plus size={17} aria-hidden="true" />
               구간 추가
             </button>
           </>

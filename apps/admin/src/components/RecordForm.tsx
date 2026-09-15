@@ -23,7 +23,7 @@ import {
   type LeaveSegment,
   type SegmentDraft,
 } from "@leave/shared";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Plus, Save } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { InitialRecord } from "./record-form/fields";
 import { AdminFields } from "./record-form/AdminFields";
@@ -170,7 +170,13 @@ export function RecordForm({
           취소
         </button>
         <button className="button primary" type="submit" disabled={pending}>
-          {pending ? <LoaderCircle className="spin" size={17} /> : null}
+          {pending ? (
+            <LoaderCircle className="spin" size={17} aria-hidden="true" />
+          ) : mode === "create" ? (
+            <Plus size={17} aria-hidden="true" />
+          ) : (
+            <Save size={17} aria-hidden="true" />
+          )}
           {mode === "create" ? "생성" : "변경 저장"}
         </button>
       </div>

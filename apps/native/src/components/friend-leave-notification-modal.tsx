@@ -25,6 +25,7 @@ export function FriendLeaveNotificationModal(props: {
         </Text>
         <View style={styles.navigation}>
           <Button
+            icon="left"
             title="이전 날짜"
             variant="secondary"
             size="sm"
@@ -33,6 +34,7 @@ export function FriendLeaveNotificationModal(props: {
           />
           <Text style={styles.title}>{detail.date}</Text>
           <Button
+            icon="right"
             title="다음 날짜"
             variant="secondary"
             size="sm"
@@ -45,7 +47,11 @@ export function FriendLeaveNotificationModal(props: {
         ) : detail.message ? (
           <View style={styles.panel}>
             <Text style={styles.body}>{detail.message}</Text>
-            <Button title="다시 시도" onPress={() => void detail.retry()} />
+            <Button
+              icon="refresh"
+              title="다시 시도"
+              onPress={() => void detail.retry()}
+            />
           </View>
         ) : (
           <>

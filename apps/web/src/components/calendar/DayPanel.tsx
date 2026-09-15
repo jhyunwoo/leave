@@ -3,6 +3,8 @@
  * 출타율·공휴일·제한 기간을 알리고, 그날의 출타 명단(DayRoster)을 보여준다.
  */
 
+import { ActionIcon } from "../ActionIcon";
+
 import {
   availabilitySignal,
   fmtRangeTiny,
@@ -150,7 +152,7 @@ export function DayPanel(props: {
         onFocus={props.onPreloadAddLeave}
         onClick={props.onAddLeave}
       >
-        이 날부터 휴가 등록
+        <ActionIcon name="calendarAdd" />이 날부터 휴가 등록
       </button>
     </div>
   );

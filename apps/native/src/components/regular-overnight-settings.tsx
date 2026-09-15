@@ -181,6 +181,7 @@ export function RegularOvernightSettings(props: {
       )}
 
       <Button
+        icon="save"
         title="정기외박 설정 저장"
         variant="tertiary"
         loading={update.isPending}

@@ -3,7 +3,7 @@
  * 성공하면 서버가 HttpOnly 세션 쿠키를 심고, 응답의 관리자 정보로 앱 상태를 채운다.
  */
 
-import { LoaderCircle, LockKeyhole } from "lucide-react";
+import { LoaderCircle, LockKeyhole, KeyRound, LogIn } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, type AdminAccount, ApiError } from "../api/client";
 import { getPasskey, passkeysSupported } from "../lib/passkeys";
@@ -113,7 +113,11 @@ export function LoginPage({
             type="submit"
             disabled={pending || !email || !password}
           >
-            {pending ? <LoaderCircle className="spin" size={18} /> : null}
+            {pending ? (
+              <LoaderCircle className="spin" size={17} aria-hidden="true" />
+            ) : (
+              <LogIn size={18} aria-hidden="true" />
+            )}
             {pending ? "확인 중…" : "로그인"}
           </button>
           {passkeysSupported ? (
@@ -123,6 +127,7 @@ export function LoginPage({
               disabled={pending}
               onClick={() => void submitPasskey()}
             >
+              <KeyRound size={17} aria-hidden="true" />
               패스키로 로그인
             </button>
           ) : null}

@@ -224,6 +224,7 @@ function EditUnitSection({ unit }: { unit: Unit }) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {saved ? <Text style={styles.saved}>저장했어요.</Text> : null}
       <Button
+        icon="save"
         title={update.isPending ? "저장 중…" : "변경사항 저장"}
         loading={update.isPending}
         onPress={() => void submit()}
@@ -278,12 +279,14 @@ function InviteSection({ unit }: { unit: Unit }) {
             {fmtDateTimeFull(invite.expiresAt)}까지 · 최대 {invite.maxUses}회
           </Text>
           <Button
+            icon="share"
             title="안전하게 공유"
             onPress={() => void shareInvite(invite)}
           />
         </>
       ) : null}
       <Button
+        icon="refresh"
         title={rotate.isPending ? "발급 중…" : "새 코드 발급·기존 코드 폐기"}
         variant="secondary"
         loading={rotate.isPending}
@@ -356,6 +359,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
       </Field>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button
+        icon="calendarAdd"
         title={create.isPending ? "등록 중…" : "제한 기간 등록"}
         variant="secondary"
         loading={create.isPending}
@@ -369,6 +373,7 @@ function BlackoutSection({ unit }: { unit: Unit }) {
             {blackout.reason ? ` · ${blackout.reason}` : ""}
           </Text>
           <Button
+            icon="trash"
             title="삭제"
             variant="danger"
             size="sm"

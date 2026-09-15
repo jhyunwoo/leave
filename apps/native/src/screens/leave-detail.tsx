@@ -57,7 +57,7 @@ export function LeaveDetailScreen() {
           <Text style={styles.emptyBody}>
             이미 삭제했거나 기간을 바꾼 계획일 수 있어요.
           </Text>
-          <Button title="돌아가기" onPress={() => router.back()} />
+          <Button icon="left" title="돌아가기" onPress={() => router.back()} />
         </ContentPanel>
       </View>
     );
@@ -100,6 +100,7 @@ export function LeaveDetailScreen() {
               actions={[
                 {
                   id: "edit",
+                  icon: "edit" as const,
                   title: "수정",
                   variant: "primary",
                   onPress: () => setEditing(true),
@@ -107,6 +108,7 @@ export function LeaveDetailScreen() {
                 },
                 {
                   id: "delete",
+                  icon: "trash" as const,
                   title: "삭제",
                   variant: "danger",
                   disabled: del.isPending,

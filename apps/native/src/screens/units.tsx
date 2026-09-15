@@ -156,6 +156,7 @@ export function UnitsScreen() {
           <View style={styles.myUnitActions}>
             {isAdmin ? (
               <Button
+                icon="users"
                 title="그룹 관리·초대"
                 variant="secondary"
                 size="sm"
@@ -163,6 +164,7 @@ export function UnitsScreen() {
               />
             ) : null}
             <Button
+              icon="logout"
               title="그룹 나가기"
               variant="danger"
               size="sm"
@@ -198,6 +200,7 @@ export function UnitsScreen() {
               <Text style={styles.errorText}>{joinError}</Text>
             ) : null}
             <Button
+              icon="users"
               title={join.isPending ? "확인 중…" : "그룹 참여"}
               loading={join.isPending}
               onPress={() => void doJoin()}
@@ -212,6 +215,7 @@ export function UnitsScreen() {
               직접 전달하세요.
             </Text>
             <Button
+              icon="plus"
               title="새 공유 그룹 만들기"
               variant="secondary"
               onPress={() => setCreateOpen(true)}
@@ -255,7 +259,7 @@ function InvitePanel(props: { invite: IssuedUnitInvite; onShare: () => void }) {
         {fmtDateTimeFull(props.invite.expiresAt)}까지 · 최대{" "}
         {props.invite.maxUses}회
       </Text>
-      <Button title="안전하게 공유" onPress={props.onShare} />
+      <Button icon="share" title="안전하게 공유" onPress={props.onShare} />
     </ContentPanel>
   );
 }
@@ -323,6 +327,7 @@ function CreateUnitModal(props: {
           closeTestID="create-unit-close"
           footer={
             <Button
+              icon="plus"
               title={create.isPending ? "만드는 중…" : "그룹 만들기"}
               onPress={() => void submit()}
               loading={create.isPending}

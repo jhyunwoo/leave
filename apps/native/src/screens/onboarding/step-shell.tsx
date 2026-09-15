@@ -59,6 +59,7 @@ export function StepNext(props: {
 }) {
   return (
     <Button
+      icon="right"
       title={props.label ?? "다음"}
       disabled={props.disabled}
       loading={props.pending}

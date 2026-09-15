@@ -393,7 +393,11 @@ export function ServiceProgressDetailScreen() {
           <Text selectable style={screenStyles.errorBody}>
             프로필로 돌아가 잠시 후 다시 열어주세요.
           </Text>
-          <Button title="프로필로 돌아가기" onPress={() => router.back()} />
+          <Button
+            icon="left"
+            title="프로필로 돌아가기"
+            onPress={() => router.back()}
+          />
         </View>
       ) : (
         <ProgressContent

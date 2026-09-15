@@ -7,6 +7,8 @@
  * 대신 회당 값의 뜻이 다르다 — 외출은 당일 복귀라 **일수가 아니라 횟수**다.
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import { useState } from "react";
 import type { LeaveGrantsPage } from "@leave/client";
 import { useUpdateOuting } from "@leave/client";
@@ -217,6 +219,7 @@ function OutingKindFields(props: { branch: Branch; fund: OutingFund }) {
         disabled={update.isPending || blocker !== null}
         onClick={() => void save()}
       >
+        <ActionIcon name="save" />
         {update.isPending ? "저장 중…" : `${label} 설정 저장`}
       </button>
 

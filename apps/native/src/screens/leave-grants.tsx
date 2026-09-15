@@ -335,7 +335,8 @@ function FundCard(props: {
       )}
 
       <Button
-        title="+ 적립분 추가"
+        icon="plus"
+        title="적립분 추가"
         variant="ghost"
         size="sm"
         onPress={props.onAdd}

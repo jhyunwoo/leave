@@ -19,6 +19,8 @@
  * (`onboardingResumeStep`). 저장을 마친 답은 다시 묻지 않는다.
  */
 
+import { ActionIcon } from "../components/ActionIcon";
+
 import {
   REGULAR_OVERNIGHT_DEFAULTS,
   regularOvernightIntervalForm,
@@ -233,6 +235,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
           disabled={index <= 0}
           data-testid="onboarding-back"
         >
+          <ActionIcon name="left" />
           뒤로
         </button>
       </header>

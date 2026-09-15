@@ -69,6 +69,7 @@ export function NotificationSettingsScreen() {
             허용하지 않아도 캘린더와 계획 기능은 그대로 사용할 수 있습니다.
           </Text>
           <Button
+            icon="bell"
             title={registerPush.isPending ? "설정 중…" : "기기 알림 켜기"}
             variant="secondary"
             loading={registerPush.isPending}

@@ -483,6 +483,7 @@ function WebHeader(props: { onCreate: () => void }) {
         actions={[
           {
             id: "create",
+            icon: "calendarAdd" as const,
             title: "휴가 등록",
             variant: "primary",
             onPress: props.onCreate,

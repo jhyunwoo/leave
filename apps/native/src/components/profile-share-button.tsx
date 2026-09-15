@@ -67,6 +67,7 @@ export function ProfileShareButton(props: {
   return (
     <View style={{ gap: spacing.xs }}>
       <Button
+        icon="share"
         title={props.own ? "내 프로필 링크 공유" : "프로필 링크 공유"}
         variant="secondary"
         loading={sharing}

@@ -73,6 +73,7 @@ export function InviteJoinScreen() {
               그룹에 들어가려면 먼저 지금 그룹에서 나가야 해요.
             </Text>
             <Button
+              icon="users"
               title="내 그룹 보기"
               onPress={() => router.replace("/units")}
             />
@@ -94,6 +95,7 @@ export function InviteJoinScreen() {
             ) : null}
             <View style={styles.actions}>
               <Button
+                icon="users"
                 title={join.isPending ? "참여하는 중…" : "그룹 참여"}
                 loading={join.isPending}
                 onPress={() => void doJoin()}

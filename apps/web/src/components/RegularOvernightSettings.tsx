@@ -3,6 +3,8 @@
  * 사용처: 보유 휴가 화면(LeaveGrantsPage).
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import { useState } from "react";
 import type { LeaveGrantsPage } from "@leave/client";
 import { useUpdateRegularOvernight } from "@leave/client";
@@ -190,6 +192,7 @@ export function RegularOvernightSettings(props: {
         disabled={update.isPending || blocker !== null}
         onClick={() => void save()}
       >
+        <ActionIcon name="save" />
         {update.isPending ? "저장 중…" : "정기외박 설정 저장"}
       </button>
 

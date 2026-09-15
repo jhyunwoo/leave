@@ -7,6 +7,8 @@
  * 정기외박 안내)만 props로 덮어쓴다. 그래야 웹과 앱의 기본 문구가 한 곳에 남는다.
  */
 
+import { ActionIcon } from "../../components/ActionIcon";
+
 import { ONBOARDING_COPY, type OnboardingStepId } from "@leave/shared";
 import type { ReactNode } from "react";
 
@@ -44,6 +46,7 @@ export function StepNext(props: {
       onClick={props.onClick}
       data-testid={props.testId ?? "onboarding-next"}
     >
+      <ActionIcon name="right" />
       {props.pending ? "저장 중…" : (props.label ?? "다음")}
     </button>
   );

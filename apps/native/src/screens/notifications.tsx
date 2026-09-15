@@ -193,6 +193,7 @@ export function NotificationsScreen() {
           actions={[
             {
               id: "settings",
+              icon: "settings" as const,
               title: "설정",
               onPress: () => router.push("/notifications/settings"),
               testID: "notifications-settings",
@@ -202,6 +203,7 @@ export function NotificationsScreen() {
               ? [
                   {
                     id: "read-all",
+                    icon: "check" as const,
                     title: markRead.isPending ? "처리 중…" : "모두 읽음",
                     variant: "primary" as const,
                     disabled: markRead.isPending,

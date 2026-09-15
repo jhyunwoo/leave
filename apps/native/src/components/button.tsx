@@ -6,6 +6,9 @@
  * 세 파일의 props가 같아야 화면 코드가 플랫폼을 신경 쓰지 않는다.
  */
 
+import Svg, { Path } from "react-native-svg";
+import { type ButtonIcon, buttonIcons } from "./button-icons";
+
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -36,6 +39,7 @@ export function Button(props: {
    * 세 파일의 props는 같아야 하므로 여기서도 받는다.
    */
   flexible?: boolean;
+  icon?: ButtonIcon;
   systemImage?: string;
   testID?: string;
 }) {
@@ -73,6 +77,22 @@ export function Button(props: {
         props.style,
       ]}
     >
+      {props.icon && !props.loading ? (
+        <Svg
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={foreground}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden={true}
+          accessible={false}
+        >
+          <Path d={buttonIcons[props.icon].path} />
+        </Svg>
+      ) : null}
       {props.loading ? (
         <ActivityIndicator color={foreground} size="small" />
       ) : typeof props.title === "string" ? (
@@ -86,6 +106,8 @@ export function Button(props: {
 
 const useStyles = makeStyles(({ colors }) => ({
   button: {
+    flexDirection: "row",
+    gap: 8,
     minHeight: 48,
     minWidth: 44,
     paddingHorizontal: 20,
@@ -122,5 +144,10 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.45 },
-  label: { fontSize: 15, fontWeight: "700" },
+  label: {
+    flexShrink: 1,
+    textAlign: "center",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 }));

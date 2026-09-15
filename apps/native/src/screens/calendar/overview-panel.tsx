@@ -123,7 +123,11 @@ export function CalendarOverviewPanel(props: {
             {props.cycle.grantDays}일 중 {props.cycleUsedDays}일 사용
           </Text>
         ) : null}
-        <Button title="휴가 등록" onPress={props.onAddLeave} />
+        <Button
+          icon="calendarAdd"
+          title="휴가 등록"
+          onPress={props.onAddLeave}
+        />
       </ContentPanel>
 
       <ContentPanel style={styles.panel}>

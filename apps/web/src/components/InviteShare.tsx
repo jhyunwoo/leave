@@ -11,6 +11,8 @@
  * 링크가 잘리는 메신저)를 위해 남긴다.
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import { fmtDateTimeFull, inviteLink } from "@leave/shared";
 import { useState } from "react";
 import type { IssuedUnitInvite } from "@leave/client";
@@ -54,6 +56,7 @@ export function InviteShare(props: { invite: IssuedUnitInvite }) {
           className="btn btn-secondary btn-sm"
           onClick={() => void copy("link", link)}
         >
+          <ActionIcon name={copied === "link" ? "check" : "copy"} />
           {copied === "link" ? "링크 복사됨" : "초대 링크 복사"}
         </button>
         <button
@@ -61,6 +64,7 @@ export function InviteShare(props: { invite: IssuedUnitInvite }) {
           className="btn btn-secondary btn-sm"
           onClick={() => void copy("code", props.invite.code)}
         >
+          <ActionIcon name={copied === "code" ? "check" : "copy"} />
           {copied === "code" ? "코드 복사됨" : "코드만 복사"}
         </button>
       </div>

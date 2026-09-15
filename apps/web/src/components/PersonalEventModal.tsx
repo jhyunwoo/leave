@@ -12,6 +12,8 @@
  * 보여주고, 끄면 저장 전에 값을 비운다.
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import { personalEventCreateSchema } from "@leave/shared";
 import {
   useCreatePersonalEvent,
@@ -210,6 +212,7 @@ export function PersonalEventModal(props: {
                     );
               }}
             >
+              <ActionIcon name="trash" />
               삭제
             </button>
           ) : null}
@@ -227,6 +230,7 @@ export function PersonalEventModal(props: {
             disabled={pending}
             data-testid="personal-event-save"
           >
+            <ActionIcon name="save" />
             {pending ? "저장 중…" : "저장"}
           </button>
         </div>

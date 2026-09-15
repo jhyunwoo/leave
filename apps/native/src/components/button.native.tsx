@@ -3,6 +3,10 @@
  * iOS 구현과 props가 같고, Material 스타일만 다르다.
  */
 
+import { Icon, Row, Text } from "@expo/ui/jetpack-compose";
+import { buttonIconSources } from "./button-icon-sources.native";
+import { type ButtonIcon } from "./button-icons";
+
 import { Button as NativeButton, Host } from "@expo/ui";
 import type { ReactNode } from "react";
 import {
@@ -31,6 +35,7 @@ export function Button(props: {
    * 밀린다. 폭이 이미 정해져 있으면 어림값 자체가 필요 없다.
    */
   flexible?: boolean;
+  icon?: ButtonIcon;
   systemImage?: string;
   testID?: string;
 }) {
@@ -54,7 +59,11 @@ export function Button(props: {
   const nativeVariant = variant === "primary" ? "filled" : "outlined";
   const minimumLabelWidth = props.flexible
     ? undefined
-    : estimateLabelWidth(label, windowWidth);
+    : estimateLabelWidth(
+        label,
+        windowWidth,
+        Boolean(props.icon && !props.loading),
+      );
 
   return (
     <Host
@@ -75,7 +84,17 @@ export function Button(props: {
         variant={nativeVariant}
         disabled={disabled}
         testID={props.testID}
-      />
+      >
+        {props.icon && !props.loading ? (
+          <Row
+            horizontalArrangement={{ spacedBy: 8 }}
+            verticalAlignment="center"
+          >
+            <Icon source={buttonIconSources[props.icon]} size={18} />
+            <Text>{label}</Text>
+          </Row>
+        ) : undefined}
+      </NativeButton>
     </Host>
   );
 }

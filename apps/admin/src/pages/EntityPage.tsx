@@ -9,7 +9,14 @@
  * 그 밖의 흐름(검색·페이지·상세 서랍·삭제 확인·토스트)은 리소스와 무관하게 같다.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Pencil, ShieldOff, Trash2 } from "lucide-react";
+import {
+  KeyRound,
+  Pencil,
+  ShieldOff,
+  Trash2,
+  Clock,
+  Check,
+} from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { api, ApiError, downloadCsv, type ListResponse } from "../api/client";
@@ -346,6 +353,7 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
                   disabled={action.isPending || selected.status === "reviewing"}
                   onClick={() => action.mutate("reviewing")}
                 >
+                  <Clock size={17} aria-hidden="true" />
                   확인 중
                 </button>
               ) : null}
@@ -356,6 +364,7 @@ export function EntityPage({ resource }: { resource: EntityResource }) {
                   disabled={action.isPending || selected.status === "resolved"}
                   onClick={() => action.mutate("resolved")}
                 >
+                  <Check size={17} aria-hidden="true" />
                   처리 완료
                 </button>
               ) : null}

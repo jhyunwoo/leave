@@ -4,6 +4,8 @@
  * 실제 클릭 때의 대기를 줄인다.
  */
 
+import { ActionIcon } from "./ActionIcon";
+
 import {
   Component as ReactComponent,
   lazy,
@@ -127,6 +129,7 @@ class LeaveFormErrorBoundary extends ReactComponent<
               onClick={() => window.location.reload()}
               autoFocus
             >
+              <ActionIcon name="refresh" />
               페이지 새로고침
             </button>
           </div>
