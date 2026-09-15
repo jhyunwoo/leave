@@ -65,7 +65,7 @@ export function LeaveStatusControl(props: { leave: MyLeave }) {
 
       {editableStatus !== null ? (
         <div
-          className="leave-status-options"
+          className="segmented-toggle"
           role="group"
           aria-label={`${leave.title} 휴가 상태 변경`}
           data-testid={`leave-status-control-${leave.id}`}
@@ -74,7 +74,7 @@ export function LeaveStatusControl(props: { leave: MyLeave }) {
             <button
               key={status}
               type="button"
-              className="leave-status-option"
+              className="segmented-toggle__option"
               aria-pressed={status === editableStatus}
               disabled={updateStatus.isPending}
               onClick={() => void changeStatus(status)}

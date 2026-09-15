@@ -483,16 +483,20 @@ html[data-session] #root[data-prerendered="/"] {
   min-height: 20px;
 }
 
-.leave-status-options {
+/* 같은 폭의 칸을 나란히 두는 토글 묶음. 휴가 상태(4칸)와 내 휴가 목록의
+   휴가/외출 탭(2칸)이 함께 쓴다. 칸 수를 CSS에 박아 두면 쓰는 곳마다 규칙이
+   갈리므로 자동 열로 둔다 — 4칸일 때의 결과는 repeat(4, …)와 같다. */
+.segmented-toggle {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
   padding: 3px;
   border-radius: var(--r-md);
   background: var(--surface-strong);
 }
 
-.leave-status-option {
+.segmented-toggle__option {
   min-width: 0;
   min-height: 38px;
   padding: 0 var(--sp-sm);
@@ -513,25 +517,25 @@ html[data-session] #root[data-prerendered="/"] {
     box-shadow 160ms var(--ease-out);
 }
 
-.leave-status-option[aria-pressed="true"] {
+.segmented-toggle__option[aria-pressed="true"] {
   color: var(--ink);
   background: var(--canvas);
   box-shadow: var(--shadow-hairline);
   font-weight: 700;
 }
 
-.leave-status-option:focus-visible {
+.segmented-toggle__option:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
 
-.leave-status-option:disabled {
+.segmented-toggle__option:disabled {
   cursor: wait;
   opacity: 0.65;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .leave-status-option:hover:not(:disabled, [aria-pressed="true"]) {
+  .segmented-toggle__option:hover:not(:disabled, [aria-pressed="true"]) {
     color: var(--ink);
     background: rgba(255, 255, 255, 0.55);
   }
