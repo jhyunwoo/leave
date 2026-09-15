@@ -176,6 +176,7 @@ export function MonthCalendar(props: {
                 key={cell.date}
                 type="button"
                 role="gridcell"
+                data-testid={`cal-cell-${cell.date}`}
                 disabled={!cell.inMonth}
                 aria-selected={isSelected}
                 aria-label={

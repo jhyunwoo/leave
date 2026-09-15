@@ -7,7 +7,7 @@
  * 만큼 화면이 아래로 튀어, 보고 있던 날짜가 사라진 것처럼 보인다.
  *
  * 스크롤포트는 화면 폭에 따라 둘 중 하나다. 넓으면 안쪽 `.cal-scroll` 박스가,
- * 좁으면 페이지 자체가 스크롤한다(`usePageScroll`). 모바일에서 박스를 쓰면
+ * 좁으면 페이지 자체가 스크롤한다(`useCompactCalendar`). 모바일에서 박스를 쓰면
  * 손가락이 달력 위에 있는 동안 페이지가 멈춰 갇힌 것처럼 느껴진다. 대신 어느
  * 쪽이 스크롤하느냐에 따라 세 곳이 갈린다 — 관찰자의 root, 달로 이동하는 좌표
  * 계산, prepend 보정. 여기서 갈리지 않은 게 있으면 조용히 어긋난다.
@@ -42,37 +42,16 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { useCalendar, usePersonalEvents } from "@leave/client";
 import type { MyLeaveDay } from "@leave/client";
 import { MonthCalendar, type OutingCycleStart } from "./MonthCalendar";
+import { useCompactCalendar } from "./compact";
 import "./calendar.css";
 
 const INITIAL_SPAN = 2;
 export const CALENDAR_PAGE_SIZE = 3;
 export const CALENDAR_MAX_MONTHS = 9;
-
-/**
- * 좁은 화면에서는 페이지가 달력의 스크롤포트가 된다. 기준은 CalendarPage가
- * 하루 패널을 아래로 내리는 폭과 같다 — 패널이 옆에 붙어 있는 동안에는 달력
- * 높이가 묶여 있어야 하지만, 아래로 쌓이고 나면 묶어 둘 이유가 없다.
- */
-const PAGE_SCROLL_QUERY = "(max-width: 900px)";
-
-function subscribeToPageScroll(onChange: () => void) {
-  const mql = window.matchMedia(PAGE_SCROLL_QUERY);
-  mql.addEventListener("change", onChange);
-  return () => mql.removeEventListener("change", onChange);
-}
-
-function usePageScroll(): boolean {
-  return useSyncExternalStore(
-    subscribeToPageScroll,
-    () => window.matchMedia(PAGE_SCROLL_QUERY).matches,
-    () => false,
-  );
-}
 
 function monthRange(center: string, span: number): string[] {
   const out: string[] = [];
@@ -146,7 +125,9 @@ const MonthScrollImpl = forwardRef<CalendarScrollHandle, MonthScrollProps>(
     const [months, setMonths] = useState(() =>
       monthRange(currentMonth, INITIAL_SPAN),
     );
-    const pageScroll = usePageScroll();
+    // 좁은 화면에서는 페이지가 달력의 스크롤포트가 된다. 기준 폭은 CalendarPage가
+    // 하루 상세를 모달로 돌리는 값과 같은 하나다 — compact.ts 주석 참고.
+    const pageScroll = useCompactCalendar();
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const weekdaysRef = useRef<HTMLDivElement>(null);

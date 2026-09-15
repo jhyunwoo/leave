@@ -40,6 +40,7 @@ import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router";
 import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll";
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
+import { useCompactCalendar } from "../components/calendar/compact";
 import { DayPanel } from "../components/calendar/DayPanel";
 import { OutingCycleNote } from "../components/calendar/OutingCycleNote";
 import {
@@ -394,6 +395,12 @@ export function CalendarPage(props: { me: Me }) {
   const [editingUnitEvent, setEditingUnitEvent] = useState<UnitEvent>();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /**
+   * 좁은 화면인가. 달력이 페이지를 스크롤포트로 쓰기 시작하는 폭과 같은 값이다
+   * (compact.ts). 여기서 하루 상세를 옆 칸에서 모달로 옮긴다 — 달력 높이가
+   * 풀린 뒤에는 상세를 달력 뒤에 쌓아 봐야 닿을 수 없기 때문이다.
+   */
+  const compact = useCompactCalendar();
   const scrollRef = useRef<CalendarScrollHandle>(null);
   const myLeaves = useMyLeaves();
   const balances = useLeaveBalances();
@@ -480,6 +487,85 @@ export function CalendarPage(props: { me: Me }) {
     setEditingUnitEvent(undefined);
     setUnitEventOpen(true);
   };
+
+  /**
+   * 고른 날의 상세. 어디에 놓이든 내용은 같아야 하므로 한 번만 짓는다 —
+   * 넓은 화면에서는 달력 옆 칸, 좁은 화면에서는 모달 안에 그대로 들어간다.
+   */
+  const unitDayDetail = selectedDate ? (
+    <>
+      {panelCalendar.data ? (
+        <UnitItems
+          events={panelCalendar.data.events ?? []}
+          date={selectedDate}
+          canManage={isUnitAdmin}
+          onAdd={openNewUnitEvent}
+          onEdit={(event) => {
+            setEditingUnitEvent(event);
+            setUnitEventOpen(true);
+          }}
+        />
+      ) : null}
+      <PersonalItems
+        events={events.data?.events ?? []}
+        date={selectedDate}
+        onAdd={openNewEvent}
+        onEdit={(event) => {
+          setEditingEvent(event);
+          setEventOpen(true);
+        }}
+      />
+      {/* 부대 달력 응답과 무관하게 그린다 — 외출 주기는 내 설정에서만 나오고,
+          DayPanel 안에 넣으면 부대가 없는 사람에게는 통째로 사라진다. */}
+      <OutingCycleNote
+        date={selectedDate}
+        outing={outingConfigs}
+        segments={balanceSegments}
+        dischargeAt={dischargeAt}
+      />
+      {panelCalendar.data ? (
+        <DayPanel
+          calendar={panelCalendar.data}
+          date={selectedDate}
+          myUserId={props.me.user.id}
+          cycle={cycleForDisplay(regularOvernight, selectedDate, dischargeAt)}
+          dischargeAt={dischargeAt}
+          onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
+          onPreloadAddLeave={preloadLeaveFormModal}
+          onAddLeave={() => setLeaveOpen(true)}
+        />
+      ) : null}
+    </>
+  ) : null;
+
+  const friendDayDetail = selectedDate ? (
+    <>
+      <SharedLeaveItems calendar={friendCalendar.data} date={selectedDate} />
+      <PersonalItems
+        events={events.data?.events ?? []}
+        date={selectedDate}
+        onAdd={openNewEvent}
+        onEdit={(event) => {
+          setEditingEvent(event);
+          setEventOpen(true);
+        }}
+      />
+    </>
+  ) : null;
+
+  const dayDetail = mode === "unit" ? unitDayDetail : friendDayDetail;
+  /**
+   * 좁은 화면의 날짜 상세 모달. 다른 모달(출타 등록, 일정 폼, 친구 고르기)이
+   * 떠 있는 동안에는 비켜난다 — 겹쳐 띄우면 나중에 닫히는 쪽이 배경 스크롤
+   * 잠금을 먼저 풀어, 뒤에 남은 모달 아래로 페이지가 굴러간다.
+   */
+  const dayModalOpen =
+    compact &&
+    dayDetail != null &&
+    !leaveOpen &&
+    !eventOpen &&
+    !unitEventOpen &&
+    !selectorOpen;
 
   return (
     <div className="anim-rise" style={{ paddingBottom: "var(--sp-3xl)" }}>
@@ -588,9 +674,10 @@ export function CalendarPage(props: { me: Me }) {
           className="cal-layout"
           style={{
             display: "grid",
-            gridTemplateColumns: selectedDate
-              ? "minmax(0, 1fr) 340px"
-              : "minmax(0, 1fr)",
+            gridTemplateColumns:
+              !compact && selectedDate
+                ? "minmax(0, 1fr) 340px"
+                : "minmax(0, 1fr)",
             gap: "var(--sp-lg)",
             alignItems: "start",
           }}
@@ -653,53 +740,9 @@ export function CalendarPage(props: { me: Me }) {
               </span>
             </div>
           </div>
-          {selectedDate ? (
+          {!compact && unitDayDetail ? (
             <div style={{ display: "grid", gap: "var(--sp-md)" }}>
-              {panelCalendar.data ? (
-                <UnitItems
-                  events={panelCalendar.data.events ?? []}
-                  date={selectedDate}
-                  canManage={isUnitAdmin}
-                  onAdd={openNewUnitEvent}
-                  onEdit={(event) => {
-                    setEditingUnitEvent(event);
-                    setUnitEventOpen(true);
-                  }}
-                />
-              ) : null}
-              <PersonalItems
-                events={events.data?.events ?? []}
-                date={selectedDate}
-                onAdd={openNewEvent}
-                onEdit={(event) => {
-                  setEditingEvent(event);
-                  setEventOpen(true);
-                }}
-              />
-              {/* 부대 달력 응답과 무관하게 그린다 — 외출 주기는 내 설정에서만 나오고,
-                  DayPanel 안에 넣으면 부대가 없는 사람에게는 통째로 사라진다. */}
-              <OutingCycleNote
-                date={selectedDate}
-                outing={outingConfigs}
-                segments={balanceSegments}
-                dischargeAt={dischargeAt}
-              />
-              {panelCalendar.data ? (
-                <DayPanel
-                  calendar={panelCalendar.data}
-                  date={selectedDate}
-                  myUserId={props.me.user.id}
-                  cycle={cycleForDisplay(
-                    regularOvernight,
-                    selectedDate,
-                    dischargeAt,
-                  )}
-                  dischargeAt={dischargeAt}
-                  onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
-                  onPreloadAddLeave={preloadLeaveFormModal}
-                  onAddLeave={() => setLeaveOpen(true)}
-                />
-              ) : null}
+              {unitDayDetail}
             </div>
           ) : null}
         </div>
@@ -734,9 +777,10 @@ export function CalendarPage(props: { me: Me }) {
           className="cal-layout"
           style={{
             display: "grid",
-            gridTemplateColumns: selectedDate
-              ? "minmax(0, 1fr) 340px"
-              : "minmax(0, 1fr)",
+            gridTemplateColumns:
+              !compact && selectedDate
+                ? "minmax(0, 1fr) 340px"
+                : "minmax(0, 1fr)",
             gap: "var(--sp-lg)",
             alignItems: "start",
           }}
@@ -753,26 +797,19 @@ export function CalendarPage(props: { me: Me }) {
               onSelectDate={selectDate}
             />
           </div>
-          {selectedDate ? (
+          {!compact && friendDayDetail ? (
             <div style={{ display: "grid", gap: "var(--sp-md)" }}>
-              <SharedLeaveItems
-                calendar={friendCalendar.data}
-                date={selectedDate}
-              />
-              <PersonalItems
-                events={events.data?.events ?? []}
-                date={selectedDate}
-                onAdd={openNewEvent}
-                onEdit={(event) => {
-                  setEditingEvent(event);
-                  setEventOpen(true);
-                }}
-              />
+              {friendDayDetail}
             </div>
           ) : null}
         </div>
       )}
 
+      {dayModalOpen ? (
+        <Modal title="날짜 상세" onClose={() => setSelectedDate(null)}>
+          <div className="cal-day-detail">{dayDetail}</div>
+        </Modal>
+      ) : null}
       {leaveOpen ? (
         <LazyLeaveFormModal
           initialDate={selectedDate ?? today}

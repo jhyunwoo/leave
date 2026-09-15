@@ -695,3 +695,22 @@ button.unit-event-card {
   border-color: var(--negative);
   background: var(--negative-tint);
 }
+
+/* 좁은 화면의 날짜 상세 모달 속.
+ *
+ * 상세를 이루는 조각들은 원래 페이지 배경 위에 놓이는 `.card`라 저마다 테두리를
+ * 두른다. 그대로 모달(역시 `.card`) 안에 넣으면 상자 속 상자로 보이므로, 여기서는
+ * 테두리를 지우고 좌우 여백을 모달 것에 맞춰 제목과 글줄을 한 줄로 세운다. */
+.cal-day-detail {
+  display: grid;
+  gap: var(--sp-md);
+}
+.cal-day-detail > .card {
+  border: 0;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.cal-day-detail > .card + .card {
+  border-top: 1px solid rgba(14, 15, 12, 0.08);
+}
