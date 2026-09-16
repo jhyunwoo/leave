@@ -1,13 +1,13 @@
-# 앱 기동 스모크 — 가입 전에 가치 데모가 보이는지 확인한다.
+# 앱 기동 스모크 — 로그인과 가입 화면을 오갈 수 있는지 확인한다.
 appId: app.leave.mobile
 ---
 - launchApp:
     clearState: true
 - assertVisible: "리브"
-- assertVisible: "가입 전 미리보기"
 - assertVisible: "로그인"
+- assertVisible: "처음이신가요?"
 - tapOn: "가입하기"
 - assertVisible: "60초 안에 시작하기"
 - assertVisible: "실제 이름·군번·계급·부대명·사진은 받지 않아요."
 - tapOn: "로그인"
-- assertVisible: "가입 전 미리보기"
+- assertVisible: "처음이신가요?"
