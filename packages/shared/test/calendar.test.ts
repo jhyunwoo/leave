@@ -8,6 +8,7 @@ import {
   fmtDateTimeShort,
   fmtRange,
   isWeekend,
+  personalEventCellLabel,
   shiftMonth,
   splitMonth,
 } from "../src";
@@ -104,5 +105,33 @@ describe("시각 표기", () => {
 
   it("전체 표기는 한국 로캘을 쓴다", () => {
     expect(fmtDateTimeFull(at.toISOString())).toBe(at.toLocaleString("ko-KR"));
+  });
+});
+
+describe("personalEventCellLabel", () => {
+  it("없는 날은 알약 자체를 그리지 않도록 null을 준다", () => {
+    expect(personalEventCellLabel([])).toBeNull();
+  });
+
+  it("한 건이면 제목만 적는다", () => {
+    expect(personalEventCellLabel([{ title: "치과" }])).toBe("치과");
+  });
+
+  it("여러 건이면 첫 제목에 나머지 개수를 접는다", () => {
+    expect(personalEventCellLabel([{ title: "치과" }, { title: "면회" }])).toBe(
+      "치과 +1",
+    );
+    expect(
+      personalEventCellLabel([
+        { title: "치과" },
+        { title: "면회" },
+        { title: "적금 만기" },
+      ]),
+    ).toBe("치과 +2");
+  });
+
+  it("칸 폭은 CSS가 줄이므로 긴 제목을 자르지 않는다", () => {
+    const long = "가".repeat(80);
+    expect(personalEventCellLabel([{ title: long }])).toBe(long);
   });
 });

@@ -402,7 +402,7 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
 
   const day = Number(today.slice(8));
   const dayCell = page.getByRole("gridcell", {
-    name: new RegExp(`^${day}일,.*개인 일정 1개$`),
+    name: new RegExp(`^${day}일,.*개인 일정 개인 운동$`),
   });
   await expect(dayCell).toBeVisible();
   await dayCell.click();

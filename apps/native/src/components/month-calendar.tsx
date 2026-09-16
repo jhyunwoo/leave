@@ -19,7 +19,12 @@
  */
 
 import { availabilitySignal } from "@leave/shared/availability";
-import { buildMonthGrid, isWeekend, WEEKDAYS } from "@leave/shared/calendar";
+import {
+  buildMonthGrid,
+  isWeekend,
+  personalEventCellLabel,
+  WEEKDAYS,
+} from "@leave/shared/calendar";
 import { addDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import { getHoliday } from "@leave/shared/holidays";
 import { balanceLabel, type OutingKind } from "@leave/shared/leave";
@@ -218,12 +223,12 @@ export function MonthCalendar(props: {
             const dragDay = cell.inMonth
               ? dragPreview?.get(cell.date)
               : undefined;
-            const personalCount = cell.inMonth
+            const personal = cell.inMonth
               ? (personalEvents?.filter(
                   (event) =>
                     event.startDate <= cell.date && cell.date <= event.endDate,
-                ).length ?? 0)
-              : 0;
+                ) ?? [])
+              : [];
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
@@ -275,7 +280,7 @@ export function MonthCalendar(props: {
                         signal?.percent == null
                           ? "출타 기준 미설정"
                           : `출타율 ${signal.percent}퍼센트, ${signal.label}`
-                      }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}${
+                      }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}${
                         blocked ? ", 제한 가능 기간" : ""
                       }`
                     : undefined
@@ -403,10 +408,17 @@ export function MonthCalendar(props: {
                         onTap={() => onSelectDate(cell.date)}
                       />
                     )}
-                    {!compact && personalCount > 0 && (
+                    {/* 무슨 일정인지 날짜를 열지 않고 읽게 한다. 줄을 늘릴
+                        자리가 없어 첫 제목만 적고 나머지는 개수로 접는다 —
+                        접힌 제목은 접근성 라벨과 날짜 상세에 그대로 있다. */}
+                    {!compact && personal.length > 0 && (
                       <View style={styles.personalPill}>
-                        <Text style={styles.personalText}>
-                          ◇ 개인{personalCount > 1 ? ` ${personalCount}` : ""}
+                        <Text
+                          style={styles.personalText}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {personalEventCellLabel(personal)}
                         </Text>
                       </View>
                     )}
@@ -736,6 +748,8 @@ const useStyles = makeStyles(({ colors }) => ({
   /** 서버에 보내는 중. 아직 확정이 아니라는 뜻으로 살짝 물린다. */
   chipSaving: { opacity: 0.6 },
   personalPill: {
+    alignSelf: "stretch",
+    marginHorizontal: 1,
     minHeight: 14,
     paddingHorizontal: 4,
     borderRadius: radius.sm,

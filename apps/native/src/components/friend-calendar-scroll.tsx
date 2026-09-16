@@ -27,6 +27,7 @@ import {
   CALENDAR_QUERY_PAST_MONTHS,
   getHoliday,
   isWeekend,
+  personalEventCellLabel,
   shiftMonth,
   todayInSeoul,
   type ISODate,
@@ -273,10 +274,10 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
             const outings = people.filter(
               (person) => person.kind === "outing",
             ).length;
-            const personalCount = props.events.filter(
+            const personal = props.events.filter(
               (event) =>
                 event.startDate <= cell.date && cell.date <= event.endDate,
-            ).length;
+            );
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             return (
               <Pressable
@@ -289,7 +290,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                 }}
                 accessibilityLabel={
                   cell.inMonth
-                    ? `${Number(cell.date.slice(8))}일, 휴가 ${people.length - outings}명${outings ? `, 외출 ${outings}명` : ""}${personalCount ? `, 개인 일정 ${personalCount}개` : ""}`
+                    ? `${Number(cell.date.slice(8))}일, 휴가 ${people.length - outings}명${outings ? `, 외출 ${outings}명` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}`
                     : undefined
                 }
                 onPress={() => props.onSelectDate(cell.date)}
@@ -350,9 +351,9 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                         <Text style={styles.more}>+{people.length - 3}</Text>
                       ) : null}
                     </View>
-                    {personalCount ? (
+                    {personal.length ? (
                       <Text style={styles.personal} numberOfLines={1}>
-                        ◇ 개인{personalCount > 1 ? ` ${personalCount}` : ""}
+                        {personalEventCellLabel(personal)}
                       </Text>
                     ) : null}
                   </>

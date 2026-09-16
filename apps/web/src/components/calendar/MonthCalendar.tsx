@@ -24,6 +24,7 @@ import {
   getHoliday,
   isWeekend,
   outingBalanceKey,
+  personalEventCellLabel,
   todayInSeoul,
   type OutingKind,
   type LeaveCycle,
@@ -184,7 +185,7 @@ export function MonthCalendar(props: {
                     ? // 출타 관련 문구는 부대가 있을 때만 붙인다. 부대가 없으면
                       // 셀 자체에 출타 정보가 없으므로 "기준 미설정"이라고 말하면
                       // 설정만 하면 되는 것처럼 들린다.
-                      `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${outingLabel ? `, ${outingLabel}` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.length}개` : ""}${
+                      `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${cycle ? `, 정기외박 ${cycle.index}주기` : ""}${outingLabel ? `, ${outingLabel}` : ""}${mine ? `, 내 ${BALANCE_LABELS[mine.key]} ${mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"}` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}${
                         signal
                           ? `, ${
                               signal.percent == null
@@ -291,12 +292,15 @@ export function MonthCalendar(props: {
                       : ""}
                   </span>
                 )}
+                {/* 무슨 일정인지 날짜를 열지 않고 읽게 한다. 줄을 늘릴 자리가
+                    없어 첫 제목만 적고 나머지는 개수로 접는다 — 접힌 제목은
+                    title과 aria-label에 그대로 있다. */}
                 {personal.length > 0 && (
                   <span
                     className="cal-personal"
                     title={personal.map((event) => event.title).join(", ")}
                   >
-                    개인{personal.length > 1 ? ` ${personal.length}` : ""}
+                    {personalEventCellLabel(personal)}
                   </span>
                 )}
                 {/* 혼잡도는 날짜를 열어보지 않아도 되게 늘 보여준다.

@@ -576,6 +576,20 @@
   font-size: 10px;
   font-weight: 700;
 }
+/* 좁은 칸에서는 알약의 여백이 제목보다 넓다 — 휴대폰 칸(49px)에서 기본 여백으로는
+   한 글자와 말줄임표밖에 남지 않아 "어떤 일정인가"에 답하지 못한다. 그래서 여백을
+   줄이고 `.cal-mine`처럼 칸 안쪽 여백 바깥까지 넓혀 글자 자리를 되찾는다.
+   화면 폭이 아니라 칸 폭을 보는 이유는 `.cal-outing-word`와 같다: 창은 넓은데
+   날짜 상세가 열려 칸만 좁아진 경우가 여기서도 똑같이 생긴다. */
+@container (max-width: 108px) {
+  .cal-personal {
+    width: calc(100% + 6px);
+    max-width: none;
+    margin: 0 -3px;
+    padding: 1px 3px;
+    font-size: 9px;
+  }
+}
 
 /* 친구 비교 달력의 범례는 사람이 10명이어도 달력 폭을 밀어내지 않는다. */
 .friend-calendar-legend {

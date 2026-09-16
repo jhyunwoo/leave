@@ -2,6 +2,7 @@ import {
   buildMonthGrid,
   getHoliday,
   isWeekend,
+  personalEventCellLabel,
   type ISODate,
 } from "@leave/shared";
 import {
@@ -154,14 +155,14 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
     return result;
   }, [props.calendar.leaves, weeks]);
   const eventsByDate = useMemo(() => {
-    const result = new Map<ISODate, number>();
+    const result = new Map<ISODate, PersonalEvent[]>();
     for (const cell of weeks.flat()) {
       if (!cell.inMonth) continue;
       result.set(
         cell.date,
         props.events.filter(
           (event) => event.startDate <= cell.date && cell.date <= event.endDate,
-        ).length,
+        ),
       );
     }
     return result;
@@ -173,7 +174,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
         <div className="cal-week" role="row" key={index}>
           {week.map((cell) => {
             const people = leavesByDate.get(cell.date) ?? [];
-            const personalCount = eventsByDate.get(cell.date) ?? 0;
+            const personal = eventsByDate.get(cell.date) ?? [];
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             return (
               <button
@@ -196,7 +197,7 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                           })
                           .filter(Boolean)
                           .join(", ") || "없음"
-                      }, 개인 일정 ${personalCount}개`
+                      }${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}`
                     : undefined
                 }
                 className={[
@@ -248,9 +249,12 @@ const FriendMonthGrid = memo(function FriendMonthGrid(props: {
                     <span className="caption">+{people.length - 4}</span>
                   ) : null}
                 </span>
-                {personalCount ? (
-                  <span className="cal-personal">
-                    개인{personalCount > 1 ? ` ${personalCount}` : ""}
+                {personal.length ? (
+                  <span
+                    className="cal-personal"
+                    title={personal.map((event) => event.title).join(", ")}
+                  >
+                    {personalEventCellLabel(personal)}
                   </span>
                 ) : null}
               </button>

@@ -143,3 +143,24 @@ export function buildMonthGrid(month: string): GridCell[][] {
   }
   return weeks;
 }
+
+/**
+ * 달력 한 칸에 적을 개인 일정 이름.
+ *
+ * 칸 높이 예산이 꽉 차 있어 일정마다 줄을 줄 수 없다(웹 `--cal-cell-h`, 네이티브
+ * `cellHeight`는 고정이고 넘치면 잘린다). 그래서 첫 제목만 적고 나머지는 개수로
+ * 접는다 — 같은 칸의 부대 일정 라벨이 쓰는 규칙과 같다. 접힌 제목은 사라지지
+ * 않는다: 날짜 상세와 접근성 라벨에 전부 남는다.
+ *
+ * 길이로는 자르지 않는다. 칸 폭은 화면마다 다르고 그 일은 CSS·`numberOfLines`가
+ * 이미 말줄임으로 처리한다 — 여기서 미리 자르면 넓은 칸에서도 짧아진다.
+ */
+export function personalEventCellLabel(
+  events: readonly { title: string }[],
+): string | null {
+  const first = events[0];
+  if (!first) return null;
+  return events.length > 1
+    ? `${first.title} +${events.length - 1}`
+    : first.title;
+}
