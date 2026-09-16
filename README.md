@@ -99,6 +99,35 @@ pnpm test --filter @leave/api    # API 통합 테스트 (격리 D1 + wrangler de
 - API 문서: http://localhost:8787/docs (OpenAPI 자동 생성)
 - 전체 타입체크/빌드: `pnpm check-types` / `pnpm build`
 
+## 통합 production 배포
+
+```bash
+# 현재 스토어에 출시된 EAS 빌드 ID를 지정합니다. 새 스토어 출시 시 갱신하세요.
+export EAS_PRODUCTION_IOS_BUILD_ID="<iOS EAS build ID>"
+export EAS_PRODUCTION_ANDROID_BUILD_ID="<Android EAS build ID>"
+pnpm deploy:production
+```
+
+`pnpm quality` → web → admin → production OTA 순서로 실행합니다.
+API 배포와 D1 마이그레이션은 포함하지 않습니다.
+
+OTA 발행 전 production 환경에서 두 플랫폼의 fingerprint를 생성하고 지정된 스토어
+빌드의 runtimeVersion과 비교합니다. 최신 성공 빌드는 아직 스토어에 출시되지 않았을
+수 있어 자동 선택하지 않습니다. ID는 EAS 대시보드 또는
+`pnpm --dir apps/native exec eas build:list --build-profile production --status finished --distribution store`
+출력에서 실제 출시된 빌드를 골라 지정하세요.
+
+ID 미지정, runtime 불일치, 미커밋 변경이 있으면 **앱 전체를 건너뛰고** 이유를 출력합니다
+(종료 코드 0, web/admin 배포는 완료). 새 네이티브 빌드나 스토어 제출은 자동 실행하지 않습니다.
+EAS 조회·인증 실패, 잘못된 빌드 정보, fingerprint 생성 실패 등 검증 오류도 OTA를 차단하며
+명령은 실패로 종료합니다. production OTA 단독 커맨드에도 동일한 검사가 적용됩니다
+(`pnpm native:eas:update:production`, 의도적 건너뛰기는 종료 코드 2).
+
+두 플랫폼이 모두 호환되면 Sentry 환경변수 검사 후 iOS 발행·소스맵 업로드,
+Android 발행·소스맵 업로드 순으로 진행합니다. 실제 발행 중 오류가 나면 즉시 멈추고
+실패로 종료합니다. 이미 완료된 web/admin 또는 한 플랫폼의 OTA는 자동 롤백하지 않습니다.
+EAS CLI와 Cloudflare 인증이 설정된 환경에서 실행하세요.
+
 ## 배포 (Cloudflare)
 
 세 워커는 각각 아래 커스텀 도메인으로 나갑니다. 도메인은 `wrangler.jsonc`의

@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { readFileSync, rmSync } from "node:fs";
+import { verifyProductionOta } from "./verify-production-ota.mjs";
 
 const TARGETS = {
   closed: {
@@ -50,6 +52,56 @@ function run(command, args) {
   return result.status ?? 1;
 }
 
+// Production must fail closed before either platform is published.
+if (targetName === "production") {
+  try {
+    const status = spawnSync("git", ["status", "--porcelain"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    });
+    if (status.error || status.status !== 0)
+      throw new Error("Could not inspect the working tree.");
+    if (status.stdout.trim()) {
+      console.error(
+        "Native OTA skipped: commit or stash working-tree changes before publishing.",
+      );
+      process.exit(2);
+    }
+    const app = JSON.parse(
+      readFileSync(path.join(nativeRoot, "app.json"), "utf8"),
+    );
+    if (app.expo.runtimeVersion?.policy !== "fingerprint") {
+      throw new Error(
+        "Production OTA verification requires the fingerprint runtime policy.",
+      );
+    }
+    const result = verifyProductionOta({
+      env: process.env,
+      projectId: app.expo.extra.eas.projectId,
+      readJson(args) {
+        const result = spawnSync("pnpm", ["exec", "eas", ...args], {
+          cwd: nativeRoot,
+          env: process.env,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "inherit"],
+          maxBuffer: 20 * 1024 * 1024,
+        });
+        if (result.error || result.status !== 0) {
+          throw new Error(`OTA verification failed: eas ${args[0]}`);
+        }
+        return JSON.parse(result.stdout);
+      },
+    });
+    if (!result.compatible) {
+      console.error(`Native OTA skipped: ${result.reason}`);
+      process.exit(2);
+    }
+  } catch (error) {
+    console.error(`Native OTA skipped: ${error.message}`);
+    process.exit(1);
+  }
+}
+
 // Sensitive EAS variables are intentionally not copied into the repository.
 // Check their presence in the selected EAS environment before publishing, so
 // an update cannot go live when its source maps are guaranteed to be orphaned.
@@ -63,7 +115,7 @@ const preflight = run("pnpm", [
   target.environment,
   `node ../../scripts/verify-sentry-env.mjs ${target.appEnvironment}`,
 ]);
-if (preflight !== 0) process.exit(preflight);
+if (preflight !== 0) process.exit(1);
 
 // 비대화형 셸(에이전트·CI)에서 `eas update`는 메시지를 스스로 물어볼 수 없어
 // `--message` 없이는 시작도 하지 않는다. `--auto`는 메시지를 만들어 주지만 **EAS
@@ -74,29 +126,38 @@ const message = spawnSync("git", ["log", "-1", "--pretty=%s"], {
   encoding: "utf8",
 }).stdout?.trim();
 
-const update = run("pnpm", [
-  "exec",
-  "eas",
-  "update",
-  "--channel",
-  target.channel,
-  "--environment",
-  target.environment,
-  ...(message ? ["--message", message] : []),
-]);
-if (update !== 0) process.exit(update);
+// Metro exports one platform at a time to fit the deployment host's memory.
+// Upload each platform's maps before the next export replaces dist.
+for (const platform of ["ios", "android"]) {
+  rmSync(path.join(nativeRoot, "dist"), { recursive: true, force: true });
+  const update = run("pnpm", [
+    "exec",
+    "eas",
+    "update",
+    "--channel",
+    target.channel,
+    "--environment",
+    target.environment,
+    "--platform",
+    platform,
+    "--non-interactive",
+    "--message",
+    message || `${targetName} OTA update`,
+  ]);
+  if (update !== 0) process.exit(1);
 
-const upload = run("pnpm", [
-  "exec",
-  "eas",
-  "env:exec",
-  target.environment,
-  "node ../../scripts/upload-sentry-update-artifacts.mjs dist",
-]);
-if (upload !== 0) {
-  console.error(
-    "\nERROR: The OTA update is published, but its Sentry source-map upload failed. " +
-      "Treat this release as unsymbolicated and retry the upload before continuing.",
-  );
-  process.exit(upload);
+  const upload = run("pnpm", [
+    "exec",
+    "eas",
+    "env:exec",
+    target.environment,
+    "node ../../scripts/upload-sentry-update-artifacts.mjs dist",
+  ]);
+  if (upload !== 0) {
+    console.error(
+      `\nERROR: The ${platform} OTA update is published, but its Sentry source-map upload failed. ` +
+        "Treat this release as unsymbolicated and retry the upload before continuing.",
+    );
+    process.exit(1);
+  }
 }

@@ -10,6 +10,7 @@
     "dev": "turbo run dev",
     "dev:admin": "turbo run dev --filter=@leave/admin",
     "dev:web": "turbo run dev --filter=@leave/api --filter=@leave/web",
+    "deploy:production": "node scripts/deploy-production.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
@@ -17,7 +18,7 @@
     "native:eas:update:preview": "node scripts/eas-update-native.mjs preview",
     "native:eas:update:production": "node scripts/eas-update-native.mjs production",
     "quality": "pnpm format:check && pnpm lint && pnpm types:check && pnpm check-types && pnpm test",
-    "test": "turbo run test --concurrency=1",
+    "test": "node --test scripts/test/*.test.mjs && turbo run test --concurrency=1",
     "test:e2e": "turbo run test:e2e",
     "types:check": "turbo run types:check"
   },
