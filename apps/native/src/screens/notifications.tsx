@@ -341,6 +341,13 @@ export function NotificationsScreen() {
                 refreshControl={refreshControl}
               >
                 {webHeader}
+                <Text
+                  style={styles.sectionTitle}
+                  accessibilityLiveRegion="polite"
+                >
+                  전체 {notifications.length}건 · 읽지 않음{" "}
+                  {list.data?.unreadCount ?? 0}건
+                </Text>
                 {!latest ? (
                   emptyPanel
                 ) : (
@@ -409,11 +416,13 @@ export function NotificationsScreen() {
                               key={date}
                               accessibilityRole="button"
                               accessibilityLabel={
-                                mine
-                                  ? `${fmtDateShort(date)}, ${mine.title} 상세 보기`
-                                  : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
+                                selected.friendLeave
+                                  ? `${fmtDateShort(date)} 친구 휴가 상세 보기`
+                                  : mine
+                                    ? `${fmtDateShort(date)}, ${mine.title} 상세 보기`
+                                    : `${fmtDateShort(date)}, 연결된 내 휴가 없음`
                               }
-                              disabled={!mine}
+                              disabled={!mine && !selected.friendLeave}
                               onPress={() => openNotification(selected, [date])}
                               style={styles.affectedRow}
                             >
@@ -424,9 +433,13 @@ export function NotificationsScreen() {
                                 style={styles.affectedLeave}
                                 numberOfLines={1}
                               >
-                                {mine ? mine.title : "연결된 계획 없음"}
+                                {selected.friendLeave
+                                  ? "친구 휴가"
+                                  : mine
+                                    ? mine.title
+                                    : "연결된 계획 없음"}
                               </Text>
-                              {mine ? (
+                              {mine || selected.friendLeave ? (
                                 <Text style={styles.detailLink}>열기</Text>
                               ) : null}
                             </Pressable>
@@ -513,7 +526,10 @@ function NotificationRow(props: {
         }
         accessibilityLabel={`${n.title}${n.read ? "" : ", 안 읽음"}`}
         onPress={props.onPress}
-        style={styles.rowTap}
+        style={[
+          styles.rowTap,
+          props.selected !== undefined && styles.rowTapWide,
+        ]}
       >
         <View
           style={[
@@ -681,6 +697,7 @@ const useStyles = makeStyles(({ colors }) => ({
     flexDirection: "row",
     gap: spacing.md,
   },
+  rowTapWide: { paddingVertical: spacing.md },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,

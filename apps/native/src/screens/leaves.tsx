@@ -42,7 +42,11 @@ import {
   useLeaveBalances,
   useMyLeaves,
 } from "@leave/client";
-import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
+import {
+  sideColumnWidth,
+  useMeasuredSizeClass,
+  useWindowSizeClass,
+} from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -61,7 +65,10 @@ import { LeaveDetailContent } from "./leave-detail-content";
 export function LeavesScreen() {
   const styles = useStyles();
   const colors = useColors();
-  const { sizeClass, isCompact, isExpanded } = useWindowSizeClass();
+  const { sizeClass, isCompact } = useWindowSizeClass();
+  const { width: contentWidth, onLayout } = useMeasuredSizeClass();
+  // 요약과 상세를 뺀 목록에도 최소 400pt를 남긴다.
+  const canShowDetail = !isCompact && contentWidth >= 1200;
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
   const refresh = useRefresh(leaves, balances);
@@ -133,7 +140,7 @@ export function LeavesScreen() {
    * 지금까지처럼 라우트로 민다.
    */
   const openLeave = (leave: MyLeave) => {
-    if (isExpanded) {
+    if (canShowDetail) {
       setSelectedLeaveId((current) => (current === leave.id ? null : leave.id));
       return;
     }
@@ -236,7 +243,7 @@ export function LeavesScreen() {
   );
 
   const renderLeaveRow = (l: MyLeave, index: number) => {
-    const selected = isExpanded && l.id === selectedLeave?.id;
+    const selected = canShowDetail && l.id === selectedLeave?.id;
     return (
       <View
         key={l.id}
@@ -250,7 +257,7 @@ export function LeavesScreen() {
         <View style={styles.leaveMainRow}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={isExpanded ? { selected } : undefined}
+            accessibilityState={canShowDetail ? { selected } : undefined}
             accessibilityLabel={`${l.title} 자세히 보기`}
             onPress={() => openLeave(l)}
             style={{ flex: 1, minWidth: 0 }}
@@ -390,7 +397,7 @@ export function LeavesScreen() {
         </ScrollView>
       ) : (
         <View style={styles.root}>
-          <View style={styles.columns}>
+          <View style={styles.columns} onLayout={onLayout}>
             {/* 열마다 스크롤을 따로 소유한다. 잔여를 보려고 목록을 끝까지
                 내릴 필요가 없어야 넓은 화면을 쓰는 뜻이 있다.
 
@@ -421,7 +428,7 @@ export function LeavesScreen() {
               </ScrollView>
             </View>
 
-            {isExpanded ? (
+            {canShowDetail && selectedLeave ? (
               <View style={styles.detailColumn}>
                 <ScrollView
                   contentInsetAdjustmentBehavior="automatic"

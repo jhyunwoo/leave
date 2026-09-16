@@ -33,16 +33,18 @@ import {
   Text,
   View,
 } from "react-native";
+import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
 import { useRefresh } from "@/lib/use-refresh";
-import { makeStyles, radius, spacing, useColors } from "@/theme";
+import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function FriendsScreen() {
   const styles = useStyles();
+  const { isCompact, sizeClass } = useWindowSizeClass();
   const colors = useColors();
   const router = useRouter();
   const me = useMe();
@@ -99,11 +101,31 @@ export function FriendsScreen() {
     await run(remove.mutateAsync(userId));
   };
 
+  const outgoingPanel = (
+    <>
+      {outgoingCount > 0 ? (
+        <ContentPanel style={styles.card}>
+          <Text style={styles.heading}>보낸 요청 {outgoingCount}건</Text>
+          <Text style={styles.caption}>
+            상대가 수락하면 내 친구 목록에 들어와요.
+          </Text>
+          <Button
+            icon="users"
+            title="보낸 요청 보기"
+            variant="secondary"
+            onPress={openAdd}
+            testID="friends-open-outgoing"
+          />
+        </ContentPanel>
+      ) : null}
+    </>
+  );
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, !isCompact && styles.wideContent]}
       refreshControl={
         <RefreshControl
           refreshing={refresh.refreshing}
@@ -157,161 +179,185 @@ export function FriendsScreen() {
           <Text style={styles.error}>{error}</Text>
         </ContentPanel>
       ) : null}
-      {(incoming.data?.requests.length ?? 0) > 0 ? (
-        <ContentPanel style={styles.card}>
-          <Text style={styles.heading}>받은 요청</Text>
-          {incoming.data!.requests.map((request) => (
-            <View key={request.userId} style={styles.row}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${request.name} 프로필 열기`}
-                disabled={!request.username}
-                onPress={() => openProfile(request.username)}
-                style={styles.who}
-              >
-                <Text style={styles.name}>{request.name}</Text>
-                {request.username ? (
-                  <Text style={styles.caption}>
-                    {formatUsername(request.username)}
-                  </Text>
-                ) : null}
-              </Pressable>
-              <View style={styles.actions}>
-                <Button
-                  icon="check"
-                  title="수락"
-                  size="sm"
-                  disabled={pending}
-                  onPress={() => void run(accept.mutateAsync(request.userId))}
-                />
-                <Button
-                  icon="close"
-                  title="거절"
-                  size="sm"
-                  variant="secondary"
-                  disabled={pending}
-                  onPress={() => void run(decline.mutateAsync(request.userId))}
-                />
-              </View>
-            </View>
-          ))}
-        </ContentPanel>
-      ) : null}
-      <ContentPanel style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.heading}>내 친구</Text>
-          <Text accessibilityLiveRegion="polite" style={styles.count}>
-            {selected.length} / {MAX_FRIEND_CALENDAR_SELECTION} 선택
-          </Text>
-        </View>
-        {friends.isPending ? (
-          <ActivityIndicator color={colors.ink} />
-        ) : friends.data?.friends.length ? (
-          friends.data.friends.map((friend) => {
-            const checked = selected.includes(friend.userId);
-            const disabled =
-              selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
-            return (
-              <View
-                key={friend.userId}
-                style={[
-                  styles.friend,
-                  checked && styles.friendSelected,
-                  disabled && styles.disabled,
-                ]}
-              >
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked, disabled }}
-                  accessibilityLabel={`${friend.name} 달력 비교 선택`}
-                  disabled={disabled}
-                  onPress={() =>
-                    setSelected((current) =>
-                      checked
-                        ? current.filter((id) => id !== friend.userId)
-                        : [...current, friend.userId],
-                    )
-                  }
-                  hitSlop={8}
-                  style={[styles.checkbox, checked && styles.checkboxChecked]}
-                >
-                  <Text style={styles.checkmark}>{checked ? "✓" : ""}</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${friend.name} 프로필 열기`}
-                  disabled={!friend.username}
-                  onPress={() => openProfile(friend.username)}
-                  style={({ pressed }) => [
-                    styles.friendMain,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Avatar name={friend.name} size={36} />
-                  <View style={styles.who}>
-                    <Text style={styles.name}>{friend.name}</Text>
-                    {friend.username ? (
+      <View style={[styles.workspace, !isCompact && styles.workspaceWide]}>
+        <View
+          style={[
+            styles.sidebar,
+            isCompact && !incoming.data?.requests.length && { display: "none" },
+            !isCompact && { width: sideColumnWidth(sizeClass) },
+          ]}
+        >
+          {!isCompact && (
+            <ContentPanel style={styles.card}>
+              <Text style={styles.heading}>함께 보는 휴가</Text>
+              <Text style={styles.body}>
+                친구를 선택하면 최대 10명의 휴가를 달력에서 비교할 수 있어요.
+              </Text>
+              <Button icon="userAdd" title="친구 찾기" onPress={openAdd} />
+              <Text style={styles.caption}>
+                받은 요청 {incoming.data?.requests.length ?? 0}건 · 보낸 요청{" "}
+                {outgoingCount}건
+              </Text>
+            </ContentPanel>
+          )}
+          {(incoming.data?.requests.length ?? 0) > 0 ? (
+            <ContentPanel style={styles.card}>
+              <Text style={styles.heading}>받은 요청</Text>
+              {incoming.data!.requests.map((request) => (
+                <View key={request.userId} style={styles.row}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${request.name} 프로필 열기`}
+                    disabled={!request.username}
+                    onPress={() => openProfile(request.username)}
+                    style={styles.who}
+                  >
+                    <Text style={styles.name}>{request.name}</Text>
+                    {request.username ? (
                       <Text style={styles.caption}>
-                        {formatUsername(friend.username)}
+                        {formatUsername(request.username)}
                       </Text>
                     ) : null}
+                  </Pressable>
+                  <View style={styles.actions}>
+                    <Button
+                      icon="check"
+                      title="수락"
+                      size="sm"
+                      disabled={pending}
+                      onPress={() =>
+                        void run(accept.mutateAsync(request.userId))
+                      }
+                    />
+                    <Button
+                      icon="close"
+                      title="거절"
+                      size="sm"
+                      variant="secondary"
+                      disabled={pending}
+                      onPress={() =>
+                        void run(decline.mutateAsync(request.userId))
+                      }
+                    />
                   </View>
-                </Pressable>
+                </View>
+              ))}
+            </ContentPanel>
+          ) : null}
+          {!isCompact && outgoingPanel}
+        </View>
+        <View style={styles.friendList}>
+          <ContentPanel style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.heading}>
+                내 친구{friends.data ? ` ${friends.data.friends.length}명` : ""}
+              </Text>
+              <Text accessibilityLiveRegion="polite" style={styles.count}>
+                {selected.length} / {MAX_FRIEND_CALENDAR_SELECTION} 선택
+              </Text>
+            </View>
+            {friends.data?.friends.length ? (
+              <Button
+                icon="calendar"
+                title="선택한 친구와 달력 보기"
+                disabled={selected.length === 0}
+                onPress={compare}
+                testID="friends-compare-calendar"
+              />
+            ) : null}
+            {friends.isPending ? (
+              <ActivityIndicator color={colors.ink} />
+            ) : friends.data?.friends.length ? (
+              friends.data.friends.map((friend) => {
+                const checked = selected.includes(friend.userId);
+                const disabled =
+                  selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
+                return (
+                  <View
+                    key={friend.userId}
+                    style={[
+                      styles.friend,
+                      checked && styles.friendSelected,
+                      disabled && styles.disabled,
+                    ]}
+                  >
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked, disabled }}
+                      accessibilityLabel={`${friend.name} 달력 비교 선택`}
+                      disabled={disabled}
+                      onPress={() =>
+                        setSelected((current) =>
+                          checked
+                            ? current.filter((id) => id !== friend.userId)
+                            : [...current, friend.userId],
+                        )
+                      }
+                      hitSlop={8}
+                      style={[
+                        styles.checkbox,
+                        checked && styles.checkboxChecked,
+                      ]}
+                    >
+                      <Text style={styles.checkmark}>{checked ? "✓" : ""}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${friend.name} 프로필 열기`}
+                      disabled={!friend.username}
+                      onPress={() => openProfile(friend.username)}
+                      style={({ pressed }) => [
+                        styles.friendMain,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Avatar name={friend.name} size={36} />
+                      <View style={styles.who}>
+                        <Text style={styles.name}>{friend.name}</Text>
+                        {friend.username ? (
+                          <Text style={styles.caption}>
+                            {formatUsername(friend.username)}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                    <Button
+                      icon="userRemove"
+                      title="삭제"
+                      size="sm"
+                      variant="danger"
+                      disabled={pending}
+                      onPress={() =>
+                        void removeFriend(friend.userId, friend.name)
+                      }
+                    />
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.body}>
+                  아직 친구가 없어요. @아이디로 찾아 요청을 보내고, 상대가
+                  수락하면 여기에서 달력을 함께 볼 수 있어요.
+                </Text>
                 <Button
-                  icon="userRemove"
-                  title="삭제"
-                  size="sm"
-                  variant="danger"
-                  disabled={pending}
-                  onPress={() => void removeFriend(friend.userId, friend.name)}
+                  icon="userAdd"
+                  title="친구 추가"
+                  onPress={openAdd}
+                  testID="friends-empty-add"
                 />
               </View>
-            );
-          })
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.body}>
-              아직 친구가 없어요. @아이디로 찾아 요청을 보내고, 상대가 수락하면
-              여기에서 달력을 함께 볼 수 있어요.
-            </Text>
-            <Button
-              icon="userAdd"
-              title="친구 추가"
-              onPress={openAdd}
-              testID="friends-empty-add"
-            />
-          </View>
-        )}
-        {selected.length >= MAX_FRIEND_CALENDAR_SELECTION ? (
-          <Text style={styles.caption}>
-            한 번에 최대 {MAX_FRIEND_CALENDAR_SELECTION}명까지 비교할 수 있어요.
-          </Text>
-        ) : null}
-        {friends.data?.friends.length ? (
-          <Button
-            icon="calendar"
-            title="선택한 친구와 달력 보기"
-            disabled={selected.length === 0}
-            onPress={compare}
-            testID="friends-compare-calendar"
-          />
-        ) : null}
-      </ContentPanel>
-      {outgoingCount > 0 ? (
-        <ContentPanel style={styles.card}>
-          <Text style={styles.heading}>보낸 요청 {outgoingCount}건</Text>
-          <Text style={styles.caption}>
-            상대가 수락하면 내 친구 목록에 들어와요.
-          </Text>
-          <Button
-            icon="users"
-            title="보낸 요청 보기"
-            variant="secondary"
-            onPress={openAdd}
-            testID="friends-open-outgoing"
-          />
-        </ContentPanel>
-      ) : null}
+            )}
+            {selected.length >= MAX_FRIEND_CALENDAR_SELECTION ? (
+              <Text style={styles.caption}>
+                한 번에 최대 {MAX_FRIEND_CALENDAR_SELECTION}명까지 비교할 수
+                있어요.
+              </Text>
+            ) : null}
+          </ContentPanel>
+        </View>
+      </View>
+      {isCompact && outgoingPanel}
     </ScrollView>
   );
 }
@@ -325,6 +371,11 @@ const useStyles = makeStyles(({ colors }) => ({
     width: "100%",
     alignSelf: "center",
   },
+  wideContent: { maxWidth: layout.workspaceContent },
+  workspace: { gap: spacing.lg },
+  workspaceWide: { flexDirection: "row", alignItems: "flex-start" },
+  sidebar: { gap: spacing.lg },
+  friendList: { flex: 1, minWidth: 0 },
   title: { fontSize: 32, fontWeight: "900", color: colors.ink },
   card: { padding: spacing.lg, gap: spacing.lg },
   heading: { flex: 1, fontSize: 20, fontWeight: "800", color: colors.ink },
