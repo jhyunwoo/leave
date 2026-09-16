@@ -7,6 +7,8 @@
  * 찾는다 — 애초에 공개하려고 만든 식별자다.
  */
 
+import "./workspace.css";
+
 import { ActionIcon } from "../components/ActionIcon";
 
 import {
@@ -179,7 +181,7 @@ export function FriendsPage(props: { me: Me }) {
 
   return (
     <div
-      className="anim-rise"
+      className="anim-rise workspace-page friends-page"
       style={{
         padding: "var(--sp-xl) 0 var(--sp-3xl)",
         display: "grid",
@@ -224,217 +226,233 @@ export function FriendsPage(props: { me: Me }) {
         </p>
       ) : null}
 
-      <Section title="사용자 이름으로 찾기">
-        <div className="field">
-          <label className="field-label" htmlFor="friend-search">
-            사용자 이름 검색
-          </label>
-          <div className="username-input">
-            <span className="username-input-at" aria-hidden="true">
-              @
-            </span>
-            <input
-              id="friend-search"
-              className="input"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="hyunwoo 또는 현우"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoComplete="off"
-              data-testid="friend-search-input"
-            />
-          </div>
-        </div>
-        {query.trim() ? <SearchResults query={debouncedQuery} /> : null}
-      </Section>
-
-      {(incoming.data?.requests.length ?? 0) > 0 ? (
-        <Section title="받은 요청">
-          {incoming.data!.requests.map((request) => (
-            <div key={request.userId} className="friend-row">
-              <Link
-                to={`/u/${request.username ?? ""}`}
-                className="friend-row-main"
-              >
-                <Avatar name={request.name} size={36} />
-                <PersonLine name={request.name} username={request.username} />
-              </Link>
-              <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(
-                      accept.mutateAsync(request.userId),
-                      "친구가 되었어요.",
-                    )
-                  }
-                >
-                  <ActionIcon name="check" />
-                  수락
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(
-                      decline.mutateAsync(request.userId),
-                      "요청을 거절했어요.",
-                    )
-                  }
-                >
-                  <ActionIcon name="close" />
-                  거절
-                </button>
+      <div className="workspace-columns friends-workspace">
+        <aside className="workspace-stack" aria-label="친구 찾기와 요청">
+          <Section title="사용자 이름으로 찾기">
+            <div className="field">
+              <label className="field-label" htmlFor="friend-search">
+                사용자 이름 검색
+              </label>
+              <div className="username-input">
+                <span className="username-input-at" aria-hidden="true">
+                  @
+                </span>
+                <input
+                  id="friend-search"
+                  className="input"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="hyunwoo 또는 현우"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
+                  data-testid="friend-search-input"
+                />
               </div>
             </div>
-          ))}
-        </Section>
-      ) : null}
+            {query.trim() ? <SearchResults query={debouncedQuery} /> : null}
+          </Section>
 
-      {(outgoing.data?.requests.length ?? 0) > 0 ? (
-        <Section title="보낸 요청">
-          {outgoing.data!.requests.map((request) => (
-            <div key={request.userId} className="friend-row">
-              <Link
-                to={`/u/${request.username ?? ""}`}
-                className="friend-row-main"
-              >
-                <Avatar name={request.name} size={36} />
-                <PersonLine name={request.name} username={request.username} />
-              </Link>
-              <span className="caption text-mute">수락 대기</span>
-              <button
-                className="btn btn-secondary btn-sm"
-                disabled={pending}
-                onClick={() =>
-                  void run(
-                    cancel.mutateAsync(request.userId),
-                    "요청을 취소했어요.",
-                  )
-                }
-              >
-                취소
-              </button>
-            </div>
-          ))}
-        </Section>
-      ) : null}
-
-      <Section title="내 친구">
-        {friends.isPending ? (
-          <div
-            className="spinner"
-            role="status"
-            aria-label="친구 불러오는 중"
-          />
-        ) : friends.isError ? (
-          <p role="alert" className="field-error">
-            친구 목록을 불러오지 못했어요.
-          </p>
-        ) : friends.data?.friends.length ? (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "var(--sp-md)",
-                flexWrap: "wrap",
-              }}
-            >
-              <strong aria-live="polite">
-                {selected.length} / {MAX_FRIEND_CALENDAR_SELECTION} 선택
-              </strong>
-              <button
-                className="btn btn-primary"
-                disabled={selected.length === 0}
-                onClick={() =>
-                  void navigate(`/?mode=friends&friends=${selected.join(",")}`)
-                }
-              >
-                <ActionIcon name="calendar" />
-                선택한 친구와 달력 보기
-              </button>
-            </div>
-            <div style={{ display: "grid", gap: "var(--sp-sm)" }}>
-              {friends.data.friends.map((friend) => {
-                const checked = selected.includes(friend.userId);
-                const limitReached =
-                  selected.length >= MAX_FRIEND_CALENDAR_SELECTION && !checked;
-                return (
-                  <div key={friend.userId} className="friend-row">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={limitReached}
-                      aria-label={`${friend.name} 선택${limitReached ? ", 최대 10명까지 선택 가능" : ""}`}
-                      onChange={() =>
-                        setSelected((current) =>
-                          checked
-                            ? current.filter((id) => id !== friend.userId)
-                            : [...current, friend.userId],
+          {(incoming.data?.requests.length ?? 0) > 0 ? (
+            <Section title="받은 요청">
+              {incoming.data!.requests.map((request) => (
+                <div key={request.userId} className="friend-row">
+                  <Link
+                    to={`/u/${request.username ?? ""}`}
+                    className="friend-row-main"
+                  >
+                    <Avatar name={request.name} size={36} />
+                    <PersonLine
+                      name={request.name}
+                      username={request.username}
+                    />
+                  </Link>
+                  <div style={{ display: "flex", gap: "var(--sp-sm)" }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={pending}
+                      onClick={() =>
+                        void run(
+                          accept.mutateAsync(request.userId),
+                          "친구가 되었어요.",
                         )
                       }
-                      style={{ width: 20, height: 20 }}
-                    />
-                    <Link
-                      to={`/u/${friend.username ?? ""}`}
-                      className="friend-row-main"
                     >
-                      <Avatar name={friend.name} size={36} />
-                      <PersonLine
-                        name={friend.name}
-                        username={friend.username}
-                      />
-                    </Link>
+                      <ActionIcon name="check" />
+                      수락
+                    </button>
                     <button
                       className="btn btn-secondary btn-sm"
+                      disabled={pending}
                       onClick={() =>
-                        void navigate(`/?mode=friends&friends=${friend.userId}`)
+                        void run(
+                          decline.mutateAsync(request.userId),
+                          "요청을 거절했어요.",
+                        )
                       }
                     >
-                      <ActionIcon name="calendar" />
-                      비교
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      disabled={pending}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `${friend.name}님을 친구에서 삭제할까요?`,
-                          )
-                        )
-                          void run(
-                            remove.mutateAsync(friend.userId),
-                            "친구를 삭제했어요.",
-                          );
-                      }}
-                    >
-                      <ActionIcon name="userRemove" />
-                      삭제
+                      <ActionIcon name="close" />
+                      거절
                     </button>
                   </div>
-                );
-              })}
-            </div>
-            {selected.length >= MAX_FRIEND_CALENDAR_SELECTION ? (
-              <p className="field-hint" role="status">
-                한 번에 최대 10명까지 비교할 수 있어요.
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-body">
-            아직 친구가 없어요. 위에서 @아이디로 찾아 요청을 보내고, 상대가
-            수락하면 일정 비교를 시작할 수 있어요.
-          </p>
-        )}
-      </Section>
+                </div>
+              ))}
+            </Section>
+          ) : null}
+
+          {(outgoing.data?.requests.length ?? 0) > 0 ? (
+            <Section title="보낸 요청">
+              {outgoing.data!.requests.map((request) => (
+                <div key={request.userId} className="friend-row">
+                  <Link
+                    to={`/u/${request.username ?? ""}`}
+                    className="friend-row-main"
+                  >
+                    <Avatar name={request.name} size={36} />
+                    <PersonLine
+                      name={request.name}
+                      username={request.username}
+                    />
+                  </Link>
+                  <span className="caption text-mute">수락 대기</span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={pending}
+                    onClick={() =>
+                      void run(
+                        cancel.mutateAsync(request.userId),
+                        "요청을 취소했어요.",
+                      )
+                    }
+                  >
+                    취소
+                  </button>
+                </div>
+              ))}
+            </Section>
+          ) : null}
+        </aside>
+        <Section
+          title={`내 친구${friends.data ? ` ${friends.data.friends.length}명` : ""}`}
+        >
+          {friends.isPending ? (
+            <div
+              className="spinner"
+              role="status"
+              aria-label="친구 불러오는 중"
+            />
+          ) : friends.isError ? (
+            <p role="alert" className="field-error">
+              친구 목록을 불러오지 못했어요.
+            </p>
+          ) : friends.data?.friends.length ? (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "var(--sp-md)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <strong aria-live="polite">
+                  {selected.length} / {MAX_FRIEND_CALENDAR_SELECTION} 선택
+                </strong>
+                <button
+                  className="btn btn-primary"
+                  disabled={selected.length === 0}
+                  onClick={() =>
+                    void navigate(
+                      `/?mode=friends&friends=${selected.join(",")}`,
+                    )
+                  }
+                >
+                  <ActionIcon name="calendar" />
+                  선택한 친구와 달력 보기
+                </button>
+              </div>
+              <div style={{ display: "grid", gap: "var(--sp-sm)" }}>
+                {friends.data.friends.map((friend) => {
+                  const checked = selected.includes(friend.userId);
+                  const limitReached =
+                    selected.length >= MAX_FRIEND_CALENDAR_SELECTION &&
+                    !checked;
+                  return (
+                    <div key={friend.userId} className="friend-row">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={limitReached}
+                        aria-label={`${friend.name} 선택${limitReached ? ", 최대 10명까지 선택 가능" : ""}`}
+                        onChange={() =>
+                          setSelected((current) =>
+                            checked
+                              ? current.filter((id) => id !== friend.userId)
+                              : [...current, friend.userId],
+                          )
+                        }
+                        style={{ width: 20, height: 20 }}
+                      />
+                      <Link
+                        to={`/u/${friend.username ?? ""}`}
+                        className="friend-row-main"
+                      >
+                        <Avatar name={friend.name} size={36} />
+                        <PersonLine
+                          name={friend.name}
+                          username={friend.username}
+                        />
+                      </Link>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() =>
+                          void navigate(
+                            `/?mode=friends&friends=${friend.userId}`,
+                          )
+                        }
+                      >
+                        <ActionIcon name="calendar" />
+                        비교
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        disabled={pending}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `${friend.name}님을 친구에서 삭제할까요?`,
+                            )
+                          )
+                            void run(
+                              remove.mutateAsync(friend.userId),
+                              "친구를 삭제했어요.",
+                            );
+                        }}
+                      >
+                        <ActionIcon name="userRemove" />
+                        삭제
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              {selected.length >= MAX_FRIEND_CALENDAR_SELECTION ? (
+                <p className="field-hint" role="status">
+                  한 번에 최대 10명까지 비교할 수 있어요.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-body">
+              아직 친구가 없어요. @아이디로 찾아 요청을 보내고, 상대가 수락하면
+              일정 비교를 시작할 수 있어요.
+            </p>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }

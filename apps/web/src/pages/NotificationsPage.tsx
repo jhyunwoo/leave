@@ -2,6 +2,8 @@
  * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
  */
 
+import "./workspace.css";
+
 import { ActionIcon } from "../components/ActionIcon";
 
 import { useState, type KeyboardEvent } from "react";
@@ -143,17 +145,7 @@ export function NotificationsPage() {
   const [latest, ...earlier] = notifications;
 
   return (
-    <div
-      className="anim-rise"
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        padding: "var(--sp-lg) 0 var(--sp-3xl)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--sp-xl)",
-      }}
-    >
+    <div className="anim-rise workspace-page notifications-page">
       {friendDetail?.notification.friendLeave && (
         <FriendLeaveNotificationModal
           target={friendDetail.notification.friendLeave}
@@ -162,6 +154,7 @@ export function NotificationsPage() {
         />
       )}
       <header
+        className="workspace-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -175,7 +168,7 @@ export function NotificationsPage() {
             className="body-lg text-body"
             style={{ marginTop: "var(--sp-sm)" }}
           >
-            최대 출타 인원 초과 소식을 여기서 확인해요.
+            친구의 휴가와 출타 인원 초과 소식을 확인해요.
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--sp-sm)", flexShrink: 0 }}>
@@ -199,6 +192,11 @@ export function NotificationsPage() {
         </div>
       </header>
 
+      {list.data && (
+        <p className="caption text-mute">
+          전체 {notifications.length}건 · 읽지 않음 {list.data.unreadCount}건
+        </p>
+      )}
       {list.isPending ? (
         <div
           style={{
@@ -223,10 +221,10 @@ export function NotificationsPage() {
           </p>
         </div>
       ) : (
-        <>
+        <div className="workspace-columns notifications-workspace">
           {/* 최근 알림은 목록에서 떼어내 가장 먼저, 가장 크게 보여준다. */}
           <section
-            className="card"
+            className="card notification-latest"
             data-testid="latest-notification"
             role="button"
             tabIndex={0}
@@ -336,7 +334,7 @@ export function NotificationsPage() {
               </ul>
             </section>
           )}
-        </>
+        </div>
       )}
     </div>
   );

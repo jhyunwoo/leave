@@ -4,6 +4,8 @@
  * 재원별 잔여 요약도 함께 보여준다.
  */
 
+import "./workspace.css";
+
 import { ActionIcon } from "../components/ActionIcon";
 
 import {
@@ -81,18 +83,9 @@ export function LeavesPage() {
   );
 
   return (
-    <div
-      className="anim-rise"
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        padding: "var(--sp-lg) 0 var(--sp-3xl)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--sp-xl)",
-      }}
-    >
+    <div className="anim-rise workspace-page leaves-page">
       <header
+        className="workspace-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -121,173 +114,185 @@ export function LeavesPage() {
         </button>
       </header>
 
-      <NextLeaveCards leaves={leaves.data?.leaves} />
+      <div className="workspace-columns leaves-workspace">
+        <aside className="workspace-stack" aria-label="휴가 요약">
+          <NextLeaveCards leaves={leaves.data?.leaves} />
 
-      {balances.data && (
-        <Link
-          to="/leaves/grants"
-          className="card-sage"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "var(--sp-md)",
-            padding: "var(--sp-lg)",
-            textDecoration: "none",
-          }}
-        >
-          <span>
-            <span className="caption text-mute" style={{ display: "block" }}>
-              보유 휴가
-            </span>
-            <span
-              className="display-xs"
-              style={{ display: "block", marginTop: 2 }}
+          {balances.data && (
+            <Link
+              to="/leaves/grants"
+              className="card-sage"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--sp-md)",
+                padding: "var(--sp-lg)",
+                textDecoration: "none",
+              }}
             >
-              남은 휴가 {holdings.remaining}일
-            </span>
-            <span
-              className="caption"
-              style={{ display: "block", marginTop: 2 }}
-            >
-              {[
-                holdings.planned > 0 ? `계획 ${holdings.planned}일` : null,
-                holdings.expiringSoon > 0
-                  ? `만료 임박 ${holdings.expiringSoon}일`
-                  : null,
-                holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "만기 기한과 정기외박 주기를 관리해요"}
-            </span>
-          </span>
-          <span aria-hidden="true" style={{ fontSize: 24 }}>
-            ›
-          </span>
-        </Link>
-      )}
-
-      {visibleBalances.length > 0 && (
-        <section className="metric-strip" aria-label="휴가 잔여량">
-          {visibleBalances.map((item) => (
-            <div key={item.key} className="metric-strip__item">
-              <p className="caption text-mute">{item.label}</p>
-              <p className="display-xs" style={{ marginTop: 2 }}>
-                {item.remainingAsOfTodayDays}일
-              </p>
-              {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
-              <p className="caption text-mute">
-                {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} · 사용{" "}
-                {item.usedToDateDays}
-                {item.plannedDays > 0 ? ` · 계획 ${item.plannedDays}` : ""}
-              </p>
-              {item.expiredDays > 0 && (
-                <p className="caption" style={{ color: "#a72027" }}>
-                  만료 {item.expiredDays}일
-                </p>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
-
-      {leaves.isPending ? (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "var(--sp-3xl)",
-          }}
-        >
-          <div className="spinner" role="status" aria-label="불러오는 중" />
-        </div>
-      ) : !leaves.data || leaves.data.leaves.length === 0 ? (
-        <div
-          className="card-sage"
-          style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
-        >
-          <p className="body-lg strong">아직 등록한 휴가가 없어요</p>
-          <p
-            className="body-sm text-body"
-            style={{ marginTop: "var(--sp-sm)" }}
-          >
-            휴가를 등록하면 부대 달력에 함께 표시돼요.
-          </p>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--sp-xl)",
-          }}
-        >
-          {/* 건수를 라벨에 함께 적는다 — 빈 탭이라는 것을 누르기 전에 알 수 있다. */}
-          <div className="segmented-toggle" role="group" aria-label="출타 종류">
-            {LEAVE_KINDS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="segmented-toggle__option"
-                aria-pressed={value === kind}
-                aria-controls="my-leave-sections"
-                onClick={() => setKind(value)}
-              >
-                {LEAVE_KIND_LABELS[value]} {kindTotal(value)}
-              </button>
-            ))}
-          </div>
-
-          <div
-            id="my-leave-sections"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--sp-xl)",
-            }}
-          >
-            {kindTotal(kind) === 0 ? (
-              <div
-                className="card-sage"
-                style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
-              >
-                <p className="body-lg strong">
-                  등록한 {LEAVE_KIND_LABELS[kind]} 기록이 없어요
-                </p>
-                <p
-                  className="body-sm text-body"
-                  style={{ marginTop: "var(--sp-sm)" }}
+              <span>
+                <span
+                  className="caption text-mute"
+                  style={{ display: "block" }}
                 >
-                  다른 탭에서 나머지 출타를 볼 수 있어요.
-                </p>
+                  보유 휴가
+                </span>
+                <span
+                  className="display-xs"
+                  style={{ display: "block", marginTop: 2 }}
+                >
+                  남은 휴가 {holdings.remaining}일
+                </span>
+                <span
+                  className="caption"
+                  style={{ display: "block", marginTop: 2 }}
+                >
+                  {[
+                    holdings.planned > 0 ? `계획 ${holdings.planned}일` : null,
+                    holdings.expiringSoon > 0
+                      ? `만료 임박 ${holdings.expiringSoon}일`
+                      : null,
+                    holdings.expired > 0 ? `소멸 ${holdings.expired}일` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "만기 기한과 정기외박 주기를 관리해요"}
+                </span>
+              </span>
+              <span aria-hidden="true" style={{ fontSize: 24 }}>
+                ›
+              </span>
+            </Link>
+          )}
+
+          {visibleBalances.length > 0 && (
+            <section className="metric-strip" aria-label="휴가 잔여량">
+              {visibleBalances.map((item) => (
+                <div key={item.key} className="metric-strip__item">
+                  <p className="caption text-mute">{item.label}</p>
+                  <p className="display-xs" style={{ marginTop: 2 }}>
+                    {item.remainingAsOfTodayDays}일
+                  </p>
+                  {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
+                  <p className="caption text-mute">
+                    {item.cycleScoped ? "이번 주기 " : ""}총 {item.totalDays} ·
+                    사용 {item.usedToDateDays}
+                    {item.plannedDays > 0 ? ` · 계획 ${item.plannedDays}` : ""}
+                  </p>
+                  {item.expiredDays > 0 && (
+                    <p className="caption" style={{ color: "#a72027" }}>
+                      만료 {item.expiredDays}일
+                    </p>
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
+        </aside>
+        <div className="workspace-stack">
+          {leaves.isPending ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "var(--sp-3xl)",
+              }}
+            >
+              <div className="spinner" role="status" aria-label="불러오는 중" />
+            </div>
+          ) : !leaves.data || leaves.data.leaves.length === 0 ? (
+            <div
+              className="card-sage"
+              style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
+            >
+              <p className="body-lg strong">아직 등록한 휴가가 없어요</p>
+              <p
+                className="body-sm text-body"
+                style={{ marginTop: "var(--sp-sm)" }}
+              >
+                휴가를 등록하면 부대 달력에 함께 표시돼요.
+              </p>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--sp-xl)",
+              }}
+            >
+              {/* 건수를 라벨에 함께 적는다 — 빈 탭이라는 것을 누르기 전에 알 수 있다. */}
+              <div
+                className="segmented-toggle"
+                role="group"
+                aria-label="출타 종류"
+              >
+                {LEAVE_KINDS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="segmented-toggle__option"
+                    aria-pressed={value === kind}
+                    aria-controls="my-leave-sections"
+                    onClick={() => setKind(value)}
+                  >
+                    {LEAVE_KIND_LABELS[value]} {kindTotal(value)}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <>
-                {/* 탭을 바꾸면 "더 보기"로 펼쳐 둔 몫도 처음으로 돌아가야 한다.
+
+              <div
+                id="my-leave-sections"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--sp-xl)",
+                }}
+              >
+                {kindTotal(kind) === 0 ? (
+                  <div
+                    className="card-sage"
+                    style={{ textAlign: "center", padding: "var(--sp-3xl)" }}
+                  >
+                    <p className="body-lg strong">
+                      등록한 {LEAVE_KIND_LABELS[kind]} 기록이 없어요
+                    </p>
+                    <p
+                      className="body-sm text-body"
+                      style={{ marginTop: "var(--sp-sm)" }}
+                    >
+                      다른 탭에서 나머지 출타를 볼 수 있어요.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* 탭을 바꾸면 "더 보기"로 펼쳐 둔 몫도 처음으로 돌아가야 한다.
                     key로 다시 마운트하는 편이 effect로 되돌리는 것보다 낫다. */}
-                <LeaveSection
-                  key={`${kind}-upcoming`}
-                  id="upcoming-leaves"
-                  title={`다가오는 ${LEAVE_KIND_LABELS[kind]}`}
-                  leaves={sections.upcoming}
-                  deleting={deleting}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                />
-                <LeaveSection
-                  key={`${kind}-past`}
-                  id="past-leaves"
-                  title={`지난 ${LEAVE_KIND_LABELS[kind]}`}
-                  leaves={sections.past}
-                  deleting={deleting}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                />
-              </>
-            )}
-          </div>
+                    <LeaveSection
+                      key={`${kind}-upcoming`}
+                      id="upcoming-leaves"
+                      title={`다가오는 ${LEAVE_KIND_LABELS[kind]}`}
+                      leaves={sections.upcoming}
+                      deleting={deleting}
+                      onEdit={setEditing}
+                      onDelete={onDelete}
+                    />
+                    <LeaveSection
+                      key={`${kind}-past`}
+                      id="past-leaves"
+                      title={`지난 ${LEAVE_KIND_LABELS[kind]}`}
+                      leaves={sections.past}
+                      deleting={deleting}
+                      onEdit={setEditing}
+                      onDelete={onDelete}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {(creating || editing) && (
         <LazyLeaveFormModal

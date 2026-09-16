@@ -1,0 +1,60 @@
+.workspace-page {
+  width: 100%;
+  padding: var(--sp-lg) 0 var(--sp-3xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+}
+
+.workspace-header {
+  flex-wrap: wrap;
+}
+
+.workspace-columns,
+.workspace-stack {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-xl);
+  min-width: 0;
+}
+
+.workspace-columns > * {
+  min-width: 0;
+}
+
+.workspace-page .friend-row {
+  flex-wrap: wrap;
+}
+
+.workspace-page .friend-row-main {
+  min-width: 120px;
+}
+
+.workspace-page .friend-row strong,
+.workspace-page .content-row,
+.notification-latest {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .workspace-columns {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.6fr);
+    align-items: start;
+  }
+
+  .friends-workspace {
+    grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.6fr);
+  }
+
+  .notifications-workspace {
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 1.5fr);
+  }
+
+  .notifications-workspace:has(> :only-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-page .content-row {
+    padding: var(--sp-lg);
+  }
+}
