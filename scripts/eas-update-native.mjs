@@ -89,7 +89,13 @@ if (targetName === "production") {
         if (result.error || result.status !== 0) {
           throw new Error(`OTA verification failed: eas ${args[0]}`);
         }
-        return JSON.parse(result.stdout);
+        // `--json` still prints a banner naming the loaded EAS environment,
+        // so parse from the first line that opens the document.
+        const start = result.stdout.search(/^[[{]/m);
+        if (start < 0) {
+          throw new Error(`OTA verification found no JSON: eas ${args[0]}`);
+        }
+        return JSON.parse(result.stdout.slice(start));
       },
     });
     if (!result.compatible) {
