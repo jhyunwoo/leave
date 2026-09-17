@@ -15,13 +15,14 @@
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui";
 import {
   frame,
+  onGeometryChange,
   presentationBackground,
   presentationDetents,
   presentationDragIndicator,
   type ModifierConfig,
   type PresentationDetent,
 } from "@expo/ui/swift-ui/modifiers";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { View } from "react-native";
 import { useColors } from "@/theme";
 import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
@@ -50,16 +51,38 @@ export function NativeBottomSheet(props: {
   // 대신 RN 콘텐츠가 시트를 가득 채우게 두고(시트가 모서리를 알아서 클리핑한다),
   // 드래그 인디케이터 자리는 콘텐츠 '안쪽' 여백(SHEET_GRABBER_INSET)으로 잡는다.
   const fitToContents = snapPoints.length === 0;
-  // SwiftUI 시트는 자기 높이를 RN 트리에 내려준다. 못 박지 않는다(sheet-snap-point.ts).
-  const pinned = pinnedSheetHeight(props.snapPoints, "detent");
+  /**
+   * 시트가 RN 표면에 실제로 내준 높이. 호스트가 `onGeometryChange`로 알려준다.
+   *
+   * 닫힐 때 지우지 않는다. 다시 열릴 때 창이 작아져 있으면 이 값은 새 디텐트보다
+   * 커지고, `pinnedSheetHeight`가 그런 값을 버리고 어림값으로 돌아간다 — 어림값은
+   * 시트보다 짧으므로 다음 실측이 곧 제 높이를 알려 준다.
+   */
+  const [hostHeight, setHostHeight] = useState<number | null>(null);
+
+  // 시트가 내준 높이를 RN 트리에 못 박는다. 안 박으면 루트가 콘텐츠를 따라 자라
+  // 안쪽 스크롤이 생기지 않는다(sheet-snap-point.ts).
+  const pinned = pinnedSheetHeight(props.snapPoints, "detent", hostHeight);
   const modifiers: ModifierConfig[] = [
     frame({
       maxWidth: Infinity,
       // 디텐트를 준 시트는 높이가 이미 정해져 있다. 늘려서 채우지 않으면 RN 트리가
       // 콘텐츠 높이에서 멈춰 시트 아래쪽이 빈 채로 남는다. 콘텐츠 높이에 맞추는
       // 시트(fitToContents)에는 걸면 안 된다 — 시트가 화면 전체로 커진다.
+      //
+      // 늘리기만 할 뿐 깎지는 못한다는 점이 중요하다. SwiftUI의 유연 프레임은
+      // `max(자식, 제안된 높이)`라, 콘텐츠가 시트보다 길면 그 길이가 그대로 남는다.
+      // 깎는 일은 위의 `pinned`가 맡는다.
       ...(fitToContents ? null : { maxHeight: Infinity }),
       alignment: "topLeading",
+    }),
+    // 늘어난 **뒤**의 높이, 즉 시트가 표면에 실제로 내준 높이를 되돌려 받는다.
+    // 모디파이어는 배열 순서대로 안쪽에서 바깥쪽으로 감싸므로 `frame` 뒤여야 한다.
+    // 콘텐츠를 시트보다 짧게 못 박아 두었으므로(`DETENT_SURFACE_SLACK`) 이 값은
+    // 콘텐츠 길이에 휘둘리지 않고 시트 높이 그 자체다.
+    onGeometryChange(({ height }) => {
+      const next = Math.round(height);
+      setHostHeight((current) => (current === next ? current : next));
     }),
     presentationDragIndicator("visible"),
     // 시트 자체의 배경을 콘텐츠와 같은 색으로 칠한다.
@@ -73,7 +96,8 @@ export function NativeBottomSheet(props: {
     // 시트가 표면에 얼마를 내주든 남는 자리가 콘텐츠와 같은 색이면 틈으로 보이지
     // 않는다. `presentationBackground`는 보통의 `background`가 닿지 못하는 시트
     // 크롬(드래그 인디케이터 자리와 안전 영역 여백)까지 칠하므로, OS 판이 시트
-    // 모양을 또 바꾸더라도 이 규칙은 그대로 선다.
+    // 모양을 또 바꾸더라도 이 규칙은 그대로 선다. 실측값이 오기 전 한 프레임 동안
+    // 표면이 조금 짧은 것도 이 배경이 덮는다.
     presentationBackground(colors.canvasSoft),
   ];
   if (!fitToContents) {

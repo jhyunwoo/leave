@@ -385,8 +385,9 @@ export function CalendarScreen() {
    */
   const daySheetPresented =
     isCompact && selectedDate != null && !formDate && !editingLeave;
-  // 날짜 상세 시트 높이. 시트 디텐트와 시트 안 RN 콘텐츠가 같은 값을 써야
-  // 안쪽 스크롤이 바닥까지 닿는다(sheet-snap-point.ts의 pinnedSheetHeight).
+  // 날짜 상세 시트 높이. 절대 높이 하나로 줘야 시트 안 RN 콘텐츠에도 같은 기준의
+  // 높이를 못 박을 수 있고, 그래야 안쪽 스크롤이 바닥까지 닿는다. 못 박을 값을
+  // 호스트마다 어떻게 정하는지는 sheet-snap-point.ts의 pinnedSheetHeight에 있다.
   const daySheetHeight = Math.round(windowHeight * 0.75);
 
   const calendarPane = (
