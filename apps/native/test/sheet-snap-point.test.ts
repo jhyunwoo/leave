@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pinnedSheetHeight } from "../src/components/sheet-snap-point";
+import {
+  fittedDetentHeight,
+  pinnedSheetHeight,
+} from "../src/components/sheet-snap-point";
 
 /**
  * 시트 안 RN 트리에는 **언제나** 높이를 못 박아야 한다. 안 박으면 루트가 콘텐츠를
@@ -70,5 +73,58 @@ describe("시트 높이를 RN 콘텐츠에 못 박는 규칙", () => {
     expect(
       pinnedSheetHeight([{ height: 320 }, "full"], "detent", 598),
     ).toBeNull();
+  });
+});
+
+/**
+ * 시트 높이를 창의 몇 퍼센트로 고정하면, 콘텐츠가 그 안에 들어가는지는 운이 된다.
+ * 날짜 상세 시트가 그랬다 — 창의 75%를 줬는데 명단도 일정도 없는 가장 짧은 날조차
+ * 본문이 시트보다 길어, 맨 아래 캡슐이 늘 접히는 자리에 걸쳐 반이 잘렸다.
+ */
+describe("콘텐츠에 맞춘 디텐트 높이", () => {
+  const bounds = { min: 639, max: 784 };
+
+  it("아직 재지 못했으면 하한으로 연다", () => {
+    // 본문이 스피너 하나인 로딩 중에 시트가 손바닥만 하게 열리면 안 된다.
+    expect(fittedDetentHeight(null, "detent", bounds)).toBe(639);
+    expect(fittedDetentHeight(undefined, "content", bounds)).toBe(639);
+    expect(fittedDetentHeight(0, "detent", bounds)).toBe(639);
+    expect(fittedDetentHeight(-1, "detent", bounds)).toBe(639);
+  });
+
+  it("디텐트 호스트에는 시트가 표면에 내주지 않는 몫까지 더해 청한다", () => {
+    // 디텐트 숫자만큼이 RN 표면으로 오지 않는다(DETENT_SURFACE_SLACK).
+    const fitted = fittedDetentHeight(660, "detent", bounds);
+    expect(fitted).toBeGreaterThan(660);
+    expect(fitted).toBeLessThanOrEqual(784);
+  });
+
+  it("콘텐츠 호스트에는 더하지 않는다 — 디텐트 숫자가 곧 시트 높이다", () => {
+    expect(fittedDetentHeight(660, "content", bounds)).toBe(660);
+    expect(fittedDetentHeight(659.2, "content", bounds)).toBe(660);
+  });
+
+  it("한계 밖으로는 나가지 않는다", () => {
+    expect(fittedDetentHeight(100, "detent", bounds)).toBe(639);
+    expect(fittedDetentHeight(100, "content", bounds)).toBe(639);
+    expect(fittedDetentHeight(5000, "detent", bounds)).toBe(784);
+    expect(fittedDetentHeight(5000, "content", bounds)).toBe(784);
+  });
+
+  it("한계가 뒤집혀 있어도 상한이 하한을 넘지 않는다", () => {
+    expect(fittedDetentHeight(900, "content", { min: 700, max: 500 })).toBe(
+      700,
+    );
+  });
+
+  it("짧은 날의 본문이 시트 안에 들어간다", () => {
+    // 393x852에서 실측: 헤더 71pt + 본문 557pt. 예전 고정 높이(639pt)가 표면에
+    // 내주던 588pt로는 모자라 하단 캡슐이 반 잘렸다.
+    const fitted = fittedDetentHeight(71 + 557, "detent", {
+      min: 639,
+      max: 784,
+    });
+    // 이 디텐트가 표면에 내주는 높이(실측 기준 약 51pt를 뺀 값)가 본문을 담는다.
+    expect(fitted - 51).toBeGreaterThanOrEqual(71 + 557);
   });
 });

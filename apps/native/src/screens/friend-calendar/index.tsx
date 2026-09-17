@@ -31,8 +31,19 @@ import {
   SHEET_GRABBER_INSET,
   SheetScaffold,
 } from "@/components/sheet-scaffold";
+import { useFittedSheetHeight } from "@/components/use-fitted-sheet-height";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
 import { FriendDayPanel } from "./day-panel";
+
+/**
+ * 날짜 상세 시트 높이의 아래·위 한계(창 높이 대비).
+ *
+ * 아래는 예전의 고정 높이 그대로다 — 달력이 오기 전 본문이 스피너 하나뿐일 때
+ * 시트가 작게 열렸다 커지는 것을 막아 준다. 위는 콘텐츠가 아무리 길어도 시트 위로
+ * 달력이 조금은 보이게 남겨 두는 선이다. 그 사이는 콘텐츠가 정한다.
+ */
+const DAY_SHEET_MIN_RATIO = 0.75;
+const DAY_SHEET_MAX_RATIO = 0.92;
 
 const LEGEND_HEIGHT = 42;
 const WEEK_ROW_HEIGHT = 32;
@@ -229,7 +240,12 @@ export function FriendCalendarScreen() {
   );
 
   const daySheetPresented = isCompact && selectedDate != null;
-  const daySheetHeight = Math.round(windowHeight * 0.75);
+  // 시트 높이는 콘텐츠가 정한다 — 고정 비율은 하단 동작이 접히는 자리에 걸치게
+  // 만든다(sheet-snap-point.ts의 fittedDetentHeight).
+  const daySheet = useFittedSheetHeight({
+    min: Math.round(windowHeight * DAY_SHEET_MIN_RATIO),
+    max: Math.round(windowHeight * DAY_SHEET_MAX_RATIO),
+  });
 
   return (
     <>
@@ -253,7 +269,7 @@ export function FriendCalendarScreen() {
 
       <NativeBottomSheet
         isPresented={daySheetPresented}
-        snapPoints={[{ height: daySheetHeight }]}
+        snapPoints={[{ height: daySheet.height }]}
         testID="friend-calendar-day-sheet"
         onDismiss={() => {
           pendingAfterSheet.current = null;
@@ -286,6 +302,7 @@ export function FriendCalendarScreen() {
           title="날짜 상세"
           onClose={() => setSelectedDate(null)}
           contentContainerStyle={styles.sheetContent}
+          onContentHeightChange={daySheet.onContentHeightChange}
           headerTopInset={SHEET_GRABBER_INSET}
         >
           {calendar.isPending ? (
@@ -392,8 +409,11 @@ const useStyles = makeStyles(({ colors }) => ({
     fontWeight: "700",
     color: colors.ink,
   },
-  /** 여백은 패널이 들고 있다(day-panel.tsx) — 시트는 자리만 내준다. */
-  sheetContent: { padding: 0, gap: 0 },
+  /**
+   * 여백은 패널이 들고 있다(day-panel.tsx) — 시트는 자리만 내준다. `padding`만으로는
+   * 스캐폴드가 따로 건 `paddingBottom`이 살아남아 아래에만 더 붙으므로 같이 지운다.
+   */
+  sheetContent: { padding: 0, paddingBottom: 0, gap: 0 },
   sheetLoading: { padding: spacing.xxxl, alignItems: "center" },
   /** 인스펙터는 이미 양옆 여백과 머리글을 갖고 있어 패널의 여백을 덜어 낸다. */
   panelInInspector: { paddingHorizontal: 0, paddingTop: 0 },

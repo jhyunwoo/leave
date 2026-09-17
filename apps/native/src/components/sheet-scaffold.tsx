@@ -3,7 +3,7 @@
  * 사용처: FormSheet를 쓰는 모든 시트.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Platform,
   ScrollView,
@@ -61,15 +61,39 @@ export function SheetScaffold(props: {
    * 스크롤을 끈다(`calendar-scroll.tsx`).
    */
   scrollEnabled?: boolean;
+  /**
+   * 이 스캐폴드가 요청하는 높이(pt) — 헤더 + 본문 + 푸터를 다 펼쳤을 때의 높이.
+   *
+   * 시트 높이를 콘텐츠에 맞추는 화면이 쓴다(`fittedDetentHeight`). 넘기지 않으면
+   * 재지도 않는다 — 높이가 시트 쪽에서 정해지는 화면에는 알릴 상대가 없다.
+   */
+  onContentHeightChange?: (height: number) => void;
 }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const maxWidth = props.contentMaxWidth ?? layout.formContent;
   const headerTopInset = props.headerTopInset ?? 0;
 
+  const onContentHeightChange = props.onContentHeightChange;
+  const measuring = onContentHeightChange != null;
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [bodyHeight, setBodyHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
+  useEffect(() => {
+    // 헤더와 본문은 언제나 있다. 둘 중 하나라도 0이면 아직 레이아웃 전이라,
+    // 그 상태의 합을 알리면 시트가 작게 열렸다 커진다.
+    if (!onContentHeightChange || headerHeight <= 0 || bodyHeight <= 0) return;
+    onContentHeightChange(headerHeight + bodyHeight + footerHeight);
+  }, [onContentHeightChange, headerHeight, bodyHeight, footerHeight]);
+
   return (
     <View style={styles.root}>
       <View
+        onLayout={
+          measuring
+            ? (event) => setHeaderHeight(event.nativeEvent.layout.height)
+            : undefined
+        }
         style={[
           styles.header,
           headerTopInset > 0 && {
@@ -104,12 +128,22 @@ export function SheetScaffold(props: {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         scrollEnabled={props.scrollEnabled ?? true}
+        // 뷰포트가 아니라 콘텐츠가 실제로 차지하는 높이다 — 바로 시트가 얼마나
+        // 커져야 스크롤 없이 다 보이는지에 해당한다.
+        onContentSizeChange={
+          measuring ? (_width, height) => setBodyHeight(height) : undefined
+        }
       >
         {props.children}
       </ScrollView>
 
       {props.footer ? (
         <View
+          onLayout={
+            measuring
+              ? (event) => setFooterHeight(event.nativeEvent.layout.height)
+              : undefined
+          }
           style={[
             styles.footer,
             { paddingBottom: Math.max(insets.bottom, spacing.md) },

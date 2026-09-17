@@ -25,7 +25,17 @@ import {
 import { useState, type ReactElement } from "react";
 import { View } from "react-native";
 import { useColors } from "@/theme";
-import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
+import {
+  pinnedSheetHeight,
+  type SheetHostSizing,
+  type SnapPoint,
+} from "./sheet-snap-point";
+
+/**
+ * SwiftUI `.sheet`은 디텐트만큼의 높이를 스스로 갖는다. 시트 높이를 콘텐츠에 맞추는
+ * 화면이 이 값을 보고 디텐트를 잡는다(`fittedDetentHeight`).
+ */
+export const SHEET_HOST_SIZING: SheetHostSizing = "detent";
 
 function toDetent(snapPoint: SnapPoint): PresentationDetent {
   if (snapPoint === "half") return "medium";
@@ -62,7 +72,11 @@ export function NativeBottomSheet(props: {
 
   // 시트가 내준 높이를 RN 트리에 못 박는다. 안 박으면 루트가 콘텐츠를 따라 자라
   // 안쪽 스크롤이 생기지 않는다(sheet-snap-point.ts).
-  const pinned = pinnedSheetHeight(props.snapPoints, "detent", hostHeight);
+  const pinned = pinnedSheetHeight(
+    props.snapPoints,
+    SHEET_HOST_SIZING,
+    hostHeight,
+  );
   const modifiers: ModifierConfig[] = [
     frame({
       maxWidth: Infinity,

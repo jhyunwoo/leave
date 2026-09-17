@@ -31,6 +31,35 @@ export type SheetHostSizing = "detent" | "content";
  */
 const DETENT_SURFACE_SLACK = 64;
 
+/**
+ * 콘텐츠가 요청한 높이에서 거꾸로 잡은 디텐트 높이(pt).
+ *
+ * 창 높이의 몇 퍼센트로 디텐트를 고정하면, 콘텐츠가 그 안에 들어가는지는 운에
+ * 맡기게 된다. 날짜 상세 시트가 그랬다 — 창의 75%(393x852에서 639pt)를 줬지만 그
+ * 중 RN 표면으로 오는 건 588pt뿐이고, 명단도 일정도 없는 **가장 짧은** 날조차 본문이
+ * 589pt였다. 그래서 맨 아래 "개인 일정 전체 보기"가 늘 접히는 자리에 걸쳤고, 시트
+ * 안에 아직 57pt가 남은 채로 캡슐이 반 잘려 보였다.
+ *
+ * 콘텐츠 높이를 받아 시트를 거기에 맞추면 그 우연이 사라진다. `detent` 호스트에는
+ * 시트가 표면에 내주지 않는 몫(`DETENT_SURFACE_SLACK`)을 얹어 달라고 해야 한다 —
+ * `content` 호스트는 디텐트 숫자가 곧 시트 높이라 얹으면 빈 자리만 그만큼 생긴다.
+ *
+ * 하한이 있는 이유는 로딩이다. 데이터가 오기 전 본문은 스피너 하나뿐이라, 하한이
+ * 없으면 시트가 손바닥만 하게 열렸다가 곧바로 커진다. 상한은 콘텐츠가 아무리 길어도
+ * 시트 위로 달력이 조금은 보이게 남겨 두는 선이다.
+ */
+export function fittedDetentHeight(
+  contentHeight: number | null | undefined,
+  sizing: SheetHostSizing,
+  bounds: { min: number; max: number },
+): number {
+  const max = Math.max(bounds.min, bounds.max);
+  // 아직 재지 못했다. 하한으로 열고, 실측이 오면 그때 늘린다.
+  if (contentHeight == null || !(contentHeight > 0)) return bounds.min;
+  const slack = sizing === "detent" ? DETENT_SURFACE_SLACK : 0;
+  return Math.min(max, Math.max(bounds.min, Math.ceil(contentHeight + slack)));
+}
+
 /** 스냅 포인트가 절대 높이 하나뿐일 때 그 높이. 아니면 null. */
 function soleDetentHeight(
   snapPoints: readonly SnapPoint[] | undefined,

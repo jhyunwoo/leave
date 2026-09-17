@@ -6,8 +6,18 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import type { ReactElement } from "react";
 import { View } from "react-native";
-import { pinnedSheetHeight, type SnapPoint } from "./sheet-snap-point";
+import {
+  pinnedSheetHeight,
+  type SheetHostSizing,
+  type SnapPoint,
+} from "./sheet-snap-point";
 import { useSheetClosed } from "./use-sheet-closed";
+
+/**
+ * Material `ModalBottomSheet`은 디텐트 숫자를 보지 않고 콘텐츠 높이로 커진다. 시트 높이를 콘텐츠에 맞추는
+ * 화면이 이 값을 보고 디텐트를 잡는다(`fittedDetentHeight`).
+ */
+export const SHEET_HOST_SIZING: SheetHostSizing = "content";
 
 export function NativeBottomSheet(props: {
   isPresented: boolean;
@@ -22,7 +32,7 @@ export function NativeBottomSheet(props: {
   useSheetClosed(props.isPresented, props.onClosed);
   // Material `ModalBottomSheet`은 콘텐츠 높이로 커진다 — 시트 높이를 RN 쪽에서
   // 정해 줘야 한다(sheet-snap-point.ts).
-  const pinned = pinnedSheetHeight(props.snapPoints, "content");
+  const pinned = pinnedSheetHeight(props.snapPoints, SHEET_HOST_SIZING);
 
   return (
     <BottomSheet

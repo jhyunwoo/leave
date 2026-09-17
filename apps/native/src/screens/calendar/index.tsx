@@ -74,6 +74,7 @@ import {
   SHEET_GRABBER_INSET,
   SheetScaffold,
 } from "@/components/sheet-scaffold";
+import { useFittedSheetHeight } from "@/components/use-fitted-sheet-height";
 import { makeStyles, spacing, useColors } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
@@ -84,6 +85,16 @@ import { DayPanel } from "./day-panel";
 import { OutingCycleNote } from "./outing-cycle-note";
 import { CalendarOverviewPanel } from "./overview-panel";
 import { useLeaveDrag } from "./use-leave-drag";
+
+/**
+ * 날짜 상세 시트 높이의 아래·위 한계(창 높이 대비).
+ *
+ * 아래는 예전의 고정 높이 그대로다 — 달력이 오기 전 본문이 스피너 하나뿐일 때
+ * 시트가 작게 열렸다 커지는 것을 막아 준다. 위는 콘텐츠가 아무리 길어도 시트 위로
+ * 달력이 조금은 보이게 남겨 두는 선이다. 그 사이는 콘텐츠가 정한다.
+ */
+const DAY_SHEET_MIN_RATIO = 0.75;
+const DAY_SHEET_MAX_RATIO = 0.92;
 
 /** 헤더 아래 요일 행 높이. */
 const WEEK_ROW_HEIGHT = 32;
@@ -250,6 +261,18 @@ export function CalendarScreen() {
   const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
   // 그 달의 내 개인 일정. 달력 스크롤이 이미 채워 둔 캐시를 그대로 다시 쓴다.
   const panelPersonalEvents = usePersonalEvents(panelMonth);
+
+  // 날짜 상세 시트 높이. 절대 높이 하나로 줘야 시트 안 RN 콘텐츠에도 같은 기준의
+  // 높이를 못 박을 수 있고, 그래야 안쪽 스크롤이 바닥까지 닿는다. 못 박을 값을
+  // 호스트마다 어떻게 정하는지는 sheet-snap-point.ts의 pinnedSheetHeight에 있다.
+  //
+  // 그 절대 높이를 콘텐츠가 정한다. 창의 75%로 고정했더니 명단도 일정도 없는 가장
+  // 짧은 날조차 본문이 시트보다 길어, 맨 아래 "개인 일정 전체 보기"가 늘 접히는
+  // 자리에 걸쳐 반이 잘렸다(fittedDetentHeight).
+  const daySheet = useFittedSheetHeight({
+    min: Math.round(windowHeight * DAY_SHEET_MIN_RATIO),
+    max: Math.round(windowHeight * DAY_SHEET_MAX_RATIO),
+  });
   const isOffline =
     netInfo.isConnected === false || netInfo.isInternetReachable === false;
   const lastUpdatedAt = Math.max(
@@ -385,10 +408,6 @@ export function CalendarScreen() {
    */
   const daySheetPresented =
     isCompact && selectedDate != null && !formDate && !editingLeave;
-  // 날짜 상세 시트 높이. 절대 높이 하나로 줘야 시트 안 RN 콘텐츠에도 같은 기준의
-  // 높이를 못 박을 수 있고, 그래야 안쪽 스크롤이 바닥까지 닿는다. 못 박을 값을
-  // 호스트마다 어떻게 정하는지는 sheet-snap-point.ts의 pinnedSheetHeight에 있다.
-  const daySheetHeight = Math.round(windowHeight * 0.75);
 
   const calendarPane = (
     <View style={styles.calendarPane}>
@@ -652,7 +671,7 @@ export function CalendarScreen() {
         // 기준으로 배치해 RN 루트가 보이는 시트보다 커지고, 비율(fraction)로 주면
         // 그 비율의 기준 높이를 RN이 알 수 없어 시트와 RN 콘텐츠의 높이가 어긋난다.
         // 둘 중 어느 쪽이든 안쪽 스크롤이 바닥에 닿지 못한다(sheet-snap-point.ts).
-        snapPoints={[{ height: daySheetHeight }]}
+        snapPoints={[{ height: daySheet.height }]}
         testID="calendar-day-sheet"
         // 사용자가 시트를 직접 내렸다. 대기 중이던 폼 요청은 무효로 본다.
         // 창이 넓어져서 내려간 경우에는 선택을 지우지 않는다 — 같은 선택이
@@ -673,6 +692,7 @@ export function CalendarScreen() {
           title="날짜 상세"
           onClose={() => setSelectedDate(null)}
           contentContainerStyle={styles.daySheetContent}
+          onContentHeightChange={daySheet.onContentHeightChange}
           // 드래그 인디케이터 자리를 헤더 안쪽에 둔다. 헤더 배경이 시트 맨 위까지
           // 이어져야 콘텐츠가 시트에 얹힌 카드로 보이지 않는다.
           headerTopInset={SHEET_GRABBER_INSET}
@@ -869,7 +889,9 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.mute,
   },
   // DayPanel이 자기 여백을 스스로 잡으므로 시트 본문은 여백 없이 둔다.
-  daySheetContent: { padding: 0, gap: 0 },
+  // `padding`만으로는 스캐폴드가 따로 건 `paddingBottom`이 살아남아 아래에만
+  // 32pt가 더 붙는다 — 시트를 콘텐츠에 맞추고 나면 그만큼이 빈 자리로 남는다.
+  daySheetContent: { padding: 0, paddingBottom: 0, gap: 0 },
   /**
    * 그래서 외출 주기 카드의 여백은 여기서 잡아준다. 그냥 두면 시트 헤더와 양옆에
    * 붙어 카드가 아니라 헤더의 일부처럼 읽힌다. 가로 여백은 카드 안쪽 여백과 더해
