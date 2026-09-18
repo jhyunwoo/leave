@@ -14,7 +14,7 @@
  * 높이만큼 칸 안에 출타자 미리보기까지 들어간다.
  */
 
-import { monthBounds, todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { monthBounds, type ISODate } from "@leave/shared/dates";
 import { OUTING_KINDS, type OutingKind } from "@leave/shared/leave";
 import {
   outingCycleStartsInRange,
@@ -28,6 +28,7 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -51,6 +52,7 @@ import { useCalendar, usePersonalEvents } from "@leave/client";
 import { useWindowSizeClass } from "@/adaptive";
 import {
   MonthCalendar,
+  useMonthDragPreview,
   type OutingCycleStart,
 } from "@/components/month-calendar";
 import { CalendarDragContext } from "@/components/calendar-drag/context";
@@ -91,6 +93,8 @@ export const CalendarScroll = forwardRef<
      * 그때는 출타율·출타자·부대 일정만 빠지고 나머지는 그대로 그린다.
      */
     unitId: string | null;
+    /** 한국시간 오늘. 화면이 자정을 넘겨 갱신해 주므로 여기서 다시 읽지 않는다. */
+    today: ISODate;
     selectedDate: ISODate | null;
     onSelectDate: (date: ISODate) => void;
     contentTopInset: number;
@@ -107,6 +111,7 @@ export const CalendarScroll = forwardRef<
 >(function CalendarScroll(
   {
     unitId,
+    today,
     selectedDate,
     onSelectDate,
     contentTopInset,
@@ -121,7 +126,7 @@ export const CalendarScroll = forwardRef<
 ) {
   const styles = useStyles();
   const { sizeClass } = useWindowSizeClass();
-  const currentMonth = todayInSeoul().slice(0, 7);
+  const currentMonth = today.slice(0, 7);
   // 목록이 실제로 차지한 높이. 헤더가 목록 위에 떠 있으므로 거기서
   // contentTopInset과 아래 탭바 몫을 빼야 "한 달이 보일 높이"가 나온다.
   const [listHeight, setListHeight] = useState(0);
@@ -244,8 +249,13 @@ export const CalendarScroll = forwardRef<
                 height={itemHeight}
                 cellHeight={cellHeight}
                 showAttendees={cellHeight >= CELL_H_ATTENDEES}
-                selectedDate={selectedDate}
+                // 고른 날짜가 든 달에만 넘긴다. 그러지 않으면 날짜를 하나 고를
+                // 때마다 마운트된 달 전부가 memo를 놓치고 다시 그려진다.
+                selectedDate={
+                  selectedDate?.slice(0, 7) === item ? selectedDate : null
+                }
                 onSelectDate={onSelectDate}
+                today={today}
                 myLeaveDays={myLeaveDays}
                 regularOvernight={regularOvernight}
                 currentCycle={currentCycle}
@@ -304,7 +314,7 @@ export const CalendarScroll = forwardRef<
   );
 });
 
-function MonthBlock(props: {
+const MonthBlock = memo(function MonthBlock(props: {
   unitId: string | null;
   month: string;
   height: number;
@@ -312,6 +322,7 @@ function MonthBlock(props: {
   showAttendees: boolean;
   selectedDate: ISODate | null;
   onSelectDate: (date: ISODate) => void;
+  today: ISODate;
   myLeaveDays: Map<ISODate, MyLeaveDay>;
   regularOvernight: RegularOvernightConfig | null;
   currentCycle: RegularOvernightCycle | null;
@@ -323,6 +334,9 @@ function MonthBlock(props: {
   const colors = useColors();
   const calendar = useCalendar(props.unitId, props.month);
   const personalEvents = usePersonalEvents(props.month);
+  // 이 달에 걸친 덧그림만 구독한다. 끌고 있는 휴가가 지나지 않는 달은 늘 null이라
+  // 아래 MonthCalendar가 memo에 걸려 그대로 남는다.
+  const dragPreview = useMonthDragPreview(props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
@@ -346,6 +360,7 @@ function MonthBlock(props: {
       calendar={calendar.data}
       selectedDate={props.selectedDate}
       onSelectDate={props.onSelectDate}
+      today={props.today}
       cellHeight={props.cellHeight}
       showAttendees={props.showAttendees}
       hideWeekdays
@@ -355,6 +370,7 @@ function MonthBlock(props: {
       outingCycleStarts={outingCycleStarts}
       dischargeAt={props.dischargeAt}
       personalEvents={personalEvents.data?.events}
+      dragPreview={dragPreview}
       dragScrollGesture={props.dragScrollGesture}
     />
   );
@@ -379,7 +395,7 @@ function MonthBlock(props: {
       )}
     </View>
   );
-}
+});
 
 const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1 },

@@ -3,11 +3,10 @@
  * 출타율·공휴일·제한 기간을 알리고 그날의 출타 명단(day-roster.tsx)과
  * 내 개인 일정을 보여준다.
  *
- * 맨 아래 동작은 두 층이다 — 이 날에 무언가를 더하는 셋(휴가 등록 · 개인 일정 ·
- * 부대 일정)을 한 줄에 같은 폭으로 두고, 구분선 아래에 이 날짜와 무관한
- * 이동(개인 일정 전체 보기)을 둔다. 셋은 "무엇을 추가할까"라는 한 번의 선택이라
- * 한 자리에 모아 두는 편이 읽기 쉽고, 주 동작인 휴가 등록은 채운 캡슐이라 같은
- * 줄에서도 무게가 구분된다.
+ * 맨 아래에는 이 날에 무언가를 더하는 셋(휴가 등록 · 개인 일정 · 부대 일정)을
+ * 한 줄에 같은 폭으로 둔다. "무엇을 추가할까"라는 한 번의 선택이라 한 자리에 모아
+ * 두는 편이 읽기 쉽고, 주 동작인 휴가 등록은 채운 캡슐이라 같은 줄에서도 무게가
+ * 구분된다.
  *
  * 라벨에서 "이 날부터"·"이 날에"를 뺀 것도 같은 이유다. 패널 제목이 이미
  * "선택한 날짜 / 9월 17일 (목)"이라 버튼마다 그 접두어를 반복할 이유가 없다.
@@ -23,9 +22,7 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared";
 import {
-  Platform,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -38,16 +35,6 @@ import { ContentPanel } from "@/components/content-panel";
 import { makeStyles, radius, spacing } from "@/theme";
 import { DayRoster } from "./day-roster";
 
-/**
- * 아래 동작 버튼들의 **세로** 간격. 가로로 나란한 두 버튼에는 쓰지 않는다.
- *
- * iOS 버튼은 SwiftUI 호스트라 자기 RN 레이아웃 상자보다 큰 캡슐을 그린다. 상자는
- * 호스트가 스스로 잰 크기(변형에 따라 24~43pt)인데 그려지는 캡슐은 48pt여서,
- * 부모의 gap 16pt이 화면에서는 1pt 남짓으로 보인다 — 두 버튼이 붙어 버린다.
- * iOS에서만 그 차이만큼 더 벌려 다른 항목 사이와 같은 여백으로 보이게 한다.
- */
-const ACTION_GAP = Platform.OS === "ios" ? spacing.xxl : spacing.lg;
-
 export function DayPanel(props: {
   calendar: Calendar;
   date: ISODate;
@@ -59,14 +46,6 @@ export function DayPanel(props: {
   personalEvents?: readonly PersonalEvent[];
   /** 개인 일정 줄을 눌러 그 일정으로 갈 수 있게 한다. */
   onOpenPersonalEvent?: (eventId: string) => void;
-  /**
-   * 개인 일정 목록 화면으로 간다.
-   *
-   * 예전에는 달력 툴바에 "개인 일정" 버튼이 있었는데, 툴바를 둘로 줄이면서
-   * 그 자리가 "일정 추가" 메뉴로 바뀌었다. 목록으로 가는 길이 여기 없으면
-   * 그룹에 속한 사용자는 자기 개인 일정 전체를 볼 방법이 사라진다.
-   */
-  onOpenPersonalEvents?: () => void;
   /** 부대 관리자라면 부대 일정 줄을 눌러 수정 화면으로 간다. */
   onOpenUnitEvent?: (eventId: string) => void;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
@@ -192,47 +171,33 @@ export function DayPanel(props: {
         </View>
       )}
 
-      <View style={styles.actions}>
-        <View style={styles.addRow}>
+      <View style={styles.addRow}>
+        <Button
+          icon="calendarAdd"
+          title="휴가 등록"
+          onPress={props.onAddLeave}
+          flexible
+          style={styles.addRowItem}
+        />
+        {props.onAddPersonalEvent ? (
           <Button
             icon="calendarAdd"
-            title="휴가 등록"
-            onPress={props.onAddLeave}
+            title="개인 일정"
+            variant="secondary"
+            onPress={props.onAddPersonalEvent}
             flexible
             style={styles.addRowItem}
           />
-          {props.onAddPersonalEvent ? (
-            <Button
-              icon="calendarAdd"
-              title="개인 일정"
-              variant="secondary"
-              onPress={props.onAddPersonalEvent}
-              flexible
-              style={styles.addRowItem}
-            />
-          ) : null}
-          {props.onAddUnitEvent ? (
-            <Button
-              icon="calendarAdd"
-              title="부대 일정"
-              variant="secondary"
-              onPress={props.onAddUnitEvent}
-              flexible
-              style={styles.addRowItem}
-            />
-          ) : null}
-        </View>
-
-        {props.onOpenPersonalEvents ? (
-          <>
-            <View style={styles.actionsDivider} />
-            <Button
-              icon="calendar"
-              title="개인 일정 전체 보기"
-              variant="ghost"
-              onPress={props.onOpenPersonalEvents}
-            />
-          </>
+        ) : null}
+        {props.onAddUnitEvent ? (
+          <Button
+            icon="calendarAdd"
+            title="부대 일정"
+            variant="secondary"
+            onPress={props.onAddUnitEvent}
+            flexible
+            style={styles.addRowItem}
+          />
         ) : null}
       </View>
     </View>
@@ -408,21 +373,12 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   personalTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
   personalMeta: { fontSize: 12, color: colors.mute },
-  actions: { gap: ACTION_GAP },
   /**
    * 세 "추가"를 한 줄에 같은 폭으로 나눈다. 무엇을 더할지 고르는 한 번의 선택이라
    * 한 자리에 모여 있는 편이 읽기 쉽다 — 주 동작인 "휴가 등록"은 채운 캡슐이라
    * 같은 줄에서도 무게가 구분된다.
-   *
-   * 가로 간격에는 `ACTION_GAP` 보정을 쓰지 않는다 — 그 보정은 iOS 버튼이 자기
-   * 상자보다 **세로로** 크게 그려지는 문제를 메우는 값이라 여기서는 뜻이 없다.
    */
   addRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   // 아이콘과 라벨이 함께 들어갈 폭을 확보하고 좁은 화면에서는 다음 줄로 보낸다.
   addRowItem: { flexGrow: 1, flexBasis: 130, minWidth: 130 },
-  /** 아래 링크는 생성이 아니라 이동이다. 구분선이 그 차이를 말해 준다. */
-  actionsDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairline,
-  },
 }));

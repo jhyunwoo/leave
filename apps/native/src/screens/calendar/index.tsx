@@ -27,7 +27,7 @@
  */
 
 import { WEEKDAYS } from "@leave/shared/calendar";
-import { todayInSeoul, type ISODate } from "@leave/shared/dates";
+import { type ISODate } from "@leave/shared/dates";
 import { type OutingKind } from "@leave/shared/leave";
 import { type OutingConfig } from "@leave/shared/outing";
 import {
@@ -39,7 +39,7 @@ import {
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -75,6 +75,7 @@ import {
   SheetScaffold,
 } from "@/components/sheet-scaffold";
 import { useFittedSheetHeight } from "@/components/use-fitted-sheet-height";
+import { useSeoulToday } from "@/lib/seoul-today";
 import { makeStyles, spacing, useColors } from "@/theme";
 import {
   CYCLE_BANNER_HEIGHT,
@@ -125,7 +126,6 @@ type CalendarIntent =
   | { kind: "form"; date: ISODate }
   | { kind: "leave"; leaveId: string }
   | { kind: "personalEvent"; date: ISODate }
-  | { kind: "personalEvents" }
   | { kind: "unitEvent"; date: ISODate };
 
 export function CalendarScreen() {
@@ -136,7 +136,8 @@ export function CalendarScreen() {
   const netInfo = useNetInfo();
   const queryClient = useQueryClient();
   const isRestoring = useIsRestoring();
-  const today = todayInSeoul();
+  // 자정을 넘기면 스스로 바뀐다 — 앱을 켜 둔 채로도 오늘 표시가 어제에 머물지 않는다.
+  const today = useSeoulToday();
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
   // 폼을 열었는지와 폼의 시작일을 한 값으로 둔다. 날짜 시트를 닫으면서 열어야
   // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
@@ -153,6 +154,23 @@ export function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<CalendarScrollHandle>(null);
+
+  /**
+   * 날짜를 고른다. 같은 날을 다시 누르면 선택을 놓는다.
+   *
+   * `useCallback`인 이유는 성능이다 — 이 함수가 렌더마다 새 것이면 달력 스크롤의
+   * 달 블록이 전부 `memo`를 놓쳐, 날짜 하나를 고를 때마다 마운트된 모든 달의
+   * 42칸이 다시 그려진다(`components/calendar-scroll.tsx`).
+   */
+  const selectDate = useCallback(
+    (date: ISODate) => {
+      // 새 날짜를 고르면 대기 중이던 요청은 무효로 본다.
+      pendingAfterSheet.current = null;
+      setSelectedDate((current) => (current === date ? null : date));
+      // setSelectedDate는 React가 고정해 주는 값이라 이 콜백은 실제로는 한 번만 만들어진다.
+    },
+    [setSelectedDate],
+  );
 
   // `me`에는 이메일 등 계정 정보가 있어 디스크에 저장하지 않는다. 완전 오프라인
   // 재실행에서는 이미 허용 목록으로 복원된 달력 캐시에서 비식별 그룹 요약만 꺼낸다.
@@ -267,8 +285,8 @@ export function CalendarScreen() {
   // 호스트마다 어떻게 정하는지는 sheet-snap-point.ts의 pinnedSheetHeight에 있다.
   //
   // 그 절대 높이를 콘텐츠가 정한다. 창의 75%로 고정했더니 명단도 일정도 없는 가장
-  // 짧은 날조차 본문이 시트보다 길어, 맨 아래 "개인 일정 전체 보기"가 늘 접히는
-  // 자리에 걸쳐 반이 잘렸다(fittedDetentHeight).
+  // 짧은 날조차 본문이 시트보다 길어, 맨 아래 버튼 줄이 늘 접히는 자리에 걸쳐
+  // 반이 잘렸다(fittedDetentHeight).
   const daySheet = useFittedSheetHeight({
     min: Math.round(windowHeight * DAY_SHEET_MIN_RATIO),
     max: Math.round(windowHeight * DAY_SHEET_MAX_RATIO),
@@ -363,9 +381,6 @@ export function CalendarScreen() {
           params: { date: intent.date },
         });
         return;
-      case "personalEvents":
-        router.push("/(tabs)/(calendar)/personal-events");
-        return;
       case "unitEvent":
         router.push({
           pathname: "/(tabs)/(calendar)/unit-event",
@@ -396,12 +411,6 @@ export function CalendarScreen() {
   const openLeave = (leaveId: string) =>
     openAfterSheet({ kind: "leave", leaveId });
 
-  const selectDate = (date: ISODate) => {
-    // 새 날짜를 고르면 대기 중이던 요청은 무효로 본다.
-    pendingAfterSheet.current = null;
-    setSelectedDate((current) => (current === date ? null : date));
-  };
-
   /**
    * 시트를 띄워도 되는 조건. 세 가지가 모두 맞아야 한다 —
    * 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 것.
@@ -414,6 +423,7 @@ export function CalendarScreen() {
       <CalendarScroll
         ref={scrollRef}
         unitId={unit?.id ?? null}
+        today={today}
         selectedDate={selectedDate}
         contentTopInset={headerHeight}
         myLeaveDays={myLeaveDays}
@@ -541,9 +551,6 @@ export function CalendarScreen() {
                     : undefined
                 }
                 personalEvents={panelPersonalEvents.data?.events}
-                onOpenPersonalEvents={() =>
-                  openAfterSheet({ kind: "personalEvents" })
-                }
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",
@@ -742,9 +749,6 @@ export function CalendarScreen() {
                     : undefined
                 }
                 personalEvents={panelPersonalEvents.data?.events}
-                onOpenPersonalEvents={() =>
-                  openAfterSheet({ kind: "personalEvents" })
-                }
                 onOpenPersonalEvent={(eventId) =>
                   router.push({
                     pathname: "/(tabs)/(calendar)/personal-event",

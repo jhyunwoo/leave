@@ -6,7 +6,7 @@ import {
 } from "@leave/shared";
 import { useFriendCalendar, usePersonalEvents } from "@leave/client";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -78,10 +78,19 @@ export function FriendCalendarScreen() {
     process.env.EXPO_OS === "android" ? 0 : insets.top + NATIVE_HEADER_HEIGHT;
   const contentTopInset = headerTopInset + stripHeight;
 
-  const selectDate = (date: ISODate) => {
-    pendingAfterSheet.current = null;
-    setSelectedDate((current) => (current === date ? null : date));
-  };
+  /**
+   * `useCallback`인 이유는 성능이다 — `FriendMonthBlock`·`FriendMonthGrid`가 `memo`인데
+   * 이 함수가 렌더마다 새 것이면 그 memo가 늘 빗나가, 날짜를 하나 고를 때마다
+   * 마운트된 모든 달의 42칸이 다시 그려진다(`components/friend-calendar-scroll.tsx`).
+   */
+  const selectDate = useCallback(
+    (date: ISODate) => {
+      pendingAfterSheet.current = null;
+      setSelectedDate((current) => (current === date ? null : date));
+      // setSelectedDate는 React가 고정해 주는 값이라 이 콜백은 실제로는 한 번만 만들어진다.
+    },
+    [setSelectedDate],
+  );
 
   const pushPersonalNavigation = (navigation: PendingPersonalNavigation) => {
     if (isCompact && selectedDate) {

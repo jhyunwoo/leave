@@ -26,7 +26,6 @@ export default function CalendarStackLayout() {
     >
       <Stack.Screen name="index" options={{ title: "부대 달력" }} />
       <Stack.Screen name="friend-calendar" options={{ title: "친구 달력" }} />
-      <Stack.Screen name="personal-events" options={{ title: "개인 일정" }} />
       {/*
         시트 크롬은 시스템 내비게이션 바가 맡는다(제목·닫기는 화면 쪽에서 채운다).
 

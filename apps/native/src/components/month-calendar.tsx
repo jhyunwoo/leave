@@ -35,7 +35,7 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared/regular-overnight";
 import { useAtomValue } from "jotai";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   GestureDetector,
@@ -51,10 +51,20 @@ import {
   calendarDragPreviewAtom,
   type LeaveDragDay,
 } from "@/state/calendar-drag";
+import {
+  buildRangeIndex,
+  sliceMonthPreview,
+} from "@/components/month-cell-index";
 import { balanceTone, makeStyles, radius, spacing, useTheme } from "@/theme";
 
 /** 칸 안에 미리 보여줄 출타자 수. 넘치면 "+N"으로 접는다. */
 const PREVIEW_ATTENDEES = 3;
+
+type UnitCalendarEvent = Calendar["events"][number];
+
+/** 일정이 없는 칸이 매번 새 배열을 만들지 않도록 공유하는 빈 목록. */
+const EMPTY_UNIT_EVENTS: readonly UnitCalendarEvent[] = [];
+const EMPTY_PERSONAL_EVENTS: readonly PersonalEvent[] = [];
 
 /** 날짜 → 그날 출타하는 사람들의 이니셜과 총원. 칸 미리보기에만 쓴다. */
 function buildAttendeePreview(
@@ -83,11 +93,21 @@ function buildAttendeePreview(
   return byDate;
 }
 
+/**
+ * 이 달에 걸친 드래그 덧그림만 구독한다. 자세한 배경은 `sliceMonthPreview`.
+ */
+export function useMonthDragPreview(
+  month: string,
+): Map<ISODate, LeaveDragDay> | null {
+  const preview = useAtomValue(calendarDragPreviewAtom);
+  return useMemo(() => sliceMonthPreview(preview, month), [preview, month]);
+}
+
 /** 그 날짜에 열리는 외출 주기 하나. 갈래를 알아야 몇 회인지 말할 수 있다. */
 export type OutingCycleStart = { kind: OutingKind; cycle: LeaveCycle };
 
 /** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */
-export function MonthCalendar(props: {
+function MonthCalendarImpl(props: {
   month: string;
   /** 부대 달력 응답. 부대가 없으면 넘기지 않는다 — 출타 관련 표시만 빠진다. */
   calendar?: Calendar;
@@ -112,6 +132,18 @@ export function MonthCalendar(props: {
   dischargeAt?: ISODate | null;
   personalEvents?: PersonalEvent[];
   /**
+   * 한국시간 오늘. 호출자가 넘기면 자정을 넘길 때 오늘 표시가 따라 움직인다
+   * (`lib/seoul-today.ts`) — 여기서 직접 읽으면 `memo`에 걸린 달은 다시 렌더될
+   * 이유가 없어 어제에 머문다.
+   */
+  today?: ISODate;
+  /**
+   * 이 달에 걸친 드래그 덧그림(`useMonthDragPreview`). 호출자가 달별로 좁혀 넘겨야
+   * 아래 `memo`가 산다 — 여기서 atom을 직접 읽으면 hover가 바뀔 때마다 마운트된
+   * 모든 달이 함께 다시 그려진다.
+   */
+  dragPreview?: Map<ISODate, LeaveDragDay> | null;
+  /**
    * 달력 목록의 스크롤 제스처. 이게 있어야 내 휴가 칩을 길게 눌러 다른 날짜로
    * 끌 수 있다 — 끄는 동안 목록이 따라 움직이지 않도록 막을 대상이 필요하다.
    */
@@ -133,7 +165,7 @@ export function MonthCalendar(props: {
   } = props;
   const styles = useStyles();
   const { colors, balance } = useTheme();
-  const today = todayInSeoul();
+  const today = props.today ?? todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(month), [month]);
   const statByDate = useMemo(
     () => new Map((calendar?.days ?? []).map((d) => [d.date, d])),
@@ -171,8 +203,19 @@ export function MonthCalendar(props: {
   // 넓은 창에서는 호출자가 창 높이에 맞춰 더 크게 잡고, 남는 높이에 출타자
   // 미리보기 한 줄(16+3)이 들어간다.
   const cellHeight = props.cellHeight ?? (compact ? 44 : 92);
-  // 지금 끌고 있는 휴가의 덧그림. 드래그가 없으면 null이라 아무 비용도 없다.
-  const dragPreview = useAtomValue(calendarDragPreviewAtom);
+  // 지금 끌고 있는 휴가의 덧그림. 이 달에 걸치지 않으면 null이라 아무 비용도 없다.
+  const dragPreview = props.dragPreview ?? null;
+  // 격자가 실제로 그리는 범위. 달 밖 채움 칸까지 포함한다.
+  const gridStart = weeks[0]?.[0]?.date ?? month + "-01";
+  const gridEnd = weeks[weeks.length - 1]?.[6]?.date ?? gridStart;
+  const unitEventsByDate = useMemo(
+    () => buildRangeIndex(calendar?.events, gridStart, gridEnd),
+    [calendar?.events, gridStart, gridEnd],
+  );
+  const personalByDate = useMemo(
+    () => buildRangeIndex(personalEvents, gridStart, gridEnd),
+    [personalEvents, gridStart, gridEnd],
+  );
 
   return (
     <View accessibilityLabel={`${month} 휴가 계획 달력`}>
@@ -207,11 +250,8 @@ export function MonthCalendar(props: {
             const weekend = isWeekend(cell.date);
             const holiday = cell.inMonth ? getHoliday(cell.date) : null;
             const unitEvents = cell.inMonth
-              ? (calendar?.events ?? []).filter(
-                  (event) =>
-                    event.startDate <= cell.date && cell.date <= event.endDate,
-                )
-              : [];
+              ? (unitEventsByDate.get(cell.date) ?? EMPTY_UNIT_EVENTS)
+              : EMPTY_UNIT_EVENTS;
             const hasUnitHoliday = unitEvents.some((event) => event.isHoliday);
             const eventLabel = unitEvents.length
               ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
@@ -224,11 +264,8 @@ export function MonthCalendar(props: {
               ? dragPreview?.get(cell.date)
               : undefined;
             const personal = cell.inMonth
-              ? (personalEvents?.filter(
-                  (event) =>
-                    event.startDate <= cell.date && cell.date <= event.endDate,
-                ) ?? [])
-              : [];
+              ? (personalByDate.get(cell.date) ?? EMPTY_PERSONAL_EVENTS)
+              : EMPTY_PERSONAL_EVENTS;
             const isDischarge =
               cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
             // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
@@ -504,6 +541,15 @@ export function MonthCalendar(props: {
     </View>
   );
 }
+
+/**
+ * 달마다 42칸을 그린다. 무한 스크롤은 대여섯 달을 동시에 마운트하므로, 날짜를
+ * 하나 고르거나 휴가를 끄는 동안 이 그리드가 전부 다시 그려지면 그 비용이 그대로
+ * 곱해진다. 소품은 호출자(`calendar-scroll.tsx`의 `MonthBlock`)가 **달별로 좁혀서**
+ * 넘긴다 — 그래야 실제로 달라진 달만 다시 그린다. 친구 달력(`friend-calendar-scroll`)이
+ * 이미 같은 방식이다.
+ */
+export const MonthCalendar = memo(MonthCalendarImpl);
 
 /**
  * 내 휴가 한 칸.
