@@ -68,8 +68,15 @@ export async function loadStoredToken(): Promise<string | null> {
     // 읽을 때는 접근 조건이 조회 조건에 들어가지 않는다 — 예전 조건으로 저장된
     // 항목도 그대로 읽힌다. 그래서 이미 깔려 있는 기기가 로그아웃 없이 넘어오도록,
     // 읽자마자 한 번 다시 써서 조건만 갱신한다.
+    //
+    // **iOS에서만 한다.** `keychainAccessible`은 expo-secure-store에서 iOS 전용
+    // 옵션이고(`@platform ios`), 안드로이드 모듈은 이 값을 아예 읽지 않는다. 대신
+    // 그 쓰기 한 번이 AndroidKeyStore AES-GCM 암호화 + SharedPreferences.commit()
+    // (동기 디스크 쓰기)이고, 이 함수는 루트 레이아웃이 **스플래시를 내리기 전에
+    // 기다리는** 자리다 — 콜드 스타트마다 얻는 것 없이 첫 화면을 그만큼 늦췄다.
+    // 안드로이드의 백업 유출은 app.json의 `allowBackup: false`가 이미 막는다.
     authToken = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (authToken) {
+    if (authToken && Platform.OS === "ios") {
       await SecureStore.setItemAsync(TOKEN_KEY, authToken, TOKEN_STORE_OPTIONS);
     }
   } catch {
