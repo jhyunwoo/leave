@@ -14,7 +14,13 @@
 
 import { QueryClient, useIsRestoring } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { type ErrorBoundaryProps, Stack, useRouter } from "expo-router";
+import {
+  DefaultTheme,
+  ThemeProvider,
+  type ErrorBoundaryProps,
+  Stack,
+  useRouter,
+} from "expo-router";
 import * as Linking from "expo-linking";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -50,7 +56,8 @@ import {
   useOnboardingStatus,
   watchFriendAccessRevocation,
 } from "@leave/client";
-import { useColors } from "@/theme";
+import { navigationTheme } from "@/navigation-theme";
+import { useColors, useTheme } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 configureQueryOnlineManager();
@@ -397,13 +404,23 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const colors = useColors();
+  const theme = useTheme();
+  const colors = theme.colors;
 
   // 루트 뷰 배경. 회전·모달 전환 중 잠깐 드러나는 면이라, 다크모드에서 흰 판이
   // 번쩍이지 않도록 스킴에 맞춰 맞춰둔다.
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(colors.canvasSoft);
   }, [colors.canvasSoft]);
+
+  /**
+   * 내비게이터가 옵션을 비워 둔 자리에 쓰는 색. 이유는 navigation-theme.ts에 있다.
+   * `DefaultTheme`에서 가져오는 것은 글꼴뿐이고, 색은 여섯 칸 모두 우리 팔레트로 덮는다.
+   */
+  const navTheme = useMemo(
+    () => ({ ...DefaultTheme, ...navigationTheme(theme) }),
+    [theme],
+  );
 
   return (
     // 달력의 휴가 칩 드래그(components/calendar-drag)가 쓰는 제스처의 뿌리.
@@ -417,7 +434,9 @@ export default function RootLayout() {
         {/* ApiProvider는 401 처리에서 쿼리 캐시를 비우므로 QueryClient 안쪽이어야 한다. */}
         <ApiProvider>
           <StatusBar style="auto" />
-          <RootNavigator />
+          <ThemeProvider value={navTheme}>
+            <RootNavigator />
+          </ThemeProvider>
         </ApiProvider>
       </PersistQueryClientProvider>
     </GestureHandlerRootView>
