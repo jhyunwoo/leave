@@ -4,7 +4,10 @@
  */
 
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { useNotifications } from "@leave/client/hooks/notifications";
+import {
+  useNotificationSummary,
+  useNotifications,
+} from "@leave/client/hooks/notifications";
 import { useColors } from "@/theme";
 
 /**
@@ -18,8 +21,26 @@ import { useColors } from "@/theme";
  */
 export default function TabLayout() {
   const colors = useColors();
-  const notifications = useNotifications();
-  const unread = notifications.data?.unreadCount ?? 0;
+  /**
+   * 배지는 안 읽은 개수 하나만 필요하다.
+   *
+   * 예전에는 여기서 `useNotifications()`를 그대로 불렀다. 그 쿼리는 알림 50건의
+   * 제목·본문·날짜를 통째로 받고 `refetchInterval: 30_000`으로 스스로 다시 받는데,
+   * 이 레이아웃은 로그인한 내내 마운트돼 있다 — 즉 **앱을 켜 두는 내내 30초마다
+   * 알림함 전체가 셀룰러로 내려왔다.** 배지가 쓰는 건 그중 숫자 하나다.
+   *
+   * 그래서 폴링은 경량 엔드포인트(`/notifications/summary`)에 맡기고, 알림함 쿼리는
+   * `enabled: false`인 관찰자로만 둔다 — 요청도 타이머도 만들지 않으면서, 알림함
+   * 화면이 받아 온 최신 개수가 들어오면 배지가 그 자리에서 함께 갱신된다.
+   * 웹의 `AppLayout`이 이미 같은 방식이다.
+   */
+  const inbox = useNotifications({ enabled: false });
+  const summary = useNotificationSummary();
+  // 둘 중 나중에 받은 쪽이 맞다. 알림함을 열어 둔 동안에는 그쪽이 더 자주 온다.
+  const unread =
+    (inbox.dataUpdatedAt > summary.dataUpdatedAt
+      ? inbox.data?.unreadCount
+      : summary.data?.unreadCount) ?? 0;
 
   return (
     <NativeTabs
