@@ -312,3 +312,36 @@ describe("서버 형식과 오가기", () => {
     );
   });
 });
+
+describe("segmentsToDrafts - 외출 갈래", () => {
+  it("주말 외출을 주말 외출 재원으로 되돌린다", () => {
+    expect(
+      segmentsToDrafts([
+        {
+          category: "outing",
+          outingKind: "weekend",
+          startDate: "2026-08-08",
+          endDate: "2026-08-08",
+        },
+      ]),
+    ).toEqual([{ key: "weekend_outing", days: 1 }]);
+  });
+
+  it("평일 외출과 갈래 없는 옛 구간은 평일 외출로 읽는다", () => {
+    expect(
+      segmentsToDrafts([
+        {
+          category: "outing",
+          outingKind: "weekday",
+          startDate: "2026-08-06",
+          endDate: "2026-08-06",
+        },
+      ]),
+    ).toEqual([{ key: "outing", days: 1 }]);
+    expect(
+      segmentsToDrafts([
+        { category: "outing", startDate: "2026-08-06", endDate: "2026-08-06" },
+      ]),
+    ).toEqual([{ key: "outing", days: 1 }]);
+  });
+});

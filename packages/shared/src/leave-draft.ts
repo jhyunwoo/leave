@@ -18,10 +18,12 @@
 import { addDays, type ISODate } from "./dates";
 import {
   inclusiveDays,
+  segmentBalanceKey,
   type BalanceKey,
   type LeaveCategory,
   type OutingKind,
   type OvernightKind,
+  type SegmentLike,
 } from "./leave";
 
 export type SegmentDraft = {
@@ -196,30 +198,30 @@ export function draftsToSegments(
   }));
 }
 
-/** 저장된 휴가를 폼 초안으로 되돌린다. 시작일 순서가 곧 구간 순서다. */
+/**
+ * 저장된 휴가를 폼 초안으로 되돌린다. 시작일 순서가 곧 구간 순서다.
+ *
+ * 재원 판별은 `segmentBalanceKey` 한 곳에만 둔다. 예전에는 여기서 category를 그대로
+ * 재원으로 썼는데, 그러면 갈래가 있는 외출이 전부 평일로 돌아왔다 — 주말 외출을
+ * 수정하려고 열면 재원이 평일 외출로 바뀌어 있었다.
+ */
 export function segmentsToDrafts(
-  segments: readonly {
-    startDate: ISODate;
-    endDate: ISODate;
-    category: string;
-    overnightKind?: string | null;
-  }[],
+  segments: readonly SegmentLike[],
 ): SegmentDraft[] {
   return [...segments]
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .map((segment) => ({
-      key: (segment.category !== "overnight"
-        ? segment.category
-        : segment.overnightKind === "regular"
-          ? "regular_overnight"
-          : "other_overnight") as BalanceKey,
+      key: segmentBalanceKey({
+        category: segment.category,
+        overnightKind: segment.overnightKind ?? undefined,
+        outingKind: segment.outingKind ?? undefined,
+      }),
       days: inclusiveDays(segment.startDate, segment.endDate),
       ...(segment.overnightKind === "regular" &&
       "regularOvernightCycleStart" in segment
         ? {
             regularOvernightCycleStart:
-              (segment as { regularOvernightCycleStart?: ISODate | null })
-                .regularOvernightCycleStart ?? null,
+              segment.regularOvernightCycleStart ?? null,
           }
         : {}),
     }));
