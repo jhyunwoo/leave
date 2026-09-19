@@ -236,13 +236,6 @@ function PersonalEventEditor(props: {
           키보드가 올라와도 본문이 함께 밀려 저장 버튼에 닿을 수 있다.
         */}
         <View style={styles.actions}>
-          <Button
-            icon="save"
-            title="저장"
-            loading={pending}
-            onPress={() => void save()}
-            testID="personal-event-save"
-          />
           {props.existing ? (
             <Button
               icon="trash"
@@ -250,8 +243,19 @@ function PersonalEventEditor(props: {
               variant="danger"
               disabled={pending}
               onPress={() => void remove()}
+              flexible
+              style={styles.actionItem}
             />
           ) : null}
+          <Button
+            icon="save"
+            title="저장"
+            loading={pending}
+            onPress={() => void save()}
+            testID="personal-event-save"
+            flexible
+            style={styles.actionItem}
+          />
         </View>
       </FormBody>
     </>
@@ -295,7 +299,7 @@ function SheetTitle(props: { title: string; onClose: () => void }) {
         title: props.title,
         // 내비게이션 바 안에는 SwiftUI 호스트(@expo/ui Button) 대신 평범한
         // 텍스트 버튼을 둔다. 호스트는 자기 크기를 스스로 정해 바 높이에 맞지 않는다.
-        headerLeft: () => (
+        headerRight: () => (
           <Pressable
             accessibilityRole="button"
             onPress={props.onClose}
@@ -333,8 +337,15 @@ const useStyles = makeStyles(({ colors }) => ({
   switchRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
   switchHint: { fontSize: 12, color: colors.mute },
-  // 저장은 폭을 꽉 채워 가운데에 놓고, 삭제는 그 아래 같은 폭으로 쌓는다.
-  // 한 줄에 나란히 두면 저장이 내용 폭만큼만 줄어 왼쪽에 치우친다.
-  actions: { width: "100%", gap: spacing.sm, marginTop: spacing.sm },
+  // 삭제·저장을 한 줄에 나란히 둔다. `flexible`이 있어야 iOS/Android 구현이
+  // 라벨 폭만큼 minWidth를 깔지 않아 둘이 칸을 반씩 나눠 갖는다.
+  actions: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionItem: { flexGrow: 1, flexBasis: 130, minWidth: 130 },
   privacy: { color: colors.mute, fontSize: 12, lineHeight: 18 },
 }));

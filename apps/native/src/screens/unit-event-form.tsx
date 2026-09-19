@@ -266,13 +266,6 @@ function UnitEventEditor(props: {
           저장하면 같은 부대의 모든 부대원에게 일정명과 상세 정보가 공유돼요.
         </Text>
         <View style={styles.actions}>
-          <Button
-            icon="save"
-            title="저장"
-            loading={pending}
-            onPress={() => void save()}
-            testID="unit-event-save"
-          />
           {props.existing ? (
             <Button
               icon="trash"
@@ -280,8 +273,19 @@ function UnitEventEditor(props: {
               variant="danger"
               disabled={pending}
               onPress={() => void remove()}
+              flexible
+              style={styles.actionItem}
             />
           ) : null}
+          <Button
+            icon="save"
+            title="저장"
+            loading={pending}
+            onPress={() => void save()}
+            testID="unit-event-save"
+            flexible
+            style={styles.actionItem}
+          />
         </View>
       </FormBody>
     </>
@@ -310,7 +314,7 @@ function SheetTitle(props: { title: string; onClose: () => void }) {
     <Stack.Screen
       options={{
         title: props.title,
-        headerLeft: () => (
+        headerRight: () => (
           <Pressable
             accessibilityRole="button"
             onPress={props.onClose}
@@ -358,5 +362,14 @@ const useStyles = makeStyles(({ colors }) => ({
   kindTitle: { color: colors.ink, fontSize: 15, fontWeight: "600" },
   kindHint: { color: colors.mute, fontSize: 12, lineHeight: 18 },
   sharedHint: { color: colors.mute, fontSize: 12, lineHeight: 18 },
-  actions: { width: "100%", gap: spacing.sm, marginTop: spacing.sm },
+  // 개인 일정 폼과 같은 배치다 — 삭제·저장을 한 줄에 나란히 둔다. `flexible`이
+  // 있어야 iOS/Android 구현이 라벨 폭만큼 minWidth를 깔지 않아 칸을 나눠 갖는다.
+  actions: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionItem: { flexGrow: 1, flexBasis: 130, minWidth: 130 },
 }));
