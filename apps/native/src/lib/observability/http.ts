@@ -219,6 +219,14 @@ export function isNetworkKnownOffline(): boolean {
   return networkOnline === false;
 }
 
+/**
+ * 앱이 켜진 뒤로 한 번이라도 앞에서 내려갔는가. 시작 시각을 모르는 전송 —
+ * expo-updates의 검사·내려받기 — 이 이 신호를 쓴다(`expectedUpdateFailure`).
+ */
+export function hasLeftForegroundSinceLaunch(): boolean {
+  return !appInForeground || leftForegroundAt !== null;
+}
+
 /** 앱이 앞에 있는지. `query-persistence.ts`의 AppState 배선에서 함께 알려준다. */
 export function updateAppForegroundState(active: boolean): void {
   appInForeground = active;

@@ -38,3 +38,26 @@ export function shouldReportTransportFailure(
     online !== false && !leftForeground && !isIntentionalCancellation(error)
   );
 }
+
+/** 업데이트 실패가 고칠 것 없는 정상 동작이었다면 그 이유. 아니면 null. */
+export type ExpectedUpdateFailure = "offline" | "backgrounded";
+
+/**
+ * OTA 검사·내려받기 실패를 이슈로 올릴 것인가.
+ *
+ * 전송 실패와 같은 두 신호를 본다(`shouldReportTransportFailure`). 다른 점은 시작
+ * 시각이 없다는 것이다 — expo-updates는 실행 직후에 스스로 시작하고 `useUpdates()`는
+ * 결과만 준다. 그래서 "요청이 나가 있는 동안"을 "앱이 켜진 뒤로" 로 넓게 잡는다.
+ * OTA 실패는 실행 직후에만 도착하므로 실제로 가려지는 창은 그만큼 좁다.
+ *
+ * 넓게 잡아도 진짜 사고는 남는다. 서명 실패·깨진 매니페스트처럼 고칠 것이 있는 실패는
+ * 망이나 앞뒤와 무관하게 되풀이되므로, 앞에 둔 채로 켠 다음 실행에서 올라온다.
+ */
+export function expectedUpdateFailure(
+  knownOffline: boolean,
+  leftForeground: boolean,
+): ExpectedUpdateFailure | null {
+  if (knownOffline) return "offline";
+  if (leftForeground) return "backgrounded";
+  return null;
+}
