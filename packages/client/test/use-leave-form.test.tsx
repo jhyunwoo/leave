@@ -315,6 +315,92 @@ describe("기본 휴가 종류", () => {
     );
     expect(result.current.drafts[0]?.key).toBe("consolation");
   });
+
+  it("휴가를 전부 계획해 남은 자리가 없으면 평일 외출을 고른다", async () => {
+    const { wrapper } = setup(undefined, [
+      // 오늘까지 쓴 것은 없지만 전부 계획에 잡혀 있어 더 넣을 자리가 없다.
+      {
+        key: "annual",
+        totalDays: 24,
+        usedDays: 24,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 24,
+      },
+      {
+        key: "award",
+        totalDays: 4,
+        usedDays: 4,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 4,
+      },
+      {
+        key: "outing",
+        totalDays: 2,
+        usedDays: 0,
+        remainingDays: 2,
+        remainingAsOfTodayDays: 2,
+      },
+    ]);
+    const { result } = await renderForm(wrapper);
+
+    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("outing"));
+    // 하루짜리 외출 한 구간이라 초과 경고 없이 열린다 — 연가로 열리면 곧바로 초과였다.
+    expect(result.current.drafts).toHaveLength(1);
+    expect(result.current.balanceBlockMessage).toBe("");
+  });
+
+  it("평일 외출까지 다 썼으면 남은 주말 외출을 고른다", async () => {
+    const { wrapper } = setup(undefined, [
+      {
+        key: "annual",
+        totalDays: 24,
+        usedDays: 24,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 24,
+      },
+      {
+        key: "outing",
+        totalDays: 2,
+        usedDays: 2,
+        remainingDays: 0,
+        remainingAsOfTodayDays: 0,
+      },
+      {
+        key: "weekend_outing",
+        totalDays: 1,
+        usedDays: 0,
+        remainingDays: 1,
+        remainingAsOfTodayDays: 1,
+      },
+    ]);
+    const { result } = await renderForm(wrapper);
+
+    await waitFor(() =>
+      expect(result.current.drafts[0]?.key).toBe("weekend_outing"),
+    );
+  });
+
+  it("쓸 수 있는 휴가가 하루라도 남았으면 외출이 더 많아도 휴가를 고른다", async () => {
+    const { wrapper } = setup(undefined, [
+      {
+        key: "annual",
+        totalDays: 24,
+        usedDays: 23,
+        remainingDays: 1,
+        remainingAsOfTodayDays: 24,
+      },
+      {
+        key: "outing",
+        totalDays: 6,
+        usedDays: 0,
+        remainingDays: 6,
+        remainingAsOfTodayDays: 6,
+      },
+    ]);
+    const { result } = await renderForm(wrapper);
+
+    await waitFor(() => expect(result.current.drafts[0]?.key).toBe("annual"));
+  });
 });
 
 describe("기간 변경", () => {

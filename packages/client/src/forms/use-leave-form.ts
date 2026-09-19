@@ -30,6 +30,7 @@ import {
   outingAvailableIn,
   outingBalanceKey,
   outingBlockMessage,
+  outingKindOfBalanceKey,
   monthsSpanning,
   recommendDateRanges,
   regularOvernightAvailableIn,
@@ -322,37 +323,72 @@ export function useLeaveForm(options: LeaveFormOptions) {
   /**
    * 등록 날짜에 실제로 가장 많이 남은 재원. 자동 정기외박은 현재 주기 요약 대신
    * 선택 날짜가 속한 주기의 잔여를 비교한다. 동률이면 API 순서를 따른다.
+   *
+   * 순서를 매기는 값과 "더 넣을 자리가 있는가"를 보는 값이 다르다.
+   *  - 순서: `remainingAsOfTodayDays` — 미래 계획은 되돌릴 수 있으니 오늘까지 실제로
+   *    쓴 것만 뺀다. 계획을 옮기려고 폼을 여는 것이 흔한 일이다.
+   *  - 자리: `remainingDays` — 계획까지 뺀 잔여. 저장을 막는 `availableByKey`와 같은
+   *    기준이라, 이 값이 0이면 그 재원을 고르는 순간 폼이 초과 경고로 열린다.
    */
   const preferredBalanceKey = useMemo<BalanceKey | undefined>(() => {
     let preferred: { key: BalanceKey; remaining: number } | undefined;
+    // 외출은 기본값이 되지 않는다. 잔여가 가장 많다는 이유로 자동 선택되면 폼이
+    // 말없이 "하루·단독" 모드가 되고, 사용자는 왜 종류를 더할 수 없는지 모른다.
+    // 외출은 고르는 것이지 기본으로 놓이는 것이 아니다 — 휴가를 전부 계획해
+    // 고를 휴가가 하나도 남지 않았을 때만 예외로 여기까지 내려온다.
+    let outingFallback: { key: BalanceKey; remaining: number } | undefined;
+    let anyLeaveRoom = false;
     for (const item of balances.data?.balances ?? []) {
-      // 외출은 기본값이 되지 않는다. 잔여가 가장 많다는 이유로 자동 선택되면 폼이
-      // 말없이 "하루·단독" 모드가 되고, 사용자는 왜 종류를 더할 수 없는지 모른다.
-      // 외출은 고르는 것이지 기본으로 놓이는 것이 아니다.
-      if (isOutingBalanceKey(item.key)) continue;
-      const remaining =
+      const outingKind = outingKindOfBalanceKey(item.key);
+      if (outingKind) {
+        const config = outingConfigs.get(outingKind);
+        // 주기 외출의 스칼라 잔여는 "이번 주기" 값이라 미래 주기를 잘못 막는다.
+        // 날짜가 정해져 있으면 그 날짜가 속한 주기로 따진다(rowAvailable과 같은 셈).
+        const remaining =
+          isOutingCycleBased(config) && validRange && dischargeAt
+            ? outingAvailableIn({
+                kind: outingKind,
+                config,
+                used: savedSegments,
+                dischargeAt,
+                from: startDate,
+                to: endDate,
+              })
+            : item.remainingDays;
+        if (remaining >= 1 && remaining > (outingFallback?.remaining ?? 0)) {
+          outingFallback = { key: item.key, remaining };
+        }
+        continue;
+      }
+      const cycleScoped =
         item.key === "regular_overnight" &&
         cycleBased &&
         validRange &&
-        dischargeAt
-          ? regularOvernightAvailableIn({
-              config: regularConfig,
-              used: savedSegments,
-              dischargeAt,
-              from: startDate,
-              to: endDate,
-            })
-          : item.remainingAsOfTodayDays;
+        Boolean(dischargeAt);
+      const remaining = cycleScoped
+        ? regularOvernightAvailableIn({
+            config: regularConfig,
+            used: savedSegments,
+            dischargeAt,
+            from: startDate,
+            to: endDate,
+          })
+        : item.remainingAsOfTodayDays;
       if (!preferred || remaining > preferred.remaining) {
         preferred = { key: item.key, remaining };
       }
+      // 주기 재원은 스칼라 잔여가 미래 주기를 설명하지 못하므로 위에서 구한 값을 쓴다.
+      anyLeaveRoom ||= (cycleScoped ? remaining : item.remainingDays) >= 1;
     }
-    return preferred?.key;
+    return anyLeaveRoom || !outingFallback
+      ? preferred?.key
+      : outingFallback.key;
   }, [
     balances.data?.balances,
     cycleBased,
     dischargeAt,
     endDate,
+    outingConfigs,
     regularConfig,
     savedSegments,
     startDate,
