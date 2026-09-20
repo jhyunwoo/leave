@@ -103,12 +103,12 @@ export function nearestGrabTarget<T>(
 
 ### 3. 짧은 탭과 긴 누름을 가르는 선
 
-| 누른 시간 | 지금 | 바뀐 뒤 |
-| --- | --- | --- |
-| ~250ms | 날짜 선택 | 그대로 |
+| 누른 시간       | 지금                       | 바뀐 뒤       |
+| --------------- | -------------------------- | ------------- |
+| ~250ms          | 날짜 선택                  | 그대로        |
 | 250ms~1초 뒤 뗌 | (칩 위였다면) 아무 일 없음 | **날짜 선택** |
-| 1초 유지 | 수정·삭제 메뉴 | 그대로 |
-| 끌어서 놓음 | 이동 | 그대로 |
+| 1초 유지        | 수정·삭제 메뉴             | 그대로        |
+| 끌어서 놓음     | 이동                       | 그대로        |
 
 가운데 줄이 새로 더하는 것이다. 칸 전체가 길게 누르기를 받으면 "조금 느리게 눌렀는데
 아무 일도 일어나지 않는" 칸이 생기는데, 그건 고장으로 읽힌다.
@@ -128,7 +128,7 @@ export type CalendarDragSubject =
   | { kind: "leave"; leaveId: string }
   | { kind: "personalEvent"; eventId: string };
 
-export type LeaveDragPhase =
+export type CalendarDragPhase =
   | "dragging"
   | "editing"
   | "dropped"
@@ -137,8 +137,9 @@ export type LeaveDragPhase =
   | "tapped";
 ```
 
-`LeaveDrag.leaveId` → `subject`. `grabDate`/`hoverDate`/`deltaDays`/`hasMoved`/`phase`는
-그대로다. `CalendarDragSession`도 `leaveId` 자리에 `subject`를 받는 것 말고는 손대지 않는다 —
+`LeaveDrag`는 `CalendarDrag`로, `LeaveDragPhase`는 `CalendarDragPhase`로 이름을 바꾸고
+`leaveId` 자리에 `subject`를 넣는다. `grabDate`/`hoverDate`/`deltaDays`/`hasMoved`/`phase`는
+그대로다. `CalendarDragSession`도 생성자 첫 인자 말고는 손대지 않는다 —
 격자 계산·월 이어붙임 보정(`rebase`)·두 번째 손가락 스크롤은 끌고 있는 것이 무엇인지
 알 필요가 없는 코드다.
 
@@ -149,7 +150,10 @@ export type LeaveDragPhase =
 
 ```ts
 export const calendarDragPreviewAtom: Atom<Map<ISODate, LeaveDragDay> | null>;
-export const personalEventDragPreviewAtom: Atom<Map<ISODate, PersonalEventDragDay> | null>;
+export const personalEventDragPreviewAtom: Atom<Map<
+  ISODate,
+  PersonalEventDragDay
+> | null>;
 ```
 
 하나로 묶으면 개인 일정을 끄는 동안 hover가 바뀔 때마다 재원 칩까지 모든 칸에서 다시
@@ -161,7 +165,7 @@ export const personalEventDragPreviewAtom: Atom<Map<ISODate, PersonalEventDragDa
 export type PersonalEventDragDay = {
   event: PersonalEvent;
   role: "origin" | "target";
-  phase: LeaveDragPhase;
+  phase: CalendarDragPhase;
 };
 ```
 
@@ -196,8 +200,8 @@ export type PersonalEventDragDay = {
 날짜 밀기는 순수 함수로 떼어 테스트한다 — `packages/shared/src/dates.ts`에 `addDays` 옆으로:
 
 ```ts
-export function shiftDateRange<T extends { startDate: ISODate; endDate: ISODate }>(
-  range: T,
+export function shiftDateRange(
+  range: { startDate: ISODate; endDate: ISODate },
   days: number,
 ): { startDate: ISODate; endDate: ISODate };
 ```
