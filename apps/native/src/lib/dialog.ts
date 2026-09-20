@@ -26,12 +26,13 @@ export function confirmAction(options: {
   return Promise.resolve(globalThis.confirm(body));
 }
 
-export type LeaveHoldAction = "edit" | "delete" | "cancel";
+export type HoldAction = "edit" | "delete" | "cancel";
 
-export function chooseLeaveHoldAction(title: string): Promise<LeaveHoldAction> {
-  const answer = globalThis.prompt(
-    `${title}\n\n수정 또는 삭제를 입력해주세요.`,
-  );
+export function chooseHoldAction(
+  title: string,
+  message: string,
+): Promise<HoldAction> {
+  const answer = globalThis.prompt(`${title}\n\n${message}`);
   if (answer === "수정") return Promise.resolve("edit");
   if (answer === "삭제") return Promise.resolve("delete");
   return Promise.resolve("cancel");

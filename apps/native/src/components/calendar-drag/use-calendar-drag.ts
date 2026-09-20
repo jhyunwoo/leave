@@ -17,6 +17,7 @@ import { runOnJS, useSharedValue } from "react-native-reanimated";
 import {
   calendarDragAtom,
   calendarGridMetricsAtom,
+  type CalendarDragSubject,
 } from "@/state/calendar-drag";
 import { setCalendarDragPressActive } from "./context";
 import { CalendarDragSession, type CalendarTouch } from "./session";
@@ -94,7 +95,7 @@ export function useCalendarDrag(options: {
   }, [listRef, store]);
 
   const begin = useCallback(
-    (leaveId: string, date: ISODate, touch: CalendarTouch) => {
+    (subject: CalendarDragSubject, date: ISODate, touch: CalendarTouch) => {
       const metrics = store.get(calendarGridMetricsAtom);
       if (
         !metrics ||
@@ -103,7 +104,7 @@ export function useCalendarDrag(options: {
       )
         return;
       session.current = new CalendarDragSession(
-        leaveId,
+        subject,
         date,
         touch,
         metrics,
@@ -185,9 +186,14 @@ export function useCalendarDrag(options: {
       active.set(false);
       setCalendarDragPressActive(false);
       resetScrollFlags();
+      // 움직이지 않고 손을 뗐으면 짧은 탭으로 되돌린다. 억제 플래그를 푸는 쪽은
+      // "제스처가 활성화된 뒤에도 Pressable이 onPress를 쏘는가"라는 플랫폼 의존
+      // 동작에 기대게 되므로, 단계로 명시해 화면이 직접 고르게 한다.
       store.set(
         calendarDragAtom,
-        result === "cancel" ? null : { ...current.drag, phase: "dropped" },
+        result === "cancel"
+          ? { ...current.drag, phase: "tapped" }
+          : { ...current.drag, phase: "dropped" },
       );
     },
     [active, clearEditTimer, resetScrollFlags, settleDragOffset, store, move],

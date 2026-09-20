@@ -32,6 +32,22 @@ export function addDays(date: ISODate, days: number): ISODate {
   return toISODate(d);
 }
 
+/**
+ * 기간 전체를 같은 일수만큼 민다. 길이는 보존된다.
+ *
+ * 개인 일정을 달력에서 끌어 옮길 때 쓴다. 휴가는 구간마다 재원이 달라 구간 배열을
+ * 통째로 미는 `shiftSegments`(./leave)를 따로 쓴다.
+ */
+export function shiftDateRange(
+  range: { startDate: ISODate; endDate: ISODate },
+  days: number,
+): { startDate: ISODate; endDate: ISODate } {
+  return {
+    startDate: addDays(range.startDate, days),
+    endDate: addDays(range.endDate, days),
+  };
+}
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }

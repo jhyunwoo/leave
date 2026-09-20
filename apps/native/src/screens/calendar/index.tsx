@@ -59,6 +59,7 @@ import {
   usePersonalEvents,
   type Calendar,
   type MyLeave,
+  type PersonalEvent,
 } from "@leave/client";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
 import { Button } from "@/components/button";
@@ -85,7 +86,7 @@ import {
 import { DayPanel } from "./day-panel";
 import { OutingCycleNote } from "./outing-cycle-note";
 import { CalendarOverviewPanel } from "./overview-panel";
-import { useLeaveDrag } from "./use-leave-drag";
+import { useCalendarItemDrag } from "./use-calendar-item-drag";
 
 /**
  * 날짜 상세 시트 높이의 아래·위 한계(창 높이 대비).
@@ -126,6 +127,8 @@ type CalendarIntent =
   | { kind: "form"; date: ISODate }
   | { kind: "leave"; leaveId: string }
   | { kind: "personalEvent"; date: ISODate }
+  /** 이미 있는 개인 일정을 연다. 달력에서 길게 눌러 "수정"을 고른 경우. */
+  | { kind: "personalEventEdit"; eventId: string; month: string }
   | { kind: "unitEvent"; date: ISODate };
 
 export function CalendarScreen() {
@@ -207,14 +210,112 @@ export function CalendarScreen() {
     [myLeaves.data],
   );
 
-  // 달력에서 휴가 칩을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
-  const leaveDrag = useLeaveDrag(myLeaves.data?.leaves, setEditingLeave);
+  /**
+   * 휴가 등록 폼을 연다. 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌
+   * 뒤에 연다.
+   *
+   * iOS는 한 화면에 모달을 하나만 띄울 수 있다. 시트가 떠 있는 채로 폼을 열면
+   * UIKit이 표시를 거부하는데, RN은 거부되기 전에 이미 "표시됨"으로 표시해둬서
+   * 그 상태가 그대로 굳는다. 그러면 폼은 영영 뜨지 않고, 굳은 모달이 화면을
+   * 덮은 채 남아 달력의 스크롤·날짜 탭까지 먹통이 된다.
+   *
+   * 넓은 창에는 시트가 아예 없으므로 선택을 지우지 않고 바로 연다 — 폼을 닫으면
+   * 인스펙터가 고르던 날짜를 그대로 들고 있다.
+   *
+   * 이 네 함수는 로딩·오류 조기 반환보다 **위**에 있어야 한다. 드래그 훅이
+   * "개인 일정 수정 화면을 연다"를 콜백으로 받는데, 훅 호출이 조기 반환 위에
+   * 있기 때문이다.
+   */
+  /** 의도를 실제로 수행한다. 시트가 닫힌 뒤에도 같은 함수가 다시 부른다. */
+  const runIntent = useCallback(
+    (intent: CalendarIntent) => {
+      switch (intent.kind) {
+        case "form":
+          setFormDate(intent.date);
+          return;
+        case "leave":
+          router.push({
+            pathname: "/leave/[leaveId]",
+            params: { leaveId: intent.leaveId },
+          });
+          return;
+        case "personalEvent":
+          router.push({
+            pathname: "/(tabs)/(calendar)/personal-event",
+            params: { date: intent.date },
+          });
+          return;
+        case "personalEventEdit":
+          router.push({
+            pathname: "/(tabs)/(calendar)/personal-event",
+            params: { eventId: intent.eventId, month: intent.month },
+          });
+          return;
+        case "unitEvent":
+          router.push({
+            pathname: "/(tabs)/(calendar)/unit-event",
+            params: { date: intent.date, month: intent.date.slice(0, 7) },
+          });
+          return;
+      }
+    },
+    [router],
+  );
+
+  /**
+   * 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 사라진 뒤에 수행한다.
+   *
+   * iOS는 모달을 하나만 띄운다 — 시트가 떠 있는 채로 다른 모달을 띄우거나 화면을
+   * 밀면, 새 화면 위에 시트가 그대로 남거나 화면이 굳는다. 여기 오는 행동들이
+   * 모두 같은 제약을 받으므로 한 문으로 모아 둔다.
+   */
+  const openAfterSheet = useCallback(
+    (intent: CalendarIntent) => {
+      if (isCompact && selectedDate != null) {
+        // 시트가 닫혔다고 알려오는 onClosed에서 이어서 수행한다.
+        pendingAfterSheet.current = intent;
+        setSelectedDate(null);
+        return;
+      }
+      runIntent(intent);
+    },
+    [isCompact, selectedDate, runIntent],
+  );
+
+  const openForm = useCallback(
+    (date: ISODate) => openAfterSheet({ kind: "form", date }),
+    [openAfterSheet],
+  );
+  const openLeave = useCallback(
+    (leaveId: string) => openAfterSheet({ kind: "leave", leaveId }),
+    [openAfterSheet],
+  );
+
+  // 개인 일정 수정은 iOS 단일 모달 규칙을 타야 한다 — 시트가 떠 있으면 먼저 닫는다.
+  const openPersonalEventEdit = useCallback(
+    (event: PersonalEvent) =>
+      openAfterSheet({
+        kind: "personalEventEdit",
+        eventId: event.id,
+        month: event.startDate.slice(0, 7),
+      }),
+    [openAfterSheet],
+  );
+
+  // 달력에서 일정을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
+  const itemDrag = useCalendarItemDrag({
+    leaves: myLeaves.data?.leaves,
+    today,
+    onEditLeave: setEditingLeave,
+    onEditPersonalEvent: openPersonalEventEdit,
+    onSelectDate: selectDate,
+  });
 
   // 끄는 도중에는 시트가 닫히기를 기다리던 요청을 무효로 본다 — 그 사이에 폼이나
   // 상세 화면이 뜨면 드래그가 갈 곳을 잃는다.
   useEffect(() => {
-    if (leaveDrag.isDragging) pendingAfterSheet.current = null;
-  }, [leaveDrag.isDragging]);
+    if (itemDrag.isDragging) pendingAfterSheet.current = null;
+  }, [itemDrag.isDragging]);
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
@@ -352,66 +453,6 @@ export function CalendarScreen() {
   // 내 휴가·개인 일정·전역일·주기 표시는 부대와 무관하다. 가입은 툴바에서 안내한다.
 
   /**
-   * 휴가 등록 폼을 연다. 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 다 닫힌
-   * 뒤에 연다.
-   *
-   * iOS는 한 화면에 모달을 하나만 띄울 수 있다. 시트가 떠 있는 채로 폼을 열면
-   * UIKit이 표시를 거부하는데, RN은 거부되기 전에 이미 "표시됨"으로 표시해둬서
-   * 그 상태가 그대로 굳는다. 그러면 폼은 영영 뜨지 않고, 굳은 모달이 화면을
-   * 덮은 채 남아 달력의 스크롤·날짜 탭까지 먹통이 된다.
-   *
-   * 넓은 창에는 시트가 아예 없으므로 선택을 지우지 않고 바로 연다 — 폼을 닫으면
-   * 인스펙터가 고르던 날짜를 그대로 들고 있다.
-   */
-  /** 의도를 실제로 수행한다. 시트가 닫힌 뒤에도 같은 함수가 다시 부른다. */
-  const runIntent = (intent: CalendarIntent) => {
-    switch (intent.kind) {
-      case "form":
-        setFormDate(intent.date);
-        return;
-      case "leave":
-        router.push({
-          pathname: "/leave/[leaveId]",
-          params: { leaveId: intent.leaveId },
-        });
-        return;
-      case "personalEvent":
-        router.push({
-          pathname: "/(tabs)/(calendar)/personal-event",
-          params: { date: intent.date },
-        });
-        return;
-      case "unitEvent":
-        router.push({
-          pathname: "/(tabs)/(calendar)/unit-event",
-          params: { date: intent.date, month: intent.date.slice(0, 7) },
-        });
-        return;
-    }
-  };
-
-  /**
-   * 좁은 창에서 날짜 시트가 떠 있으면 먼저 닫고, 사라진 뒤에 수행한다.
-   *
-   * iOS는 모달을 하나만 띄운다 — 시트가 떠 있는 채로 다른 모달을 띄우거나 화면을
-   * 밀면, 새 화면 위에 시트가 그대로 남거나 화면이 굳는다. 여기 오는 네 가지
-   * 행동이 모두 같은 제약을 받으므로 한 문으로 모아 둔다.
-   */
-  const openAfterSheet = (intent: CalendarIntent) => {
-    if (isCompact && selectedDate != null) {
-      // 시트가 닫혔다고 알려오는 onClosed에서 이어서 수행한다.
-      pendingAfterSheet.current = intent;
-      setSelectedDate(null);
-      return;
-    }
-    runIntent(intent);
-  };
-
-  const openForm = (date: ISODate) => openAfterSheet({ kind: "form", date });
-  const openLeave = (leaveId: string) =>
-    openAfterSheet({ kind: "leave", leaveId });
-
-  /**
    * 시트를 띄워도 되는 조건. 세 가지가 모두 맞아야 한다 —
    * 좁은 창이고, 고른 날짜가 있고, 등록 폼이 떠 있지 않을 것.
    */
@@ -450,11 +491,11 @@ export function CalendarScreen() {
           accessibilityLiveRegion="polite"
           style={[
             styles.syncStatus,
-            isOffline && !leaveDrag.statusLabel && styles.syncStatusOffline,
-            leaveDrag.statusLabel != null && styles.dragStatus,
+            isOffline && !itemDrag.statusLabel && styles.syncStatusOffline,
+            itemDrag.statusLabel != null && styles.dragStatus,
           ]}
         >
-          {leaveDrag.statusLabel ?? syncStatusLabel}
+          {itemDrag.statusLabel ?? syncStatusLabel}
         </Text>
         {currentCycle ? (
           <CycleBanner
