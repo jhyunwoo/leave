@@ -8,6 +8,7 @@ import {
   isValidISODate,
   monthBounds,
   rangesOverlap,
+  shiftDateRange,
 } from "../src";
 
 describe("isValidISODate", () => {
@@ -72,5 +73,31 @@ describe("monthBounds / rangesOverlap", () => {
     expect(
       rangesOverlap("2026-01-01", "2026-01-09", "2026-01-10", "2026-01-20"),
     ).toBe(false);
+  });
+});
+
+describe("shiftDateRange", () => {
+  it("기간 전체를 같은 일수만큼 민다", () => {
+    expect(
+      shiftDateRange({ startDate: "2026-03-10", endDate: "2026-03-12" }, 5),
+    ).toEqual({ startDate: "2026-03-15", endDate: "2026-03-17" });
+  });
+
+  it("음수면 앞으로 민다", () => {
+    expect(
+      shiftDateRange({ startDate: "2026-03-01", endDate: "2026-03-01" }, -1),
+    ).toEqual({ startDate: "2026-02-28", endDate: "2026-02-28" });
+  });
+
+  it("달과 해의 경계를 넘어도 길이를 보존한다", () => {
+    expect(
+      shiftDateRange({ startDate: "2026-12-30", endDate: "2027-01-02" }, 3),
+    ).toEqual({ startDate: "2027-01-02", endDate: "2027-01-05" });
+  });
+
+  it("0이면 그대로 둔다", () => {
+    expect(
+      shiftDateRange({ startDate: "2026-03-10", endDate: "2026-03-12" }, 0),
+    ).toEqual({ startDate: "2026-03-10", endDate: "2026-03-12" });
   });
 });
