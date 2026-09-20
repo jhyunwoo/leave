@@ -1,10 +1,10 @@
 /**
- * 달력에서 끌어 옮긴 휴가를 미리 보여주고, 놓이면 저장한다.
+ * 달력에서 끌어 옮긴 항목을 미리 보여주고, 놓이면 저장한다.
  *
  * 사용처: screens/calendar/index.tsx.
  *
- * 제스처(components/calendar-drag)는 "어느 휴가를 며칠 옮기는 중"까지만 안다.
- * 휴가 목록과 저장을 쥔 쪽은 달력 화면이므로, 겹침 판정·미리보기·저장은 여기서 한다.
+ * 제스처(components/calendar-drag)는 "무엇을 며칠 옮기는 중"까지만 안다.
+ * 목록과 저장을 쥔 쪽은 달력 화면이므로, 겹침 판정·미리보기·저장은 여기서 한다.
  */
 
 import { fmtRange } from "@leave/shared/calendar";
@@ -93,15 +93,19 @@ function planMove(
   };
 }
 
-export function useLeaveDrag(
-  leaves: readonly MyLeave[] | undefined,
-  onEdit: (leave: MyLeave) => void,
-): {
-  /** 지금 휴가를 끌고 있는지. */
+export function useCalendarItemDrag(options: {
+  leaves: readonly MyLeave[] | undefined;
+  /** 휴가 편집. 화면이 모달 순서 규칙을 지켜 연다. */
+  onEditLeave: (leave: MyLeave) => void;
+  /** 움직이지 않고 손을 뗐을 때. 짧은 탭과 같이 그날을 고른다. */
+  onSelectDate: (date: ISODate) => void;
+}): {
+  /** 지금 무언가를 끌고 있는지. */
   isDragging: boolean;
   /** 끄는 동안 머리말 줄에 대신 띄울 안내. 드래그가 없으면 null. */
   statusLabel: string | null;
 } {
+  const { leaves, onEditLeave, onSelectDate } = options;
   const drag = useAtomValue(calendarDragAtom);
   const setDrag = useSetAtom(calendarDragAtom);
   const setPreview = useSetAtom(calendarDragPreviewAtom);
@@ -155,6 +159,13 @@ export function useLeaveDrag(
 
   useEffect(() => () => setPreview(null), [setPreview]);
 
+  // 움직이지 않고 손을 뗐다. 짧은 탭과 같이 그날을 고르고 드래그를 접는다.
+  useEffect(() => {
+    if (drag?.phase !== "tapped") return;
+    onSelectDate(drag.grabDate);
+    setDrag(null);
+  }, [drag, onSelectDate, setDrag]);
+
   // 손을 뗐다. 여기서 실제로 저장한다.
   useEffect(() => {
     if (
@@ -170,7 +181,7 @@ export function useLeaveDrag(
         if (drag.phase === "editing") {
           if (!leave) return;
           const action = await chooseLeaveHoldAction(leave.title);
-          if (action === "edit") onEdit(leave);
+          if (action === "edit") onEditLeave(leave);
           if (
             action === "delete" &&
             (await confirmAction({
@@ -201,7 +212,7 @@ export function useLeaveDrag(
         }
         if (moved.needsCycleChoice) {
           const range = segmentsRange(moved.segments)!;
-          onEdit({
+          onEditLeave({
             ...leave,
             ...range,
             segments: moved.segments,
@@ -255,7 +266,7 @@ export function useLeaveDrag(
         setDrag(null);
       }
     })();
-  }, [drag, leave, moved, setDrag, updateLeave, deleteLeave, onEdit]);
+  }, [drag, leave, moved, setDrag, updateLeave, deleteLeave, onEditLeave]);
 
   const statusLabel = useMemo(() => {
     if (!drag) return null;

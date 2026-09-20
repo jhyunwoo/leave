@@ -63,7 +63,14 @@ export type CalendarDragPhase =
   /** 손을 뗐다. 달력 화면이 이 상태를 보고 저장을 시작한다. */
   | "dropped"
   /** 서버에 보내는 중. 미리보기를 그대로 둔 채 기다린다. */
-  | "saving";
+  | "saving"
+  /**
+   * 움직이지 않고 편집 타이머(1초)가 울리기 전에 손을 뗐다.
+   *
+   * 칸 전체가 길게 누르기를 받으므로, 여기서 아무 일도 하지 않으면 "조금 느리게
+   * 눌렀더니 반응이 없는" 칸이 된다. 화면이 이 단계를 보고 날짜 선택으로 되돌린다.
+   */
+  | "tapped";
 
 export type CalendarDrag = {
   subject: CalendarDragSubject;

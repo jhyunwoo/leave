@@ -85,7 +85,7 @@ import {
 import { DayPanel } from "./day-panel";
 import { OutingCycleNote } from "./outing-cycle-note";
 import { CalendarOverviewPanel } from "./overview-panel";
-import { useLeaveDrag } from "./use-leave-drag";
+import { useCalendarItemDrag } from "./use-calendar-item-drag";
 
 /**
  * 날짜 상세 시트 높이의 아래·위 한계(창 높이 대비).
@@ -207,14 +207,18 @@ export function CalendarScreen() {
     [myLeaves.data],
   );
 
-  // 달력에서 휴가 칩을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
-  const leaveDrag = useLeaveDrag(myLeaves.data?.leaves, setEditingLeave);
+  // 달력에서 일정을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
+  const itemDrag = useCalendarItemDrag({
+    leaves: myLeaves.data?.leaves,
+    onEditLeave: setEditingLeave,
+    onSelectDate: selectDate,
+  });
 
   // 끄는 도중에는 시트가 닫히기를 기다리던 요청을 무효로 본다 — 그 사이에 폼이나
   // 상세 화면이 뜨면 드래그가 갈 곳을 잃는다.
   useEffect(() => {
-    if (leaveDrag.isDragging) pendingAfterSheet.current = null;
-  }, [leaveDrag.isDragging]);
+    if (itemDrag.isDragging) pendingAfterSheet.current = null;
+  }, [itemDrag.isDragging]);
 
   // 정기외박 주기는 프로필의 자동 적립 설정에서 파생한다(별도 API 없음).
   const regularOvernight = balances.data?.regularOvernight ?? null;
@@ -450,11 +454,11 @@ export function CalendarScreen() {
           accessibilityLiveRegion="polite"
           style={[
             styles.syncStatus,
-            isOffline && !leaveDrag.statusLabel && styles.syncStatusOffline,
-            leaveDrag.statusLabel != null && styles.dragStatus,
+            isOffline && !itemDrag.statusLabel && styles.syncStatusOffline,
+            itemDrag.statusLabel != null && styles.dragStatus,
           ]}
         >
-          {leaveDrag.statusLabel ?? syncStatusLabel}
+          {itemDrag.statusLabel ?? syncStatusLabel}
         </Text>
         {currentCycle ? (
           <CycleBanner
