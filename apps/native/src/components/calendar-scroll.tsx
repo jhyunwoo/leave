@@ -53,6 +53,7 @@ import { useWindowSizeClass } from "@/adaptive";
 import {
   MonthCalendar,
   useMonthDragPreview,
+  useMonthPersonalDragPreview,
   type OutingCycleStart,
 } from "@/components/month-calendar";
 import { CalendarDragContext } from "@/components/calendar-drag/context";
@@ -337,6 +338,7 @@ const MonthBlock = memo(function MonthBlock(props: {
   // 이 달에 걸친 덧그림만 구독한다. 끌고 있는 휴가가 지나지 않는 달은 늘 null이라
   // 아래 MonthCalendar가 memo에 걸려 그대로 남는다.
   const dragPreview = useMonthDragPreview(props.month);
+  const personalDragPreview = useMonthPersonalDragPreview(props.month);
   const cycles = useMemo(() => {
     const { start, end } = monthBounds(props.month);
     return cyclesInRange(props.regularOvernight, start, end);
@@ -371,6 +373,7 @@ const MonthBlock = memo(function MonthBlock(props: {
       dischargeAt={props.dischargeAt}
       personalEvents={personalEvents.data?.events}
       dragPreview={dragPreview}
+      personalDragPreview={personalDragPreview}
       dragScrollGesture={props.dragScrollGesture}
     />
   );

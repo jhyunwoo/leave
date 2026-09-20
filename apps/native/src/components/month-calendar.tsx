@@ -55,7 +55,9 @@ import {
 } from "@/components/calendar-drag/use-day-cell-drag";
 import {
   calendarDragPreviewAtom,
+  personalEventDragPreviewAtom,
   type LeaveDragDay,
+  type PersonalEventDragDay,
 } from "@/state/calendar-drag";
 import {
   buildRangeIndex,
@@ -116,6 +118,14 @@ export function useMonthDragPreview(
   return useMemo(() => sliceMonthPreview(preview, month), [preview, month]);
 }
 
+/** 개인 일정 덧그림의 같은 짝. 나눠 둔 이유는 atom 주석에 있다. */
+export function useMonthPersonalDragPreview(
+  month: string,
+): Map<ISODate, PersonalEventDragDay> | null {
+  const preview = useAtomValue(personalEventDragPreviewAtom);
+  return useMemo(() => sliceMonthPreview(preview, month), [preview, month]);
+}
+
 /** 그 날짜에 열리는 외출 주기 하나. 갈래를 알아야 몇 회인지 말할 수 있다. */
 export type OutingCycleStart = { kind: OutingKind; cycle: LeaveCycle };
 
@@ -159,6 +169,8 @@ function MonthCalendarImpl(props: {
    * 모든 달이 함께 다시 그려진다.
    */
   dragPreview?: Map<ISODate, LeaveDragDay> | null;
+  /** 이 달에 걸친 개인 일정 덧그림. `dragPreview`와 같은 이유로 달별로 좁혀 넘긴다. */
+  personalDragPreview?: Map<ISODate, PersonalEventDragDay> | null;
   /**
    * 달력 목록의 스크롤 제스처. 이게 있어야 내 휴가 칩을 길게 눌러 다른 날짜로
    * 끌 수 있다 — 끄는 동안 목록이 따라 움직이지 않도록 막을 대상이 필요하다.
@@ -277,6 +289,11 @@ function MonthCalendarImpl(props: {
                 }
                 mine={cell.inMonth ? myLeaveDays?.get(cell.date) : undefined}
                 dragDay={cell.inMonth ? dragPreview?.get(cell.date) : undefined}
+                personalDrag={
+                  cell.inMonth
+                    ? props.personalDragPreview?.get(cell.date)
+                    : undefined
+                }
                 isDischarge={
                   cell.inMonth &&
                   dischargeAt != null &&
@@ -349,6 +366,7 @@ function DayCell(props: {
   personal: readonly PersonalEvent[];
   mine: MyLeaveDay | undefined;
   dragDay: LeaveDragDay | undefined;
+  personalDrag: PersonalEventDragDay | undefined;
   isDischarge: boolean;
   inCycle: boolean;
   cycle: RegularOvernightCycle | undefined;
@@ -369,6 +387,7 @@ function DayCell(props: {
     personal,
     mine,
     dragDay,
+    personalDrag,
     isDischarge,
     inCycle,
     cycle,
@@ -410,6 +429,20 @@ function DayCell(props: {
     ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
     : null;
   const calendarLabel = [holiday, eventLabel].filter(Boolean).join(" · ");
+  // 도착 칸에서는 끌고 있는 일정을 맨 앞에 끼워 그 제목이 알약에 보이게 한다.
+  // 출발 칸은 저장된 목록에 아직 그 일정이 들어 있으므로 그대로 두고 알약만 흐리게
+  // 그린다 — 하루에 일정이 여럿인 출발 칸은 알약 하나가 통째로 흐려지지만, 알약은
+  // 한 줄뿐이고 칸 높이 예산에 여유가 없어 쪼갤 수 없다.
+  const personalForLabel = useMemo(
+    () =>
+      personalDrag?.role === "target"
+        ? [
+            personalDrag.event,
+            ...personal.filter((it) => it.id !== personalDrag.event.id),
+          ]
+        : personal,
+    [personalDrag, personal],
+  );
 
   const body = (
     <Pressable
@@ -429,7 +462,7 @@ function DayCell(props: {
               signal?.percent == null
                 ? "출타 기준 미설정"
                 : `출타율 ${signal.percent}퍼센트, ${signal.label}`
-            }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}${
+            }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personalForLabel.map((event) => event.title).join(", ")}` : ""}${
               blocked ? ", 제한 가능 기간" : ""
             }`
           : undefined
@@ -548,14 +581,24 @@ function DayCell(props: {
           {/* 무슨 일정인지 날짜를 열지 않고 읽게 한다. 줄을 늘릴
                         자리가 없어 첫 제목만 적고 나머지는 개수로 접는다 —
                         접힌 제목은 접근성 라벨과 날짜 상세에 그대로 있다. */}
-          {!compact && personal.length > 0 && (
-            <View style={styles.personalPill}>
+          {!compact && personalForLabel.length > 0 && (
+            <View
+              onLayout={(event) => {
+                rects.current.personal = event.nativeEvent.layout;
+              }}
+              style={[
+                styles.personalPill,
+                personalDrag?.role === "origin" && styles.pillLifted,
+                personalDrag?.role === "target" && styles.pillTarget,
+                personalDrag?.phase === "saving" && styles.chipSaving,
+              ]}
+            >
               <Text
                 style={styles.personalText}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {personalEventCellLabel(personal)}
+                {personalEventCellLabel(personalForLabel)}
               </Text>
             </View>
           )}
@@ -857,6 +900,10 @@ const useStyles = makeStyles(({ colors }) => ({
   chipTarget: { borderWidth: 2 },
   /** 서버에 보내는 중. 아직 확정이 아니라는 뜻으로 살짝 물린다. */
   chipSaving: { opacity: 0.6 },
+  /** 집어 든 개인 일정의 원래 자리. 재원 칩의 chipLifted와 같은 규칙이다. */
+  pillLifted: { opacity: 0.3, borderStyle: "dashed" },
+  /** 놓이게 될 자리. 테두리를 굵혀 이미 저장된 알약과 구분한다. */
+  pillTarget: { borderWidth: 2 },
   personalPill: {
     alignSelf: "stretch",
     marginHorizontal: 1,

@@ -14,7 +14,7 @@
 
 import type { ISODate } from "@leave/shared/dates";
 import { atom } from "jotai";
-import type { MyLeaveDay } from "@leave/client";
+import type { MyLeaveDay, PersonalEvent } from "@leave/client";
 
 /**
  * 달력 격자의 치수. `CalendarScroll`이 창 크기에 맞춰 계산해 둔 값을 그대로 옮긴다.
@@ -120,3 +120,21 @@ export const calendarDragActiveAtom = atom(
 export const calendarDragPreviewAtom = atom<Map<ISODate, LeaveDragDay> | null>(
   null,
 );
+
+/**
+ * 옮기는 중인 개인 일정이 걸치는 칸 하나.
+ *
+ * 재원 칩과 atom을 나눠 둔 것이 중요하다. 하나로 묶으면 개인 일정을 끄는 동안
+ * hover가 바뀔 때마다 휴가 칩까지 모든 칸에서 다시 그려진다.
+ */
+export type PersonalEventDragDay = {
+  event: PersonalEvent;
+  /** 원래 자리인지, 옮겨 갈 자리인지. 두 자리가 겹치면 target이 이긴다. */
+  role: "origin" | "target";
+  phase: CalendarDragPhase;
+};
+
+export const personalEventDragPreviewAtom = atom<Map<
+  ISODate,
+  PersonalEventDragDay
+> | null>(null);
