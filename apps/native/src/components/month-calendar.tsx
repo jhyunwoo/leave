@@ -27,7 +27,11 @@ import {
 } from "@leave/shared/calendar";
 import { addDays, todayInSeoul, type ISODate } from "@leave/shared/dates";
 import { getHoliday } from "@leave/shared/holidays";
-import { balanceLabel, type OutingKind } from "@leave/shared/leave";
+import {
+  balanceLabel,
+  isUserEditableLeaveStatus,
+  type OutingKind,
+} from "@leave/shared/leave";
 import { type LeaveCycle } from "@leave/shared/leave-cycle";
 import { outingBalanceKey } from "@leave/shared/outing";
 import {
@@ -35,8 +39,8 @@ import {
   type RegularOvernightCycle,
 } from "@leave/shared/regular-overnight";
 import { useAtomValue } from "jotai";
-import { memo, useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { memo, useMemo, useRef } from "react";
+import { type LayoutChangeEvent, Pressable, Text, View } from "react-native";
 import {
   GestureDetector,
   type NativeGesture,
@@ -45,8 +49,10 @@ import type { Calendar, MyLeaveDay, PersonalEvent } from "@leave/client";
 import {
   isDragPressSuppressed,
   noteCalendarPressStart,
-  useLeaveChipDrag,
-} from "@/components/calendar-drag/use-leave-chip-drag";
+  useDayCellDrag,
+  type DayCellRects,
+  type DayCellSubject,
+} from "@/components/calendar-drag/use-day-cell-drag";
 import {
   calendarDragPreviewAtom,
   type LeaveDragDay,
@@ -55,7 +61,14 @@ import {
   buildRangeIndex,
   sliceMonthPreview,
 } from "@/components/month-cell-index";
-import { balanceTone, makeStyles, radius, spacing, useTheme } from "@/theme";
+import {
+  balanceTone,
+  makeStyles,
+  radius,
+  spacing,
+  useColors,
+  useTheme,
+} from "@/theme";
 
 /** 칸 안에 미리 보여줄 출타자 수. 넘치면 "+N"으로 접는다. */
 const PREVIEW_ATTENDEES = 3;
@@ -105,6 +118,9 @@ export function useMonthDragPreview(
 
 /** 그 날짜에 열리는 외출 주기 하나. 갈래를 알아야 몇 회인지 말할 수 있다. */
 export type OutingCycleStart = { kind: OutingKind; cycle: LeaveCycle };
+
+/** 주기가 열리지 않는 칸이 매번 새 배열을 만들지 않도록 공유하는 빈 목록. */
+const EMPTY_OUTING_STARTS: readonly OutingCycleStart[] = [];
 
 /** 공유 그룹 월 달력. 절대 인원 대신 상태·비율을 기본 표시한다. */
 function MonthCalendarImpl(props: {
@@ -164,7 +180,7 @@ function MonthCalendarImpl(props: {
     personalEvents,
   } = props;
   const styles = useStyles();
-  const { colors, balance } = useTheme();
+  const colors = useColors();
   const today = props.today ?? todayInSeoul();
   const weeks = useMemo(() => buildMonthGrid(month), [month]);
   const statByDate = useMemo(
@@ -237,303 +253,61 @@ function MonthCalendarImpl(props: {
       {weeks.map((week, wi) => (
         <View key={wi} style={styles.weekRow}>
           {week.map((cell) => {
-            const stat = cell.inMonth ? statByDate.get(cell.date) : undefined;
-            const signal = stat
-              ? availabilitySignal(stat.count, stat.allowed)
-              : null;
-            const exceeded = signal?.key === "exceeded";
-            // 블랙아웃은 출타율과 무관하게 제한될 수 있는 날이다.
-            const blocked = stat?.blocked ?? false;
-            const isToday = cell.date === today;
-            const isSelected = cell.date === selectedDate;
-            const dayNum = Number(cell.date.slice(8));
-            const weekend = isWeekend(cell.date);
-            const holiday = cell.inMonth ? getHoliday(cell.date) : null;
-            const unitEvents = cell.inMonth
-              ? (unitEventsByDate.get(cell.date) ?? EMPTY_UNIT_EVENTS)
-              : EMPTY_UNIT_EVENTS;
-            const hasUnitHoliday = unitEvents.some((event) => event.isHoliday);
-            const eventLabel = unitEvents.length
-              ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
-              : null;
-            const calendarLabel = [holiday, eventLabel]
-              .filter(Boolean)
-              .join(" · ");
-            const mine = cell.inMonth ? myLeaveDays?.get(cell.date) : undefined;
-            const dragDay = cell.inMonth
-              ? dragPreview?.get(cell.date)
-              : undefined;
-            const personal = cell.inMonth
-              ? (personalByDate.get(cell.date) ?? EMPTY_PERSONAL_EVENTS)
-              : EMPTY_PERSONAL_EVENTS;
-            const isDischarge =
-              cell.inMonth && dischargeAt != null && cell.date === dischargeAt;
-            // 전역한 뒤의 주기는 받을 일도 쓸 일도 없어 아예 그리지 않는다.
             const pastDischarge =
               dischargeAt != null && cell.date > dischargeAt;
-            const inCycle =
-              cell.inMonth &&
-              !pastDischarge &&
-              currentCycle != null &&
-              currentCycle.start <= cell.date &&
-              cell.date <= currentCycle.end;
-            // 이 날이 속한 정기외박 주기. 칸 아래 얇은 색 선으로 표시한다.
-            const cycle =
-              cell.inMonth && !pastDischarge
-                ? cycles?.find(
-                    (c) => c.start <= cell.date && cell.date <= c.end,
-                  )
-                : undefined;
-            // 이 날 열리는 외출 주기. 기간을 칠하지 않고 시작일에만 찍는다.
-            const outingStarts =
-              cell.inMonth && !pastDischarge && !compact
-                ? (outingStartsByDate.get(cell.date) ?? [])
-                : [];
-            const preview =
-              cell.inMonth && showAttendees
-                ? attendeePreview.get(cell.date)
-                : undefined;
-
             return (
-              <Pressable
+              <DayCell
                 key={cell.date}
-                disabled={!cell.inMonth}
-                accessibilityRole="button"
-                accessibilityLabel={
+                cell={cell}
+                compact={compact ?? false}
+                cellHeight={cellHeight}
+                today={today}
+                isSelected={cell.date === selectedDate}
+                onSelectDate={onSelectDate}
+                stat={cell.inMonth ? statByDate.get(cell.date) : undefined}
+                unitEvents={
                   cell.inMonth
-                    ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${
-                        cycle ? `, 정기외박 ${cycle.index}주기` : ""
-                      }${
-                        mine
-                          ? `, 내 ${balanceLabel(mine.key)} ${
-                              mine.isDraft
-                                ? "초안"
-                                : mine.isConfirmed
-                                  ? "확정"
-                                  : "희망"
-                            }`
-                          : ""
-                      }, ${
-                        signal?.percent == null
-                          ? "출타 기준 미설정"
-                          : `출타율 ${signal.percent}퍼센트, ${signal.label}`
-                      }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}${
-                        blocked ? ", 제한 가능 기간" : ""
-                      }`
+                    ? (unitEventsByDate.get(cell.date) ?? EMPTY_UNIT_EVENTS)
+                    : EMPTY_UNIT_EVENTS
+                }
+                personal={
+                  cell.inMonth
+                    ? (personalByDate.get(cell.date) ?? EMPTY_PERSONAL_EVENTS)
+                    : EMPTY_PERSONAL_EVENTS
+                }
+                mine={cell.inMonth ? myLeaveDays?.get(cell.date) : undefined}
+                dragDay={cell.inMonth ? dragPreview?.get(cell.date) : undefined}
+                isDischarge={
+                  cell.inMonth &&
+                  dischargeAt != null &&
+                  cell.date === dischargeAt
+                }
+                inCycle={
+                  cell.inMonth &&
+                  !pastDischarge &&
+                  currentCycle != null &&
+                  currentCycle.start <= cell.date &&
+                  cell.date <= currentCycle.end
+                }
+                cycle={
+                  cell.inMonth && !pastDischarge
+                    ? cycles?.find(
+                        (c) => c.start <= cell.date && cell.date <= c.end,
+                      )
                     : undefined
                 }
-                onPressIn={noteCalendarPressStart}
-                onPress={() => {
-                  // 휴가를 옮기고 손을 뗀 순간의 탭은 드래그의 잔상이다.
-                  if (isDragPressSuppressed()) return;
-                  onSelectDate(cell.date);
-                }}
-                style={({ pressed }) => [
-                  styles.cell,
-                  { height: cellHeight },
-                  inCycle && { backgroundColor: colors.cycleTint },
-                  exceeded && { backgroundColor: colors.negativeTint },
-                  // 전역일은 복무에서 한 번뿐이라 주기·초과 배경을 이기고 칸 전체를
-                  // 가져간다. cell이 이미 투명 1px 테두리를 갖고 있어 높이는 그대로다.
-                  isDischarge && {
-                    backgroundColor: colors.primaryPale,
-                    borderColor: colors.brand,
-                  },
-                  // 집어 든 칸은 줄이지 않는다. 길게 누르는 250ms 동안 쪼그라들었다가
-                  // 드래그가 시작되며 되돌아오는 깜빡임이 생긴다.
-                  pressed &&
-                    dragDay?.role !== "origin" && {
-                      transform: [{ scale: 0.97 }],
-                    },
-                ]}
-              >
-                {cell.inMonth && (
-                  <>
-                    {/* 날짜 줄. 외출 주기 마커는 이 줄의 남는 자리를 쓴다 —
-                        칸 높이 예산이 꽉 차 있어 줄을 늘리면 마지막 주가 잘린다. */}
-                    <View style={styles.dayNumRow}>
-                      <View
-                        style={[
-                          styles.dayNumWrap,
-                          isToday && styles.todayWrap,
-                          // 오늘이면 primary 채움을 그대로 두고 테두리만 더한다.
-                          isSelected && !isToday && styles.selectedWrap,
-                        ]}
-                      >
-                        {/* 고른 날의 테두리는 칸 안에 겹쳐 그린다. borderWidth를
-                            주면 글자 자리가 그만큼 좁아져 두 자리 날짜에서 원이
-                            커졌다 작아졌다 한다. */}
-                        {isSelected && (
-                          <View
-                            pointerEvents="none"
-                            style={styles.selectedRing}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.dayNum,
-                            (weekend || holiday || hasUnitHoliday) && {
-                              color: colors.negative,
-                            },
-                            exceeded && { color: colors.negativeDeep },
-                            // 고른 날은 채움이 옅어 숫자가 제 색(주말이면 빨강)을
-                            // 그대로 쓴다. 오늘만 진한 primary 위라 글자를 뒤집는다.
-                            isToday && { color: colors.onPrimary },
-                          ]}
-                        >
-                          {dayNum}
-                        </Text>
-                      </View>
-                      {outingStarts.map((entry) => {
-                        // 재원 톤을 **뒤집어** 쓴다 — 옅은 칩은 날짜 숫자에 묻혀
-                        // 안 보였다. 색을 새로 만들지는 않고 대비만 올린다.
-                        const tone = balanceTone(
-                          balance,
-                          outingBalanceKey(entry.kind),
-                        );
-                        return (
-                          <View
-                            key={entry.kind}
-                            style={[
-                              styles.outingStart,
-                              { backgroundColor: tone.fg },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.outingStartText,
-                                { color: tone.bg },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {entry.kind === "weekend" ? "주말" : "외출"}
-                              {"+"}
-                              {entry.cycle.grantDays}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                    {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 아래 칸 높이
-                        예산이 꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는
-                        날에는 전역이 이기고, 공휴일 이름은 날짜 상세에서 그대로 보인다. */}
-                    {!compact && isDischarge ? (
-                      <View style={styles.dischargeBadge}>
-                        <Text style={styles.dischargeText} numberOfLines={1}>
-                          전역
-                        </Text>
-                      </View>
-                    ) : !compact && calendarLabel ? (
-                      <Text
-                        style={[
-                          styles.calendarLabel,
-                          (holiday || hasUnitHoliday) && styles.holidayLabel,
-                        ]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {calendarLabel}
-                      </Text>
-                    ) : null}
-                    {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
-                    {!compact && (mine || dragDay) && (
-                      <MyLeaveChip
-                        date={cell.date}
-                        mine={mine}
-                        preview={dragDay}
-                        scrollGesture={props.dragScrollGesture ?? null}
-                        onTap={() => onSelectDate(cell.date)}
-                      />
-                    )}
-                    {/* 무슨 일정인지 날짜를 열지 않고 읽게 한다. 줄을 늘릴
-                        자리가 없어 첫 제목만 적고 나머지는 개수로 접는다 —
-                        접힌 제목은 접근성 라벨과 날짜 상세에 그대로 있다. */}
-                    {!compact && personal.length > 0 && (
-                      <View style={styles.personalPill}>
-                        <Text
-                          style={styles.personalText}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {personalEventCellLabel(personal)}
-                        </Text>
-                      </View>
-                    )}
-                    {/* 칸이 넉넉한 창에서만 — 그날 나가는 사람을 이니셜로 미리 본다.
-                        시트를 열지 않고도 겹치는 사람을 훑을 수 있게 하는 표시라,
-                        숫자(총원)를 함께 적어 색·글자 어느 쪽으로도 읽히게 한다. */}
-                    {preview && (
-                      <View style={styles.attendeeRow}>
-                        {preview.initials.map((initial, index) => (
-                          <View key={index} style={styles.attendeeDot}>
-                            <Text style={styles.attendeeDotText}>
-                              {initial}
-                            </Text>
-                          </View>
-                        ))}
-                        {preview.total > preview.initials.length && (
-                          <Text style={styles.attendeeMore}>
-                            +{preview.total - preview.initials.length}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-                    {/* 서버의 절대 인원은 셀에서 드러내지 않고 상태·비율만 보여준다. */}
-                    {!compact && blocked && (
-                      <View style={styles.blockedPill}>
-                        <Text style={styles.blockedText}>제한</Text>
-                      </View>
-                    )}
-                    {!compact && signal && (
-                      <View
-                        style={[
-                          styles.countPill,
-                          signal.percent === 0 && styles.countPillEmpty,
-                          signal.key === "near" && styles.countPillNear,
-                          exceeded && {
-                            backgroundColor: colors.negativeBg,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.countText,
-                            signal.percent === 0 && { color: colors.mute },
-                            // 노란 채움 위에 얹히므로 warningContent가 아니라
-                            // 전용 대비색을 쓴다(다크에서 노랑 위 노랑이 된다).
-                            signal.key === "near" && {
-                              color: colors.onWarning,
-                            },
-                            exceeded && { color: colors.onNegativeBg },
-                            isSelected && {
-                              color: exceeded
-                                ? colors.negativeDeep
-                                : colors.inkDeep,
-                            },
-                          ]}
-                        >
-                          {signal.percent == null
-                            ? signal.label
-                            : `${signal.label} ${signal.percent}%`}
-                        </Text>
-                      </View>
-                    )}
-                    {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
-                    {cycle && (
-                      <View
-                        style={[
-                          styles.cycleBar,
-                          { backgroundColor: cycleColor(cycle.index) },
-                          cell.date === cycle.start && styles.cycleBarStart,
-                          // 전역일에서 잘린 주기도 뚝 끊기지 않고 둥글게 닫는다.
-                          (cell.date === cycle.end || isDischarge) &&
-                            styles.cycleBarEnd,
-                        ]}
-                      />
-                    )}
-                  </>
-                )}
-              </Pressable>
+                outingStarts={
+                  cell.inMonth && !pastDischarge && !compact
+                    ? (outingStartsByDate.get(cell.date) ?? EMPTY_OUTING_STARTS)
+                    : EMPTY_OUTING_STARTS
+                }
+                attendeePreview={
+                  cell.inMonth && showAttendees
+                    ? attendeePreview.get(cell.date)
+                    : undefined
+                }
+                dragScrollGesture={props.dragScrollGesture ?? null}
+              />
             );
           })}
         </View>
@@ -552,32 +326,337 @@ function MonthCalendarImpl(props: {
 export const MonthCalendar = memo(MonthCalendarImpl);
 
 /**
+ * 날짜 칸 하나.
+ *
+ * 길게 누르기 인식기가 여기 붙는다 — 칩이 아니라 칸이다. 11px 알약을 휴대폰에서
+ * 정확히 짚기 어려워, 빗나가면 드래그 대신 날짜가 선택되어 버렸다. 무엇을 집을지는
+ * 손가락 위치가 정한다(`calendar-drag/grab-target.ts`).
+ *
+ * 제스처는 **집을 것이 있는 칸에만** 붙인다. 무한 스크롤은 대여섯 달을 동시에
+ * 마운트하므로 빈 칸까지 달면 네이티브 인식기가 250개를 넘는다. 판정은 저장된
+ * 데이터로만 한다 — 드래그 덧그림을 섞으면 끌고 가는 도중에 목적지 칸의 트리 모양이
+ * 바뀌어 `Pressable`이 리마운트된다.
+ */
+function DayCell(props: {
+  cell: { date: ISODate; inMonth: boolean };
+  compact: boolean;
+  cellHeight: number;
+  today: ISODate;
+  isSelected: boolean;
+  onSelectDate: (date: ISODate) => void;
+  stat: Calendar["days"][number] | undefined;
+  unitEvents: readonly UnitCalendarEvent[];
+  personal: readonly PersonalEvent[];
+  mine: MyLeaveDay | undefined;
+  dragDay: LeaveDragDay | undefined;
+  isDischarge: boolean;
+  inCycle: boolean;
+  cycle: RegularOvernightCycle | undefined;
+  outingStarts: readonly OutingCycleStart[];
+  attendeePreview: { initials: string[]; total: number } | undefined;
+  dragScrollGesture: NativeGesture | null;
+}) {
+  // 옮겨 온 JSX가 바꾸지 않고 그대로 쓰도록 전부 풀어 둔다.
+  const {
+    cell,
+    compact,
+    cellHeight,
+    today,
+    isSelected,
+    onSelectDate,
+    stat,
+    unitEvents,
+    personal,
+    mine,
+    dragDay,
+    isDischarge,
+    inCycle,
+    cycle,
+    outingStarts,
+    attendeePreview: preview,
+  } = props;
+  const styles = useStyles();
+  const { colors, balance } = useTheme();
+  // 자리별 세로 구간. onLayout이 채우고 제스처의 onStart가 읽는다. 상태로 두면
+  // 레이아웃이 올 때마다 42칸이 다시 그려진다.
+  const rects = useRef<DayCellRects>({});
+  const leaveId =
+    mine != null && isUserEditableLeaveStatus(mine.status)
+      ? mine.leaveId
+      : null;
+  const subjects = useMemo<DayCellSubject[]>(() => {
+    const list: DayCellSubject[] = [];
+    if (leaveId)
+      list.push({ slot: "leave", subject: { kind: "leave", leaveId } });
+    return list;
+  }, [leaveId]);
+  const gesture = useDayCellDrag({
+    subjects,
+    rects,
+    date: cell.date,
+    scrollGesture: props.dragScrollGesture,
+  });
+
+  const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
+  const exceeded = signal?.key === "exceeded";
+  // 블랙아웃은 출타율과 무관하게 제한될 수 있는 날이다.
+  const blocked = stat?.blocked ?? false;
+  const isToday = cell.date === today;
+  const dayNum = Number(cell.date.slice(8));
+  const weekend = isWeekend(cell.date);
+  const holiday = cell.inMonth ? getHoliday(cell.date) : null;
+  const hasUnitHoliday = unitEvents.some((event) => event.isHoliday);
+  const eventLabel = unitEvents.length
+    ? `${unitEvents[0]!.title}${unitEvents.length > 1 ? ` +${unitEvents.length - 1}` : ""}`
+    : null;
+  const calendarLabel = [holiday, eventLabel].filter(Boolean).join(" · ");
+
+  const body = (
+    <Pressable
+      disabled={!cell.inMonth}
+      accessibilityRole="button"
+      accessibilityLabel={
+        cell.inMonth
+          ? `${dayNum}일${isDischarge ? ", 전역일" : ""}${holiday ? `, ${holiday}` : ""}${
+              cycle ? `, 정기외박 ${cycle.index}주기` : ""
+            }${
+              mine
+                ? `, 내 ${balanceLabel(mine.key)} ${
+                    mine.isDraft ? "초안" : mine.isConfirmed ? "확정" : "희망"
+                  }`
+                : ""
+            }, ${
+              signal?.percent == null
+                ? "출타 기준 미설정"
+                : `출타율 ${signal.percent}퍼센트, ${signal.label}`
+            }${preview ? `, 출타 ${preview.total}명` : ""}${unitEvents.length ? `, 부대 일정 ${unitEvents.map((event) => event.title).join(", ")}` : ""}${personal.length ? `, 개인 일정 ${personal.map((event) => event.title).join(", ")}` : ""}${
+              blocked ? ", 제한 가능 기간" : ""
+            }`
+          : undefined
+      }
+      onPressIn={noteCalendarPressStart}
+      onPress={() => {
+        // 휴가를 옮기고 손을 뗀 순간의 탭은 드래그의 잔상이다.
+        if (isDragPressSuppressed()) return;
+        onSelectDate(cell.date);
+      }}
+      style={({ pressed }) => [
+        styles.cell,
+        { height: cellHeight },
+        inCycle && { backgroundColor: colors.cycleTint },
+        exceeded && { backgroundColor: colors.negativeTint },
+        // 전역일은 복무에서 한 번뿐이라 주기·초과 배경을 이기고 칸 전체를
+        // 가져간다. cell이 이미 투명 1px 테두리를 갖고 있어 높이는 그대로다.
+        isDischarge && {
+          backgroundColor: colors.primaryPale,
+          borderColor: colors.brand,
+        },
+        // 집어 든 칸은 줄이지 않는다. 길게 누르는 250ms 동안 쪼그라들었다가
+        // 드래그가 시작되며 되돌아오는 깜빡임이 생긴다.
+        pressed &&
+          dragDay?.role !== "origin" && {
+            transform: [{ scale: 0.97 }],
+          },
+      ]}
+    >
+      {cell.inMonth && (
+        <>
+          {/* 날짜 줄. 외출 주기 마커는 이 줄의 남는 자리를 쓴다 —
+                        칸 높이 예산이 꽉 차 있어 줄을 늘리면 마지막 주가 잘린다. */}
+          <View style={styles.dayNumRow}>
+            <View
+              style={[
+                styles.dayNumWrap,
+                isToday && styles.todayWrap,
+                // 오늘이면 primary 채움을 그대로 두고 테두리만 더한다.
+                isSelected && !isToday && styles.selectedWrap,
+              ]}
+            >
+              {/* 고른 날의 테두리는 칸 안에 겹쳐 그린다. borderWidth를
+                            주면 글자 자리가 그만큼 좁아져 두 자리 날짜에서 원이
+                            커졌다 작아졌다 한다. */}
+              {isSelected && (
+                <View pointerEvents="none" style={styles.selectedRing} />
+              )}
+              <Text
+                style={[
+                  styles.dayNum,
+                  (weekend || holiday || hasUnitHoliday) && {
+                    color: colors.negative,
+                  },
+                  exceeded && { color: colors.negativeDeep },
+                  // 고른 날은 채움이 옅어 숫자가 제 색(주말이면 빨강)을
+                  // 그대로 쓴다. 오늘만 진한 primary 위라 글자를 뒤집는다.
+                  isToday && { color: colors.onPrimary },
+                ]}
+              >
+                {dayNum}
+              </Text>
+            </View>
+            {outingStarts.map((entry) => {
+              // 재원 톤을 **뒤집어** 쓴다 — 옅은 칩은 날짜 숫자에 묻혀
+              // 안 보였다. 색을 새로 만들지는 않고 대비만 올린다.
+              const tone = balanceTone(balance, outingBalanceKey(entry.kind));
+              return (
+                <View
+                  key={entry.kind}
+                  style={[styles.outingStart, { backgroundColor: tone.fg }]}
+                >
+                  <Text
+                    style={[styles.outingStartText, { color: tone.bg }]}
+                    numberOfLines={1}
+                  >
+                    {entry.kind === "weekend" ? "주말" : "외출"}
+                    {"+"}
+                    {entry.cycle.grantDays}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          {/* 전역 배지와 공휴일 이름은 한 자리를 나눠 쓴다 — 아래 칸 높이
+                        예산이 꽉 차 있어 줄을 늘리면 그 달 마지막 주가 잘린다. 겹치는
+                        날에는 전역이 이기고, 공휴일 이름은 날짜 상세에서 그대로 보인다. */}
+          {!compact && isDischarge ? (
+            <View style={styles.dischargeBadge}>
+              <Text style={styles.dischargeText} numberOfLines={1}>
+                전역
+              </Text>
+            </View>
+          ) : !compact && calendarLabel ? (
+            <Text
+              style={[
+                styles.calendarLabel,
+                (holiday || hasUnitHoliday) && styles.holidayLabel,
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {calendarLabel}
+            </Text>
+          ) : null}
+          {/* 내 휴가가 있는 날은 재원 칩을 먼저 깔고, */}
+          {!compact && (mine || dragDay) && (
+            <MyLeaveChip
+              mine={mine}
+              preview={dragDay}
+              onLayout={(event) => {
+                rects.current.leave = event.nativeEvent.layout;
+              }}
+            />
+          )}
+          {/* 무슨 일정인지 날짜를 열지 않고 읽게 한다. 줄을 늘릴
+                        자리가 없어 첫 제목만 적고 나머지는 개수로 접는다 —
+                        접힌 제목은 접근성 라벨과 날짜 상세에 그대로 있다. */}
+          {!compact && personal.length > 0 && (
+            <View style={styles.personalPill}>
+              <Text
+                style={styles.personalText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {personalEventCellLabel(personal)}
+              </Text>
+            </View>
+          )}
+          {/* 칸이 넉넉한 창에서만 — 그날 나가는 사람을 이니셜로 미리 본다.
+                        시트를 열지 않고도 겹치는 사람을 훑을 수 있게 하는 표시라,
+                        숫자(총원)를 함께 적어 색·글자 어느 쪽으로도 읽히게 한다. */}
+          {preview && (
+            <View style={styles.attendeeRow}>
+              {preview.initials.map((initial, index) => (
+                <View key={index} style={styles.attendeeDot}>
+                  <Text style={styles.attendeeDotText}>{initial}</Text>
+                </View>
+              ))}
+              {preview.total > preview.initials.length && (
+                <Text style={styles.attendeeMore}>
+                  +{preview.total - preview.initials.length}
+                </Text>
+              )}
+            </View>
+          )}
+          {/* 서버의 절대 인원은 셀에서 드러내지 않고 상태·비율만 보여준다. */}
+          {!compact && blocked && (
+            <View style={styles.blockedPill}>
+              <Text style={styles.blockedText}>제한</Text>
+            </View>
+          )}
+          {!compact && signal && (
+            <View
+              style={[
+                styles.countPill,
+                signal.percent === 0 && styles.countPillEmpty,
+                signal.key === "near" && styles.countPillNear,
+                exceeded && {
+                  backgroundColor: colors.negativeBg,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.countText,
+                  signal.percent === 0 && { color: colors.mute },
+                  // 노란 채움 위에 얹히므로 warningContent가 아니라
+                  // 전용 대비색을 쓴다(다크에서 노랑 위 노랑이 된다).
+                  signal.key === "near" && {
+                    color: colors.onWarning,
+                  },
+                  exceeded && { color: colors.onNegativeBg },
+                  isSelected && {
+                    color: exceeded ? colors.negativeDeep : colors.inkDeep,
+                  },
+                ]}
+              >
+                {signal.percent == null
+                  ? signal.label
+                  : `${signal.label} ${signal.percent}%`}
+              </Text>
+            </View>
+          )}
+          {/* 주기 표시선 — 같은 주기는 같은 색으로 이어져 한 줄처럼 보인다. */}
+          {cycle && (
+            <View
+              style={[
+                styles.cycleBar,
+                { backgroundColor: cycleColor(cycle.index) },
+                cell.date === cycle.start && styles.cycleBarStart,
+                // 전역일에서 잘린 주기도 뚝 끊기지 않고 둥글게 닫는다.
+                (cell.date === cycle.end || isDischarge) && styles.cycleBarEnd,
+              ]}
+            />
+          )}
+        </>
+      )}
+    </Pressable>
+  );
+  // 집을 것이 없는 칸에는 인식기를 달지 않는다.
+  return subjects.length > 0 ? (
+    <GestureDetector gesture={gesture}>{body}</GestureDetector>
+  ) : (
+    body
+  );
+}
+
+/**
  * 내 휴가 한 칸.
  *
  * 저장된 칸(`mine`)과 드래그 미리보기(`preview`) 어느 쪽이 와도 같은 규칙으로
  * 그린다 — 옮기는 중에도 재원 색과 이어붙임이 그대로 보여야 "이 휴가가 저기로
- * 간다"가 읽힌다.
+ * 간다"가 읽힌다. 원래 날짜에 `role: "origin"` 항목을 남겨 출발 위치를 흐리게
+ * 보여준다.
  *
- * 여기서는 길게 누르기로 선택하고, 이후 이동은 달력 루트가 맡는다.
- * 원래 날짜에 `role: "origin"` 항목을 남겨 출발 위치를 흐리게 보여준다.
+ * 누름은 받지 않는다. 길게 누르기도 탭도 칸(`DayCell`)이 맡는다.
  */
 function MyLeaveChip(props: {
-  date: ISODate;
   /** 저장된 내 휴가. 옮겨 갈 자리를 덧그리는 칸에는 없다. */
   mine: MyLeaveDay | undefined;
   preview: LeaveDragDay | undefined;
-  scrollGesture: NativeGesture | null;
-  /** 칩을 그냥 눌렀을 때 — 칸을 눌렀을 때와 같이 그날을 고른다. */
-  onTap: () => void;
+  /** 칸 안 세로 위치를 칸에 알린다. 무엇을 집을지 고르는 데 쓴다. */
+  onLayout: (event: LayoutChangeEvent) => void;
 }) {
   const styles = useStyles();
   const { colors, balance } = useTheme();
-  const gesture = useLeaveChipDrag({
-    leaveId: props.mine?.leaveId ?? null,
-    status: props.mine?.status ?? null,
-    date: props.date,
-    scrollGesture: props.scrollGesture,
-  });
 
   // 미리보기가 있으면 그쪽이 이긴다. 원래 자리와 옮길 자리가 겹치는 날에도
   // 마찬가지 — 사용자가 보고 싶은 건 옮긴 뒤의 모습이다.
@@ -595,50 +674,35 @@ function MyLeaveChip(props: {
   const bg = conflict ? colors.negativeBg : tone.bg;
 
   return (
-    <GestureDetector gesture={gesture}>
-      {/* 칩이 제 눌림을 직접 받는다. GestureDetector가 붙은 뒤로는 이 뷰의 누름이
-          감싸고 있는 날짜 칸의 Pressable에 온전히 전달되지 않아서, 이게 없으면
-          휴가가 그려진 자리만 눌러도 아무 일이 없는 죽은 영역이 된다.
-          accessibilityRole은 주지 않는다 — 칸이 이미 버튼이라 웹에서 버튼이
-          중첩되고, 읽어 줄 내용도 칸의 라벨에 이미 다 들어 있다. */}
-      <Pressable
-        // 접근성 트리에는 칸 버튼 하나만 남긴다. 칸의 라벨이 이미 "내 연가 희망"까지
-        // 읽어 주고, 눌렀을 때 하는 일도 칸과 같다 — 따로 초점을 받을 이유가 없다.
-        accessible={false}
-        onPressIn={noteCalendarPressStart}
-        onPress={() => {
-          // 휴가를 옮기고 손을 뗀 순간의 눌림은 드래그의 잔상이다.
-          if (isDragPressSuppressed()) return;
-          props.onTap();
-        }}
-        style={[
-          styles.myChip,
-          { backgroundColor: bg },
-          // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
-          day.isConfirmed
-            ? [styles.chipConfirmed, { borderColor: fg }]
-            : [styles.chipTentative, { borderColor: fg }],
-          // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
-          !day.isSegmentStart && styles.chipJoinLeft,
-          !day.isSegmentEnd && styles.chipJoinRight,
-          role === "origin" && styles.chipLifted,
-          role === "target" && styles.chipTarget,
-          merging && { borderColor: colors.brand },
-          saving && styles.chipSaving,
-        ]}
-      >
-        {day.isSegmentStart && (
-          <Text
-            style={[styles.myChipText, { color: fg }]}
-            numberOfLines={1}
-            ellipsizeMode="clip"
-          >
-            {day.isDraft ? "초안 " : ""}
-            {balanceLabel(day.key)}
-          </Text>
-        )}
-      </Pressable>
-    </GestureDetector>
+    <View
+      onLayout={props.onLayout}
+      style={[
+        styles.myChip,
+        { backgroundColor: bg },
+        // 색만으로 구분하지 않도록 확정은 실선, 희망은 점선 테두리.
+        day.isConfirmed
+          ? [styles.chipConfirmed, { borderColor: fg }]
+          : [styles.chipTentative, { borderColor: fg }],
+        // 이어지는 날은 모서리를 붙여 한 덩어리로 보이게 한다.
+        !day.isSegmentStart && styles.chipJoinLeft,
+        !day.isSegmentEnd && styles.chipJoinRight,
+        role === "origin" && styles.chipLifted,
+        role === "target" && styles.chipTarget,
+        merging && { borderColor: colors.brand },
+        saving && styles.chipSaving,
+      ]}
+    >
+      {day.isSegmentStart && (
+        <Text
+          style={[styles.myChipText, { color: fg }]}
+          numberOfLines={1}
+          ellipsizeMode="clip"
+        >
+          {day.isDraft ? "초안 " : ""}
+          {balanceLabel(day.key)}
+        </Text>
+      )}
+    </View>
   );
 }
 
