@@ -17,6 +17,7 @@ import { runOnJS, useSharedValue } from "react-native-reanimated";
 import {
   calendarDragAtom,
   calendarGridMetricsAtom,
+  type CalendarDragSubject,
 } from "@/state/calendar-drag";
 import { setCalendarDragPressActive } from "./context";
 import { CalendarDragSession, type CalendarTouch } from "./session";
@@ -94,7 +95,7 @@ export function useCalendarDrag(options: {
   }, [listRef, store]);
 
   const begin = useCallback(
-    (leaveId: string, date: ISODate, touch: CalendarTouch) => {
+    (subject: CalendarDragSubject, date: ISODate, touch: CalendarTouch) => {
       const metrics = store.get(calendarGridMetricsAtom);
       if (
         !metrics ||
@@ -103,7 +104,7 @@ export function useCalendarDrag(options: {
       )
         return;
       session.current = new CalendarDragSession(
-        leaveId,
+        subject,
         date,
         touch,
         metrics,

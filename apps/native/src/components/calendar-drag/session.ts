@@ -1,7 +1,11 @@
 /** 두 손가락의 역할과 스크롤 좌표를 보존한다. 네이티브 이벤트 순서와 독립적으로 검증한다. */
 import { buildMonthGrid, splitMonth } from "@leave/shared/calendar";
 import { diffDays, type ISODate } from "@leave/shared/dates";
-import type { CalendarGridMetrics, LeaveDrag } from "@/state/calendar-drag";
+import type {
+  CalendarDrag,
+  CalendarDragSubject,
+  CalendarGridMetrics,
+} from "@/state/calendar-drag";
 import {
   locateDate,
   resolveDrop,
@@ -22,7 +26,7 @@ function monthNumber(month: string): number {
 }
 
 export class CalendarDragSession {
-  readonly drag: LeaveDrag;
+  readonly drag: CalendarDrag;
   scrollOffset: number;
   private startOffset: number;
   private metrics: CalendarGridMetrics;
@@ -37,7 +41,7 @@ export class CalendarDragSession {
   }
 
   constructor(
-    leaveId: string,
+    subject: CalendarDragSubject,
     date: ISODate,
     private readonly start: CalendarTouch,
     metrics: CalendarGridMetrics,
@@ -51,7 +55,7 @@ export class CalendarDragSession {
     this.primary = start;
     this.scrollOffset = this.startOffset = scrollOffset;
     this.drag = {
-      leaveId,
+      subject,
       grabDate: date,
       hoverDate: date,
       deltaDays: 0,

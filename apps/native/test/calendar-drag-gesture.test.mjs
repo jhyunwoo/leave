@@ -88,7 +88,7 @@ describe("달력 길게 누르기 — Expo Worklets 빌드", () => {
     callbacks.onTouchesDown({ changedTouches: [touch] });
     callbacks.onStart();
     expect(begin).toHaveBeenCalledExactlyOnceWith(
-      "leave-1",
+      { kind: "leave", leaveId: "leave-1" },
       "2026-09-07",
       touch,
     );
@@ -100,7 +100,7 @@ describe("달력 길게 누르기 — Expo Worklets 빌드", () => {
     callbacks.onTouchesDown({ changedTouches: [touch] });
     callbacks.onStart();
     expect(begin).toHaveBeenCalledExactlyOnceWith(
-      "leave-1",
+      { kind: "leave", leaveId: "leave-1" },
       "2026-09-07",
       touch,
     );
@@ -115,7 +115,7 @@ describe("달력 길게 누르기 — Expo Worklets 빌드", () => {
     });
     callbacks.onStart();
     expect(begin).toHaveBeenCalledExactlyOnceWith(
-      "leave-1",
+      { kind: "leave", leaveId: "leave-1" },
       "2026-09-07",
       touch,
     );
@@ -131,7 +131,11 @@ describe("달력 길게 누르기 — Expo Worklets 빌드", () => {
     const next = { id: 4, absoluteX: 200, absoluteY: 420 };
     callbacks.onTouchesDown({ changedTouches: [next] });
     callbacks.onStart();
-    expect(begin).toHaveBeenLastCalledWith("leave-1", "2026-09-07", next);
+    expect(begin).toHaveBeenLastCalledWith(
+      { kind: "leave", leaveId: "leave-1" },
+      "2026-09-07",
+      next,
+    );
     expect(begin).toHaveBeenCalledTimes(2);
   });
 });

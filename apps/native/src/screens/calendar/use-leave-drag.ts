@@ -111,11 +111,11 @@ export function useLeaveDrag(
   const me = useMe();
   const committing = useRef(false);
 
-  const leave = useMemo(
-    () =>
-      drag ? (leaves?.find((it) => it.id === drag.leaveId) ?? null) : null,
-    [drag, leaves],
-  );
+  const leave = useMemo(() => {
+    if (!drag || drag.subject.kind !== "leave") return null;
+    const { leaveId } = drag.subject;
+    return leaves?.find((it) => it.id === leaveId) ?? null;
+  }, [drag, leaves]);
 
   const moved = useMemo(() => {
     if (!drag || !leave || drag.hoverDate == null) return null;

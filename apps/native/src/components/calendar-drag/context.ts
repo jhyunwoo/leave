@@ -1,11 +1,16 @@
 import type { ISODate } from "@leave/shared/dates";
 import { createContext } from "react";
 import type { ManualGesture } from "react-native-gesture-handler";
+import type { CalendarDragSubject } from "@/state/calendar-drag";
 import type { CalendarTouch } from "./session";
 
 export const CalendarDragContext = createContext<{
   gesture: ManualGesture;
-  begin: (leaveId: string, date: ISODate, touch: CalendarTouch) => void;
+  begin: (
+    subject: CalendarDragSubject,
+    date: ISODate,
+    touch: CalendarTouch,
+  ) => void;
 } | null>(null);
 
 let dragging = false;

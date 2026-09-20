@@ -11,7 +11,13 @@ const metrics = {
 const primary = { id: 7, absoluteX: 220, absoluteY: 320 };
 const secondary = { id: 12, absoluteX: 80, absoluteY: 650 };
 function begin() {
-  return new CalendarDragSession("leave-1", "2026-01-15", primary, metrics, 0);
+  return new CalendarDragSession(
+    { kind: "leave", leaveId: "leave-1" },
+    "2026-01-15",
+    primary,
+    metrics,
+    0,
+  );
 }
 
 describe("CalendarDragSession", () => {

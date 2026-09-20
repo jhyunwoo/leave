@@ -47,7 +47,7 @@ export function useLeaveChipDrag(args: {
       })
       .onStart(() => {
         if (leaveId && pointer.touch)
-          context?.begin(leaveId, date, pointer.touch);
+          context?.begin({ kind: "leave", leaveId }, date, pointer.touch);
       })
       .onFinalize(() => {
         pointer.touch = null;

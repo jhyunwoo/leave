@@ -1,11 +1,11 @@
 /**
- * 달력에서 휴가 칩을 끌어 옮기는 동안의 상태.
+ * 달력에서 일정을 끌어 옮기는 동안의 상태.
  *
  * 세 곳이 이 상태를 나눠 쓴다 —
  * - `components/calendar-scroll.tsx`가 격자 치수와 목록 스크롤을 연결한다.
- * - `components/calendar-drag`가 휴가 선택과 두 손가락 이동을 맡는다.
- * - `screens/calendar/index.tsx`가 휴가 목록과 저장을 쥐고 있어, 미리보기를 파생하고
- *   놓인 순간 실제로 저장한다.
+ * - `components/calendar-drag`가 항목 선택과 두 손가락 이동을 맡는다.
+ * - `screens/calendar/index.tsx`가 휴가·개인 일정 목록과 저장을 쥐고 있어,
+ *   미리보기를 파생하고 놓인 순간 실제로 저장한다.
  *
  * 셋이 서로를 직접 알지 않도록 jotai로 묶었다(`state/auth.ts`와 같은 방식). prop으로
  * 내리면 `MonthBlock` → `MonthCalendar`를 지나야 하는데, 그러면 손가락이 칸을 지날
@@ -45,7 +45,17 @@ export type LeaveDragVerdict =
   /** 다른 휴가와 기간이 겹친다. 놓을 수 없다. */
   | "conflict";
 
-export type LeaveDragPhase =
+/**
+ * 달력에서 끌 수 있는 것.
+ *
+ * 세션·격자·두 손가락 스크롤(`components/calendar-drag/`)은 이게 무엇인지 **모른다**.
+ * 아는 쪽은 양 끝뿐이다 — 무엇을 집었는지 정하는 칸과, 놓였을 때 저장하는 화면.
+ */
+export type CalendarDragSubject =
+  | { kind: "leave"; leaveId: string }
+  | { kind: "personalEvent"; eventId: string };
+
+export type CalendarDragPhase =
   /** 손가락이 아직 화면에 있다. */
   | "dragging"
   /** 이동 없이 길게 누르고 놓았다. 편집 옵션을 연다. */
@@ -55,17 +65,17 @@ export type LeaveDragPhase =
   /** 서버에 보내는 중. 미리보기를 그대로 둔 채 기다린다. */
   | "saving";
 
-export type LeaveDrag = {
-  leaveId: string;
+export type CalendarDrag = {
+  subject: CalendarDragSubject;
   /** 집어 든 칸의 날짜. 이동량은 이 날짜를 기준으로 잰다. */
   grabDate: ISODate;
   /** 지금 놓이게 될 날짜. 놓을 수 없는 자리 위면 null. */
   hoverDate: ISODate | null;
-  /** 휴가 전체가 밀려날 일수. */
+  /** 항목 전체가 밀려날 일수. */
   deltaDays: number;
   /** 손떨림을 넘는 이동이나 두 번째 손가락 스크롤을 한 적이 있는가. */
   hasMoved: boolean;
-  phase: LeaveDragPhase;
+  phase: CalendarDragPhase;
 };
 
 /**
@@ -78,12 +88,12 @@ export type LeaveDragDay = MyLeaveDay & {
   /** 원래 자리인지, 옮겨 갈 자리인지. 두 자리가 겹치면 target이 이긴다. */
   role: "origin" | "target";
   verdict: LeaveDragVerdict;
-  phase: LeaveDragPhase;
+  phase: CalendarDragPhase;
 };
 
 export const calendarGridMetricsAtom = atom<CalendarGridMetrics | null>(null);
 
-export const calendarDragAtom = atom<LeaveDrag | null>(null);
+export const calendarDragAtom = atom<CalendarDrag | null>(null);
 
 /**
  * 드래그 중인지만 알면 되는 곳(스크롤 동결)이 hover 변화마다 다시 그리지 않도록
