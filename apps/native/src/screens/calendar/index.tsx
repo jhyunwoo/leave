@@ -59,6 +59,7 @@ import {
   usePersonalEvents,
   type Calendar,
   type MyLeave,
+  type PersonalEvent,
 } from "@leave/client";
 import { SplitPane, useWindowSizeClass } from "@/adaptive";
 import { Button } from "@/components/button";
@@ -126,6 +127,8 @@ type CalendarIntent =
   | { kind: "form"; date: ISODate }
   | { kind: "leave"; leaveId: string }
   | { kind: "personalEvent"; date: ISODate }
+  /** 이미 있는 개인 일정을 연다. 달력에서 길게 눌러 "수정"을 고른 경우. */
+  | { kind: "personalEventEdit"; eventId: string; month: string }
   | { kind: "unitEvent"; date: ISODate };
 
 export function CalendarScreen() {
@@ -242,6 +245,12 @@ export function CalendarScreen() {
             params: { date: intent.date },
           });
           return;
+        case "personalEventEdit":
+          router.push({
+            pathname: "/(tabs)/(calendar)/personal-event",
+            params: { eventId: intent.eventId, month: intent.month },
+          });
+          return;
         case "unitEvent":
           router.push({
             pathname: "/(tabs)/(calendar)/unit-event",
@@ -282,10 +291,23 @@ export function CalendarScreen() {
     [openAfterSheet],
   );
 
+  // 개인 일정 수정은 iOS 단일 모달 규칙을 타야 한다 — 시트가 떠 있으면 먼저 닫는다.
+  const openPersonalEventEdit = useCallback(
+    (event: PersonalEvent) =>
+      openAfterSheet({
+        kind: "personalEventEdit",
+        eventId: event.id,
+        month: event.startDate.slice(0, 7),
+      }),
+    [openAfterSheet],
+  );
+
   // 달력에서 일정을 길게 눌러 다른 날짜로 옮기는 조작. 미리보기와 저장을 맡는다.
   const itemDrag = useCalendarItemDrag({
     leaves: myLeaves.data?.leaves,
+    today,
     onEditLeave: setEditingLeave,
+    onEditPersonalEvent: openPersonalEventEdit,
     onSelectDate: selectDate,
   });
 

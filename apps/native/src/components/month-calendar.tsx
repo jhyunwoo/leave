@@ -403,12 +403,22 @@ function DayCell(props: {
     mine != null && isUserEditableLeaveStatus(mine.status)
       ? mine.leaveId
       : null;
+  // 하루에 개인 일정이 여럿이면 칸에 제목이 보이는 첫 일정을 집는다. 알약은 한
+  // 줄뿐이라 사용자가 보고 있는 것도 그 하나다. 덧그림이 섞인 personalForLabel이
+  // 아니라 **저장된** 목록을 쓴다 — 그러지 않으면 끌고 가는 도중에 목적지 칸의
+  // 트리 모양이 바뀌어 Pressable이 리마운트된다.
+  const personalEventId = personal[0]?.id ?? null;
   const subjects = useMemo<DayCellSubject[]>(() => {
     const list: DayCellSubject[] = [];
     if (leaveId)
       list.push({ slot: "leave", subject: { kind: "leave", leaveId } });
+    if (personalEventId)
+      list.push({
+        slot: "personal",
+        subject: { kind: "personalEvent", eventId: personalEventId },
+      });
     return list;
-  }, [leaveId]);
+  }, [leaveId, personalEventId]);
   const gesture = useDayCellDrag({
     subjects,
     rects,

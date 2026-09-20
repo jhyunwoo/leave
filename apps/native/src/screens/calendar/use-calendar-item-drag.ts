@@ -8,7 +8,7 @@
  */
 
 import { fmtRange } from "@leave/shared/calendar";
-import type { ISODate } from "@leave/shared/dates";
+import { eachDate, shiftDateRange, type ISODate } from "@leave/shared/dates";
 import { segmentsRange, shiftSegments } from "@leave/shared/leave";
 import {
   eligibleRegularOvernightCycles,
@@ -21,18 +21,24 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useRef } from "react";
 import {
   buildMyLeaveDayMap,
+  useDeletePersonalEvent,
   useUpdateLeave,
   useDeleteLeave,
   useLeaveBalances,
   useMe,
+  usePersonalEvents,
+  useUpdatePersonalEvent,
   type MyLeave,
+  type PersonalEvent,
 } from "@leave/client";
 import { chooseHoldAction, confirmAction, notify } from "@/lib/dialog";
 import {
   calendarDragAtom,
   calendarDragPreviewAtom,
+  personalEventDragPreviewAtom,
   type LeaveDragDay,
   type LeaveDragVerdict,
+  type PersonalEventDragDay,
 } from "@/state/calendar-drag";
 
 /**
@@ -95,8 +101,12 @@ function planMove(
 
 export function useCalendarItemDrag(options: {
   leaves: readonly MyLeave[] | undefined;
+  /** 한국시간 오늘. 드래그가 없을 때 구독할 달을 고르는 데만 쓴다. */
+  today: ISODate;
   /** 휴가 편집. 화면이 모달 순서 규칙을 지켜 연다. */
   onEditLeave: (leave: MyLeave) => void;
+  /** 개인 일정 편집. 화면이 모달 순서 규칙을 지켜 연다. */
+  onEditPersonalEvent: (event: PersonalEvent) => void;
   /** 움직이지 않고 손을 뗐을 때. 짧은 탭과 같이 그날을 고른다. */
   onSelectDate: (date: ISODate) => void;
 }): {
@@ -105,7 +115,8 @@ export function useCalendarItemDrag(options: {
   /** 끄는 동안 머리말 줄에 대신 띄울 안내. 드래그가 없으면 null. */
   statusLabel: string | null;
 } {
-  const { leaves, onEditLeave, onSelectDate } = options;
+  const { leaves, today, onEditLeave, onEditPersonalEvent, onSelectDate } =
+    options;
   const drag = useAtomValue(calendarDragAtom);
   const setDrag = useSetAtom(calendarDragAtom);
   const setPreview = useSetAtom(calendarDragPreviewAtom);
@@ -120,6 +131,38 @@ export function useCalendarItemDrag(options: {
     const { leaveId } = drag.subject;
     return leaves?.find((it) => it.id === leaveId) ?? null;
   }, [drag, leaves]);
+
+  const setPersonalPreview = useSetAtom(personalEventDragPreviewAtom);
+  const updatePersonalEvent = useUpdatePersonalEvent();
+  const deletePersonalEvent = useDeletePersonalEvent();
+
+  /**
+   * 끌고 있는 개인 일정이 있는 달. 달력 블록(`calendar-scroll.tsx`)이 같은 키로
+   * 이미 채워 둔 캐시라 추가 요청이 나가지 않는다. 시작일이 앞 달인 일정도 서버가
+   * 겹치는 일정을 모두 주므로 이 달 응답에 들어 있다.
+   *
+   * 끌고 있지 않을 때 오늘의 달을 구독하는 것은 낭비가 아니다 — 그 달은 어차피
+   * 달력이 들고 있다.
+   */
+  const personalMonth =
+    drag?.subject.kind === "personalEvent"
+      ? drag.grabDate.slice(0, 7)
+      : today.slice(0, 7);
+  const personalEvents = usePersonalEvents(personalMonth);
+  const personalEvent = useMemo(() => {
+    if (!drag || drag.subject.kind !== "personalEvent") return null;
+    const { eventId } = drag.subject;
+    return personalEvents.data?.events.find((it) => it.id === eventId) ?? null;
+  }, [drag, personalEvents.data]);
+
+  /** 옮긴 뒤의 개인 일정. 놓을 수 없는 자리 위면 null. */
+  const movedEvent = useMemo(
+    () =>
+      personalEvent && drag?.hoverDate
+        ? { ...personalEvent, ...shiftDateRange(personalEvent, drag.deltaDays) }
+        : null,
+    [personalEvent, drag],
+  );
 
   const moved = useMemo(() => {
     if (!drag || !leave || drag.hoverDate == null) return null;
@@ -159,6 +202,31 @@ export function useCalendarItemDrag(options: {
 
   useEffect(() => () => setPreview(null), [setPreview]);
 
+  // 개인 일정 덧그림. 출발 자리와 옮길 자리를 함께 보여주고, 겹치면 도착이 이긴다.
+  useEffect(() => {
+    if (!drag || !personalEvent) {
+      setPersonalPreview(null);
+      return;
+    }
+    const map = new Map<ISODate, PersonalEventDragDay>();
+    for (const date of eachDate(personalEvent.startDate, personalEvent.endDate))
+      map.set(date, {
+        event: personalEvent,
+        role: "origin",
+        phase: drag.phase,
+      });
+    if (movedEvent)
+      for (const date of eachDate(movedEvent.startDate, movedEvent.endDate))
+        map.set(date, {
+          event: movedEvent,
+          role: "target",
+          phase: drag.phase,
+        });
+    setPersonalPreview(map);
+  }, [drag, personalEvent, movedEvent, setPersonalPreview]);
+
+  useEffect(() => () => setPersonalPreview(null), [setPersonalPreview]);
+
   // 움직이지 않고 손을 뗐다. 짧은 탭과 같이 그날을 고르고 드래그를 접는다.
   useEffect(() => {
     if (drag?.phase !== "tapped") return;
@@ -178,6 +246,50 @@ export function useCalendarItemDrag(options: {
 
     void (async () => {
       try {
+        if (drag.subject.kind === "personalEvent") {
+          if (!personalEvent) return;
+          if (drag.phase === "editing") {
+            const action = await chooseHoldAction(
+              personalEvent.title,
+              "개인 일정 작업을 선택하세요.",
+            );
+            if (action === "edit") onEditPersonalEvent(personalEvent);
+            if (
+              action === "delete" &&
+              (await confirmAction({
+                title: "개인 일정 삭제",
+                message: `"${personalEvent.title}" 일정을 삭제할까요?`,
+                confirmLabel: "삭제",
+                destructive: true,
+              }))
+            ) {
+              await deletePersonalEvent.mutateAsync(personalEvent);
+            }
+            return;
+          }
+          if (!movedEvent || drag.deltaDays === 0) return;
+          // 오프라인에서는 시도조차 하지 않는다. 휴가 쪽과 같은 이유다 —
+          // networkMode 기본값이라 연결이 없으면 영영 끝나지 않는다.
+          if (!onlineManager.isOnline()) {
+            notify(
+              "오프라인이라 옮길 수 없어요",
+              "연결된 뒤에 다시 시도해주세요.",
+            );
+            return;
+          }
+          setDrag((current) =>
+            current ? { ...current, phase: "saving" } : current,
+          );
+          await updatePersonalEvent.mutateAsync({
+            id: personalEvent.id,
+            input: {
+              startDate: movedEvent.startDate,
+              endDate: movedEvent.endDate,
+            },
+            previous: personalEvent,
+          });
+          return;
+        }
         if (drag.phase === "editing") {
           if (!leave) return;
           const action = await chooseHoldAction(
@@ -269,10 +381,37 @@ export function useCalendarItemDrag(options: {
         setDrag(null);
       }
     })();
-  }, [drag, leave, moved, setDrag, updateLeave, deleteLeave, onEditLeave]);
+  }, [
+    drag,
+    leave,
+    moved,
+    personalEvent,
+    movedEvent,
+    setDrag,
+    updateLeave,
+    deleteLeave,
+    updatePersonalEvent,
+    deletePersonalEvent,
+    onEditLeave,
+    onEditPersonalEvent,
+  ]);
 
   const statusLabel = useMemo(() => {
     if (!drag) return null;
+    if (drag.subject.kind === "personalEvent") {
+      // 하루에 일정이 여럿일 때 무엇이 움직이는지 알 수 있는 유일한 단서다.
+      const title = personalEvent?.title ?? "개인 일정";
+      if (drag.phase === "saving") return `${title} 옮기는 중…`;
+      if (drag.hoverDate == null) return "달력 안의 날짜에 놓아주세요";
+      if (drag.phase === "editing") return `${title} 편집`;
+      if (drag.deltaDays === 0)
+        return drag.hasMoved
+          ? "옮길 날짜로 끌어주세요"
+          : "1초 누르면 편집 · 다른 손가락으로 월 이동";
+      return movedEvent
+        ? `${title} · ${fmtRange(movedEvent.startDate, movedEvent.endDate)}로 옮기기`
+        : null;
+    }
     if (drag.phase === "saving") return "옮기는 중…";
     if (drag.hoverDate == null) return "달력 안의 날짜에 놓아주세요";
     if (drag.phase === "editing") return "휴가 편집";
@@ -287,7 +426,7 @@ export function useCalendarItemDrag(options: {
     return moved?.verdict === "merge"
       ? `${label} · 앞뒤 휴가와 합쳐져요`
       : `${label}로 옮기기`;
-  }, [drag, moved]);
+  }, [drag, moved, personalEvent, movedEvent]);
 
   return { isDragging: drag !== null, statusLabel };
 }
