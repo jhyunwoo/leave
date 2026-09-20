@@ -27,7 +27,7 @@ import {
   useMe,
   type MyLeave,
 } from "@leave/client";
-import { chooseLeaveHoldAction, confirmAction, notify } from "@/lib/dialog";
+import { chooseHoldAction, confirmAction, notify } from "@/lib/dialog";
 import {
   calendarDragAtom,
   calendarDragPreviewAtom,
@@ -180,7 +180,10 @@ export function useCalendarItemDrag(options: {
       try {
         if (drag.phase === "editing") {
           if (!leave) return;
-          const action = await chooseLeaveHoldAction(leave.title);
+          const action = await chooseHoldAction(
+            leave.title,
+            "휴가 작업을 선택하세요.",
+          );
           if (action === "edit") onEditLeave(leave);
           if (
             action === "delete" &&

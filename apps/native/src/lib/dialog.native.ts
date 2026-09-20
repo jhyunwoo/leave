@@ -39,10 +39,12 @@ export function confirmAction(options: {
   });
 }
 
-export type LeaveHoldAction = "edit" | "delete" | "cancel";
+export type HoldAction = "edit" | "delete" | "cancel";
 
 /**
- * 달력 칩을 가만히 누르고 있을 때 손을 떼기 전에 여는 편집 메뉴.
+ * 달력 칸을 가만히 누르고 있을 때 손을 떼기 전에 여는 편집 메뉴.
+ *
+ * 휴가와 개인 일정이 같은 메뉴를 쓴다. 무엇을 다루는지는 `message`가 말한다.
  *
  * **버튼 순서가 플랫폼마다 다르다.** iOS는 배열 순서대로 그리고 `cancel`을 맨 아래에
  * 붙이지만, Android는 배열을 **끝에서 pop해** 마지막 항목을 `buttonPositive`
@@ -53,7 +55,10 @@ export type LeaveHoldAction = "edit" | "delete" | "cancel";
  * 확인 자리에는 되돌릴 수 있는 쪽(수정)을 둔다. 확인 대화상자(`confirmAction`)는
  * 반대로 마지막이 확인이어야 맞으므로 그쪽은 손대지 않는다.
  */
-export function chooseLeaveHoldAction(title: string): Promise<LeaveHoldAction> {
+export function chooseHoldAction(
+  title: string,
+  message: string,
+): Promise<HoldAction> {
   return new Promise((resolve) => {
     const cancel: AlertButton = {
       text: "취소",
@@ -68,7 +73,7 @@ export function chooseLeaveHoldAction(title: string): Promise<LeaveHoldAction> {
     };
     Alert.alert(
       title,
-      "휴가 작업을 선택하세요.",
+      message,
       Platform.OS === "android"
         ? [cancel, remove, edit]
         : [cancel, edit, remove],
