@@ -52,3 +52,8 @@ store/generate/.seed-session.json
 # Playwright 실행 산출물. 실패 시 error-context.md가 수천 줄씩 쌓여 커밋에 섞인다.
 test-results/
 playwright-report/
+
+# 에이전트 작업용 git worktree. 트리 전체가 통째로 커밋되는 사고를 막는다.
+.claude/worktrees/
+# Subagent-Driven Development 작업 기록(원장·브리프·리뷰 꾸러미). 기록은 git 이력이 맡는다.
+.superpowers/
