@@ -150,6 +150,8 @@ export function serializeOnboardingStatus(
 ) {
   return {
     completed: Boolean(user.onboardingCompletedAt),
+    email: user.email,
+    emailVerified: Boolean(user.emailVerifiedAt),
     /**
      * 0023 이전 계정은 온보딩을 마쳤어도 이름이 없다. 클라이언트는
      * `completed && username === null`을 보고 1회성 설정 화면을 띄운다.

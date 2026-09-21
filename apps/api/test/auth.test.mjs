@@ -1,3 +1,4 @@
+import { markEmailVerified } from "./helpers.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -44,6 +45,7 @@ test("계정 생성 후 온보딩을 중단·재개하고 완료한다", async (
   assert.equal(created.status, 201);
   assert.equal(created.data.onboardingCompleted, false);
   assert.equal(created.data.user, null);
+  markEmailVerified(email);
   const token = created.data.token;
 
   const blocked = await req("GET", "/auth/me", { token });
@@ -315,6 +317,7 @@ test("육군 온보딩은 달 단위 정기외박 주기를 저장하고 달력�
     body: { email, password: "password123", dataConsent: true },
   });
   assert.equal(created.status, 201);
+  markEmailVerified(email);
   const token = created.data.token;
 
   assert.equal(

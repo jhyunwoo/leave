@@ -48,6 +48,12 @@ import { RouteMetadata } from "./seo/RouteMetadata";
 import { isAuthedAtom } from "./state/auth";
 import { safeNext } from "./state/next-destination";
 
+const VerifyEmailPage = lazy(() =>
+  import("./pages/VerifyEmailPage").then((m) => ({
+    default: m.VerifyEmailPage,
+  })),
+);
+
 const AppLayout = lazy(() =>
   import("./layouts/AppLayout").then((m) => ({ default: m.AppLayout })),
 );
@@ -228,6 +234,8 @@ function AuthedApp() {
   const onboarding = useAuthBootstrap();
   if (onboarding.isPending) return <FullPageSpinner />;
   if (!onboarding.data) return <Navigate to="/login" replace />;
+  if (!onboarding.data.emailVerified)
+    return <VerifyEmailPage email={onboarding.data.email} />;
   if (!onboarding.data.completed)
     return <OnboardingPage status={onboarding.data} />;
   // 0023 이전에 가입해 아직 공개 이름이 없는 계정 — 1회성 설정 화면.

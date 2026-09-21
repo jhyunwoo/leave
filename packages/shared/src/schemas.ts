@@ -817,3 +817,8 @@ export type RegularOvernightConfigInput = z.infer<
 >;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
+
+/** 메일에서 받은 일회용 코드. 선행 0도 보존한다. */
+export const emailVerificationSchema = z.object({
+  code: z.string().regex(/^[0-9]{6}$/, "6자리 인증 코드를 입력해주세요"),
+});

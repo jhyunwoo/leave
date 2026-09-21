@@ -1,3 +1,4 @@
+import { markEmailVerified } from "./helpers.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { req, setUsername, signup, uniq } from "./helpers.mjs";
@@ -164,6 +165,7 @@ test("온보딩은 이름 없이 완료되지 않고, 기존 계정은 완료 �
     body: { email, password: "password123", dataConsent: true },
   });
   assert.equal(created.status, 201);
+  markEmailVerified(email);
   const token = created.data.token;
   assert.equal(
     (

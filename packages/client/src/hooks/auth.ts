@@ -356,3 +356,28 @@ export function useDeleteAccount() {
     },
   });
 }
+
+export function useSendEmailVerification() {
+  const { client, unwrap } = useLeaveApi();
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await client.auth["email-verification"].send.$post()),
+  });
+}
+
+export function useVerifyEmail() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) =>
+      unwrap(
+        await client.auth["email-verification"].verify.$post({
+          json: { code },
+        }),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}

@@ -1,6 +1,10 @@
 /** 웹 e2e 테스트 설정. 실행: `pnpm --filter @leave/web test:e2e`. */
 
 import { defineConfig, devices } from "@playwright/test";
+import { loadEnv } from "vite";
+
+const reuseTestServers =
+  loadEnv("test", false, "LEAVE_E2E_").LEAVE_E2E_REUSE_SERVERS === "1";
 
 /**
  * 웹 e2e 설정.
@@ -23,19 +27,24 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  // API(8787)와 웹(5173)을 함께 기동. 이미 떠 있으면 재사용.
+  // 실제 메일을 보내는 개발 API를 실수로 재사용하지 않는다. 테스트 서버만 명시적으로 재사용한다.
   webServer: [
     {
+      command: "node e2e/mail-server.mjs",
+      url: "http://127.0.0.1:8790/",
+      reuseExistingServer: reuseTestServers,
+    },
+    {
       command:
-        'pnpm --filter @leave/api exec wrangler dev --port 8787 --var CORS_ORIGIN:http://localhost:5173 --var \'RATE_LIMITS:{"signup":100000,"login":100000}\'',
+        'pnpm --filter @leave/api exec wrangler dev --port 8787 --var RESEND_API_KEY:test-resend-key --var RESEND_API_URL:http://127.0.0.1:8790 --var CORS_ORIGIN:http://localhost:5173 --var \'RATE_LIMITS:{"signup":100000,"login":100000}\'',
       url: "http://localhost:8787/",
-      reuseExistingServer: true,
+      reuseExistingServer: reuseTestServers,
       timeout: 60_000,
     },
     {
       command: "pnpm --filter @leave/web dev",
       url: "http://localhost:5173/",
-      reuseExistingServer: true,
+      reuseExistingServer: reuseTestServers,
       timeout: 60_000,
     },
   ],

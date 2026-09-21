@@ -1,3 +1,4 @@
+import { verifyTestEmail } from "./helpers";
 import {
   expect,
   test,
@@ -22,6 +23,7 @@ async function seedCalendarUser(request: APIRequestContext): Promise<string> {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  await verifyTestEmail(request, token);
   const handle = await request.put("http://localhost:8787/users/me/username", {
     headers: { Authorization: `Bearer ${token}` },
     data: { username: handleSafe("cal") },

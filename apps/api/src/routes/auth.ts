@@ -37,6 +37,10 @@ import {
   verifyPassword,
   verifyPasswordOrDecoy,
 } from "../lib/crypto";
+import {
+  sendEmailVerification,
+  verifyEmailCode,
+} from "../lib/email-verification";
 import { deleteAccount } from "../lib/delete-account";
 import { readRemainingDutyDays } from "../lib/duty-days";
 import { leaveRuleMessage } from "../lib/errors";
@@ -65,6 +69,8 @@ import {
 import { authMiddleware } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 import {
+  sendEmailVerificationRoute,
+  verifyEmailRoute,
   activityRoute,
   authBootstrapRoute,
   changePasswordRoute,
@@ -102,6 +108,7 @@ function newUserRow(input: SignupInput): UserRow {
   return {
     id: crypto.randomUUID(),
     email: input.email,
+    emailVerifiedAt: null,
     passwordHash: "",
     passwordSalt: "",
     name: input.name ?? PLACEHOLDER_PROFILE.name,
@@ -144,6 +151,15 @@ app.use("/login", rateLimit({ name: "login", limit: 10, windowSeconds: 600 }));
 app.use(
   "/signup",
   rateLimit({ name: "signup", limit: 10, windowSeconds: 600 }),
+);
+app.use("/email-verification/*", authMiddleware);
+app.use(
+  "/email-verification/send",
+  rateLimit({ name: "email-send", limit: 5, windowSeconds: 3600 }),
+);
+app.use(
+  "/email-verification/verify",
+  rateLimit({ name: "email-verify", limit: 30, windowSeconds: 3600 }),
 );
 app.use("/logout", authMiddleware);
 app.use("/bootstrap", authMiddleware);
@@ -201,6 +217,43 @@ export const authRoutes = app
       },
       201,
     );
+  })
+  .openapi(sendEmailVerificationRoute, async (c) => {
+    const result = await sendEmailVerification(
+      drizzle(c.env.DB),
+      c.env,
+      c.get("user"),
+    );
+    if (result === "rate_limited") {
+      c.header("Retry-After", "60");
+      return c.json(
+        { error: "인증 코드는 60초 뒤에 다시 보낼 수 있어요" },
+        429,
+      );
+    }
+    if (result === "unavailable")
+      return c.json(
+        { error: "인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요." },
+        503,
+      );
+    return c.json({ ok: true as const }, 200);
+  })
+  .openapi(verifyEmailRoute, async (c) => {
+    const verified = await verifyEmailCode(
+      drizzle(c.env.DB),
+      c.env,
+      c.get("user"),
+      c.req.valid("json").code,
+    );
+    if (!verified)
+      return c.json(
+        {
+          error:
+            "코드가 올바르지 않거나 만료됐어요. 5회 틀렸다면 새 코드를 받아주세요.",
+        },
+        400,
+      );
+    return c.json({ ok: true as const }, 200);
   })
   .openapi(loginRoute, async (c) => {
     const input: LoginInput = c.req.valid("json");

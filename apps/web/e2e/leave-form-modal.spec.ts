@@ -1,3 +1,4 @@
+import { verifyTestEmail } from "./helpers";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { handleSafe } from "./helpers";
 
@@ -30,6 +31,7 @@ async function seedLongLeaveList(request: APIRequestContext) {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  await verifyTestEmail(request, token);
   // 0023부터 이름이 없으면 웹 앱이 1회성 설정 화면을 먼저 띄운다.
   const handle = await request.put("http://localhost:8787/users/me/username", {
     headers: { Authorization: `Bearer ${token}` },
@@ -290,6 +292,7 @@ test("초과 등록 토스트가 페이지가 아니라 화면 아래에 붙는�
     });
     expect(res.ok()).toBeTruthy();
     const token = ((await res.json()) as { token: string }).token;
+    await verifyTestEmail(request, token);
     const handle = await request.put(`${api}/users/me/username`, {
       headers: { Authorization: `Bearer ${token}` },
       data: { username: handleSafe(`toast${tag}`) },

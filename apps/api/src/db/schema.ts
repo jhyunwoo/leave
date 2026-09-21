@@ -38,6 +38,7 @@ export const users = sqliteTable(
   {
     id: text("id").primaryKey(),
     email: text("email").notNull().unique(),
+    emailVerifiedAt: text("email_verified_at"),
     passwordHash: text("password_hash").notNull(),
     passwordSalt: text("password_salt").notNull(),
     name: text("name").notNull(),
@@ -78,6 +79,19 @@ export const users = sqliteTable(
     uniqueIndex("users_username_idx").on(t.username),
   ],
 );
+
+/** 계정마다 최신 코드 하나만 유지한다. 원문은 메일 전송 중에만 존재한다. */
+export const emailVerifications = sqliteTable("email_verifications", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  id: text("id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  sentAt: text("sent_at"),
+});
 
 export const sessions = sqliteTable(
   "sessions",

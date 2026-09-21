@@ -1,3 +1,4 @@
+import { markEmailVerified } from "./helpers.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createUnit, req, setUsername, signup, uniq } from "./helpers.mjs";
@@ -74,14 +75,16 @@ test("없는·이름 없는·온보딩 미완료 계정은 모두 같은 404다"
   assert.equal(nameless.username, null);
 
   const pendingUsername = `pending${uniq("")}`;
+  const email = `${uniq("pending")}@test.com`;
   const pending = await req("POST", "/auth/signup", {
     body: {
-      email: `${uniq("pending")}@test.com`,
+      email,
       password: "password123",
       dataConsent: true,
     },
   });
   assert.equal(pending.status, 201);
+  markEmailVerified(email);
   assert.equal(pending.data.onboardingCompleted, false);
   assert.equal(
     (await setUsername(pending.data.token, pendingUsername)).status,

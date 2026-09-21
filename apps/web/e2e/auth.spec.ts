@@ -1,5 +1,6 @@
+import { verifyTestEmail } from "./helpers";
 import { expect, test } from "@playwright/test";
-import { handleSafe } from "./helpers";
+import { handleSafe, testEmailCode } from "./helpers";
 
 /**
  * 인증 흐름 e2e (로그인 화면, 동의 기반 회원가입).
@@ -66,7 +67,10 @@ test("로그인 화면의 ?next=는 이 사이트 안의 경로로만 해석된�
   expect(new URL(page.url()).origin).toBe("http://localhost:5173");
 });
 
-test("회원가입 후 한 화면 한 입력 온보딩 10단계", async ({ page }) => {
+test("회원가입 후 이메일 인증과 한 화면 한 입력 온보딩 10단계", async ({
+  page,
+  request,
+}) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -85,6 +89,21 @@ test("회원가입 후 한 화면 한 입력 온보딩 10단계", async ({ page 
   await checks.nth(1).check();
   await checks.nth(2).check();
   await page.getByRole("button", { name: "가입하고 시작" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "이메일 인증", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "이메일 인증", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "인증 코드 보내기", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("인증 코드를 보냈어요");
+  const code = await testEmailCode(request, email);
+  await page.getByLabel("인증 코드", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "인증 완료", exact: true }).click();
 
   const next = page.getByTestId("onboarding-next");
   // 단계마다 입력이 하나뿐이라, 화면이 바뀌었는지는 단계 id로 확인한다.
@@ -179,6 +198,7 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   });
   expect(signup.ok()).toBeTruthy();
   const auth = (await signup.json()) as { token: string };
+  await verifyTestEmail(request, auth.token);
   // 0023부터 이름이 없으면 웹 앱이 1회성 설정 화면을 먼저 띄운다. 이 테스트가
   // 보려는 것은 적립분 화면이므로 여기서 이름을 정하고 지나간다.
   const handle = await request.put("http://localhost:8787/users/me/username", {
@@ -295,4 +315,33 @@ test("휴가 총량 수정 후 여러 재원을 한 일정에 배분", async ({
   await expect(savedLeave).toContainText(
     `포상휴가 ${monthNumber}/4–${monthNumber}/5`,
   );
+});
+
+test("미인증 계정으로 초대 링크를 열면 이메일 인증부터 진행한다", async ({
+  page,
+  request,
+}) => {
+  const email = `invite-verification-${Date.now()}@test.com`;
+  const signup = await request.post("http://localhost:8787/auth/signup", {
+    data: { email, password: "password123", dataConsent: true },
+  });
+  expect(signup.ok()).toBeTruthy();
+  const { token } = (await signup.json()) as { token: string };
+  await page.addInitScript(
+    (value) => localStorage.setItem("leave.token", value),
+    token,
+  );
+  await page.goto("/invite/ABC123");
+  await expect(
+    page.getByRole("heading", { name: "이메일 인증", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "인증 코드 보내기", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("인증 코드를 보냈어요");
+  await page
+    .getByLabel("인증 코드", { exact: true })
+    .fill(await testEmailCode(request, email));
+  await page.getByRole("button", { name: "인증 완료", exact: true }).click();
+  await expect(page.getByTestId("onboarding-step-welcome")).toBeVisible();
 });

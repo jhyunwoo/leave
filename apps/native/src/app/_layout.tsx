@@ -182,12 +182,15 @@ function RootNavigator() {
   const isAuthed = token !== null && token !== undefined;
   const onboarding = useOnboardingStatus(isAuthed);
   // 로그인 상태에서만 이 앱 푸시의 수신·열람 이벤트를 서버에 보고 (동의 기반)
-  useNotificationLogging(isAuthed);
 
+  // 이전 앱이 저장한 캐시에는 필드가 없다. 해당 계정은 마이그레이션에서 인증 완료된다.
+  const emailVerified = onboarding.data?.emailVerified !== false;
+  useNotificationLogging(isAuthed && emailVerified);
   const onboardingComplete = onboarding.data?.completed === true;
   // 0023 이전에 가입해 아직 공개 이름이 없는 계정은 1회성 설정 화면을 지난다.
   const hasUsername = Boolean(onboarding.data?.username);
-  const canBrowse = isAuthed && onboardingComplete && hasUsername;
+  const canBrowse =
+    isAuthed && emailVerified && onboardingComplete && hasUsername;
 
   // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
   usePendingDeepLink(ready, canBrowse);
@@ -388,11 +391,20 @@ function RootNavigator() {
             }}
           />
         </Stack.Protected>
-        <Stack.Protected guard={isAuthed && !onboardingComplete}>
+        <Stack.Protected
+          guard={isAuthed && emailVerified && !onboardingComplete}
+        >
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        <Stack.Protected guard={isAuthed && onboardingComplete && !hasUsername}>
+        <Stack.Protected
+          guard={
+            isAuthed && emailVerified && onboardingComplete && !hasUsername
+          }
+        >
           <Stack.Screen name="username-setup" />
+        </Stack.Protected>
+        <Stack.Protected guard={isAuthed && !emailVerified}>
+          <Stack.Screen name="verify-email" />
         </Stack.Protected>
         <Stack.Protected guard={!isAuthed}>
           <Stack.Screen name="login" />

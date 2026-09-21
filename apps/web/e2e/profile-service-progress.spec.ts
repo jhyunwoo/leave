@@ -1,3 +1,4 @@
+import { verifyTestEmail } from "./helpers";
 import {
   expect,
   test,
@@ -30,6 +31,7 @@ async function seedProfileUser(request: APIRequestContext): Promise<string> {
   });
   expect(signup.ok()).toBeTruthy();
   const { token } = (await signup.json()) as { token: string };
+  await verifyTestEmail(request, token);
   const username = await request.put(`${API}/users/me/username`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { username: handleSafe("progress") },

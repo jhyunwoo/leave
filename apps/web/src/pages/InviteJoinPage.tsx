@@ -26,7 +26,7 @@
 
 import { ActionIcon } from "../components/ActionIcon";
 
-import { useJoinUnit, useMe } from "@leave/client";
+import { useAuthBootstrap, useJoinUnit, useMe } from "@leave/client";
 import { inviteAppLink, inviteCodeFromUrl } from "@leave/shared";
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -69,6 +69,7 @@ function Shell(props: { children: ReactNode }) {
 export function InviteJoinPage() {
   const { code: raw } = useParams<{ code: string }>();
   const isAuthed = useAtomValue(isAuthedAtom);
+  const onboarding = useAuthBootstrap(isAuthed);
   const [handoffDone, setHandoffDone] = useState(false);
 
   // 링크의 코드는 사람이 손으로 고칠 수 있다. 형식에 맞지 않으면 아무 그룹도
@@ -114,6 +115,36 @@ export function InviteJoinPage() {
    */
   if (!isAuthed) {
     return <Navigate to={withNext("/signup", `/invite/${code}`)} replace />;
+  }
+
+  if (onboarding.isPending) {
+    return (
+      <Shell>
+        <p role="status">계정 정보를 확인하고 있어요…</p>
+      </Shell>
+    );
+  }
+  if (onboarding.isError) {
+    return (
+      <Shell>
+        <p role="alert">계정 정보를 불러오지 못했어요.</p>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => void onboarding.refetch()}
+        >
+          다시 시도
+        </button>
+      </Shell>
+    );
+  }
+  if (
+    !onboarding.data.emailVerified ||
+    !onboarding.data.completed ||
+    !onboarding.data.username
+  ) {
+    // 초대코드는 이미 저장했다. 루트에서 인증·온보딩을 마치면 그룹 단계가 이 코드를 이어받는다.
+    return <Navigate to="/" replace />;
   }
 
   return <AuthedInviteJoin code={code} />;

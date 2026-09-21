@@ -58,6 +58,7 @@ export async function signup(overrides = {}) {
   };
   const res = await req("POST", "/auth/signup", { body });
   const token = res.data?.token;
+  if (token) markEmailVerified(body.email);
   let handle = null;
   if (token && username !== null) {
     const set = await setUsername(token, username ?? uniq("u"));
@@ -134,4 +135,17 @@ export function isoDaysFromToday(days) {
     now.getTime() + 9 * 60 * 60 * 1000 + days * 24 * 60 * 60 * 1000,
   );
   return kstNoon.toISOString().slice(0, 10);
+}
+
+/** 이메일 인증 이외 기능의 fixture. 실제 인증 테스트는 이 헬퍼를 쓰지 않는다. */
+export function markEmailVerified(email) {
+  const db = openTestDb();
+  try {
+    db.prepare("UPDATE users SET email_verified_at = ? WHERE email = ?").run(
+      new Date().toISOString(),
+      email,
+    );
+  } finally {
+    db.close();
+  }
 }

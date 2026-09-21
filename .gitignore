@@ -41,6 +41,8 @@ yarn-error.log*
 
 # Wrangler
 .wrangler/
+.dev.vars
+.dev.vars.*
 
 # Google Service Key
 leave-504802-81ac1ab95dea.json

@@ -1,3 +1,4 @@
+import { verifyTestEmail } from "./helpers";
 import {
   expect,
   test,
@@ -42,6 +43,7 @@ async function signup(
     token: string;
     user: { id: string };
   };
+  await verifyTestEmail(request, body.token);
   let handle: string | null = null;
   if (username !== null) {
     // 꼬리표에 하이픈이 섞여 들어올 수 있다(`friend-0`). 이름에 쓸 수 없는

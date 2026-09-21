@@ -16,6 +16,7 @@
 import { sql } from "drizzle-orm";
 import {
   accessLogs,
+  emailVerifications,
   passkeyChallenges,
   pushLogs,
   rateLimitCounters,
@@ -33,6 +34,7 @@ const DELETE_BATCH = 500;
 const MAX_ROUNDS = 20;
 
 export type RetentionSummary = {
+  emailVerifications: number;
   accessLogs: number;
   pushLogs: number;
   sessions: number;
@@ -141,7 +143,18 @@ export async function pruneExpiredData(
     return result.meta.changes;
   });
 
+  const removedEmailVerifications = await deleteInRounds(db, async (limit) => {
+    const result = await db
+      .delete(emailVerifications)
+      .where(
+        sql`${emailVerifications.userId} in (select ${emailVerifications.userId} from ${emailVerifications} where ${emailVerifications.expiresAt} <= ${nowIso} limit ${limit})`,
+      )
+      .run();
+    return result.meta.changes;
+  });
+
   return {
+    emailVerifications: removedEmailVerifications,
     accessLogs: removedAccessLogs,
     pushLogs: removedPushLogs,
     sessions: removedSessions,

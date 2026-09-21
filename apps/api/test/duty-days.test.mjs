@@ -1,3 +1,4 @@
+import { markEmailVerified } from "./helpers.mjs";
 // GET /auth/me/duty-days — 남은 일과일.
 //
 // 요일·공휴일·전역일 당일 같은 경계는 packages/shared의 vitest가 지킨다(순수 함수라
@@ -103,14 +104,16 @@ test("남은 일과일은 인증과 온보딩을 요구한다", async () => {
   const anonymous = await readDutyDays(undefined);
   assert.equal(anonymous.status, 401);
 
+  const email = `${uniq("duty-")}@test.com`;
   const created = await req("POST", "/auth/signup", {
     body: {
-      email: `${uniq("duty-")}@test.com`,
+      email,
       password: "password123",
       dataConsent: true,
     },
   });
   assert.equal(created.status, 201);
+  markEmailVerified(email);
   const blocked = await readDutyDays(created.data.token);
   assert.equal(blocked.status, 428);
 });

@@ -11,6 +11,7 @@
 
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  emailVerificationSchema,
   loginSchema,
   onboardingProfileSchema,
   passwordChangeSchema,
@@ -169,6 +170,8 @@ export const passkeyAuthenticationVerifyRoute = createRoute({
 });
 
 const onboardingStatusSchema = z.object({
+  email: z.string(),
+  emailVerified: z.boolean(),
   completed: z.boolean(),
   /**
    * 공개 사용자 이름. 0023 이전 계정은 온보딩을 마쳤어도 null이라,
@@ -408,5 +411,39 @@ export const deleteAccountRoute = createRoute({
   responses: {
     200: jsonContent(okSchema, "삭제 완료"),
     401: errorResponse("인증 실패"),
+  },
+});
+
+export const sendEmailVerificationRoute = createRoute({
+  method: "post",
+  path: "/email-verification/send",
+  tags: ["인증"],
+  summary: "이메일 인증 코드 발송 (10분 유효, 재발송 60초 간격)",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(okSchema, "발송 완료 또는 이미 인증됨"),
+    401: errorResponse("인증 실패"),
+    429: errorResponse("재발송 제한"),
+    503: errorResponse("메일을 보내지 못함"),
+  },
+});
+
+export const verifyEmailRoute = createRoute({
+  method: "post",
+  path: "/email-verification/verify",
+  tags: ["인증"],
+  summary: "이메일 인증 코드 확인",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: emailVerificationSchema } },
+    },
+  },
+  responses: {
+    200: jsonContent(okSchema, "이메일 인증 완료"),
+    400: errorResponse("코드 불일치·만료·사용됨·시도 횟수 초과"),
+    401: errorResponse("인증 실패"),
+    429: errorResponse("시도 횟수 제한"),
   },
 });

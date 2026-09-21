@@ -17,7 +17,7 @@ import { readOnboardingStatus, serializeOnboardingStatus } from "./onboarding";
 import { serializeUnit, serializeUser } from "./serialize";
 
 export async function buildAuthBootstrap(db: Db, user: UserRow) {
-  if (!user.onboardingCompletedAt) {
+  if (!user.emailVerifiedAt || !user.onboardingCompletedAt) {
     return {
       onboarding: await readOnboardingStatus(db, user),
       me: null,

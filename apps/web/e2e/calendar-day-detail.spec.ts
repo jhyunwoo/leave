@@ -1,3 +1,4 @@
+import { verifyTestEmail } from "./helpers";
 import {
   expect,
   test,
@@ -37,6 +38,7 @@ async function signup(request: APIRequestContext, tag: string) {
   });
   expect(response.ok(), await response.text()).toBeTruthy();
   const body = (await response.json()) as { token: string };
+  await verifyTestEmail(request, body.token);
   const set = await request.put(`${API}/users/me/username`, {
     headers: { Authorization: `Bearer ${body.token}` },
     data: { username: handleSafe(tag) },

@@ -39,5 +39,27 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   c.set("user", row.user);
+  // 미인증 세션은 상태 조회·인증·로그아웃·탈퇴만 허용한다.
+  // 온보딩 완료 여부나 패스키 로그인으로 이메일 검증을 우회할 수 없다.
+  const allowed = new Set([
+    "GET /auth/bootstrap",
+    "GET /auth/onboarding",
+    "POST /auth/email-verification/send",
+    "POST /auth/email-verification/verify",
+    "POST /auth/logout",
+    "DELETE /auth/account",
+  ]);
+  if (
+    !row.user.emailVerifiedAt &&
+    !allowed.has(`${c.req.method} ${c.req.path}`)
+  ) {
+    return c.json(
+      {
+        error: "이메일 인증을 먼저 완료해주세요",
+        code: "email_verification_required",
+      },
+      403,
+    );
+  }
   await next();
 });
