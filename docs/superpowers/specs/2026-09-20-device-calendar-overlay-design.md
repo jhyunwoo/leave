@@ -99,18 +99,23 @@ type DeviceCalendarPreferences = {
 ### 4. bridge — 기기와 닿는 유일한 자리
 
 ```ts
-type DeviceCalendar = { id: string; title: string; color: string;
-                        source: string; allowsModifications: boolean };
+type DeviceCalendar = {
+  id: string;
+  title: string;
+  color: string;
+  source: string;
+  allowsModifications: boolean;
+};
 
 type DeviceEvent = {
   id: string;
   title: string;
-  startDate: ISODate;          // 포함 시작
-  endDate: ISODate;            // 포함 끝
+  startDate: ISODate; // 포함 시작
+  endDate: ISODate; // 포함 끝
   startTime: LocalTime | null; // 종일이면 null ("HH:mm")
   endTime: LocalTime | null;
   calendarId: string;
-  color: string;               // 기기 캘린더의 색. 칸의 점에 그대로 쓴다
+  color: string; // 기기 캘린더의 색. 칸의 점에 그대로 쓴다
 };
 ```
 
@@ -250,8 +255,8 @@ type GrabCandidate<T> = { subject: T | null; rect: GrabRect | null };
 카드 둘:
 
 1. **외부 캘린더 일정 보기** — 마스터 토글. 설명이 이 기능의 계약을 그대로 적는다:
-   *"기기 캘린더를 읽어 달력 탭에만 겹쳐 보여줍니다. 리브 서버에 올라가지 않고,
-   친구에게 보이지 않고, 리브에서는 고칠 수 없어요."* 켜는 순간 권한을 요청한다.
+   _"기기 캘린더를 읽어 달력 탭에만 겹쳐 보여줍니다. 리브 서버에 올라가지 않고,
+   친구에게 보이지 않고, 리브에서는 고칠 수 없어요."_ 켜는 순간 권한을 요청한다.
 2. **가져올 캘린더** — 목록. 행마다 색 점 + 이름 + 출처(iCloud/Gmail…) + `NativeCheckbox`.
    마스터가 꺼져 있으면 비활성.
 
@@ -270,12 +275,12 @@ iOS 17+에는 전체 접근과 별도로 제한적 접근이 있어 목록이 �
 `docs/testing.md`의 표를 따른다. `apps/native/test`는 node 환경이라 react-native를 불러올
 수 없다 — 그래서 순수 함수에만 붙이고, 그게 위험이 몰린 자리와 정확히 겹친다.
 
-| 파일 | 고정하는 것 |
-| --- | --- |
-| `test/device-calendar-dates.test.ts` | 종일/시간 일정 접기, KST 자정 경계, 월말·연말, 포함·배타 끝, 여러 날 걸침 |
-| `test/device-calendar-preferences.test.ts` | 사라진 ID 걸러내기, 모르는 캘린더는 꺼짐, `defaultCalendarIds` 규칙 |
-| `test/calendar-grab-target.test.ts` (기존) | 가장 가까운 후보가 막개면 `null`. 막개만 있으면 `null` |
-| `packages/shared/test/dates.test.ts` (기존) | `seoulDate`가 `todayInSeoul`과 같은 답을 준다 |
+| 파일                                        | 고정하는 것                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| `test/device-calendar-dates.test.ts`        | 종일/시간 일정 접기, KST 자정 경계, 월말·연말, 포함·배타 끝, 여러 날 걸침 |
+| `test/device-calendar-preferences.test.ts`  | 사라진 ID 걸러내기, 모르는 캘린더는 꺼짐, `defaultCalendarIds` 규칙       |
+| `test/calendar-grab-target.test.ts` (기존)  | 가장 가까운 후보가 막개면 `null`. 막개만 있으면 `null`                    |
+| `packages/shared/test/dates.test.ts` (기존) | `seoulDate`가 `todayInSeoul`과 같은 답을 준다                             |
 
 화면 자체는 `check-types` + `lint` + 실기기 확인이다. Maestro는 붙이지 않는다 —
 시뮬레이터에 캘린더 데이터를 심는 고정장치가 없어 테스트가 환경에 매달린다.
