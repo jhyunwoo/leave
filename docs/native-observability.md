@@ -80,6 +80,8 @@ Expo config plugin이 CNG/prebuild 결과에 다음을 넣는다.
 
 EAS Build 환경에 위 build 변수들이 있으면 preview/closed/production 빌드가 JS maps, iOS dSYM, Android mapping/native symbols를 업로드한다. `SENTRY_ALLOW_FAILURE`나 `SENTRY_DISABLE_AUTO_UPLOAD`을 설정하지 않는다. `@sentry/cli` install script는 pnpm `allowBuilds`에 명시되어 있다.
 
+Android Proguard mapping은 R8이 돌아야만 생긴다. `app.json`의 `expo-build-properties`에 `android.enableMinifyInReleaseBuilds: true`가 있어야 하고, 이를 끄면 `minifyEnabled`가 CNG 템플릿 기본값인 `false`로 돌아가 mapping 파일이 아예 만들어지지 않는다. 그러면 Sentry의 `autoUploadProguardMapping`이 올릴 대상이 없어 조용히 지나가고, Play Console은 업로드한 App Bundle에 가독화 파일이 없다고 경고한다. `apps/native/test/android-release-minify.test.ts`가 이 설정을 지킨다.
+
 OTA는 반드시 저장소 루트의 다음 명령으로 낸다.
 
 ```bash
@@ -161,6 +163,6 @@ Sentry 프로젝트의 Alerts에서 `environment=production` 조건으로 다음
 - **환경이 production으로 잘못 표시됨**: 해당 EAS environment의 `EXPO_PUBLIC_APP_ENV`와 build profile의 `environment`를 맞춘다. OTA는 반드시 wrapper를 쓴다.
 - **JS frame이 minified**: 이벤트 Debug ID와 build/update upload 로그를 비교한다. OTA라면 남아 있는 `dist`를 artifact upload 명령으로 다시 올린다.
 - **iOS missing dSYM**: EAS build log의 `Upload Debug Symbols to Sentry` phase와 token 권한을 확인한다.
-- **Android missing mapping/symbol**: build log의 Sentry Gradle tasks, release variant, `SENTRY_AUTH_TOKEN`과 generated `sentry.properties` fallback을 확인한다.
+- **Android missing mapping/symbol**: 먼저 `android.enableMinifyInReleaseBuilds`가 켜져 있고 build log에 `:app:minifyReleaseWithR8`이 있는지 본다. 그다음 Sentry Gradle tasks, release variant, `SENTRY_AUTH_TOKEN`과 generated `sentry.properties` fallback을 확인한다.
 - **중복 issue**: 두 이벤트의 `error.source`와 exception identity를 비교한다. 동일 객체는 앱 deduper가 막으므로 서로 새로 만들어진 wrapper Error인지 확인한다.
 - **OTA가 다른 코드로 보임**: `expo.update_id`, group, channel, runtime fingerprint를 EAS Update와 맞추고 해당 `dist`의 maps가 업로드됐는지 확인한다.
