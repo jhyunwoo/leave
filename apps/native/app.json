@@ -20,6 +20,7 @@
       "icon": "./assets/images/leave-icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "CADisableMinimumFrameDurationOnPhone": true,
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown"

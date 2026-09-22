@@ -345,6 +345,11 @@ test("요청 수락, 10명 비교, 친구 달력과 개인 일정 CRUD", async (
   });
   const choices = friendSection.getByRole("checkbox");
   await expect(choices).toHaveCount(11);
+  const progress = friendSection.getByTestId("friend-service-progress");
+  await expect(progress).toHaveCount(11);
+  await expect(progress.first().getByRole("progressbar")).toBeVisible();
+  await expect(progress.first()).toContainText(/복무 \d+\.\d{5}%/);
+  await expect(progress.first()).toContainText(/남은 일과일 \d+일/);
   for (let index = 0; index < 10; index += 1) await choices.nth(index).check();
   await expect(friendSection.getByText("10 / 10 선택")).toBeVisible();
   await expect(choices.nth(10)).toBeDisabled();

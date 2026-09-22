@@ -31,70 +31,99 @@ export interface DutyDaysResult {
   through: string;
 }
 
+type DutyUser = Pick<
+  UserRow,
+  "id" | "unitId" | "enlistedAt" | "branch" | "dischargeAt"
+>;
+
 export async function readRemainingDutyDays(
   db: Db,
-  user: UserRow,
+  user: DutyUser,
   today: string = todayInSeoul(),
 ): Promise<DutyDaysResult> {
-  const dischargeAt = normalizeLegacyDischargeDate(
-    user.enlistedAt,
-    user.branch,
-    user.dischargeAt,
-  );
-  const through = lastDutyDayCandidate(dischargeAt);
-  if (through < today) return { dutyDays: 0, from: today, through };
+  const results = await readRemainingDutyDaysForUsers(db, [user], today);
+  return results.get(user.id)!;
+}
 
-  const [unitHolidays, leaveRanges] = await db.batch([
-    db
-      .select({
-        startDate: unitEvents.startDate,
-        endDate: unitEvents.endDate,
-      })
-      .from(unitEvents)
-      .where(
-        and(
-          // 그룹에 참여하지 않은 사용자는 부대 휴일이 없다. 빈 문자열은 어떤
-          // unit_id와도 같지 않으므로 인덱스 조회가 0행으로 끝난다 — 분기를 두어
-          // batch를 쪼개는 것보다 왕복이 하나 적다.
-          eq(unitEvents.unitId, user.unitId ?? ""),
-          eq(unitEvents.isHoliday, true),
-          lte(unitEvents.startDate, through),
-          gte(unitEvents.endDate, today),
+/** 친구별 왕복을 만들지 않고 D1의 100개 바인딩 상한 안에서 묶어 읽는다. */
+export async function readRemainingDutyDaysForUsers(
+  db: Db,
+  people: readonly DutyUser[],
+  today: string = todayInSeoul(),
+): Promise<Map<string, DutyDaysResult>> {
+  const results = new Map<string, DutyDaysResult>();
+  const active = people.flatMap((user) => {
+    const dischargeAt = normalizeLegacyDischargeDate(
+      user.enlistedAt,
+      user.branch,
+      user.dischargeAt,
+    );
+    const through = lastDutyDayCandidate(dischargeAt);
+    if (through < today) {
+      results.set(user.id, { dutyDays: 0, from: today, through });
+      return [];
+    }
+    return [{ ...user, dischargeAt, through }];
+  });
+  for (let offset = 0; offset < active.length; offset += 90) {
+    const chunk = active.slice(offset, offset + 90);
+    const through = chunk.reduce(
+      (last, user) => (user.through > last ? user.through : last),
+      today,
+    );
+    const unitIds = [...new Set(chunk.map((user) => user.unitId ?? ""))];
+    const [unitHolidays, leaveRanges] = await db.batch([
+      db
+        .select({
+          unitId: unitEvents.unitId,
+          startDate: unitEvents.startDate,
+          endDate: unitEvents.endDate,
+        })
+        .from(unitEvents)
+        .where(
+          and(
+            inArray(unitEvents.unitId, unitIds),
+            eq(unitEvents.isHoliday, true),
+            lte(unitEvents.startDate, through),
+            gte(unitEvents.endDate, today),
+          ),
         ),
-      ),
-    // 구간(leave_segments)으로 읽는 이유는 외출을 빼기 위해서다. 외출은 같은 날
-    // 복귀하므로 일과가 사라지지 않는다. 휴가 머리행만 보면 구분할 수 없다.
-    //
-    // **여기서는 부대 설정을 보지 않는다.** 부대 달력은 외출을 셀지를 고를 수 있지만
-    // (`units.outingCounts`, 기본은 셈), 둘이 어긋난 것이 아니라 묻는 것이 다르다 —
-    // 여기는 "그날 일과가 사라지는가", 저기는 "그날 몇 명이 부대 밖에 있는가"다.
-    // 외출은 앞의 답이 언제나 아니오다. 부대가 고를 여지가 없으므로 설정도 보지 않는다.
-    db
-      .select({
-        startDate: leaveSegments.startDate,
-        endDate: leaveSegments.endDate,
-      })
-      .from(leaveSegments)
-      .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
-      .where(
-        and(
-          eq(leaves.userId, user.id),
-          inArray(leaves.status, [...COUNTED_LEAVE_STATUSES]),
-          ne(leaveSegments.category, "outing"),
-          lte(leaveSegments.startDate, through),
-          gte(leaveSegments.endDate, today),
+      // 외출은 일과가 사라지지 않으므로 부대 출타 집계 설정과 무관하게 제외한다.
+      db
+        .select({
+          userId: leaves.userId,
+          startDate: leaveSegments.startDate,
+          endDate: leaveSegments.endDate,
+        })
+        .from(leaveSegments)
+        .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+        .where(
+          and(
+            inArray(
+              leaves.userId,
+              chunk.map((user) => user.id),
+            ),
+            inArray(leaves.status, [...COUNTED_LEAVE_STATUSES]),
+            ne(leaveSegments.category, "outing"),
+            lte(leaveSegments.startDate, through),
+            gte(leaveSegments.endDate, today),
+          ),
         ),
-      ),
-  ]);
-
-  return {
-    dutyDays: remainingDutyDays({
-      from: today,
-      dischargeAt,
-      unitHolidays,
-      leaves: leaveRanges,
-    }),
-    from: today,
-    through,
-  };
+    ]);
+    for (const user of chunk) {
+      results.set(user.id, {
+        dutyDays: remainingDutyDays({
+          from: today,
+          dischargeAt: user.dischargeAt,
+          unitHolidays: unitHolidays.filter(
+            (holiday) => holiday.unitId === user.unitId,
+          ),
+          leaves: leaveRanges.filter((leave) => leave.userId === user.id),
+        }),
+        from: today,
+        through: user.through,
+      });
+    }
+  }
+  return results;
 }

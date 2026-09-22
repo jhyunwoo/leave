@@ -18,6 +18,7 @@ import {
   MAX_DATE_RANGE_DAYS,
   monthBounds,
   normalizeUsername,
+  normalizeLegacyDischargeDate,
   settledLeaveStatus,
   SOCIAL_ERROR_CODES,
   todayInSeoul,
@@ -32,6 +33,7 @@ import {
   users,
 } from "../db/schema";
 import { createApp } from "../lib/app";
+import { readRemainingDutyDaysForUsers } from "../lib/duty-days";
 import type { Db } from "../lib/db";
 import { codedError } from "../lib/responses";
 import { notifyFriendRequest } from "../lib/social-notify";
@@ -73,6 +75,10 @@ function relationPeopleQuery(db: Db, viewerId: string) {
       otherUserId: users.id,
       otherName: users.name,
       otherUsername: users.username,
+      enlistedAt: users.enlistedAt,
+      dischargeAt: users.dischargeAt,
+      branch: users.branch,
+      unitId: users.unitId,
     })
     .from(friendships)
     .innerJoin(
@@ -291,6 +297,11 @@ export const friendRoutes = app
       (row): row is typeof row & { acceptedAt: string } =>
         row.status === "accepted" && row.acceptedAt !== null,
     );
+    const dutyDays = await readRemainingDutyDaysForUsers(
+      drizzle(c.env.DB),
+      rows.map((row) => ({ ...row, id: row.otherUserId })),
+    );
+    noStore(c);
     return c.json(
       {
         friends: rows.map((row) => ({
@@ -298,6 +309,13 @@ export const friendRoutes = app
           name: row.otherName,
           username: row.otherUsername,
           since: row.acceptedAt,
+          enlistedAt: row.enlistedAt,
+          dischargeAt: normalizeLegacyDischargeDate(
+            row.enlistedAt,
+            row.branch,
+            row.dischargeAt,
+          ),
+          dutyDays: dutyDays.get(row.otherUserId)!.dutyDays,
         })),
       },
       200,

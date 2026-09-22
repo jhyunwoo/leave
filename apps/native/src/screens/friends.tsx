@@ -34,6 +34,8 @@ import {
   View,
 } from "react-native";
 import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
+import { FriendServiceProgress } from "@/components/friend-service-progress";
+import { useActiveGate, useServiceTicker } from "@/lib/service-progress-clock";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
@@ -44,6 +46,8 @@ import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
 export function FriendsScreen() {
   const styles = useStyles();
+  const active = useActiveGate();
+  const now = useServiceTicker(active);
   const { isCompact, sizeClass } = useWindowSizeClass();
   const colors = useColors();
   const router = useRouter();
@@ -281,55 +285,64 @@ export function FriendsScreen() {
                       disabled && styles.disabled,
                     ]}
                   >
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked, disabled }}
-                      accessibilityLabel={`${friend.name} 달력 비교 선택`}
-                      disabled={disabled}
-                      onPress={() =>
-                        setSelected((current) =>
-                          checked
-                            ? current.filter((id) => id !== friend.userId)
-                            : [...current, friend.userId],
-                        )
-                      }
-                      hitSlop={8}
-                      style={[
-                        styles.checkbox,
-                        checked && styles.checkboxChecked,
-                      ]}
-                    >
-                      <Text style={styles.checkmark}>{checked ? "✓" : ""}</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${friend.name} 프로필 열기`}
-                      disabled={!friend.username}
-                      onPress={() => openProfile(friend.username)}
-                      style={({ pressed }) => [
-                        styles.friendMain,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Avatar name={friend.name} size={36} />
-                      <View style={styles.who}>
-                        <Text style={styles.name}>{friend.name}</Text>
-                        {friend.username ? (
-                          <Text style={styles.caption}>
-                            {formatUsername(friend.username)}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </Pressable>
-                    <Button
-                      icon="userRemove"
-                      title="삭제"
-                      size="sm"
-                      variant="danger"
-                      disabled={pending}
-                      onPress={() =>
-                        void removeFriend(friend.userId, friend.name)
-                      }
+                    <View style={styles.friendHeader}>
+                      <Pressable
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked, disabled }}
+                        accessibilityLabel={`${friend.name} 달력 비교 선택`}
+                        disabled={disabled}
+                        onPress={() =>
+                          setSelected((current) =>
+                            checked
+                              ? current.filter((id) => id !== friend.userId)
+                              : [...current, friend.userId],
+                          )
+                        }
+                        hitSlop={8}
+                        style={[
+                          styles.checkbox,
+                          checked && styles.checkboxChecked,
+                        ]}
+                      >
+                        <Text style={styles.checkmark}>
+                          {checked ? "✓" : ""}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${friend.name} 프로필 열기`}
+                        disabled={!friend.username}
+                        onPress={() => openProfile(friend.username)}
+                        style={({ pressed }) => [
+                          styles.friendMain,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Avatar name={friend.name} size={36} />
+                        <View style={styles.who}>
+                          <Text style={styles.name}>{friend.name}</Text>
+                          {friend.username ? (
+                            <Text style={styles.caption}>
+                              {formatUsername(friend.username)}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </Pressable>
+                      <Button
+                        icon="userRemove"
+                        title="삭제"
+                        size="sm"
+                        variant="danger"
+                        disabled={pending}
+                        onPress={() =>
+                          void removeFriend(friend.userId, friend.name)
+                        }
+                      />
+                    </View>
+                    <FriendServiceProgress
+                      friend={friend}
+                      active={active}
+                      now={now}
                     />
                   </View>
                 );
@@ -400,10 +413,9 @@ const useStyles = makeStyles(({ colors }) => ({
   error: { fontSize: 13, fontWeight: "600", color: colors.negativeDeep },
   count: { fontSize: 13, fontWeight: "700", color: colors.brand },
   empty: { gap: spacing.md },
+  friendHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   friend: {
     minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,

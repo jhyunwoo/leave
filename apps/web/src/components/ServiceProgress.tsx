@@ -83,11 +83,12 @@ function LivePercentReadout(props: {
   span: number;
   active: boolean;
   initialNow: number;
+  decimals: number;
 }) {
   const valueRef = useRef<HTMLSpanElement>(null);
   const initial = formatPercent(
     percentBetween(props.start, props.span, props.initialNow),
-    SERVICE_PERCENT_DECIMALS,
+    props.decimals,
   );
 
   useEffect(() => {
@@ -105,7 +106,7 @@ function LivePercentReadout(props: {
 
     const write = (now: number): number => {
       const percent = percentBetween(props.start, props.span, now);
-      const label = formatPercent(percent, SERVICE_PERCENT_DECIMALS);
+      const label = formatPercent(percent, props.decimals);
       if (text.data !== label) text.data = label;
       return percent;
     };
@@ -166,12 +167,12 @@ function LivePercentReadout(props: {
       observer?.disconnect();
       stopAnimation();
     };
-  }, [props.active, props.span, props.start]);
+  }, [props.active, props.span, props.start, props.decimals]);
 
   return (
     <span
       ref={valueRef}
-      style={numberStyle}
+      style={{ ...numberStyle, width: `${props.decimals + 5}ch` }}
       data-testid="profile-service-progress-value"
     >
       {initial}
@@ -184,7 +185,10 @@ export function ServiceProgress(props: {
   enlistedAt: ISODate;
   dischargeAt: ISODate;
   caption: string;
+  decimals?: number;
+  compact?: boolean;
 }) {
+  const decimals = props.decimals ?? SERVICE_PERCENT_DECIMALS;
   const [initialNow] = useState(() => Date.now());
   const clock = useSlowClock(initialNow);
   const reducedMotion = useReducedMotion();
@@ -194,7 +198,7 @@ export function ServiceProgress(props: {
   const slowPercent = percentBetween(start, span, clock.now);
 
   return (
-    <div style={{ marginTop: "var(--sp-2xl)" }}>
+    <div style={{ marginTop: props.compact ? 0 : "var(--sp-2xl)" }}>
       <div
         role="progressbar"
         aria-valuenow={Math.round(slowPercent)}
@@ -211,11 +215,15 @@ export function ServiceProgress(props: {
       >
         <div
           style={{
-            width: `${slowPercent}%`,
+            width: "100%",
+            transform: `scaleX(${slowPercent / 100})`,
+            transformOrigin: "left center",
             height: "100%",
             borderRadius: "var(--r-pill)",
             background: "var(--primary)",
-            transition: "width 240ms var(--ease-out)",
+            transition: reducedMotion
+              ? "none"
+              : "transform 650ms var(--ease-out)",
           }}
         />
       </div>
@@ -241,7 +249,7 @@ export function ServiceProgress(props: {
               style={numberStyle}
               data-testid="profile-service-progress-value"
             >
-              {formatPercent(slowPercent, STATIC_DECIMALS)}
+              {formatPercent(slowPercent, props.decimals ?? STATIC_DECIMALS)}
             </span>
           ) : (
             <LivePercentReadout
@@ -249,6 +257,7 @@ export function ServiceProgress(props: {
               span={span}
               active={clock.visible}
               initialNow={initialNow}
+              decimals={decimals}
             />
           )}
         </span>

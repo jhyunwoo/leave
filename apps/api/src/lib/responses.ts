@@ -243,6 +243,9 @@ export const friendSummarySchema = z
     name: z.string(),
     username: z.string().nullable(),
     since: z.string(),
+    enlistedAt: z.string(),
+    dischargeAt: z.string(),
+    dutyDays: z.number().int().nonnegative(),
   })
   .openapi("FriendSummary");
 

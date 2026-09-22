@@ -109,6 +109,8 @@ export function useFriends() {
   const { client, unwrap } = useLeaveApi();
   return useQuery({
     queryKey: queryKeys.friendList,
+    staleTime: 0,
+    refetchInterval: 60_000,
     queryFn: async () =>
       unwrap<{ friends: Friend[] }>(await client.friends.$get()),
   });

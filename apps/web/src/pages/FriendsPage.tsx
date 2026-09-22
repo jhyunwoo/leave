@@ -31,6 +31,7 @@ import {
 } from "@leave/shared";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { ServiceProgress } from "../components/ServiceProgress";
 import { Avatar } from "../components/Avatar";
 
 function Section(props: {
@@ -435,6 +436,18 @@ export function FriendsPage(props: { me: Me }) {
                         <ActionIcon name="userRemove" />
                         삭제
                       </button>
+                      <div
+                        style={{ flexBasis: "100%", minWidth: 0 }}
+                        data-testid="friend-service-progress"
+                      >
+                        <ServiceProgress
+                          enlistedAt={friend.enlistedAt}
+                          dischargeAt={friend.dischargeAt}
+                          decimals={5}
+                          compact
+                          caption={`남은 일과일 ${friend.dutyDays}일`}
+                        />
+                      </div>
                     </div>
                   );
                 })}

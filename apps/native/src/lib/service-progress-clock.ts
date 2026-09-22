@@ -116,6 +116,10 @@ export function useServicePercentClock(
   }, false);
 
   useEffect(() => {
+    percent.set(percentBetween(start, span, initialNow));
+  }, [initialNow, start, span, percent]);
+
+  useEffect(() => {
     frameCallback.setActive(active);
     return () => frameCallback.setActive(false);
   }, [active, frameCallback]);

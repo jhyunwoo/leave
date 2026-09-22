@@ -75,6 +75,13 @@ test("친구 요청 수명주기와 목록은 상호 동의를 요구한다", as
     [second.data.user.id],
   );
   assert.equal(friends.data.friends[0].username, second.username);
+  const summary = friends.data.friends[0];
+  assert.equal(summary.enlistedAt, second.data.user.enlistedAt);
+  assert.equal(summary.dischargeAt, second.data.user.dischargeAt);
+  const duty = await req("GET", "/auth/me/duty-days", { token: second.token });
+  assert.equal(summary.dutyDays, duty.data.dutyDays);
+  assert.equal(friends.headers["cache-control"], "no-store");
+  assert.equal("enlistedAt" in incoming.data.requests[0], false);
 
   assert.equal(
     (
@@ -546,4 +553,53 @@ test("친구 달력은 휴가와 외출을 갈라 알려주되 세부 종류는 
     ["outing", "leave"],
     "같은 스키마를 쓰는 일정 조회도 갈래를 싣는다",
   );
+});
+
+test("친구별 일과일은 소속 휴일을 분리하고 전역자는 0으로 반환한다", async () => {
+  const viewer = await signup();
+  const profile = {
+    enlistedAt: isoDaysFromToday(-400),
+    dischargeAt: isoDaysFromToday(60),
+  };
+  const holidayFriend = await signup({ ...profile, name: "휴무 친구" });
+  const workingFriend = await signup({ ...profile, name: "일과 친구" });
+  const dischargedFriend = await signup({
+    enlistedAt: isoDaysFromToday(-600),
+    dischargeAt: isoDaysFromToday(-1),
+  });
+  const unit = await createUnit(holidayFriend.token);
+  const holiday = await req("POST", `/units/${unit.data.unit.id}/events`, {
+    token: holidayFriend.token,
+    body: {
+      title: "비공개 부대 휴일",
+      isHoliday: true,
+      startDate: isoDaysFromToday(0),
+      endDate: isoDaysFromToday(59),
+    },
+  });
+  assert.equal(holiday.status, 201);
+  for (const friend of [holidayFriend, workingFriend, dischargedFriend]) {
+    assert.equal((await requestFriend(viewer, friend)).status, 200);
+    assert.equal((await acceptFriend(friend, viewer)).status, 200);
+  }
+  const response = await req("GET", "/friends", { token: viewer.token });
+  assert.equal(response.status, 200);
+  const summaries = new Map(
+    response.data.friends.map((friend) => [friend.userId, friend]),
+  );
+  assert.equal(summaries.get(holidayFriend.data.user.id).dutyDays, 0);
+  assert.ok(summaries.get(workingFriend.data.user.id).dutyDays > 0);
+  assert.equal(summaries.get(dischargedFriend.data.user.id).dutyDays, 0);
+  for (const friend of [holidayFriend, workingFriend, dischargedFriend]) {
+    const own = await req("GET", "/auth/me/duty-days", { token: friend.token });
+    assert.equal(
+      summaries.get(friend.data.user.id).dutyDays,
+      own.data.dutyDays,
+    );
+  }
+  assert.equal(
+    JSON.stringify(response.data).includes("비공개 부대 휴일"),
+    false,
+  );
+  assert.equal("unitId" in response.data.friends[0], false);
 });
