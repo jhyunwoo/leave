@@ -40,11 +40,13 @@ bridge가 `Date`를 `ISODate`로 접어 `PersonalEvent`와 같은 모양(`startD
 이 규칙이 Task 2의 상수를 정하므로 먼저 한다.
 
 **Files:**
+
 - Modify: `apps/native/package.json` (dependencies만)
 - Modify: `apps/native/app.json`
 - Create: `apps/native/src/device-calendar/types.ts`
 
 **Interfaces:**
+
 - Produces: `DeviceCalendar`, `DeviceEvent`, `PermissionState` — 이후 모든 태스크가 쓴다.
 
 - [ ] **Step 1: 패키지를 고정 버전으로 더한다**
@@ -171,7 +173,13 @@ useEffect(() => {
       new Date("2026-10-31T23:59:59Z"),
     );
     for (const e of events)
-      console.log("[allday]", e.allDay, e.title, String(e.startDate), String(e.endDate));
+      console.log(
+        "[allday]",
+        e.allDay,
+        e.title,
+        String(e.startDate),
+        String(e.endDate),
+      );
   })();
 }, []);
 ```
@@ -209,12 +217,14 @@ git commit -m "feat(native): 기기 캘린더를 읽을 채비를 한다"
 ### Task 2: 날짜 접기 — 순수 함수와 테스트
 
 **Files:**
+
 - Modify: `packages/shared/src/dates.ts`
 - Modify: `packages/shared/test/dates.test.ts`
 - Create: `apps/native/src/device-calendar/dates.ts`
 - Test: `apps/native/test/device-calendar-dates.test.ts`
 
 **Interfaces:**
+
 - Consumes: `DeviceEvent`, `LocalTime` (Task 1)
 - Produces:
   - `seoulDate(at: Date): ISODate` — `@leave/shared/dates`
@@ -315,18 +325,26 @@ describe("toDate", () => {
 
 describe("frameDate", () => {
   it("utc 프레임은 UTC 날짜 성분을 읽는다", () => {
-    expect(frameDate(new Date("2026-10-05T00:00:00Z"), "utc")).toBe("2026-10-05");
-    expect(frameDate(new Date("2026-10-05T23:59:00Z"), "utc")).toBe("2026-10-05");
+    expect(frameDate(new Date("2026-10-05T00:00:00Z"), "utc")).toBe(
+      "2026-10-05",
+    );
+    expect(frameDate(new Date("2026-10-05T23:59:00Z"), "utc")).toBe(
+      "2026-10-05",
+    );
   });
 
   it("device 프레임은 기기 로컬 날짜 성분을 읽는다", () => {
     // 로컬 성분으로 만든 Date라 테스트 기기의 시간대와 무관하게 같은 답이 나온다.
     expect(frameDate(new Date(2026, 9, 5, 0, 0), "device")).toBe("2026-10-05");
-    expect(frameDate(new Date(2026, 9, 5, 23, 59), "device")).toBe("2026-10-05");
+    expect(frameDate(new Date(2026, 9, 5, 23, 59), "device")).toBe(
+      "2026-10-05",
+    );
   });
 
   it("연·월을 두 자리로 채운다", () => {
-    expect(frameDate(new Date("2026-01-05T00:00:00Z"), "utc")).toBe("2026-01-05");
+    expect(frameDate(new Date("2026-01-05T00:00:00Z"), "utc")).toBe(
+      "2026-01-05",
+    );
   });
 });
 
@@ -499,10 +517,11 @@ export type AllDayConvention = {
  * 플랫폼별 종일 일정 규칙. **Task 1의 실측값이다** — 추측이 아니라 관찰로 채운다.
  * 근거는 types.ts 아래 주석에 있다.
  */
-export const ALL_DAY_CONVENTIONS: Record<"ios" | "android", AllDayConvention> = {
-  ios: { frame: "device", end: "inclusive" },
-  android: { frame: "utc", end: "exclusive" },
-};
+export const ALL_DAY_CONVENTIONS: Record<"ios" | "android", AllDayConvention> =
+  {
+    ios: { frame: "device", end: "inclusive" },
+    android: { frame: "utc", end: "exclusive" },
+  };
 
 const SEOUL_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Seoul",
@@ -602,6 +621,7 @@ git commit -m "feat(native): 기기 캘린더의 Date를 리브 날짜로 접는
 ### Task 3: 설정값 — 모듈 스토어와 테스트
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar/preferences.ts`
 - Create: `apps/native/src/device-calendar/storage.ts`
 - Create: `apps/native/src/device-calendar/storage.native.ts`
@@ -609,6 +629,7 @@ git commit -m "feat(native): 기기 캘린더의 Date를 리브 날짜로 접는
 - Test: `apps/native/test/device-calendar-preferences.test.ts`
 
 **Interfaces:**
+
 - Consumes: `DeviceCalendar` (Task 1)
 - Produces:
   - `type DeviceCalendarPreferences = { enabled: boolean; calendarIds: string[] }`
@@ -831,7 +852,9 @@ export function normalizeDeviceCalendarPreferences(
 ): DeviceCalendarPreferences {
   if (typeof value !== "object" || value === null)
     return { ...defaultDeviceCalendarPreferences };
-  const raw = value as Partial<Record<keyof DeviceCalendarPreferences, unknown>>;
+  const raw = value as Partial<
+    Record<keyof DeviceCalendarPreferences, unknown>
+  >;
   if (typeof raw.enabled !== "boolean" || !Array.isArray(raw.calendarIds))
     return { ...defaultDeviceCalendarPreferences };
   const ids = raw.calendarIds.filter(
@@ -974,10 +997,12 @@ git commit -m "feat(native): 어느 기기 캘린더를 볼지 이 기기에 저
 ### Task 4: bridge — 기기와 닿는 유일한 자리
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar/bridge.ts`
 - Create: `apps/native/src/device-calendar/bridge.native.ts`
 
 **Interfaces:**
+
 - Consumes: `DeviceCalendar`, `DeviceEvent`, `PermissionState` (Task 1),
   `foldAllDay`, `foldTimed`, `toDate`, `ALL_DAY_CONVENTIONS` (Task 2)
 - Produces: `deviceCalendarBridge` — 아래 다섯 함수
@@ -996,7 +1021,11 @@ Create `apps/native/src/device-calendar/bridge.ts`:
  * 그 분기가 곧 기기에서만 나는 버그가 된다.
  */
 
-import { type DeviceCalendar, type DeviceEvent, type PermissionState } from "./types";
+import {
+  type DeviceCalendar,
+  type DeviceEvent,
+  type PermissionState,
+} from "./types";
 
 export interface DeviceCalendarBridge {
   getPermission(): Promise<PermissionState>;
@@ -1043,13 +1072,12 @@ import * as Calendar from "expo-calendar";
 import { monthBounds } from "@leave/shared/dates";
 import { Platform } from "react-native";
 import type { DeviceCalendarBridge } from "./bridge";
+import { ALL_DAY_CONVENTIONS, foldAllDay, foldTimed, toDate } from "./dates";
 import {
-  ALL_DAY_CONVENTIONS,
-  foldAllDay,
-  foldTimed,
-  toDate,
-} from "./dates";
-import { type DeviceCalendar, type DeviceEvent, type PermissionState } from "./types";
+  type DeviceCalendar,
+  type DeviceEvent,
+  type PermissionState,
+} from "./types";
 
 /** 색이 없는 캘린더가 실제로 있다(Android의 일부 로컬 캘린더). */
 const FALLBACK_COLOR = "#868685";
@@ -1123,7 +1151,10 @@ export const deviceCalendarBridge: DeviceCalendarBridge = {
 
     const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
     const colors = new Map(
-      calendars.map((calendar) => [calendar.id, calendar.color ?? FALLBACK_COLOR]),
+      calendars.map((calendar) => [
+        calendar.id,
+        calendar.color ?? FALLBACK_COLOR,
+      ]),
     );
     const events = await Calendar.listEvents(calendarIds, from, through);
     return events
@@ -1175,9 +1206,11 @@ git commit -m "feat(native): 기기 캘린더를 읽는 감싸개를 둔다"
 ### Task 5: 월 단위 조회 훅
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar/use-device-calendar-events.ts`
 
 **Interfaces:**
+
 - Consumes: `deviceCalendarBridge` (Task 4), `useDeviceCalendarPreferences`,
   `visibleCalendarIds` (Task 3)
 - Produces:
@@ -1273,11 +1306,13 @@ git commit -m "feat(native): 달마다 기기 캘린더 일정을 읽는다"
 길게 눌렀을 때 개인 일정이 끌려간다.
 
 **Files:**
+
 - Modify: `apps/native/src/components/calendar-drag/grab-target.ts`
 - Modify: `apps/native/src/components/calendar-drag/use-day-cell-drag.ts:28-33`
 - Test: `apps/native/test/calendar-grab-target.test.ts`
 
 **Interfaces:**
+
 - Produces: `GrabCandidate<T> = { subject: T | null; rect: GrabRect | null }`,
   `DayCellSlot = "leave" | "personal" | "external"`,
   `DayCellSubject = { slot: DayCellSlot; subject: CalendarDragSubject | null }`
@@ -1411,10 +1446,12 @@ git commit -m "fix(native): 읽기 전용 알약 위에서는 아무것도 집�
 ### Task 7: 칸에 알약을 그린다
 
 **Files:**
+
 - Modify: `apps/native/src/components/month-calendar.tsx`
 - Modify: `apps/native/src/components/calendar-scroll.tsx:318-380`
 
 **Interfaces:**
+
 - Consumes: `DeviceEvent` (Task 1), `useDeviceCalendarEvents` (Task 5),
   `DayCellSlot` (Task 6)
 
@@ -1443,10 +1480,10 @@ props(159행 `personalEvents?: PersonalEvent[];` 아래)에 더한다:
 개인 일정 인덱스 옆(244행)에 같은 모양으로 더한다:
 
 ```ts
-  const deviceIndex = useMemo(
-    () => buildRangeIndex(deviceEvents, gridStart, gridEnd),
-    [deviceEvents, gridStart, gridEnd],
-  );
+const deviceIndex = useMemo(
+  () => buildRangeIndex(deviceEvents, gridStart, gridEnd),
+  [deviceEvents, gridStart, gridEnd],
+);
 ```
 
 칸에 넘기는 자리(`personal={...}` 옆)에 더한다:
@@ -1469,49 +1506,47 @@ props(159행 `personalEvents?: PersonalEvent[];` 아래)에 더한다:
 `nearestGrabTarget`이 거리로 고를 때 순서가 화면과 같아야 한다:
 
 ```ts
-  const personalEventId = personal[0]?.id ?? null;
-  const hasDevice = device.length > 0;
-  const subjects = useMemo<DayCellSubject[]>(() => {
-    const list: DayCellSubject[] = [];
-    if (leaveId)
-      list.push({ slot: "leave", subject: { kind: "leave", leaveId } });
-    if (personalEventId)
-      list.push({
-        slot: "personal",
-        subject: { kind: "personalEvent", eventId: personalEventId },
-      });
-    // 기기 캘린더 알약은 자리만 차지한다. 이것이 없으면 그 위를 길게 눌렀을 때
-    // 바로 위의 개인 일정이 집힌다(grab-target.ts의 막개).
-    if (hasDevice) list.push({ slot: "external", subject: null });
-    return list;
-  }, [leaveId, personalEventId, hasDevice]);
+const personalEventId = personal[0]?.id ?? null;
+const hasDevice = device.length > 0;
+const subjects = useMemo<DayCellSubject[]>(() => {
+  const list: DayCellSubject[] = [];
+  if (leaveId)
+    list.push({ slot: "leave", subject: { kind: "leave", leaveId } });
+  if (personalEventId)
+    list.push({
+      slot: "personal",
+      subject: { kind: "personalEvent", eventId: personalEventId },
+    });
+  // 기기 캘린더 알약은 자리만 차지한다. 이것이 없으면 그 위를 길게 눌렀을 때
+  // 바로 위의 개인 일정이 집힌다(grab-target.ts의 막개).
+  if (hasDevice) list.push({ slot: "external", subject: null });
+  return list;
+}, [leaveId, personalEventId, hasDevice]);
 ```
 
 개인 일정 알약 블록(594-613행) **바로 아래에** 더한다:
 
 ```tsx
-          {/* 기기 캘린더 일정. 중성색 외곽선과 캘린더 색 점으로 "내가 리브에
+{
+  /* 기기 캘린더 일정. 중성색 외곽선과 캘린더 색 점으로 "내가 리브에
               적은 것"과 가른다. 여기서 수정할 수는 없다 — 고치는 곳은 기기
-              캘린더 앱 하나여야 두 벌이 생기지 않는다. */}
-          {!compact && device.length > 0 && (
-            <View
-              onLayout={(event) => {
-                rects.current.external = event.nativeEvent.layout;
-              }}
-              style={styles.devicePill}
-            >
-              <View
-                style={[styles.deviceDot, { backgroundColor: device[0]!.color }]}
-              />
-              <Text
-                style={styles.deviceText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {personalEventCellLabel(device)}
-              </Text>
-            </View>
-          )}
+              캘린더 앱 하나여야 두 벌이 생기지 않는다. */
+}
+{
+  !compact && device.length > 0 && (
+    <View
+      onLayout={(event) => {
+        rects.current.external = event.nativeEvent.layout;
+      }}
+      style={styles.devicePill}
+    >
+      <View style={[styles.deviceDot, { backgroundColor: device[0]!.color }]} />
+      <Text style={styles.deviceText} numberOfLines={1} ellipsizeMode="tail">
+        {personalEventCellLabel(device)}
+      </Text>
+    </View>
+  );
+}
 ```
 
 - [ ] **Step 3: 스타일을 더한다**
@@ -1566,7 +1601,7 @@ import { useDeviceCalendarEvents } from "@/device-calendar/use-device-calendar-e
 `MonthBlock` 안, `const personalEvents = usePersonalEvents(props.month);` 다음 줄:
 
 ```ts
-  const deviceEvents = useDeviceCalendarEvents(props.month);
+const deviceEvents = useDeviceCalendarEvents(props.month);
 ```
 
 `<MonthCalendar ... />`의 `personalEvents={personalEvents.data?.events}` 다음:
@@ -1588,6 +1623,7 @@ git commit -m "feat(native): 달력 칸에 기기 캘린더 일정을 함께 그
 ### Task 8: 하루 패널에 목록을 더한다
 
 **Files:**
+
 - Modify: `apps/native/src/screens/calendar/day-panel.tsx`
 - Modify: `apps/native/src/screens/calendar/index.tsx:381, 594, 792`
 
@@ -1610,9 +1646,9 @@ props의 `onOpenPersonalEvent` 다음에 더한다:
 `dayEvents` 계산 아래에 더한다:
 
 ```ts
-  const deviceDayEvents = (props.deviceEvents ?? []).filter(
-    (event) => event.startDate <= date && date <= event.endDate,
-  );
+const deviceDayEvents = (props.deviceEvents ?? []).filter(
+  (event) => event.startDate <= date && date <= event.endDate,
+);
 ```
 
 - [ ] **Step 2: 섹션을 그린다**
@@ -1620,16 +1656,18 @@ props의 `onOpenPersonalEvent` 다음에 더한다:
 `내 개인 일정` 블록 바로 다음, `addRow` 앞에 넣는다:
 
 ```tsx
-      {deviceDayEvents.length > 0 && (
-        <View style={styles.personalList}>
-          <Text style={styles.personalHeading} selectable>
-            기기 캘린더 {deviceDayEvents.length}건
-          </Text>
-          {deviceDayEvents.map((event) => (
-            <DeviceEventRow key={event.id} event={event} />
-          ))}
-        </View>
-      )}
+{
+  deviceDayEvents.length > 0 && (
+    <View style={styles.personalList}>
+      <Text style={styles.personalHeading} selectable>
+        기기 캘린더 {deviceDayEvents.length}건
+      </Text>
+      {deviceDayEvents.map((event) => (
+        <DeviceEventRow key={event.id} event={event} />
+      ))}
+    </View>
+  );
+}
 ```
 
 - [ ] **Step 3: 행 컴포넌트를 더한다**
@@ -1662,9 +1700,7 @@ function DeviceEventRow(props: { event: DeviceEvent }) {
       style={styles.personalRow}
     >
       <View style={styles.deviceRowTitle}>
-        <View
-          style={[styles.deviceRowDot, { backgroundColor: event.color }]}
-        />
+        <View style={[styles.deviceRowDot, { backgroundColor: event.color }]} />
         <Text style={styles.personalTitle} numberOfLines={2}>
           {event.title}
         </Text>
@@ -1693,8 +1729,8 @@ import { useDeviceCalendarEvents } from "@/device-calendar/use-device-calendar-e
 381행 `const panelPersonalEvents = usePersonalEvents(panelMonth);` 다음:
 
 ```ts
-  // 그 달의 기기 캘린더 일정. 달력 스크롤이 이미 채워 둔 캐시를 그대로 다시 쓴다.
-  const panelDeviceEvents = useDeviceCalendarEvents(panelMonth);
+// 그 달의 기기 캘린더 일정. 달력 스크롤이 이미 채워 둔 캐시를 그대로 다시 쓴다.
+const panelDeviceEvents = useDeviceCalendarEvents(panelMonth);
 ```
 
 **두 자리 모두**(594행과 792행 근처) `personalEvents={panelPersonalEvents.data?.events}`
@@ -1717,6 +1753,7 @@ git commit -m "feat(native): 날짜 상세에서 기기 캘린더 일정을 보�
 ### Task 9: 설정 화면
 
 **Files:**
+
 - Create: `apps/native/src/screens/calendar-settings.tsx`
 - Create: `apps/native/src/app/calendar-settings.tsx`
 - Modify: `apps/native/src/app/_layout.tsx:368-378` (근처에 Stack.Screen 추가)
@@ -1835,19 +1872,20 @@ export function CalendarSettingsScreen() {
           </Text>
           <Text selectable style={styles.cardBody}>
             기기 캘린더를 읽어 달력 탭에만 겹쳐 보여줍니다. 리브 서버에 올라가지
-            않고, 친구에게 보이지 않고, 리브에서는 고칠 수 없어요. 일정을 고치려면
-            줄을 눌러 캘린더 앱에서 열면 됩니다.
+            않고, 친구에게 보이지 않고, 리브에서는 고칠 수 없어요. 일정을
+            고치려면 줄을 눌러 캘린더 앱에서 열면 됩니다.
           </Text>
 
           {!deviceCalendarSupported ? (
             <Text selectable style={styles.hint}>
-              이 기기에서는 쓸 수 없어요. 휴대폰이나 태블릿의 리브 앱에서 켜 주세요.
+              이 기기에서는 쓸 수 없어요. 휴대폰이나 태블릿의 리브 앱에서 켜
+              주세요.
             </Text>
           ) : permission === "denied" ? (
             <>
               <Text selectable style={styles.hint}>
-                캘린더 접근이 꺼져 있어요. 기기 설정에서 리브에 캘린더를 허용하면
-                여기서 켤 수 있습니다.
+                캘린더 접근이 꺼져 있어요. 기기 설정에서 리브에 캘린더를
+                허용하면 여기서 켤 수 있습니다.
               </Text>
               <Button
                 icon="settings"
@@ -1872,8 +1910,9 @@ export function CalendarSettingsScreen() {
             가져올 캘린더
           </Text>
           <Text selectable style={styles.cardBody}>
-            고른 캘린더의 일정만 달력에 나와요. 공휴일·생일처럼 구독해 둔 캘린더는
-            기본으로 꺼 둡니다 — 리브가 공휴일을 이미 표시하고 있어서예요.
+            고른 캘린더의 일정만 달력에 나와요. 공휴일·생일처럼 구독해 둔
+            캘린더는 기본으로 꺼 둡니다 — 리브가 공휴일을 이미 표시하고
+            있어서예요.
           </Text>
 
           {!preferences.enabled ? (
@@ -1881,11 +1920,13 @@ export function CalendarSettingsScreen() {
               위 스위치를 켜면 이 기기의 캘린더 목록이 나옵니다.
             </Text>
           ) : calendars.isPending ? (
-            <Text selectable style={styles.hint}>캘린더를 읽는 중이에요.</Text>
+            <Text selectable style={styles.hint}>
+              캘린더를 읽는 중이에요.
+            </Text>
           ) : (calendars.data ?? []).length === 0 ? (
             <Text selectable style={styles.hint}>
-              보여줄 캘린더가 없어요. 기기 설정에서 리브에 보여줄 캘린더를 더 고를
-              수 있습니다.
+              보여줄 캘린더가 없어요. 기기 설정에서 리브에 보여줄 캘린더를 더
+              고를 수 있습니다.
             </Text>
           ) : (
             <View style={styles.list}>
@@ -1976,18 +2017,18 @@ export default function CalendarSettingsRoute() {
 같은 옵션으로 넣는다:
 
 ```tsx
-          <Stack.Screen
-            name="calendar-settings"
-            options={{
-              headerShown: true,
-              title: "캘린더 연동",
-              headerBackTitle: "프로필",
-              headerTransparent: process.env.EXPO_OS === "ios",
-              headerShadowVisible: false,
-              headerTintColor: colors.brand,
-              headerTitleStyle: { fontWeight: "600", color: colors.ink },
-            }}
-          />
+<Stack.Screen
+  name="calendar-settings"
+  options={{
+    headerShown: true,
+    title: "캘린더 연동",
+    headerBackTitle: "프로필",
+    headerTransparent: process.env.EXPO_OS === "ios",
+    headerShadowVisible: false,
+    headerTintColor: colors.brand,
+    headerTitleStyle: { fontWeight: "600", color: colors.ink },
+  }}
+/>
 ```
 
 - [ ] **Step 4: 프로필에서 들어가게 한다**
@@ -1995,22 +2036,22 @@ export default function CalendarSettingsRoute() {
 `screens/profile.tsx`의 `홈 화면 위젯` `<ContentPanel>` **다음에** 넣는다:
 
 ```tsx
-        <ContentPanel style={styles.card}>
-          <Text selectable style={styles.sectionTitle}>
-            캘린더 연동
-          </Text>
-          <Text selectable style={styles.sectionBody}>
-            아이폰·안드로이드 기본 캘린더의 일정을 달력 탭에서 휴가와 함께 볼 수
-            있어요. 어느 캘린더를 가져올지 여기서 고릅니다.
-          </Text>
-          <Button
-            icon="settings"
-            title="캘린더 연동 설정"
-            variant="secondary"
-            onPress={() => router.push("/calendar-settings")}
-            testID="open-calendar-settings"
-          />
-        </ContentPanel>
+<ContentPanel style={styles.card}>
+  <Text selectable style={styles.sectionTitle}>
+    캘린더 연동
+  </Text>
+  <Text selectable style={styles.sectionBody}>
+    아이폰·안드로이드 기본 캘린더의 일정을 달력 탭에서 휴가와 함께 볼 수 있어요.
+    어느 캘린더를 가져올지 여기서 고릅니다.
+  </Text>
+  <Button
+    icon="settings"
+    title="캘린더 연동 설정"
+    variant="secondary"
+    onPress={() => router.push("/calendar-settings")}
+    testID="open-calendar-settings"
+  />
+</ContentPanel>
 ```
 
 - [ ] **Step 5: 확인하고 커밋한다**
