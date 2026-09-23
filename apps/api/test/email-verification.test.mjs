@@ -250,3 +250,83 @@ test("발송은 계정별 시간당 상한을 지키고 만료된 코드는 정�
     db.close();
   }
 });
+
+async function linkFor(account) {
+  const messages = await fetch(
+    `${process.env.MAIL_URL}?email=${encodeURIComponent(account.email)}`,
+  ).then((r) => r.json());
+  const link = messages.at(-1)?.text.match(/https?:\/\/\S+/)?.[0];
+  assert.ok(link, "메일에 인증 링크가 있다");
+  assert.equal(new URL(link).origin, new URL(process.env.API_URL).origin);
+  assert.ok(messages.at(-1).html.includes(link.replaceAll("&", "&amp;")));
+  return new URL(link);
+}
+function submitLink(fields) {
+  return fetch(`${process.env.API_URL}/auth/verify-email`, {
+    method: "POST",
+    body: new URLSearchParams(fields),
+  });
+}
+async function emailVerified(account) {
+  return (await req("GET", "/auth/onboarding", { token: account.token })).data
+    .emailVerified;
+}
+
+test("메일 버튼 링크는 열기만 해서는 인증하지 않고, 확인 POST로 인증한다", async () => {
+  const account = await pending("link");
+  assert.equal((await send(account)).status, 200);
+  const link = await linkFor(account);
+  assert.equal(link.pathname, "/auth/verify-email");
+
+  const page = await fetch(
+    `${process.env.API_URL}${link.pathname}${link.search}`,
+  );
+  assert.equal(page.status, 200);
+  assert.equal(page.headers.get("cache-control"), "no-store");
+  assert.equal(page.headers.get("referrer-policy"), "no-referrer");
+  assert.match(await page.text(), /<form method="post"/);
+  assert.equal(await emailVerified(account), false);
+
+  const fields = Object.fromEntries(link.searchParams);
+  const done = await submitLink(fields);
+  assert.equal(done.status, 200);
+  assert.match(await done.text(), /이메일 인증을 마쳤어요/);
+  assert.equal(await emailVerified(account), true);
+  // 스캐너가 먼저 열었거나 두 번 누른 경우에도 성공 화면을 보인다.
+  assert.equal((await submitLink(fields)).status, 200);
+});
+
+test("서명이 다르거나 만료되거나 이전 메일의 링크면 인증하지 않는다", async () => {
+  const account = await pending("link-bad");
+  const other = await pending("link-other");
+  await send(account);
+  await send(other);
+  const fields = Object.fromEntries((await linkFor(account)).searchParams);
+  const otherFields = Object.fromEntries((await linkFor(other)).searchParams);
+
+  const tampered = {
+    ...fields,
+    s: fields.s.replace(/.$/, (d) => (d === "0" ? "1" : "0")),
+  };
+  assert.equal((await submitLink(tampered)).status, 400);
+  // 다른 계정의 서명을 가져와도 쓸 수 없다.
+  assert.equal((await submitLink({ ...fields, s: otherFields.s })).status, 400);
+  assert.equal((await submitLink({ u: "x", c: "y", s: "z" })).status, 400);
+  const malformed = await fetch(
+    `${process.env.API_URL}/auth/verify-email?u=%3Cscript%3E`,
+  );
+  assert.equal(malformed.status, 400);
+  assert.ok(!(await malformed.text()).includes("<script>alert"));
+
+  mutateChallenge(account, "expires_at = '2000-01-01T00:00:00.000Z'");
+  assert.equal((await submitLink(fields)).status, 400);
+  // 재발송하면 이전 메일의 링크는 쓸 수 없다.
+  mutateChallenge(account, "created_at = '2000-01-01T00:00:00.000Z'");
+  assert.equal((await send(account)).status, 200);
+  assert.equal((await submitLink(fields)).status, 400);
+  assert.equal(await emailVerified(account), false);
+
+  const current = Object.fromEntries((await linkFor(account)).searchParams);
+  assert.equal((await submitLink(current)).status, 200);
+  assert.equal(await emailVerified(account), true);
+});

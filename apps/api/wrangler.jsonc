@@ -36,6 +36,9 @@
     "EMAIL_FROM": "리브 <noreply@moveto.kr>",
     // 웹 오리진으로 제한 (네이티브 앱은 브라우저 CORS 대상이 아니므로 영향 없음)
     "CORS_ORIGIN": "https://leave.moveto.kr",
+    // 인증 메일 버튼 링크의 주소. wrangler dev는 요청 주소를 위 커스텀 도메인으로
+    // 바꿔 보내므로 요청에서 얻지 않는다. 로컬·테스트는 `--var`로 덮어쓴다.
+    "API_ORIGIN": "https://api.leave.moveto.kr",
     // 접속 기록·푸시 로그 보관 일수. 개인정보 처리방침과 같은 값이어야 한다.
     "LOG_RETENTION_DAYS": "90",
   },

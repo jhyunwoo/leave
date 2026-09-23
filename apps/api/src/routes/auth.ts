@@ -21,6 +21,7 @@ import type {
 } from "@simplewebauthn/server";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import type { Context } from "hono";
 import {
   accessLogs,
   pushLogs,
@@ -29,7 +30,7 @@ import {
   users,
   type UserRow,
 } from "../db/schema";
-import { createApp } from "../lib/app";
+import { createApp, type AppEnv } from "../lib/app";
 import { buildAuthBootstrap } from "../lib/auth-bootstrap";
 import {
   hashPassword,
@@ -40,7 +41,10 @@ import {
 import {
   sendEmailVerification,
   verifyEmailCode,
+  verifyEmailLink,
+  type EmailLink,
 } from "../lib/email-verification";
+import { verificationLinkPage } from "../lib/verification-email";
 import { deleteAccount } from "../lib/delete-account";
 import { readRemainingDutyDays } from "../lib/duty-days";
 import { leaveRuleMessage } from "../lib/errors";
@@ -161,6 +165,10 @@ app.use(
   "/email-verification/verify",
   rateLimit({ name: "email-verify", limit: 30, windowSeconds: 3600 }),
 );
+app.use(
+  "/verify-email",
+  rateLimit({ name: "email-link", limit: 30, windowSeconds: 600 }),
+);
 app.use("/logout", authMiddleware);
 app.use("/bootstrap", authMiddleware);
 app.use("/me", authMiddleware);
@@ -178,6 +186,58 @@ app.use(
   "/passkeys/authentication/*",
   rateLimit({ name: "passkey-login", limit: 20, windowSeconds: 600 }),
 );
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function readEmailLink(values: Record<string, unknown>): EmailLink | null {
+  const { u, c, s } = values;
+  if (typeof u !== "string" || typeof c !== "string" || typeof s !== "string")
+    return null;
+  if (!UUID.test(u) || !UUID.test(c) || !/^[0-9a-f]{64}$/.test(s)) return null;
+  return { userId: u, challengeId: c, signature: s };
+}
+
+function linkPageHeaders(c: Context<AppEnv>) {
+  // 주소에 서명이 들어 있다. 캐시·검색·다른 사이트의 Referer로 새지 않게 한다.
+  c.header("Cache-Control", "no-store");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Robots-Tag", "noindex");
+}
+
+function webAppUrl(env: AppEnv["Bindings"]) {
+  return env.CORS_ORIGIN?.split(",")[0]?.trim() || "https://leave.moveto.kr";
+}
+
+// 메일 버튼이 여는 페이지. 브라우저로 열리므로 세션 없이 링크 서명만으로 판단한다.
+// 문서화된 JSON API가 아니라 OpenAPI 계약(AppType)에 넣지 않는다.
+app.get("/verify-email", (c) => {
+  linkPageHeaders(c);
+  const link = readEmailLink(c.req.query());
+  if (!link)
+    return c.html(
+      verificationLinkPage({ kind: "invalid", appUrl: webAppUrl(c.env) }),
+      400,
+    );
+  return c.html(
+    verificationLinkPage({
+      kind: "confirm",
+      fields: { u: link.userId, c: link.challengeId, s: link.signature },
+    }),
+  );
+});
+app.post("/verify-email", async (c) => {
+  linkPageHeaders(c);
+  const link = readEmailLink(await c.req.parseBody());
+  const verified =
+    link !== null && (await verifyEmailLink(drizzle(c.env.DB), c.env, link));
+  return c.html(
+    verificationLinkPage({
+      kind: verified ? "verified" : "invalid",
+      appUrl: webAppUrl(c.env),
+    }),
+    verified ? 200 : 400,
+  );
+});
 
 export const authRoutes = app
   .openapi(signupRoute, async (c) => {
@@ -223,6 +283,7 @@ export const authRoutes = app
       drizzle(c.env.DB),
       c.env,
       c.get("user"),
+      c.env.API_ORIGIN ?? new URL(c.req.url).origin,
     );
     if (result === "rate_limited") {
       c.header("Retry-After", "60");

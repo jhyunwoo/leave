@@ -53,10 +53,19 @@ function digestsMatch(a: string, b: string) {
   return difference === 0;
 }
 
+/**
+ * 메일 버튼 링크의 서명. 코드 해시와 같은 키·챌린지를 쓰되 "link"를 넣어 두 값이
+ * 섞이지 않게 한다(코드는 항상 숫자 6자리). 256비트라 시도 횟수를 세지 않는다.
+ */
+function linkSignature(secret: string, userId: string, id: string) {
+  return codeDigest(secret, userId, id, "link");
+}
+
 export async function sendEmailVerification(
   db: Db,
   env: AppBindings,
   user: UserRow,
+  apiOrigin: string,
 ) {
   if (user.emailVerifiedAt) return "already_verified" as const;
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM || !env.EMAIL_CODE_SECRET)
@@ -87,7 +96,13 @@ export async function sendEmailVerification(
     })
     .returning({ id: emailVerifications.id });
   if (!reserved) return "rate_limited" as const;
-  const { subject, text, html } = verificationEmail(code);
+  const link = new URL("/auth/verify-email", apiOrigin);
+  link.search = new URLSearchParams({
+    u: user.id,
+    c: id,
+    s: await linkSignature(env.EMAIL_CODE_SECRET, user.id, id),
+  }).toString();
+  const { subject, text, html } = verificationEmail(code, link.toString());
   try {
     const response = await fetch(
       `${env.RESEND_API_URL ?? "https://api.resend.com"}/emails`,
@@ -190,4 +205,61 @@ export async function verifyEmailCode(
       ),
   ]);
   return verified.length === 1;
+}
+
+export type EmailLink = {
+  userId: string;
+  challengeId: string;
+  signature: string;
+};
+
+/**
+ * 메일 버튼으로 인증한다. 서명이 맞으면 코드 입력과 같은 조건(만료 전·발송 완료)에서
+ * 인증하고 챌린지를 지운다. 이미 인증된 계정의 링크를 다시 열면 성공으로 본다 —
+ * 메일 보안 스캐너가 먼저 열었거나 두 번 누른 경우다.
+ */
+export async function verifyEmailLink(
+  db: Db,
+  env: AppBindings,
+  link: EmailLink,
+) {
+  if (!env.EMAIL_CODE_SECRET) return false;
+  const expected = await linkSignature(
+    env.EMAIL_CODE_SECRET,
+    link.userId,
+    link.challengeId,
+  );
+  if (!digestsMatch(link.signature, expected)) return false;
+  const now = new Date().toISOString();
+  const [verified] = await db.batch([
+    db
+      .update(users)
+      .set({ emailVerifiedAt: now })
+      .where(
+        and(
+          eq(users.id, link.userId),
+          isNull(users.emailVerifiedAt),
+          sql`exists (select 1 from ${emailVerifications} where ${emailVerifications.userId} = ${link.userId}
+        and ${emailVerifications.id} = ${link.challengeId} and ${emailVerifications.expiresAt} > ${now}
+        and ${emailVerifications.sentAt} is not null)`,
+        ),
+      )
+      .returning({ id: users.id }),
+    db
+      .delete(emailVerifications)
+      .where(
+        and(
+          eq(emailVerifications.userId, link.userId),
+          eq(emailVerifications.id, link.challengeId),
+          sql`exists (select 1 from ${users} where ${users.id} = ${link.userId} and ${users.emailVerifiedAt} is not null)`,
+        ),
+      ),
+  ]);
+  if (verified.length === 1) return true;
+  const user = await db
+    .select({ emailVerifiedAt: users.emailVerifiedAt })
+    .from(users)
+    .where(eq(users.id, link.userId))
+    .get();
+  return Boolean(user?.emailVerifiedAt);
 }

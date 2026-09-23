@@ -100,7 +100,7 @@ test("회원가입 후 이메일 인증과 한 화면 한 입력 온보딩 10단
   await page
     .getByRole("button", { name: "인증 코드 보내기", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("인증 코드를 보냈어요");
+  await expect(page.getByRole("status")).toContainText("인증 메일을 보냈어요");
   const code = await testEmailCode(request, email);
   await page.getByLabel("인증 코드", { exact: true }).fill(code);
   await page.getByRole("button", { name: "인증 완료", exact: true }).click();
@@ -338,7 +338,7 @@ test("미인증 계정으로 초대 링크를 열면 이메일 인증부터 진�
   await page
     .getByRole("button", { name: "인증 코드 보내기", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("인증 코드를 보냈어요");
+  await expect(page.getByRole("status")).toContainText("인증 메일을 보냈어요");
   await page
     .getByLabel("인증 코드", { exact: true })
     .fill(await testEmailCode(request, email));
