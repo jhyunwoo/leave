@@ -51,6 +51,8 @@ function SharedSchedule(props: { userId: string }) {
     monthBounds(shiftMonth(current, -1)).start,
     monthBounds(shiftMonth(current, 5)).end,
   );
+  // 공유를 끈 친구는 휴가가 비어 온다. "휴가 없음"과 구분해 말하고, 비교할 것도 없다.
+  const hidden = schedule.data?.people[0]?.leaveScheduleShared === false;
 
   return (
     <ContentPanel style={styles.card}>
@@ -64,6 +66,8 @@ function SharedSchedule(props: { userId: string }) {
         <Text style={styles.error}>
           일정을 볼 수 없어요. 친구 관계나 차단 상태를 확인해주세요.
         </Text>
+      ) : hidden ? (
+        <Text style={styles.body}>휴가 일정을 공유하지 않는 친구예요.</Text>
       ) : schedule.data?.leaves.length ? (
         <>
           {schedule.data.leaves.map((leave) => (

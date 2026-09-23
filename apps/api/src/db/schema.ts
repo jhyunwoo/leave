@@ -610,6 +610,27 @@ export const userNotificationPrefs = sqliteTable("user_notification_prefs", {
 });
 
 /**
+ * 친구에게 보여줄 항목. 모든 친구에게 같게 적용된다.
+ *
+ * 행이 없으면 전부 공유한 것으로 본다 — 이 표가 생기기 전의 동작 그대로다.
+ * 끈 항목은 화면이 가리는 것이 아니라 서버가 응답에서 뺀다(lib/friend-sharing.ts).
+ */
+export const userFriendSharing = sqliteTable("user_friend_sharing", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // 복무율은 입대일·전역일에서 계산되므로 끄면 두 날짜가 함께 빠진다.
+  serviceProgress: integer("service_progress", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  dutyDays: integer("duty_days", { mode: "boolean" }).notNull().default(true),
+  leaveSchedule: integer("leave_schedule", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/**
  * 자유 입력(그룹 별칭·설명, 참여자 별칭) 신고. 신고자가 탈퇴해도 접수 건은
  * 남겨야 하므로 reporterId는 nullable이고 외래키를 걸지 않는다.
  */
@@ -716,6 +737,7 @@ export type UnitBlackoutRow = typeof unitBlackouts.$inferSelect;
 export type UnitEventRow = typeof unitEvents.$inferSelect;
 export type UserNotificationPrefsRow =
   typeof userNotificationPrefs.$inferSelect;
+export type UserFriendSharingRow = typeof userFriendSharing.$inferSelect;
 export type ContentReportRow = typeof contentReports.$inferSelect;
 export type UserBlockRow = typeof userBlocks.$inferSelect;
 export type FriendshipRow = typeof friendships.$inferSelect;

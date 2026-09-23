@@ -16,10 +16,13 @@ import {
   useCancelFriendRequest,
   useDeclineFriendRequest,
   useFriends,
+  useFriendSharing,
   useIncomingFriendRequests,
   useOutgoingFriendRequests,
   useRemoveFriend,
+  useUpdateFriendSharing,
   useUserSearch,
+  type Friend,
   type Me,
   type UserProfile,
 } from "@leave/client";
@@ -28,6 +31,7 @@ import {
   isUsernameQuery,
   MAX_FRIEND_CALENDAR_SELECTION,
   normalizeUsernameQuery,
+  type FriendSharingInput,
 } from "@leave/shared";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -144,6 +148,132 @@ function SearchResults(props: { query: string }) {
   );
 }
 
+/**
+ * 내가 친구에게 보여주는 항목 — 모든 친구에게 같게 적용된다.
+ *
+ * 설정을 받기 전에는 체크박스를 잠근다. 기본값인 "켜짐"을 먼저 그렸다가 실제 값으로
+ * 바꾸면, 공유를 끈 사람에게 잠깐이라도 "공유 중"이라고 말하게 된다.
+ */
+function SharingSection() {
+  const sharing = useFriendSharing();
+  const update = useUpdateFriendSharing();
+  const current = sharing.data?.sharing;
+  const change = (input: FriendSharingInput) => update.mutate(input);
+
+  return (
+    <Section title="내가 공유하는 항목">
+      <p className="caption text-body">
+        모든 친구에게 똑같이 적용돼요. 끈 항목은 친구 화면에 “비공개”로 보여요.
+      </p>
+      <SharingToggle
+        label="복무율 (입대일·전역일)"
+        checked={current?.serviceProgress}
+        onChange={(serviceProgress) => change({ serviceProgress })}
+        testId="friend-sharing-service-progress"
+      />
+      <SharingToggle
+        label="남은 일과일"
+        hint="휴가로 빠지는 날이 반영된 숫자예요."
+        checked={current?.dutyDays}
+        onChange={(dutyDays) => change({ dutyDays })}
+        testId="friend-sharing-duty-days"
+      />
+      <SharingToggle
+        label="휴가 일정 (외출 포함)"
+        hint="끄면 친구 달력과 새 휴가 알림에서도 빠져요."
+        checked={current?.leaveSchedule}
+        onChange={(leaveSchedule) => change({ leaveSchedule })}
+        testId="friend-sharing-leave-schedule"
+      />
+      {sharing.isError ? (
+        <p role="alert" className="field-error">
+          공유 설정을 불러오지 못했어요.
+        </p>
+      ) : null}
+      {update.isError ? (
+        <p role="alert" className="field-error">
+          저장하지 못했어요. 잠시 후 다시 시도해주세요.
+        </p>
+      ) : null}
+    </Section>
+  );
+}
+
+function SharingToggle(props: {
+  label: string;
+  hint?: string;
+  /** 아직 받지 못했으면 undefined — 그동안은 잠가 둔다. */
+  checked: boolean | undefined;
+  onChange: (next: boolean) => void;
+  testId: string;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        gap: "var(--sp-sm)",
+        alignItems: "flex-start",
+        cursor: "pointer",
+        minHeight: 44,
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={props.checked ?? false}
+        disabled={props.checked === undefined}
+        onChange={(event) => props.onChange(event.target.checked)}
+        style={{ width: 20, height: 20, flexShrink: 0 }}
+        data-testid={props.testId}
+      />
+      <span style={{ display: "grid", gap: 2 }}>
+        <span className="body-sm text-body">{props.label}</span>
+        {props.hint ? (
+          <span className="caption text-mute">{props.hint}</span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+/**
+ * 친구가 공유한 만큼만 그린다. null은 "없음"이 아니라 공유하지 않은 것이다 —
+ * 빈 자리로 두면 "휴가가 없다"거나 "셀 날이 없다"로 읽힌다.
+ */
+function FriendSharedStatus(props: { friend: Friend }) {
+  const { friend } = props;
+  const dutyDays =
+    friend.dutyDays === null
+      ? "남은 일과일 비공개"
+      : `남은 일과일 ${friend.dutyDays}일`;
+  return (
+    <div
+      style={{
+        flexBasis: "100%",
+        minWidth: 0,
+        display: "grid",
+        gap: "var(--sp-xs)",
+      }}
+    >
+      {friend.enlistedAt !== null && friend.dischargeAt !== null ? (
+        <div data-testid="friend-service-progress">
+          <ServiceProgress
+            enlistedAt={friend.enlistedAt}
+            dischargeAt={friend.dischargeAt}
+            decimals={5}
+            compact
+            caption={dutyDays}
+          />
+        </div>
+      ) : (
+        <p className="caption text-mute">복무율 비공개 · {dutyDays}</p>
+      )}
+      {friend.leaveScheduleShared ? null : (
+        <p className="caption text-mute">휴가 일정 비공개</p>
+      )}
+    </div>
+  );
+}
+
 export function FriendsPage(props: { me: Me }) {
   const friends = useFriends();
   const incoming = useIncomingFriendRequests();
@@ -228,7 +358,10 @@ export function FriendsPage(props: { me: Me }) {
       ) : null}
 
       <div className="workspace-columns friends-workspace">
-        <aside className="workspace-stack" aria-label="친구 찾기와 요청">
+        <aside
+          className="workspace-stack"
+          aria-label="친구 찾기와 요청, 공유 설정"
+        >
           <Section title="사용자 이름으로 찾기">
             <div className="field">
               <label className="field-label" htmlFor="friend-search">
@@ -334,6 +467,8 @@ export function FriendsPage(props: { me: Me }) {
               ))}
             </Section>
           ) : null}
+
+          <SharingSection />
         </aside>
         <Section
           title={`내 친구${friends.data ? ` ${friends.data.friends.length}명` : ""}`}
@@ -436,18 +571,7 @@ export function FriendsPage(props: { me: Me }) {
                         <ActionIcon name="userRemove" />
                         삭제
                       </button>
-                      <div
-                        style={{ flexBasis: "100%", minWidth: 0 }}
-                        data-testid="friend-service-progress"
-                      >
-                        <ServiceProgress
-                          enlistedAt={friend.enlistedAt}
-                          dischargeAt={friend.dischargeAt}
-                          decimals={5}
-                          compact
-                          caption={`남은 일과일 ${friend.dutyDays}일`}
-                        />
-                      </div>
+                      <FriendSharedStatus friend={friend} />
                     </div>
                   );
                 })}

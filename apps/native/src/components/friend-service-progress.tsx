@@ -27,9 +27,51 @@ export function FriendServiceProgress({
   now: number;
 }) {
   const styles = useStyles();
+  const dutyDays =
+    friend.dutyDays === null
+      ? "남은 일과일 비공개"
+      : `남은 일과일 ${friend.dutyDays}일`;
+  // null은 "없음"이 아니라 친구가 공유하지 않은 것이다. 빈 막대로 두면 0%로 읽힌다.
+  if (friend.enlistedAt === null || friend.dischargeAt === null) {
+    return (
+      <View style={styles.meta}>
+        <Text style={styles.hidden}>복무율 비공개</Text>
+        <Text style={styles.days}>{dutyDays}</Text>
+      </View>
+    );
+  }
+  return (
+    <LiveProgress
+      name={friend.name}
+      enlistedAt={friend.enlistedAt}
+      dischargeAt={friend.dischargeAt}
+      dutyDays={dutyDays}
+      active={active}
+      now={now}
+    />
+  );
+}
+
+/** 날짜가 있을 때만 그린다 — 아래 훅들은 조건부로 부를 수 없다. */
+function LiveProgress({
+  name,
+  enlistedAt,
+  dischargeAt,
+  dutyDays,
+  active,
+  now,
+}: {
+  name: string;
+  enlistedAt: string;
+  dischargeAt: string;
+  dutyDays: string;
+  active: boolean;
+  now: number;
+}) {
+  const styles = useStyles();
   const reducedMotion = useReducedMotion();
-  const start = kstMidnight(friend.enlistedAt);
-  const end = kstMidnight(friend.dischargeAt);
+  const start = kstMidnight(enlistedAt);
+  const end = kstMidnight(dischargeAt);
   const span = Math.max(0, end - start);
   const percent = useServicePercentClock(
     start,
@@ -69,12 +111,12 @@ export function FriendServiceProgress({
             importantForAccessibility="no-hide-descendants"
           />
         )}
-        <Text style={styles.days}>남은 일과일 {friend.dutyDays}일</Text>
+        <Text style={styles.days}>{dutyDays}</Text>
       </View>
       <View
         style={styles.track}
         accessibilityRole="progressbar"
-        accessibilityLabel={`${friend.name} 복무율`}
+        accessibilityLabel={`${name} 복무율`}
         accessibilityValue={{
           min: 0,
           max: 100,
@@ -115,6 +157,7 @@ const useStyles = makeStyles(({ colors }) => ({
     pointerEvents: "none",
   },
   days: { fontSize: 12, color: colors.mute, fontVariant: ["tabular-nums"] },
+  hidden: { fontSize: 13, fontWeight: "700", color: colors.mute },
   track: {
     height: 8,
     borderRadius: radius.pill,

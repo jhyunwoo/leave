@@ -237,17 +237,32 @@ export const blockedUserSchema = z
   })
   .openapi("BlockedUser");
 
+/**
+ * 친구 목록의 한 사람. null은 "없다"가 아니라 **친구가 공유하지 않았다**는 뜻이다
+ * (lib/friend-sharing.ts). 복무율을 끄면 두 날짜가 함께 빠진다.
+ */
 export const friendSummarySchema = z
   .object({
     userId: z.string(),
     name: z.string(),
     username: z.string().nullable(),
     since: z.string(),
-    enlistedAt: z.string(),
-    dischargeAt: z.string(),
-    dutyDays: z.number().int().nonnegative(),
+    enlistedAt: z.string().nullable(),
+    dischargeAt: z.string().nullable(),
+    dutyDays: z.number().int().nonnegative().nullable(),
+    /** false면 달력·일정 조회에 이 사람의 휴가가 실리지 않는다. */
+    leaveScheduleShared: z.boolean(),
   })
   .openapi("FriendSummary");
+
+/** 내가 친구에게 보여주는 항목. 모든 친구에게 같게 적용된다. */
+export const friendSharingResponseSchema = z
+  .object({
+    serviceProgress: z.boolean(),
+    dutyDays: z.boolean(),
+    leaveSchedule: z.boolean(),
+  })
+  .openapi("FriendSharing");
 
 export const friendRequestSchema = z
   .object({
@@ -280,6 +295,11 @@ export const friendCalendarPersonSchema = z.object({
   name: z.string(),
   username: z.string().nullable(),
   isViewer: z.boolean(),
+  /**
+   * false면 이 사람의 휴가는 조회하지 않았다. 화면은 빈 칸을 "휴가 없음"이 아니라
+   * "비공개"로 읽어야 한다. 조회자 본인은 언제나 true다.
+   */
+  leaveScheduleShared: z.boolean(),
 });
 
 export const friendCalendarLeaveSchema = z.object({

@@ -19,6 +19,7 @@ import {
 } from "../src/hooks/notifications";
 import { useRotateUnitInvite } from "../src/hooks/units";
 import { useBlockUser } from "../src/hooks/moderation";
+import { useFriendSharing, useUpdateFriendSharing } from "../src/hooks/friends";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
 
@@ -280,6 +281,102 @@ describe("authoritative mutation responses", () => {
     });
     expect(queryClient.getQueryData(queryKeys.notificationPrefs)).toEqual({
       preferences: { overage: false, blackout: false, unitNotice: true },
+    });
+  });
+
+  it("writes returned friend sharing without a second GET", async () => {
+    const initial = {
+      sharing: { serviceProgress: true, dutyDays: true, leaveSchedule: true },
+    };
+    const updated = {
+      sharing: { serviceProgress: true, dutyDays: true, leaveSchedule: false },
+    };
+    const get = vi.fn(() => Promise.resolve(initial));
+    const client = {
+      friends: {
+        sharing: {
+          $get: get,
+          $patch: () => Promise.resolve(updated),
+        },
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    const view = renderHook(
+      () => ({ sharing: useFriendSharing(), update: useUpdateFriendSharing() }),
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(view.result.current.sharing.isSuccess).toBe(true),
+    );
+
+    await act(() =>
+      view.result.current.update.mutateAsync({ leaveSchedule: false }),
+    );
+
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(queryKeys.friendSharing)).toEqual(updated);
+  });
+
+  it("serializes concurrent sharing PATCHes so a switched-off item stays off", async () => {
+    type Sharing = {
+      sharing: {
+        serviceProgress: boolean;
+        dutyDays: boolean;
+        leaveSchedule: boolean;
+      };
+    };
+    const firstResponse = deferred<Sharing>();
+    const secondResponse = deferred<Sharing>();
+    const patch = vi
+      .fn()
+      .mockImplementationOnce(() => firstResponse.promise)
+      .mockImplementationOnce(() => secondResponse.promise);
+    const client = { friends: { sharing: { $patch: patch } } };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.friendSharing, {
+      sharing: { serviceProgress: true, dutyDays: true, leaveSchedule: true },
+    });
+    const { result } = renderHook(() => useUpdateFriendSharing(), {
+      wrapper,
+    });
+    let firstMutation!: Promise<unknown>;
+    let secondMutation!: Promise<unknown>;
+
+    act(() => {
+      firstMutation = result.current.mutateAsync({ dutyDays: false });
+      secondMutation = result.current.mutateAsync({ leaveSchedule: false });
+    });
+
+    await waitFor(() => expect(patch).toHaveBeenCalledTimes(1));
+    expect(patch.mock.calls[0]?.[0]).toEqual({ json: { dutyDays: false } });
+
+    await act(async () => {
+      firstResponse.resolve({
+        sharing: {
+          serviceProgress: true,
+          dutyDays: false,
+          leaveSchedule: true,
+        },
+      });
+      await firstMutation;
+    });
+    await waitFor(() => expect(patch).toHaveBeenCalledTimes(2));
+    expect(patch.mock.calls[1]?.[0]).toEqual({
+      json: { leaveSchedule: false },
+    });
+
+    await act(async () => {
+      secondResponse.resolve({
+        sharing: {
+          serviceProgress: true,
+          dutyDays: false,
+          leaveSchedule: false,
+        },
+      });
+      await secondMutation;
+    });
+    expect(queryClient.getQueryData(queryKeys.friendSharing)).toEqual({
+      sharing: { serviceProgress: true, dutyDays: false, leaveSchedule: false },
     });
   });
 

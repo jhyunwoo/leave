@@ -27,10 +27,13 @@ export function useNotificationLeaveDetails(
       (error.status === 403 || error.status === 404)
       ? "친구 관계가 변경되어 이 일정을 볼 수 없어요."
       : "일정을 불러오지 못했어요. 다시 시도해주세요."
-    : !loading &&
-        !friend.data?.leaves.some((leave) => leave.leaveId === target.leaveId)
-      ? "이 휴가는 삭제되었거나 기간 또는 공유 상태가 변경되었어요."
-      : null;
+    : loading
+      ? null
+      : friend.data?.people[0]?.leaveScheduleShared === false
+        ? "친구가 휴가 일정을 공유하지 않아요."
+        : !friend.data?.leaves.some((leave) => leave.leaveId === target.leaveId)
+          ? "이 휴가는 삭제되었거나 기간 또는 공유 상태가 변경되었어요."
+          : null;
   return {
     date,
     previous: () => setDate(addDays(date, -1)),

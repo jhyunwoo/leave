@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createUnit, isoDaysFromToday, req, signup } from "./helpers.mjs";
+import {
+  createUnit,
+  isoDaysFromToday,
+  openTestDb,
+  req,
+  signup,
+} from "./helpers.mjs";
 
 /** 공개 사용자 이름으로 친구를 요청한다. 대소문자·공백·@는 서버가 정규화한다. */
 async function requestFriend(sender, receiver) {
@@ -459,10 +465,33 @@ test("계정 삭제는 친구 관계와 요청을 제거하고 이름을 놓아�
   await requestFriend(first, friend);
   await acceptFriend(friend, first);
   await requestFriend(pending, first);
+  // 공유 설정 행이 있어도 탈퇴가 막히지 않고, 행도 함께 사라져야 한다.
+  assert.equal(
+    (
+      await req("PATCH", "/friends/sharing", {
+        token: first.token,
+        body: { leaveSchedule: false },
+      })
+    ).status,
+    200,
+  );
   assert.equal(
     (await req("DELETE", "/auth/account", { token: first.token })).status,
     200,
   );
+  const db = openTestDb();
+  try {
+    assert.equal(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM user_friend_sharing WHERE user_id = ?",
+        )
+        .get(first.data.user.id).count,
+      0,
+    );
+  } finally {
+    db.close();
+  }
   assert.equal(
     (await req("GET", "/friends", { token: friend.token })).data.friends.length,
     0,
@@ -602,4 +631,222 @@ test("친구별 일과일은 소속 휴일을 분리하고 전역자는 0으로 
     false,
   );
   assert.equal("unitId" in response.data.friends[0], false);
+});
+
+/**
+ * 공유 설정 — 친구에게 무엇을 보여줄지는 본인이 고른다.
+ *
+ * 화면이 가리는 것이 아니라 서버가 응답에서 빼는지 확인한다. 행이 없는 사용자
+ * (설정을 한 번도 건드리지 않은 대다수)는 지금까지처럼 전부 공유한다.
+ */
+test("공유 설정은 기본값이 전부 공유이고 보낸 항목만 바꾼다", async () => {
+  const user = await signup();
+  assert.equal((await req("GET", "/friends/sharing")).status, 401);
+
+  const initial = await req("GET", "/friends/sharing", { token: user.token });
+  assert.equal(initial.status, 200);
+  assert.deepEqual(initial.data.sharing, {
+    serviceProgress: true,
+    dutyDays: true,
+    leaveSchedule: true,
+  });
+
+  const first = await req("PATCH", "/friends/sharing", {
+    token: user.token,
+    body: { dutyDays: false },
+  });
+  assert.equal(first.status, 200);
+  assert.deepEqual(first.data.sharing, {
+    serviceProgress: true,
+    dutyDays: false,
+    leaveSchedule: true,
+  });
+  // 다른 항목만 보내도 앞서 끈 값은 그대로다. 본문 전체로 덮어쓰면 여기서
+  // 끈 적 없는 기본값으로 되살아난다.
+  const second = await req("PATCH", "/friends/sharing", {
+    token: user.token,
+    body: { leaveSchedule: false },
+  });
+  assert.deepEqual(second.data.sharing, {
+    serviceProgress: true,
+    dutyDays: false,
+    leaveSchedule: false,
+  });
+  assert.deepEqual(
+    (await req("GET", "/friends/sharing", { token: user.token })).data.sharing,
+    { serviceProgress: true, dutyDays: false, leaveSchedule: false },
+  );
+
+  assert.equal(
+    (
+      await req("PATCH", "/friends/sharing", {
+        token: user.token,
+        body: { dutyDays: "no" },
+      })
+    ).status,
+    400,
+  );
+});
+
+test("복무율·남은 일과일을 끄면 친구 목록이 그 값을 보내지 않는다", async () => {
+  const viewer = await signup({ name: "보는이" });
+  const friend = await signup({
+    name: "숨기는이",
+    enlistedAt: "2026-02-09",
+    dischargeAt: "2027-08-08",
+  });
+  await requestFriend(viewer, friend);
+  await acceptFriend(friend, viewer);
+  const listOf = () => req("GET", "/friends", { token: viewer.token });
+
+  const shared = (await listOf()).data.friends[0];
+  assert.equal(shared.enlistedAt, "2026-02-09");
+  assert.equal(shared.dischargeAt, "2027-08-08");
+  assert.equal(typeof shared.dutyDays, "number");
+
+  await req("PATCH", "/friends/sharing", {
+    token: friend.token,
+    body: { serviceProgress: false },
+  });
+  const withoutProgress = await listOf();
+  const [progressHidden] = withoutProgress.data.friends;
+  assert.equal(progressHidden.enlistedAt, null);
+  assert.equal(progressHidden.dischargeAt, null);
+  assert.equal(typeof progressHidden.dutyDays, "number", "끈 항목만 빠진다");
+  const body = JSON.stringify(withoutProgress.data);
+  assert.ok(
+    !body.includes("2026-02-09") && !body.includes("2027-08-08"),
+    "입대일·전역일이 본문 어디에도 남으면 안 된다",
+  );
+
+  await req("PATCH", "/friends/sharing", {
+    token: friend.token,
+    body: { dutyDays: false },
+  });
+  const bothHidden = (await listOf()).data.friends[0];
+  assert.equal(bothHidden.dutyDays, null);
+  assert.equal(bothHidden.enlistedAt, null);
+
+  await req("PATCH", "/friends/sharing", {
+    token: friend.token,
+    body: { serviceProgress: true, dutyDays: true },
+  });
+  const restored = (await listOf()).data.friends[0];
+  assert.equal(restored.enlistedAt, "2026-02-09");
+  assert.equal(restored.dischargeAt, "2027-08-08");
+  assert.equal(typeof restored.dutyDays, "number");
+});
+
+test("휴가 일정을 끄면 달력·일정 조회가 그 사람의 휴가를 싣지 않는다", async () => {
+  const viewer = await signup({ name: "보는이" });
+  const hider = await signup({ name: "숨기는이" });
+  const sharer = await signup({ name: "보여주는이" });
+  for (const user of [viewer, hider, sharer]) await createUnit(user.token);
+  for (const friend of [hider, sharer]) {
+    await requestFriend(viewer, friend);
+    await acceptFriend(friend, viewer);
+  }
+  // 40일 뒤가 속한 달의 10~12일은 오늘이 그 달의 며칠이든 언제나 미래다.
+  const month = isoDaysFromToday(40).slice(0, 7);
+  for (const [user, day] of [
+    [viewer, "10"],
+    [hider, "11"],
+    [sharer, "12"],
+  ]) {
+    const created = await req("POST", "/leaves", {
+      token: user.token,
+      body: {
+        title: "연가",
+        status: "shared",
+        segments: [
+          {
+            category: "annual",
+            startDate: `${month}-${day}`,
+            endDate: `${month}-${day}`,
+          },
+        ],
+      },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.data));
+  }
+  // 조회자도 자기 일정을 끈다 — 남에게 숨기는 설정이 내 달력에서 나를 지우면 안 된다.
+  for (const user of [hider, viewer]) {
+    await req("PATCH", "/friends/sharing", {
+      token: user.token,
+      body: { leaveSchedule: false },
+    });
+  }
+
+  const friendIds = `${hider.data.user.id},${sharer.data.user.id}`;
+  const expectedOwners = [viewer.data.user.id, sharer.data.user.id].sort();
+  const calendar = await req(
+    "GET",
+    `/friends/calendar?friendIds=${friendIds}&month=${month}`,
+    { token: viewer.token },
+  );
+  assert.equal(calendar.status, 200, JSON.stringify(calendar.data));
+  assert.deepEqual(
+    calendar.data.leaves.map((row) => row.userId).sort(),
+    expectedOwners,
+  );
+  const sharedFlags = new Map(
+    calendar.data.people.map((person) => [
+      person.userId,
+      person.leaveScheduleShared,
+    ]),
+  );
+  assert.equal(sharedFlags.get(hider.data.user.id), false);
+  assert.equal(sharedFlags.get(sharer.data.user.id), true);
+  assert.equal(sharedFlags.get(viewer.data.user.id), true);
+
+  const calendars = await req(
+    "GET",
+    `/friends/calendars?friendIds=${friendIds}&months=${month}`,
+    { token: viewer.token },
+  );
+  assert.equal(calendars.status, 200, JSON.stringify(calendars.data));
+  assert.deepEqual(
+    calendars.data.calendars[0].leaves.map((row) => row.userId).sort(),
+    expectedOwners,
+  );
+
+  const scheduleOfHider = () =>
+    req(
+      "GET",
+      `/friends/${hider.data.user.id}/schedule?startDate=${month}-01&endDate=${month}-28`,
+      { token: viewer.token },
+    );
+  const hidden = await scheduleOfHider();
+  assert.equal(hidden.status, 200, JSON.stringify(hidden.data));
+  assert.deepEqual(hidden.data.leaves, []);
+  assert.equal(hidden.data.people[0].leaveScheduleShared, false);
+
+  const friends = await req("GET", "/friends", { token: viewer.token });
+  assert.deepEqual(
+    Object.fromEntries(
+      friends.data.friends.map((row) => [row.userId, row.leaveScheduleShared]),
+    ),
+    { [hider.data.user.id]: false, [sharer.data.user.id]: true },
+  );
+
+  await req("PATCH", "/friends/sharing", {
+    token: hider.token,
+    body: { leaveSchedule: true },
+  });
+  const visible = await scheduleOfHider();
+  assert.equal(visible.data.leaves.length, 1);
+  assert.equal(visible.data.people[0].leaveScheduleShared, true);
+
+  // 공유를 켜 둔 것은 친구에게 보여주겠다는 뜻이지 아무에게나 열겠다는 뜻이 아니다.
+  const stranger = await signup();
+  assert.equal(
+    (
+      await req(
+        "GET",
+        `/friends/${hider.data.user.id}/schedule?startDate=${month}-01&endDate=${month}-28`,
+        { token: stranger.token },
+      )
+    ).status,
+    403,
+  );
 });

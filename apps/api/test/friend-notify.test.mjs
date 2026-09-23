@@ -174,3 +174,44 @@ test("친구 휴가 알림을 끈 사람에게는 가지 않는다", async () =>
 
   assert.equal((await notificationsOf(friend)).length, before);
 });
+
+test("휴가 일정을 공유하지 않는 사람의 새 휴가는 친구에게 알리지 않는다", async () => {
+  const actor = await withUnit(await signup({ name: "숨김등록자" }));
+  const friend = await signup();
+  await befriend(actor, friend);
+  await req("PATCH", "/friends/sharing", {
+    token: actor.token,
+    body: { leaveSchedule: false },
+  });
+
+  const before = (await notificationsOf(friend)).length;
+  const hidden = await req("POST", "/leaves", {
+    token: actor.token,
+    body: {
+      title: "연가",
+      segments: [
+        { category: "annual", startDate: "2026-12-08", endDate: "2026-12-09" },
+      ],
+    },
+  });
+  assert.equal(hidden.status, 201);
+  await sleep(400);
+  // 알림 본문에 날짜가 들어간다 — 여기서 새면 달력을 막은 뜻이 사라진다.
+  assert.equal((await notificationsOf(friend)).length, before);
+
+  await req("PATCH", "/friends/sharing", {
+    token: actor.token,
+    body: { leaveSchedule: true },
+  });
+  await req("POST", "/leaves", {
+    token: actor.token,
+    body: {
+      title: "연가",
+      segments: [
+        { category: "annual", startDate: "2026-12-15", endDate: "2026-12-16" },
+      ],
+    },
+  });
+  await sleep(400);
+  assert.equal((await notificationsOf(friend)).length, before + 1);
+});

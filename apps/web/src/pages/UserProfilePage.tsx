@@ -102,6 +102,8 @@ function SharedSchedule(props: { userId: string }) {
     range.endDate,
   );
   const navigate = useNavigate();
+  // 공유를 끈 친구는 휴가가 비어 온다. "휴가 없음"과 구분해 말하고, 비교할 것도 없다.
+  const hidden = schedule.data?.people[0]?.leaveScheduleShared === false;
 
   return (
     <section
@@ -122,14 +124,16 @@ function SharedSchedule(props: { userId: string }) {
         }}
       >
         <h2 className="display-xs">공유된 휴가 일정</h2>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() =>
-            void navigate(`/?mode=friends&friends=${props.userId}`)
-          }
-        >
-          <ActionIcon name="calendar" />내 달력과 비교
-        </button>
+        {hidden ? null : (
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() =>
+              void navigate(`/?mode=friends&friends=${props.userId}`)
+            }
+          >
+            <ActionIcon name="calendar" />내 달력과 비교
+          </button>
+        )}
       </div>
       {schedule.isPending ? (
         <div className="spinner" role="status" aria-label="일정 불러오는 중" />
@@ -140,6 +144,8 @@ function SharedSchedule(props: { userId: string }) {
         <p role="alert" className="field-error">
           일정을 볼 수 없어요. 친구 관계나 차단 상태를 확인해주세요.
         </p>
+      ) : hidden ? (
+        <p className="text-body">휴가 일정을 공유하지 않는 친구예요.</p>
       ) : schedule.data?.leaves.length ? (
         schedule.data.leaves.map((leave) => (
           <div

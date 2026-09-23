@@ -11,6 +11,9 @@
  *
  * 이름을 누르면 프로필로 간다. 삭제·비교는 목록에 남긴다 — 이미 친구인 사람에게
  * 자주 하는 일이라 한 번 더 들어갔다 나오게 할 이유가 없다.
+ *
+ * 내가 친구에게 보여줄 항목은 툴바의 "공유 설정"이 여는 화면에서 고른다
+ * (friend-sharing.tsx). 한 번 정하면 잘 바꾸지 않는 값이라 목록 사이에 두지 않았다.
  */
 
 import { formatUsername, MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
@@ -74,6 +77,7 @@ export function FriendsScreen() {
     }
   };
   const openAdd = () => router.push("/(tabs)/(friends)/add");
+  const openSharing = () => router.push("/(tabs)/(friends)/sharing");
   const openProfile = (username: string | null) => {
     if (!username) return;
     router.push({ pathname: "/u/[username]", params: { username } });
@@ -146,6 +150,9 @@ export function FriendsScreen() {
         >
           내 프로필
         </Stack.Toolbar.Button>
+        <Stack.Toolbar.Button icon="eye" onPress={openSharing}>
+          공유 설정
+        </Stack.Toolbar.Button>
         <Stack.Toolbar.Button
           icon="person.badge.plus"
           variant="prominent"
@@ -167,6 +174,13 @@ export function FriendsScreen() {
             onPress: openMyProfile,
             disabled: !myUsername,
             testID: "friends-open-my-profile",
+          },
+          {
+            id: "sharing",
+            icon: "settings" as const,
+            title: "공유 설정",
+            onPress: openSharing,
+            testID: "friends-open-sharing",
           },
           {
             id: "add-friend",
@@ -344,6 +358,9 @@ export function FriendsScreen() {
                       active={active}
                       now={now}
                     />
+                    {friend.leaveScheduleShared ? null : (
+                      <Text style={styles.caption}>휴가 일정 비공개</Text>
+                    )}
                   </View>
                 );
               })

@@ -8,8 +8,52 @@ import {
 } from "../src/hooks/personal-events";
 import { useCreateUnitEvent } from "../src/hooks/unit-events";
 import { useRemoveFriend } from "../src/hooks/friends";
+import { useNotificationLeaveDetails } from "../src/hooks/notification-leave";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
+
+describe("friend leave notification details", () => {
+  const target = {
+    userId: "friend",
+    leaveId: "leave-1",
+    startDate: "2026-11-02",
+    endDate: "2026-11-04",
+  };
+
+  function renderDetails(leaveScheduleShared: boolean) {
+    const schedule = {
+      people: [
+        {
+          userId: "friend",
+          name: "친구",
+          username: null,
+          isViewer: false,
+          leaveScheduleShared,
+        },
+      ],
+      leaves: [],
+    };
+    const client = {
+      friends: {
+        ":userId": { schedule: { $get: () => Promise.resolve(schedule) } },
+      },
+      leaves: { mine: { $get: () => Promise.resolve({ leaves: [] }) } },
+    };
+    const wrapper = wrapperFor(testQueryClient(), testAdapter({ client }));
+    return renderHook(() => useNotificationLeaveDetails(target), { wrapper });
+  }
+
+  it("tells a friend who stopped sharing apart from a deleted leave", async () => {
+    const hidden = renderDetails(false);
+    const deleted = renderDetails(true);
+    await waitFor(() => expect(hidden.result.current.loading).toBe(false));
+    await waitFor(() => expect(deleted.result.current.loading).toBe(false));
+
+    // 둘 다 휴가가 비어 있다. 공유를 끈 친구를 "삭제됨"으로 말하면 틀린 정보다.
+    expect(hidden.result.current.message).toMatch(/공유하지 않아요/);
+    expect(deleted.result.current.message).toMatch(/삭제/);
+  });
+});
 
 describe("friend query keys", () => {
   it("normalizes selection order and duplicates", () => {

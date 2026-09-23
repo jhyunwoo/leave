@@ -341,6 +341,10 @@ function FriendSelector(props: {
                 />
                 <span>
                   <strong>{friend.name}</strong>
+                  {/* 선택은 막지 않는다 — 달력 범례가 같은 뜻을 한 번 더 말해 준다. */}
+                  {friend.leaveScheduleShared ? null : (
+                    <small className="field-hint">휴가 일정 비공개</small>
+                  )}
                   {disabled ? (
                     <small className="field-hint">
                       최대 10명까지 선택할 수 있어요

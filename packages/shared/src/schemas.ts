@@ -760,6 +760,15 @@ export const notificationPrefsSchema = z.object({
   friendLeave: z.boolean().optional(),
 });
 
+/** 친구에게 보여줄 항목. 모든 친구에게 같게 적용되고, 보낸 항목만 바꾼다. */
+export const friendSharingSchema = z.object({
+  /** 복무율 — 친구에게 입대일·전역일이 간다. */
+  serviceProgress: z.boolean().optional(),
+  dutyDays: z.boolean().optional(),
+  /** 휴가 일정(외출 포함). 끄면 친구에게 가는 새 휴가 알림도 멈춘다. */
+  leaveSchedule: z.boolean().optional(),
+});
+
 export const leaveStatusSchema = z.enum(LEAVE_STATUSES);
 
 export const pushTokenSchema = z.object({
@@ -807,6 +816,7 @@ export type PersonalEventUpdateInput = z.infer<
 export type UnitEventCreateInput = z.infer<typeof unitEventCreateSchema>;
 export type UnitEventUpdateInput = z.infer<typeof unitEventUpdateSchema>;
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
+export type FriendSharingInput = z.infer<typeof friendSharingSchema>;
 export type LeaveCreateInput = z.infer<typeof leaveCreateSchema>;
 export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
 export type LeaveGrantCreateInput = z.infer<typeof leaveGrantCreateSchema>;

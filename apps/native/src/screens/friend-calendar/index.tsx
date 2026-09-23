@@ -163,6 +163,10 @@ export function FriendCalendarScreen() {
                   />
                   <Text style={styles.legendText}>
                     {person.isViewer ? "나" : person.name}
+                    {/* 공유를 끈 친구의 칸은 비어 있다. "휴가 없음"으로 읽히지 않게 밝혀 둔다. */}
+                    {person.leaveScheduleShared ? null : (
+                      <Text style={styles.legendMuted}> · 비공개</Text>
+                    )}
                   </Text>
                 </View>
               ))}
@@ -378,6 +382,7 @@ const useStyles = makeStyles(({ colors }) => ({
     borderColor: colors.body,
   },
   legendText: { fontSize: 12, fontWeight: "700", color: colors.ink },
+  legendMuted: { fontWeight: "600", color: colors.mute },
   personalLegend: {
     width: 11,
     height: 11,

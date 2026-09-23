@@ -32,7 +32,11 @@ export function createWebQueryClient(): QueryClient {
     refetchOnReconnect: false,
   });
 
-  for (const queryKey of [queryKeys.me, queryKeys.notificationPrefs]) {
+  for (const queryKey of [
+    queryKeys.me,
+    queryKeys.notificationPrefs,
+    queryKeys.friendSharing,
+  ]) {
     queryClient.setQueryDefaults(queryKey, {
       staleTime: WEB_QUERY_STALE_TIMES.profileConfig,
       refetchOnWindowFocus: true,

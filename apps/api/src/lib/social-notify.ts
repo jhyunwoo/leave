@@ -4,9 +4,9 @@
  * 사용처: `POST /friends/requests`, `POST /leaves` (routes/friends.ts, routes/leaves.ts).
  *
  * `lib/`에 있는 이유는 여러 표를 순서대로 바꾸기 때문이다 — 수신자를 고르고
- * (친구 관계 + 차단 + 종류별 수신 설정), 인앱 알림을 넣고, 푸시를 보내고,
- * 발송 로그를 남긴다. 그 순서와 D1 상한 처리가 HTTP 상태 코드를 고르는 코드와
- * 섞이면 읽다가 놓친다. 초과 알림(`overage.ts`)이 같은 구조다.
+ * (친구 관계 + 차단 + 종류별 수신 설정 + 보내는 사람의 공유 설정), 인앱 알림을
+ * 넣고, 푸시를 보내고, 발송 로그를 남긴다. 그 순서와 D1 상한 처리가 HTTP 상태
+ * 코드를 고르는 코드와 섞이면 읽다가 놓친다. 초과 알림(`overage.ts`)이 같은 구조다.
  *
  * ## 두 가지 규칙을 여기서 지킨다
  *
@@ -32,6 +32,7 @@ import {
 } from "../db/schema";
 import { insertStatements, runBatch } from "./d1";
 import type { Db } from "./db";
+import { friendSharingQuery, resolveFriendSharing } from "./friend-sharing";
 import { buildNotificationPushMessage, sendExpoPushMessages } from "./push";
 
 type Recipient = { id: string; expoPushToken: string | null };
@@ -160,6 +161,9 @@ export async function notifyFriendRequest(
  *
  * 대상은 **수락된** 친구뿐이고, 어느 방향으로든 차단이 있으면 뺀다. 친구 달력이
  * 매 요청마다 같은 두 가지를 다시 확인하는 것과 같은 판단이다.
+ *
+ * 휴가 일정을 공유하지 않는 사람이면 아무에게도 보내지 않는다. 알림 본문에 기간이
+ * 들어가므로, 여기서 새면 달력에서 막은 것이 뜻을 잃는다(lib/friend-sharing.ts).
  */
 export async function notifyFriendsOfLeave(
   db: Db,
@@ -169,7 +173,8 @@ export async function notifyFriendsOfLeave(
     waitUntil: (promise: Promise<unknown>) => void;
   },
 ): Promise<void> {
-  const [relations, blockedRows] = await db.batch([
+  const [actorSharing, relations, blockedRows] = await db.batch([
+    friendSharingQuery(db, input.actor.id),
     db
       .select({
         userAId: friendships.userAId,
@@ -198,6 +203,7 @@ export async function notifyFriendsOfLeave(
         ),
       ),
   ]);
+  if (!resolveFriendSharing(actorSharing[0]).leaveSchedule) return;
 
   const blocked = new Set(
     blockedRows.map((row) =>

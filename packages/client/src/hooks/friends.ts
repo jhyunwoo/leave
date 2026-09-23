@@ -16,6 +16,7 @@
 import {
   ApiError,
   type FriendRequestCreateInput,
+  type FriendSharingInput,
   MAX_FRIEND_CALENDAR_SELECTION,
   normalizeFriendIds,
 } from "@leave/shared";
@@ -34,9 +35,13 @@ import type {
   FriendCalendar,
   FriendRequest,
   FriendSchedule,
+  FriendSharing,
 } from "../types";
+import { setAuthoritativeQueryData } from "./invalidate";
 
 const enqueueFriendCalendar = createMonthRequestQueue<FriendCalendar>();
+/** 항목별 PATCH가 서로의 전체 응답을 덮지 않도록 제출 순서를 보존한다. */
+const FRIEND_SHARING_MUTATION_SCOPE = { id: "friend-sharing" } as const;
 
 /**
  * 관계가 바뀌면 목록 셋과 사용자 검색·프로필이 함께 낡는다. 검색 결과에는
@@ -113,6 +118,46 @@ export function useFriends() {
     refetchInterval: 60_000,
     queryFn: async () =>
       unwrap<{ friends: Friend[] }>(await client.friends.$get()),
+  });
+}
+
+/** 내가 친구에게 보여주는 항목. 친구의 데이터가 아니라 내 설정이다. */
+export function useFriendSharing() {
+  const { client, unwrap, useRequestAbortSignal } = useLeaveApi();
+  return useQuery({
+    queryKey: queryKeys.friendSharing,
+    queryFn: async (context) =>
+      unwrap<{ sharing: FriendSharing }>(
+        await client.friends.sharing.$get(
+          undefined,
+          queryRequestOptions(useRequestAbortSignal, context),
+        ),
+      ),
+  });
+}
+
+/**
+ * 공유 항목을 바꾼다. 보낸 항목만 바뀌고 응답은 전체 설정이다.
+ *
+ * 내 설정이 바뀌어도 내가 보는 친구 목록·달력은 그대로라 무효화할 것이 없다 —
+ * 달라지는 것은 친구들이 다음에 받을 응답이고, 그건 서버가 매 요청 새로 판정한다.
+ */
+export function useUpdateFriendSharing() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    scope: FRIEND_SHARING_MUTATION_SCOPE,
+    mutationFn: async (input: FriendSharingInput) =>
+      unwrap<{ sharing: FriendSharing }>(
+        await client.friends.sharing.$patch({ json: input }),
+      ),
+    onSuccess: async (data) => {
+      await setAuthoritativeQueryData(
+        queryClient,
+        queryKeys.friendSharing,
+        data,
+      );
+    },
   });
 }
 

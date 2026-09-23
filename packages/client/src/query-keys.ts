@@ -59,6 +59,12 @@ export const queryKeys = {
   friendCalendars: ["friends", "calendar"] as const,
   friendCalendar: (friendIds: readonly string[], month: string) =>
     ["friends", "calendar", [...friendIds].sort(), month] as const,
+  /**
+   * 내가 친구에게 보여주는 항목. `friends` 아래가 아닌 이유는 무효화 범위다 —
+   * 이건 친구의 데이터가 아니라 내 설정이라, 차단·관계 변화가 `friends` 전체를
+   * 무효화할 때 함께 다시 받을 이유가 없다.
+   */
+  friendSharing: ["friendSharing"] as const,
 
   /**
    * 사용자 검색·공개 프로필. `friends` 아래가 아니라 따로 둔 이유는 무효화 범위다 —

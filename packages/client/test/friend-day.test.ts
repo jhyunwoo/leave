@@ -25,9 +25,27 @@ function calendar(leaves: FriendCalendarLeave[]): FriendCalendar {
   return {
     month: "2026-09",
     people: [
-      { userId: "me", name: "나본인", username: null, isViewer: true },
-      { userId: "b", name: "김하나", username: null, isViewer: false },
-      { userId: "a", name: "박두울", username: null, isViewer: false },
+      {
+        userId: "me",
+        name: "나본인",
+        username: null,
+        isViewer: true,
+        leaveScheduleShared: true,
+      },
+      {
+        userId: "b",
+        name: "김하나",
+        username: null,
+        isViewer: false,
+        leaveScheduleShared: true,
+      },
+      {
+        userId: "a",
+        name: "박두울",
+        username: null,
+        isViewer: false,
+        leaveScheduleShared: true,
+      },
     ],
     leaves,
   };

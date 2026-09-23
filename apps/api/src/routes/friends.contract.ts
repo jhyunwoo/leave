@@ -2,12 +2,14 @@ import { createRoute, z } from "@hono/zod-openapi";
 import {
   friendIdsSchema,
   friendRequestCreateSchema,
+  friendSharingSchema,
   monthSchema,
 } from "@leave/shared";
 import {
   errorResponse,
   friendCalendarSchema,
   friendRequestSchema,
+  friendSharingResponseSchema,
   friendSummarySchema,
   jsonContent,
   okSchema,
@@ -55,6 +57,45 @@ export const listFriendsRoute = createRoute({
       z.object({ friends: z.array(friendSummarySchema) }),
       "친구 목록",
     ),
+    401: authErrors[401],
+  },
+});
+export const getFriendSharingRoute = createRoute({
+  method: "get",
+  path: "/sharing",
+  tags: TAGS,
+  summary: "친구에게 보여줄 항목",
+  description:
+    "설정한 적이 없으면 전부 공유한 것으로 답합니다. 모든 친구에게 같게 적용됩니다.",
+  security: [{ Bearer: [] }],
+  responses: {
+    200: jsonContent(
+      z.object({ sharing: friendSharingResponseSchema }),
+      "공유 설정",
+    ),
+    401: authErrors[401],
+  },
+});
+export const updateFriendSharingRoute = createRoute({
+  method: "patch",
+  path: "/sharing",
+  tags: TAGS,
+  summary: "친구에게 보여줄 항목 변경",
+  description:
+    "보낸 항목만 바꿉니다. 끈 항목은 친구 목록·달력·일정 응답에서 빠지고, 휴가 일정을 끄면 친구에게 가는 새 휴가 알림도 멈춥니다.",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: friendSharingSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(
+      z.object({ sharing: friendSharingResponseSchema }),
+      "변경된 공유 설정",
+    ),
+    400: authErrors[400],
     401: authErrors[401],
   },
 });

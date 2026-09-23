@@ -41,6 +41,10 @@ export const FriendCalendarLegend = memo(function FriendCalendarLegend(props: {
             style={{ background: friendPersonColor(person.userId) }}
           />
           <strong>{person.isViewer ? "나" : person.name}</strong>
+          {/* 공유를 끈 친구의 칸은 비어 있다. "휴가 없음"으로 읽히지 않게 밝혀 둔다. */}
+          {person.leaveScheduleShared ? null : (
+            <span className="caption text-mute">· 비공개</span>
+          )}
         </span>
       ))}
       <span className="friend-calendar-legend-item">

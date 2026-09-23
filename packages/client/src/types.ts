@@ -146,6 +146,11 @@ export type Friend = InferResponseType<
   Client["friends"]["$get"],
   200
 >["friends"][number];
+/** 내가 친구에게 보여주는 항목. 모든 친구에게 같게 적용된다. */
+export type FriendSharing = InferResponseType<
+  Client["friends"]["sharing"]["$get"],
+  200
+>["sharing"];
 export type FriendRequest = InferResponseType<
   Client["friends"]["requests"]["incoming"]["$get"],
   200

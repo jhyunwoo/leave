@@ -8,6 +8,9 @@
  * 경로가 매 요청마다 DB에서 수락 상태와 양방향 차단을 다시 확인한다. 친구를
  * 끊은 다음 요청은 그 자리에서 403이 되고, 이미 열려 있던 화면이 남아 있어도
  * 다음 요청부터는 아무것도 받지 못한다.
+ *
+ * 친구 사이라도 상대가 공유를 끈 항목은 싣지 않는다(../lib/friend-sharing.ts).
+ * 관계 판정과 같은 조회에서 함께 읽으므로 이것도 매 요청 새로 판정된다.
  */
 
 import {
@@ -30,11 +33,18 @@ import {
   leaves,
   leaveSegments,
   userBlocks,
+  userFriendSharing,
   users,
 } from "../db/schema";
 import { createApp } from "../lib/app";
 import { readRemainingDutyDaysForUsers } from "../lib/duty-days";
 import type { Db } from "../lib/db";
+import {
+  friendSharingColumns,
+  readFriendSharing,
+  resolveFriendSharing,
+  updateFriendSharing,
+} from "../lib/friend-sharing";
 import { codedError } from "../lib/responses";
 import { notifyFriendRequest } from "../lib/social-notify";
 import {
@@ -55,11 +65,13 @@ import {
   friendCalendarRoute,
   friendCalendarsRoute,
   friendScheduleRoute,
+  getFriendSharingRoute,
   listFriendsRoute,
   listIncomingRoute,
   listOutgoingRoute,
   removeFriendRoute,
   sendFriendRequestRoute,
+  updateFriendSharingRoute,
 } from "./friends.contract";
 
 function relationPeopleQuery(db: Db, viewerId: string) {
@@ -79,6 +91,8 @@ function relationPeopleQuery(db: Db, viewerId: string) {
       dischargeAt: users.dischargeAt,
       branch: users.branch,
       unitId: users.unitId,
+      // 상대가 친구에게 보여주기로 한 항목. 설정한 적이 없으면 null이다.
+      sharing: friendSharingColumns,
     })
     .from(friendships)
     .innerJoin(
@@ -94,6 +108,7 @@ function relationPeopleQuery(db: Db, viewerId: string) {
         ),
       ),
     )
+    .leftJoin(userFriendSharing, eq(userFriendSharing.userId, users.id))
     .where(
       or(eq(friendships.userAId, viewerId), eq(friendships.userBId, viewerId)),
     )
@@ -125,7 +140,9 @@ async function visibleRelations(db: Db, viewerId: string) {
       row.userId === viewerId ? row.blockedUserId : row.userId,
     ),
   );
-  return relations.filter((row) => !blocked.has(row.otherUserId));
+  return relations
+    .filter((row) => !blocked.has(row.otherUserId))
+    .map((row) => ({ ...row, sharing: resolveFriendSharing(row.sharing) }));
 }
 
 /**
@@ -189,6 +206,8 @@ async function buildFriendCalendars(input: {
       name: viewer.name,
       username: viewer.username,
       isViewer: true,
+      // 남에게 숨기는 설정이 내 달력에서 나를 지우지는 않는다.
+      leaveScheduleShared: true,
     },
     ...allowed
       .map((row) => ({
@@ -196,6 +215,7 @@ async function buildFriendCalendars(input: {
         name: row.otherName,
         username: row.otherUsername,
         isViewer: false,
+        leaveScheduleShared: row.sharing.leaveSchedule,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   ];
@@ -208,7 +228,11 @@ async function buildFriendCalendars(input: {
     (value, range) => (range.end > value ? range.end : value),
     ranges[0]!.end,
   );
-  const userIds = [viewer.id, ...friendIds];
+  // 휴가 일정을 끈 친구는 조회 대상에서 뺀다. 받아 온 뒤 거르면 거르는 자리를
+  // 하나만 빠뜨려도 새지만, 읽지 않은 것은 어디로도 새지 않는다.
+  const userIds = people
+    .filter((person) => person.leaveScheduleShared)
+    .map((person) => person.userId);
   const rows = await db
     .select({
       leaveId: leaves.id,
@@ -297,9 +321,12 @@ export const friendRoutes = app
       (row): row is typeof row & { acceptedAt: string } =>
         row.status === "accepted" && row.acceptedAt !== null,
     );
+    // 공유하지 않는 사람의 일과일은 세지도 않는다 — 보내지 않을 값에 D1 왕복을 쓰지 않는다.
     const dutyDays = await readRemainingDutyDaysForUsers(
       drizzle(c.env.DB),
-      rows.map((row) => ({ ...row, id: row.otherUserId })),
+      rows
+        .filter((row) => row.sharing.dutyDays)
+        .map((row) => ({ ...row, id: row.otherUserId })),
     );
     noStore(c);
     return c.json(
@@ -309,17 +336,39 @@ export const friendRoutes = app
           name: row.otherName,
           username: row.otherUsername,
           since: row.acceptedAt,
-          enlistedAt: row.enlistedAt,
-          dischargeAt: normalizeLegacyDischargeDate(
-            row.enlistedAt,
-            row.branch,
-            row.dischargeAt,
-          ),
-          dutyDays: dutyDays.get(row.otherUserId)!.dutyDays,
+          ...(row.sharing.serviceProgress
+            ? {
+                enlistedAt: row.enlistedAt,
+                dischargeAt: normalizeLegacyDischargeDate(
+                  row.enlistedAt,
+                  row.branch,
+                  row.dischargeAt,
+                ),
+              }
+            : { enlistedAt: null, dischargeAt: null }),
+          dutyDays: row.sharing.dutyDays
+            ? dutyDays.get(row.otherUserId)!.dutyDays
+            : null,
+          leaveScheduleShared: row.sharing.leaveSchedule,
         })),
       },
       200,
     );
+  })
+  .openapi(getFriendSharingRoute, async (c) => {
+    const sharing = await readFriendSharing(
+      drizzle(c.env.DB),
+      c.get("user").id,
+    );
+    return c.json({ sharing }, 200);
+  })
+  .openapi(updateFriendSharingRoute, async (c) => {
+    const sharing = await updateFriendSharing(
+      drizzle(c.env.DB),
+      c.get("user").id,
+      c.req.valid("json"),
+    );
+    return c.json({ sharing }, 200);
   })
   .openapi(listIncomingRoute, async (c) => {
     const user = c.get("user");
@@ -559,6 +608,19 @@ export const friendRoutes = app
         403,
       );
     }
+    const person = {
+      userId: otherId,
+      name: allowed.otherName,
+      username: allowed.otherUsername,
+      isViewer: false,
+      leaveScheduleShared: allowed.sharing.leaveSchedule,
+    };
+    // 공유를 끈 친구의 휴가는 읽지도 않는다. 403으로 답하지 않는 이유: 관계는 그대로라
+    // 화면의 캐시를 지울 일이 아니고(@leave/client의 watchFriendAccessRevocation),
+    // 화면은 빈 목록을 "휴가 없음"이 아니라 "비공개"로 그려야 한다.
+    if (!person.leaveScheduleShared) {
+      return c.json({ people: [person], leaves: [] }, 200);
+    }
     const rows = await db
       .select({
         leaveId: leaves.id,
@@ -587,14 +649,7 @@ export const friendRoutes = app
     const today = todayInSeoul();
     return c.json(
       {
-        people: [
-          {
-            userId: otherId,
-            name: allowed.otherName,
-            username: allowed.otherUsername,
-            isViewer: false,
-          },
-        ],
+        people: [person],
         leaves: rows.map((row) => ({
           ...row,
           status: settledLeaveStatus(row.status, row.endDate, today),
