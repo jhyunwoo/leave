@@ -68,6 +68,10 @@ test("Resend 메일의 코드로 인증, 해시 저장, 재사용 방지, 재로
   assert.equal((await send(account)).status, 200);
   const code = await codeFor(account);
   assert.match(code, /^[0-9]{6}$/);
+  const [mail] = await fetch(
+    `${process.env.MAIL_URL}?email=${encodeURIComponent(account.email)}`,
+  ).then((r) => r.json());
+  assert.ok(mail.html.includes(`>${code}</div>`));
   const db = openTestDb();
   try {
     const row = db

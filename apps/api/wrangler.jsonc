@@ -31,7 +31,7 @@
   "triggers": {
     "crons": ["10 3 * * *"],
   },
-  "secrets": { "required": ["RESEND_API_KEY"] },
+  "secrets": { "required": ["RESEND_API_KEY", "EMAIL_CODE_SECRET"] },
   "vars": {
     "EMAIL_FROM": "리브 <noreply@moveto.kr>",
     // 웹 오리진으로 제한 (네이티브 앱은 브라우저 CORS 대상이 아니므로 영향 없음)

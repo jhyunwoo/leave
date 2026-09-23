@@ -36,7 +36,7 @@ export default defineConfig({
     },
     {
       command:
-        'pnpm --filter @leave/api exec wrangler dev --port 8787 --var RESEND_API_KEY:test-resend-key --var RESEND_API_URL:http://127.0.0.1:8790 --var CORS_ORIGIN:http://localhost:5173 --var \'RATE_LIMITS:{"signup":100000,"login":100000}\'',
+        'pnpm --filter @leave/api exec wrangler dev --port 8787 --var RESEND_API_KEY:test-resend-key --var EMAIL_CODE_SECRET:test-email-code-secret --var RESEND_API_URL:http://127.0.0.1:8790 --var CORS_ORIGIN:http://localhost:5173 --var \'RATE_LIMITS:{"signup":100000,"login":100000}\'',
       url: "http://localhost:8787/",
       reuseExistingServer: reuseTestServers,
       timeout: 60_000,

@@ -23,14 +23,20 @@ DB에 저장하지 않고 Resend 메일 본문으로만 보낸다. DB에는 계�
 
 - `RESEND_API_KEY`: API Worker의 비밀 설정. 로컬에서는 Git에서 제외된
   `apps/api/.dev.vars`에 저장한다. 웹·앱 번들에 넣지 않는다.
+- `EMAIL_CODE_SECRET`: 인증 코드 HMAC 키. API Worker의 비밀 설정이며 Resend 키와 따로 둔다.
+  로컬에서는 `apps/api/.dev.vars`에 `openssl rand -hex 32` 값을 넣는다.
 - `EMAIL_FROM`: `apps/api/wrangler.jsonc`에 설정한 `리브 <noreply@moveto.kr>`.
   Resend에서 발신 도메인이 인증되어 있어야 한다.
 - `RESEND_API_URL`: 생략하면 `https://api.resend.com`. 로컬 자동화 테스트의 메일
   서버를 연결할 때만 덮어쓰며 운영 환경에서는 설정하지 않는다.
 
-운영 배포 전 API Worker에 `pnpm --filter @leave/api exec wrangler secret put RESEND_API_KEY`로
-키를 등록한다. 키를 명령 인수에 적지 않고 프롬프트에 입력한다. 키를 교체하면 아직
-사용하지 않은 인증 코드도 무효화되어 새 코드를 받아야 한다.
+운영 배포 전 API Worker에 `pnpm --filter @leave/api exec wrangler secret put RESEND_API_KEY`와
+`... secret put EMAIL_CODE_SECRET`으로 두 값을 등록한다. 값은 명령 인수에 적지 않고 프롬프트에
+입력한다. `RESEND_API_KEY`는 대기 중인 코드에 영향 없이 교체할 수 있다. `EMAIL_CODE_SECRET`을
+교체하면 아직 사용하지 않은 인증 코드가 무효화되어 새 코드를 받아야 한다.
+
+메일은 텍스트와 HTML을 함께 보낸다. HTML은 `apps/api/src/lib/verification-email.ts`에 있고,
+메일 클라이언트 호환을 위해 표 레이아웃과 인라인 스타일만 쓴다. 색은 웹 디자인 토큰 값을 옮겨 쓴다.
 
 네이티브 앱의 인증 화면이 포함된 버전을 먼저 배포하고, API 마이그레이션과 웹을 함께
 적용한다. 이전 네이티브 버전으로 신규 가입하면 인증 화면을 표시할 수 없으므로 업데이트가

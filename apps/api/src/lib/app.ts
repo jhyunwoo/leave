@@ -19,6 +19,11 @@ import type { UserRow } from "../db/schema";
 export type AppBindings = {
   DB: D1Database;
   RESEND_API_KEY?: string;
+  /**
+   * 인증 코드 HMAC 키. Resend 키와 따로 두어, 메일 키를 교체해도 대기 중인 코드가
+   * 무효가 되지 않고 메일 키가 새어도 저장된 해시를 대조할 수 없게 한다.
+   */
+  EMAIL_CODE_SECRET?: string;
   EMAIL_FROM?: string;
   /** 기본값은 Resend 공식 API. 로컬 통합 테스트에서는 격리된 메일 서버를 사용한다. */
   RESEND_API_URL?: string;

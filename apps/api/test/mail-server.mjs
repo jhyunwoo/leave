@@ -21,6 +21,7 @@ export function startMailServer(port) {
       request.headers.authorization !== "Bearer test-resend-key" ||
       !mail.from ||
       !mail.text ||
+      !mail.html ||
       !request.headers["idempotency-key"]
     ) {
       response.statusCode = 400;

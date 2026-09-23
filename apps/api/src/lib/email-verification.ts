@@ -2,6 +2,7 @@ import { and, eq, gt, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { emailVerifications, users, type UserRow } from "../db/schema";
 import type { AppBindings } from "./app";
 import type { Db } from "./db";
+import { verificationEmail } from "./verification-email";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const RESEND_DELAY_MS = 60 * 1000;
@@ -41,20 +42,32 @@ async function codeDigest(
   ).join("");
 }
 
+function digestsMatch(a: string, b: string) {
+  // 응답 시간으로 저장된 해시를 한 글자씩 맞혀 가지 못하게 끝까지 비교한다.
+  // 길이는 비밀이 아니다(항상 64자, 발송 실패로 무효화된 코드만 빈 문자열).
+  // Workers의 crypto.subtle.timingSafeEqual은 웹·앱 타입 검사(DOM lib)에 없어 직접 비교한다.
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i++)
+    difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return difference === 0;
+}
+
 export async function sendEmailVerification(
   db: Db,
   env: AppBindings,
   user: UserRow,
 ) {
   if (user.emailVerifiedAt) return "already_verified" as const;
-  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) return "unavailable" as const;
+  if (!env.RESEND_API_KEY || !env.EMAIL_FROM || !env.EMAIL_CODE_SECRET)
+    return "unavailable" as const;
   const now = new Date();
   const id = crypto.randomUUID();
   const code = newCode();
   const challenge = {
     userId: user.id,
     id,
-    codeHash: await codeDigest(env.RESEND_API_KEY, user.id, id, code),
+    codeHash: await codeDigest(env.EMAIL_CODE_SECRET, user.id, id, code),
     attempts: 0,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + CODE_TTL_MS).toISOString(),
@@ -74,6 +87,7 @@ export async function sendEmailVerification(
     })
     .returning({ id: emailVerifications.id });
   if (!reserved) return "rate_limited" as const;
+  const { subject, text, html } = verificationEmail(code);
   try {
     const response = await fetch(
       `${env.RESEND_API_URL ?? "https://api.resend.com"}/emails`,
@@ -87,8 +101,9 @@ export async function sendEmailVerification(
         body: JSON.stringify({
           from: env.EMAIL_FROM,
           to: [user.email],
-          subject: "리브 이메일 인증 코드",
-          text: `리브 이메일 인증 코드: ${code}\n\n10분 안에 리브 화면에 입력해주세요. 코드는 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메일을 무시해주세요.`,
+          subject,
+          text,
+          html,
         }),
         signal: AbortSignal.timeout(10_000),
       },
@@ -126,7 +141,7 @@ export async function verifyEmailCode(
   user: UserRow,
   code: string,
 ) {
-  if (user.emailVerifiedAt || !env.RESEND_API_KEY) return false;
+  if (user.emailVerifiedAt || !env.EMAIL_CODE_SECRET) return false;
   const now = new Date().toISOString();
   // 오답을 포함한 모든 시도를 원자적으로 센다. 병렬 요청으로 상한을 넘길 수 없다.
   const [challenge] = await db
@@ -143,12 +158,12 @@ export async function verifyEmailCode(
     .returning();
   if (!challenge) return false;
   const digest = await codeDigest(
-    env.RESEND_API_KEY,
+    env.EMAIL_CODE_SECRET,
     user.id,
     challenge.id,
     code,
   );
-  if (digest !== challenge.codeHash) return false;
+  if (!digestsMatch(digest, challenge.codeHash)) return false;
   // 인증 상태 변경과 코드 소비를 한 트랜잭션으로 묶고 최신 challenge를 다시 확인한다.
   const [verified] = await db.batch([
     db

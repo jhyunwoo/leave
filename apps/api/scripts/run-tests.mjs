@@ -91,6 +91,8 @@ async function main() {
       "--var",
       "RESEND_API_KEY:test-resend-key",
       "--var",
+      "EMAIL_CODE_SECRET:test-email-code-secret",
+      "--var",
       `RESEND_API_URL:http://127.0.0.1:${PORT + 1}`,
       // 스위트 전체가 한 IP에서 돈다. IP 버킷을 쓰는 가입·로그인만 상한을 풀어
       // 두고, 사용자별 버킷인 나머지는 실제 값 그대로 검증한다.
