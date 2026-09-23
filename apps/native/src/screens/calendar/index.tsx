@@ -612,11 +612,11 @@ export function CalendarScreen() {
                 }
                 style={styles.inspectorDayPanel}
               />
-            ) : (
+            ) : unit ? (
               <View style={styles.inspectorLoading}>
                 <ActivityIndicator color={colors.ink} />
               </View>
-            )}
+            ) : null}
           </>
         ) : (
           <CalendarOverviewPanel
@@ -809,11 +809,12 @@ export function CalendarScreen() {
                     : undefined
                 }
               />
-            ) : (
+            ) : unit ? (
+              // 부대가 없으면 부대 달력 조회가 꺼져 있어 기다릴 데이터가 없다.
               <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
                 <ActivityIndicator color={colors.ink} />
               </View>
-            ))}
+            ) : null)}
         </SheetScaffold>
       </NativeBottomSheet>
 
