@@ -7,10 +7,9 @@
  * 배경을 칠하고 형제 중 나중에 그려지므로 `@`가 그대로 가려진다. 그래서 테두리와
  * 배경은 바깥 칸이 갖고, 그 안에 `@`와 투명한 TextInput을 나란히 놓는다.
  *
- * 그리고 한 줄짜리 TextInput에는 세로 padding을 주지 않는다. iOS는 padding을
- * UITextField의 `textContainerInset`으로 넘기는데, 이 값이 이미 세로 가운데로
- * 잡힌 글자 사각형에 다시 적용돼 글자가 padding만큼 아래로 밀린다. 높이는 바깥
- * 칸이 정하고 글자는 가운데 정렬에 맡긴다.
+ * 그리고 TextInput을 칸 높이(48pt)만큼 키우지 않는다. iOS UITextField는 그 안에서
+ * 글자를 가운데보다 한참 아래에 그린다. TextInput은 글자 줄 높이만 차지하고, 바깥
+ * 칸의 `alignItems: "center"`가 세로 가운데에 놓는다(`field.tsx`의 `Input`과 같은 방식).
  */
 
 import { useRef } from "react";
@@ -68,15 +67,12 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   at: { fontSize: 16, fontWeight: "700", color: colors.mute },
   input: {
-    // 칸 전체가 눌리는 영역이 되도록 높이를 채운다.
-    alignSelf: "stretch",
     flex: 1,
     minWidth: 0,
     padding: 0,
     fontSize: 16,
     color: colors.ink,
-    // 안드로이드: 칸 높이 안에서 글자를 가운데로, 기본 글꼴 여백은 끈다.
-    textAlignVertical: "center",
+    // 안드로이드: 기본 글꼴 여백을 꺼서 글자 줄 높이만 차지하게 한다.
     includeFontPadding: false,
   },
 }));

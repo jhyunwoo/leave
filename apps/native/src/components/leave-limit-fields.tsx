@@ -32,6 +32,7 @@ export function LeaveLimitFields(props: {
             value={props.count}
             onChangeText={props.onCountChange}
             keyboardType="number-pad"
+            containerStyle={styles.countBox}
             style={styles.countInput}
             accessibilityLabel="하루 최대 출타 인원"
             testID={props.testID}
@@ -60,7 +61,8 @@ export function LeaveLimitFields(props: {
 
 const useStyles = makeStyles(({ colors }) => ({
   countRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  countInput: { width: 120, textAlign: "center" },
+  countBox: { width: 120 },
+  countInput: { textAlign: "center" },
   unit: { fontSize: 16, fontWeight: "600", color: colors.ink },
   toggleRow: {
     flexDirection: "row",
