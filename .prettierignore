@@ -16,6 +16,7 @@ apps/*/worker-env.d.ts
 
 # Expo가 생성한다.
 apps/native/expo-env.d.ts
+apps/native/ios
 
 # 법적 고지·지원 페이지는 손으로 관리하는 단독 HTML이다. Prettier의 HTML 재배치는
 # 인라인 요소 사이 공백을 바꿔 렌더 결과를 건드릴 수 있어 대상에서 뺀다.
