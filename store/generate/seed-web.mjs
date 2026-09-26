@@ -23,9 +23,42 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execFileSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(__dirname, "../..");
+const API_DIR = path.join(REPO, "apps", "api");
 const API = process.env.SEED_API_URL || "http://localhost:8787";
+
+/**
+ * 가입만으로는 email_verified_at이 비어 있어 이후 요청이 전부
+ * `email_verification_required`(403)로 막힌다. 로컬에는 RESEND가 없어 코드를
+ * 받을 수 없으니, 로컬 전용 시드이므로 miniflare의 D1 파일에 인증 시각을 직접 심는다.
+ */
+function markEmailVerified(email) {
+  const dbDir = path.join(
+    API_DIR,
+    ".wrangler",
+    "state",
+    "v3",
+    "d1",
+    "miniflare-D1DatabaseObject",
+  );
+  const files = fs
+    .readdirSync(dbDir)
+    .filter((f) => f.endsWith(".sqlite") && f !== "metadata.sqlite")
+    .map((f) => path.join(dbDir, f));
+  const sql = `UPDATE users SET email_verified_at = datetime('now') WHERE email = '${email.replace(/'/g, "''")}'`;
+  for (const file of files) {
+    const hasUsers = execFileSync("sqlite3", [
+      file,
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users' LIMIT 1",
+    ])
+      .toString()
+      .trim();
+    if (hasUsers === "1") execFileSync("sqlite3", [file, sql]);
+  }
+}
 
 /**
  * 이 스크립트가 만드는 계정은 전부 **같은 비밀번호**를 쓴다. 캡처용 로컬 데이터라
@@ -92,10 +125,11 @@ async function api(pathname, { method = "GET", token, body } = {}) {
   return json;
 }
 
-/** 가입 → 온보딩 3단계 → 완료. 반환: 세션 토큰. */
+/** 가입 → 이메일 인증 표시 → 온보딩 3단계 → 완료. 반환: 세션 토큰. */
 async function createUser({
   email,
   name,
+  username,
   branch,
   rank,
   enlistedAt,
@@ -107,6 +141,7 @@ async function createUser({
     body: { email, password: PASSWORD, dataConsent: true },
   });
   const token = signup.token;
+  markEmailVerified(email);
   await api("/auth/onboarding/profile", {
     method: "PUT",
     token,
@@ -117,6 +152,11 @@ async function createUser({
     token,
     body: overnight ?? { enabled: false },
   });
+  await api("/users/me/username", {
+    method: "PUT",
+    token,
+    body: { username },
+  });
   await api("/auth/onboarding/complete", { method: "POST", token });
   return token;
 }
@@ -126,6 +166,7 @@ async function createUser({
 const MEMBERS = [
   {
     name: "푸른고래",
+    username: "bluewhale",
     branch: "air_force",
     rank: "corporal",
     enlistedAt: "2025-11-03",
@@ -133,6 +174,7 @@ const MEMBERS = [
   },
   {
     name: "새벽하늘",
+    username: "dawnsky",
     branch: "army",
     rank: "sergeant",
     enlistedAt: "2025-06-16",
@@ -140,6 +182,7 @@ const MEMBERS = [
   },
   {
     name: "밤바다",
+    username: "nightsea",
     branch: "navy",
     rank: "corporal",
     enlistedAt: "2025-09-01",
@@ -147,6 +190,7 @@ const MEMBERS = [
   },
   {
     name: "구름따라",
+    username: "cloudtrail",
     branch: "army",
     rank: "private_first",
     enlistedAt: "2026-02-09",
@@ -154,6 +198,7 @@ const MEMBERS = [
   },
   {
     name: "노을진",
+    username: "sunsetjin",
     branch: "air_force",
     rank: "sergeant",
     enlistedAt: "2025-04-07",
@@ -161,6 +206,7 @@ const MEMBERS = [
   },
   {
     name: "산들바람",
+    username: "breezehill",
     branch: "army",
     rank: "corporal",
     enlistedAt: "2025-12-15",
@@ -168,6 +214,7 @@ const MEMBERS = [
   },
   {
     name: "돌담길",
+    username: "stonepath",
     branch: "navy",
     rank: "private_first",
     enlistedAt: "2026-01-19",
@@ -175,6 +222,7 @@ const MEMBERS = [
   },
   {
     name: "고요한밤",
+    username: "calmnight",
     branch: "army",
     rank: "corporal",
     enlistedAt: "2025-10-13",
@@ -209,7 +257,8 @@ const LEAVES = [
   { who: 4, title: "연가", segments: annual(day(27), day(29)) },
   { who: 5, title: "연가", segments: annual(day(22), day(25)) },
   { who: 5, title: "연가", segments: annual(day(6), day(8)) },
-  { who: 6, title: "정기외박", segments: overnight(day(27), day(28)) },
+  // 정기외박은 주기 경계를 넘으면 차감 주기를 골라야 해서 한 주기 안에 둔다.
+  { who: 6, title: "정기외박", segments: overnight(day(28), day(30)) },
   { who: 6, title: "연가", segments: annual(day(21), day(23)) },
   { who: 7, title: "연가", segments: annual(day(4), day(6)) },
   { who: 7, title: "연가", segments: annual(day(27), day(28)) },
@@ -267,6 +316,8 @@ async function run() {
     const token = await createUser({
       ...m,
       email: `demo-${stamp}-${String(i + 1).padStart(2, "0")}@leave.example`,
+      // 사용자명은 유일값이라 재실행 때 이전 실행과 겹치지 않게 접미사를 단다.
+      username: `${m.username}${stamp.slice(-4)}`,
       // 정기외박 자동 적립은 해군·공군만 설정할 수 있다(API 검증). 이 주기가 곧
       // 정기외박 적립분이라, 켜두지 않으면 아래 LEAVES의 외박 등록이
       // "쓸 수 있는 적립분이 없어요"로 막힌다. 시작일은 기준월보다 넉넉히 앞에 둔다.
