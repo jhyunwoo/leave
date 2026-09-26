@@ -37,11 +37,10 @@ const API = process.env.SEED_API_URL || "http://localhost:8787";
  */
 function markEmailVerified(email) {
   if (!isLoopback(API)) {
-    console.warn(
-      `  ! ${email}: 원격 대상은 로컬 D1을 건드릴 수 없어 이메일 인증을 건너뜁니다. ` +
-        `이어지는 요청은 email_verification_required(403)로 막힐 수 있어요.`,
+    throw new Error(
+      `${email}: 원격 대상은 로컬 D1을 건드릴 수 없어 이메일 인증을 완료할 수 없습니다. ` +
+        `이어지는 요청은 전부 email_verification_required(403)로 막히므로 여기서 중단합니다.`,
     );
-    return;
   }
   const dbDir = path.join(
     API_DIR,
