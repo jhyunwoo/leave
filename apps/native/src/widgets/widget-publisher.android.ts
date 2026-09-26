@@ -2,12 +2,14 @@ import { getLeaveAndroidWidgets } from "../../modules/leave-android-widgets";
 import { captureHandledError } from "@/lib/observability";
 import { buildAndroidWidgetTimeline } from "./android-transport";
 import type { WidgetTimelineEntry } from "./payload";
+import type { WatchPublishContext } from "./watch-publisher";
 import { createWidgetPublishQueue } from "./publish-queue";
 
 const queue = createWidgetPublishQueue();
 
 export function publishWidgetTimeline(
   entries: WidgetTimelineEntry[],
+  _context?: WatchPublishContext,
 ): Promise<void> {
   return queue.publish(
     entries.some(({ props }) => props.state === "ready"),

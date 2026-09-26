@@ -17,6 +17,7 @@
     "test:e2e": "maestro test .maestro"
   },
   "dependencies": {
+    "@bacons/apple-targets": "5.0.0",
     "@expo/ui": "57.0.15",
     "@leave/api": "workspace:*",
     "@leave/client": "workspace:*",

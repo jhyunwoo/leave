@@ -24,8 +24,10 @@ import { useCalendar } from "@leave/client/hooks/calendar";
 import { useLeaveBalances, useMyLeaves } from "@leave/client/hooks/leaves";
 import { addDays, todayInSeoul } from "@leave/shared/dates";
 import { useEffect, useMemo, useRef } from "react";
+import { getAuthToken } from "@/api/client";
 import { captureHandledError } from "@/lib/observability";
 import { publishWidgetTimeline } from "./widget-publisher";
+import type { WatchPublishContext } from "./watch-publisher";
 import {
   buildWidgetTimeline,
   emptyWidgetProps,
@@ -35,12 +37,16 @@ import {
   type WidgetTimelineEntry,
 } from "./payload";
 import { buildWidgetSource } from "./sources";
+import { buildWatchFaceData } from "./watch-face";
 import { useWidgetPreferences } from "./use-widget-preferences";
 
 /** 두 위젯은 같은 payload를 받는다 — 무엇을 고를지만 서로 다르다. */
-async function pushTimeline(entries: WidgetTimelineEntry[]): Promise<boolean> {
+async function pushTimeline(
+  entries: WidgetTimelineEntry[],
+  context?: WatchPublishContext,
+): Promise<boolean> {
   try {
-    await publishWidgetTimeline(entries);
+    await publishWidgetTimeline(entries, context);
     return true;
   } catch (error) {
     // 위젯이 없거나(구형 OS) 익스텐션이 아직 설치되지 않은 기기가 있다.
@@ -84,21 +90,18 @@ function ReadyWidgetSync() {
     lastMonth === firstMonth ? firstMonth : lastMonth,
   );
 
-  const entries = useMemo(
+  const source = useMemo(
     () =>
-      buildWidgetTimeline(
-        buildWidgetSource({
-          state: "ready",
-          today,
-          me: me.data,
-          dutyDays: dutyDays.data,
-          leaves: leaves.data?.leaves,
-          balances: balances.data,
-          calendars: [firstCalendar.data, secondCalendar.data],
-          preferences,
-        }),
-        new Date(),
-      ),
+      buildWidgetSource({
+        state: "ready",
+        today,
+        me: me.data,
+        dutyDays: dutyDays.data,
+        leaves: leaves.data?.leaves,
+        balances: balances.data,
+        calendars: [firstCalendar.data, secondCalendar.data],
+        preferences,
+      }),
     [
       today,
       me.data,
@@ -111,21 +114,38 @@ function ReadyWidgetSync() {
     ],
   );
 
+  const entries = useMemo(
+    () => buildWidgetTimeline(source, new Date()),
+    [source],
+  );
+
   const lastSignature = useRef<string | null>(null);
   useEffect(() => {
     // 내 정보가 아직 없으면 그릴 것이 없다. 빈 값을 밀어 넣으면 홈 화면의
     // 멀쩡한 위젯이 잠깐 "값 없음"으로 깜빡인다.
     if (!me.data) return;
-    const signature = timelineSignature(entries);
+    // 워치 전체화면 복무율·페이스 컴플리케이션은 타임라인 엔트리에 없는 원자료
+    // (입대/전역일, 다음 외출)가 필요하다.
+    const user = me.data.user;
+    const watchContext: WatchPublishContext = {
+      service:
+        user.enlistedAt && user.dischargeAt
+          ? { enlistedAt: user.enlistedAt, dischargeAt: user.dischargeAt }
+          : null,
+      face: buildWatchFaceData(source, today),
+    };
+    // 타임라인이 같아도 토큰 회전·페이스 값 변화(예: 다음 외출)는 다시 밀어 넣어야
+    // 한다 — 그대로 넘기면 워치는 폐기된 토큰이나 지난 컴플리케이션 값을 쥔다.
+    const signature = `${timelineSignature(entries)}|${getAuthToken() ?? ""}|${JSON.stringify(watchContext.face ?? null)}`;
     if (signature === lastSignature.current) return;
     let active = true;
-    void pushTimeline(entries).then((published) => {
+    void pushTimeline(entries, watchContext).then((published) => {
       if (active && published) lastSignature.current = signature;
     });
     return () => {
       active = false;
     };
-  }, [entries, me.data]);
+  }, [entries, me.data, source, today]);
 
   return null;
 }
