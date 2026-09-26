@@ -168,9 +168,10 @@ enum WatchApi {
                     Double((hour * 60 + minute) * 60_000) > Date().timeIntervalSince1970 * 1000
             }
         guard let leave = upcoming.first else { return nil }
-        let days = max(SeoulDate.diffDays(today, leave.startDate <= today ? leave.endDate : leave.startDate), 0)
+        let target = leave.startDate <= today ? leave.endDate : leave.startDate
         return WatchFaceData.Countdown(
-            days: days,
+            days: max(SeoulDate.diffDays(today, target), 0),
+            date: target,
             title: leave.title,
             range: SeoulDate.rangeTiny(leave.startDate, leave.endDate)
         )

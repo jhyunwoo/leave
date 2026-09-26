@@ -6,8 +6,19 @@ export type LeaveWatchFaceData = {
   discharge: { days: number; date: string } | null;
   progress: number | null;
   dutyDays: number | null;
-  nextLeave: { days: number; title: string; range: string } | null;
-  nextOuting: { days: number; title: string; range: string } | null;
+  /** `date`는 카운트다운의 목표 날짜 — 워치가 자정이 지나도 days를 다시 센다. */
+  nextLeave: {
+    days: number;
+    date: string;
+    title: string;
+    range: string;
+  } | null;
+  nextOuting: {
+    days: number;
+    date: string;
+    title: string;
+    range: string;
+  } | null;
 };
 
 /**

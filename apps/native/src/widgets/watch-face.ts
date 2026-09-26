@@ -20,6 +20,11 @@ function countdownToJson(
   if (!countdown) return null;
   return {
     days: countdown.days,
+    // 진행 중이면 복귀일, 아니면 시작일이 목표 날짜다(nextLeaveCountdown의 규칙).
+    date:
+      countdown.phase === "onLeave"
+        ? countdown.leave.endDate
+        : countdown.leave.startDate,
     title: countdown.leave.title,
     range: fmtRangeTiny(countdown.leave.startDate, countdown.leave.endDate),
   };

@@ -24,6 +24,7 @@ import { useCalendar } from "@leave/client/hooks/calendar";
 import { useLeaveBalances, useMyLeaves } from "@leave/client/hooks/leaves";
 import { addDays, todayInSeoul } from "@leave/shared/dates";
 import { useEffect, useMemo, useRef } from "react";
+import { getAuthToken } from "@/api/client";
 import { captureHandledError } from "@/lib/observability";
 import { publishWidgetTimeline } from "./widget-publisher";
 import type { WatchPublishContext } from "./watch-publisher";
@@ -123,9 +124,6 @@ function ReadyWidgetSync() {
     // 내 정보가 아직 없으면 그릴 것이 없다. 빈 값을 밀어 넣으면 홈 화면의
     // 멀쩡한 위젯이 잠깐 "값 없음"으로 깜빡인다.
     if (!me.data) return;
-    const signature = timelineSignature(entries);
-    if (signature === lastSignature.current) return;
-    let active = true;
     // 워치 전체화면 복무율·페이스 컴플리케이션은 타임라인 엔트리에 없는 원자료
     // (입대/전역일, 다음 외출)가 필요하다.
     const user = me.data.user;
@@ -136,6 +134,11 @@ function ReadyWidgetSync() {
           : null,
       face: buildWatchFaceData(source, today),
     };
+    // 타임라인이 같아도 토큰 회전·페이스 값 변화(예: 다음 외출)는 다시 밀어 넣어야
+    // 한다 — 그대로 넘기면 워치는 폐기된 토큰이나 지난 컴플리케이션 값을 쥔다.
+    const signature = `${timelineSignature(entries)}|${getAuthToken() ?? ""}|${JSON.stringify(watchContext.face ?? null)}`;
+    if (signature === lastSignature.current) return;
+    let active = true;
     void pushTimeline(entries, watchContext).then((published) => {
       if (active && published) lastSignature.current = signature;
     });

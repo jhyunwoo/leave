@@ -3,7 +3,7 @@ import Foundation
 /// apps/native/src/widgets/payload.ts의 LeaveWidgetProps / MetricValue와 같은 모양.
 /// 아이폰 앱이 위젯용으로 만든 14일치 타임라인을 그대로 보내 오므로,
 /// 워치는 지금 시각에 맞는 엔트리를 골라 그리기만 하면 된다.
-struct WatchMetricValue: Decodable {
+struct WatchMetricValue: Codable {
     let value: String
     let label: String
     let caption: String?
@@ -11,25 +11,25 @@ struct WatchMetricValue: Decodable {
     let gauge: Double?
 }
 
-struct LeaveWatchProps: Decodable {
+struct LeaveWatchProps: Codable {
     let state: String
     let date: String
     let metrics: [String: WatchMetricValue]
 }
 
-struct WatchTimelineEntry: Decodable {
+struct WatchTimelineEntry: Codable {
     let date: String
     let props: LeaveWatchProps
 }
 
 /// 전체화면 복무율이 매 프레임 새로 세는 데 필요한 날짜 두 개.
-struct WatchServiceDates: Decodable {
+struct WatchServiceDates: Codable {
     let enlistedAt: String
     let dischargeAt: String
 }
 
 /// 셀룰러 단독 모드용. 아이폰이 같이 보내는 API 주소와 세션 토큰.
-struct WatchAuth: Decodable {
+struct WatchAuth: Codable {
     let apiUrl: String
     let token: String
 }
@@ -38,6 +38,9 @@ struct WatchAuth: Decodable {
 struct WatchFaceData: Codable {
     struct Countdown: Codable {
         let days: Int
+        /// 카운트다운 목표 날짜(진행 중이면 복귀일, 아니면 시작일).
+        /// 저장된 days와 함께 있으면 컴플리케이션이 엔트리 시각 기준으로 다시 센다.
+        let date: String?
         let title: String?
         let range: String?
     }
@@ -55,7 +58,7 @@ struct WatchFaceData: Codable {
 }
 
 /// 아이폰 → 워치 applicationContext 한 통.
-struct WatchEnvelope: Decodable {
+struct WatchEnvelope: Codable {
     let timeline: [WatchTimelineEntry]
     let service: WatchServiceDates?
     let face: WatchFaceData?
@@ -117,13 +120,25 @@ enum SeoulDate {
 }
 
 enum LeaveWatchPayload {
-    static func currentProps(from entries: [WatchTimelineEntry], at now: Date = Date()) -> LeaveWatchProps? {
+    static func entryDate(_ entry: WatchTimelineEntry) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: entry.date)
+    }
+
+    static func currentProps(from entries: [WatchTimelineEntry], at now: Date = Date()) -> LeaveWatchProps? {
         let current = entries.last { entry in
-            guard let at = formatter.date(from: entry.date) else { return false }
+            guard let at = entryDate(entry) else { return false }
             return at <= now
         }
         return (current ?? entries.last)?.props
+    }
+
+    /// 지금 이후에 시작하는 첫 엔트리의 시각 — 그때 props를 다시 골라야 한다.
+    static func nextEntryDate(from entries: [WatchTimelineEntry], at now: Date = Date()) -> Date? {
+        entries.lazy
+            .compactMap(entryDate)
+            .filter { $0 > now }
+            .min()
     }
 }

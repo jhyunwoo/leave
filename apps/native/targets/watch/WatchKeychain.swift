@@ -31,6 +31,9 @@ enum WatchKeychain {
         SecItemDelete(query as CFDictionary)
         var insert = query
         insert[kSecValueData as String] = token.data(using: .utf8)
+        // 다른 기기의 백업으로 토큰이 새어가지 않게 이 기기에만 묶는다.
+        insert[kSecAttrAccessible as String] =
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(insert as CFDictionary, nil)
     }
 

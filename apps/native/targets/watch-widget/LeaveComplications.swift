@@ -89,21 +89,21 @@ struct DischargeComplicationView: View {
                             .gaugeStyle(.accessoryCircular)
                             .tint(.orange)
                         }
-                        Text("D-\(d.days)")
+                        Text("D-\(d.daysLeft(at: entry.date))")
                             .font(.title3.weight(.bold))
                             .minimumScaleFactor(0.45)
                     }
                 }
             case .accessoryCorner:
-                Text("D-\(d.days)")
+                Text("D-\(d.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
                     .minimumScaleFactor(0.6)
                     .widgetLabel { Text("전역") }
             case .accessoryInline:
-                Text("전역 D-\(d.days)")
+                Text("전역 D-\(d.daysLeft(at: entry.date))")
             default:
                 countdownView(
-                    label: "전역", value: "D-\(d.days)", caption: d.date,
+                    label: "전역", value: "D-\(d.daysLeft(at: entry.date))", caption: d.date,
                     accent: .orange
                 )
             }
@@ -146,21 +146,21 @@ struct NextLeaveComplicationView: View {
                         Text("휴가")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.purple)
-                        Text("D-\(leave.days)")
+                        Text("D-\(leave.daysLeft(at: entry.date))")
                             .font(.title3.weight(.bold))
                             .minimumScaleFactor(0.45)
                     }
                 }
             case .accessoryCorner:
-                Text("D-\(leave.days)")
+                Text("D-\(leave.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
                     .minimumScaleFactor(0.6)
                     .widgetLabel { Text("다음 휴가") }
             case .accessoryInline:
-                Text(inlineText(["휴가 D-\(leave.days)", leave.range]))
+                Text(inlineText(["휴가 D-\(leave.daysLeft(at: entry.date))", leave.range]))
             default:
                 countdownView(
-                    label: "다음 휴가", value: "D-\(leave.days)",
+                    label: "다음 휴가", value: "D-\(leave.daysLeft(at: entry.date))",
                     caption: leave.title ?? leave.range, accent: .purple
                 )
             }
@@ -203,21 +203,21 @@ struct NextOutingComplicationView: View {
                         Text("외출")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.green)
-                        Text("D-\(outing.days)")
+                        Text("D-\(outing.daysLeft(at: entry.date))")
                             .font(.title3.weight(.bold))
                             .minimumScaleFactor(0.45)
                     }
                 }
             case .accessoryCorner:
-                Text("D-\(outing.days)")
+                Text("D-\(outing.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
                     .minimumScaleFactor(0.6)
                     .widgetLabel { Text("다음 외출") }
             case .accessoryInline:
-                Text(inlineText(["외출 D-\(outing.days)", outing.range]))
+                Text(inlineText(["외출 D-\(outing.daysLeft(at: entry.date))", outing.range]))
             default:
                 countdownView(
-                    label: "다음 외출", value: "D-\(outing.days)",
+                    label: "다음 외출", value: "D-\(outing.daysLeft(at: entry.date))",
                     caption: outing.title ?? outing.range, accent: .green
                 )
             }
