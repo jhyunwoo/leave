@@ -86,6 +86,7 @@ private func circularText(
             .foregroundStyle(accent)
         Text(value)
             .font(.title3.weight(.bold))
+            .lineLimit(1)
             .minimumScaleFactor(0.45)
     }
 }
@@ -115,6 +116,7 @@ struct DischargeComplicationView: View {
                         } currentValueLabel: {
                             Text("D-\(d.daysLeft(at: entry.date))")
                                 .font(.title3.weight(.bold))
+                                .lineLimit(1)
                                 .minimumScaleFactor(0.45)
                         }
                         .gaugeStyle(.accessoryCircular)
@@ -130,6 +132,7 @@ struct DischargeComplicationView: View {
             case .accessoryCorner:
                 Text("D-\(d.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
+                    .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .widgetLabel {
                         // 배터리 코너처럼 라벨 텍스트와 함께 베젤을 따라 도는 용량 아치.
@@ -197,6 +200,7 @@ struct NextLeaveComplicationView: View {
             case .accessoryCorner:
                 Text("D-\(leave.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
+                    .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .widgetLabel { Text("다음 휴가") }
             case .accessoryInline:
@@ -252,6 +256,7 @@ struct NextOutingComplicationView: View {
             case .accessoryCorner:
                 Text("D-\(outing.daysLeft(at: entry.date))")
                     .font(.headline.weight(.bold))
+                    .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .widgetLabel { Text("다음 외출") }
             case .accessoryInline:
