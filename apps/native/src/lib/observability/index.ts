@@ -176,6 +176,11 @@ export function initializeObservability(): void {
       enableAutoPerformanceTracing: false,
       enableNativeFramesTracking: false,
       enableAppHangTracking: false,
+      // sentry-cocoa AppHangsV2 — the RN option types don't declare this key,
+      // but SentryOptionsInternal.initWithDict reads the whole options dict.
+      // V2 reports fatal app hangs with stack traces, which the stack-less
+      // WatchdogTermination events can't explain on their own.
+      ...{ enableAppHangTrackingV2: true },
       enableWatchdogTerminationTracking: true,
       patchGlobalPromise: true,
       beforeSend,
