@@ -11,8 +11,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS = path.resolve(__dirname, "..", "assets", "screens");
 
-// 원본 캡처 크기
-export const SRC = { w: 922, h: 1999 };
+// 원본 캡처 크기 — iPhone 17 시뮬레이터 실제 디스플레이 크기
+export const SRC = { w: 1206, h: 2622 };
 
 // 브랜드 토큰 (apps/native theme.ts / DESIGN.md 기준)
 export const B = {
@@ -27,7 +27,8 @@ export const B = {
 
 function dataURI(file) {
   const buf = fs.readFileSync(path.join(ASSETS, file));
-  return `data:image/jpeg;base64,${buf.toString("base64")}`;
+  const mime = file.endsWith(".png") ? "image/png" : "image/jpeg";
+  return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
 // 캡처별 처리 규칙
@@ -39,37 +40,41 @@ function dataURI(file) {
 //   좌표를 눈으로 검증할 수 있다.
 export const SHOTS = {
   calendar: {
-    file: "01-calendar.jpg",
-    cropBottom: 1795, // 탭바 + "2026년 8월" 스크롤 잔상 제거
+    file: "01-calendar.png",
+    cropBottom: 2330, // 플로팅 탭바 + 다음 달 스크롤 잔상 제거
     redact: [],
   },
   myleave: {
-    file: "02-myleave.jpg",
-    cropBottom: 1952, // 탭바 아래 "두 번째 휴가" 잘림 제거
+    file: "02-myleave.png",
+    cropBottom: 2330, // 플로팅 탭바 아래 잘린 재원 카드 제거
     redact: [],
   },
   balance: {
-    file: "03-balance.jpg",
-    cropBottom: 1955, // 반쯤 잘린 "0일" 제거
+    file: "03-balance.png",
+    cropBottom: 2330, // 플로팅 탭바 제거
     redact: [],
   },
   notify: {
-    file: "04-notify.jpg",
-    // 알림 화면은 카드 아래가 거의 비어 있어, 헤더와 알림 카드만 잘라 카드 목업으로 쓴다.
-    cropTop: 268,
-    cropBottom: 950,
-    // 알림 본문 1행 전체(실제 부대명 + "에서 4월 24")와 2행 앞머리("일 외 2일에")를 덮어
-    // 남은 문장이 "최대 출타 인원을 초과했습니다."로 자연스럽게 읽히게 한다.
-    redact: [
-      { x: 80, y: 596, w: 828, h: 56 },
-      { x: 80, y: 651, w: 172, h: 60 },
-    ],
+    file: "04-notify.png",
+    // 알림 화면은 헤더 아래 알림 카드만 크게 쓴다 — 빈 영역은 잘라낸다.
+    cropTop: 300,
+    cropBottom: 1200,
+    redact: [],
+  },
+  friends: {
+    file: "05b-friends-cal.png",
+    cropBottom: 2330, // 플로팅 탭바 제거
+    redact: [],
+  },
+  leaveform: {
+    file: "05d-leaveform.png",
+    cropBottom: 2520, // 시트 둥근 아래 모서리까지 살린다
+    redact: [],
   },
   profile: {
-    file: "05-profile.jpg",
-    cropBottom: 1795, // 탭바 뒤에 비치는 실제 부대명 잔상 제거
-    // 프로필의 실제 이메일 주소(원본 x 282–645, y 563–600). 이름 "김공군"은 y 552에서 끝난다.
-    redact: [{ x: 268, y: 555, w: 394, h: 53 }],
+    file: "05-profile.png",
+    cropBottom: 2330, // 플로팅 탭바 제거
+    redact: [],
   },
 };
 
@@ -134,53 +139,62 @@ export const SLIDES = [
     tint: "mint",
   },
   {
-    id: "02-balance",
-    shot: "myleave",
+    id: "02-friends",
+    shot: "friends",
     layout: "framed",
-    kicker: "내 휴가",
-    caption: "남은 휴가,<br><em>재원별로</em>",
-    sub: "연가·포상·위로·청원휴가를 한 화면에서",
+    kicker: "친구와 함께",
+    caption: "친구의 휴가도<br><em>같이 보여요</em>",
+    sub: "친구를 고르면 겹치는 날을 바로 확인해요",
     tint: "pale",
   },
   {
-    id: "03-accrual",
-    shot: "balance",
+    id: "03-leaveform",
+    shot: "leaveform",
     layout: "bleed",
-    kicker: "보유 휴가",
-    caption: "적립분과 만기까지<br><em>자동 계산</em>",
-    sub: "만기가 빠른 적립분부터 알아서 차감돼요",
+    kicker: "휴가 등록",
+    caption: "날짜만 고르면<br><em>등록 끝</em>",
+    sub: "희망·신청·확정, 계획 상태별로 나눠 관리해요",
     tint: "lime",
   },
   {
     id: "04-notify",
     shot: "notify",
     layout: "card",
-    kicker: "출타 인원 알림",
-    caption: "인원이 차면<br><em>바로 알림</em>",
-    sub: "최대 출타 인원을 넘긴 날짜만 골라서 알려줘요",
+    kicker: "알림",
+    caption: "친구의 새 휴가,<br><em>바로 알림</em>",
+    sub: "친구 요청과 친구의 새 휴가를 놓치지 않아요",
     tint: "mint",
   },
   {
-    id: "05-profile",
-    shot: "profile",
+    id: "05-balance",
+    shot: "myleave",
     layout: "tilt",
-    kicker: "내 프로필",
-    caption: "전역까지<br><em>며칠 남았는지</em>",
-    sub: "복무율과 다음 진급일을 프로필에서 바로",
+    kicker: "내 휴가",
+    caption: "남은 휴가,<br><em>재원별로</em>",
+    sub: "연가·포상·위로·청원휴가를 한 화면에서",
     tint: "pale",
   },
   {
-    id: "06-more",
+    id: "06-accrual",
+    shot: "balance",
+    layout: "framed",
+    kicker: "보유 휴가",
+    caption: "적립분과 만기까지<br><em>자동 계산</em>",
+    sub: "만기가 빠른 적립분부터 알아서 차감돼요",
+    tint: "lime",
+  },
+  {
+    id: "07-more",
     layout: "wall",
     kicker: "LEAVE, SIMPLIFIED",
     caption: "휴가 계획은 같이,<br><em>잔여 관리는 나답게</em>",
     sub: "함께 세우는 계획과 내 휴가 관리를 리브 하나로",
     features: [
       ["01", "공유 달력", "함께 보는 휴가 계획"],
-      ["02", "혼잡 신호", "겹치는 날 미리 확인"],
-      ["03", "재원별 잔여", "연가부터 청원휴가까지"],
-      ["04", "적립분 관리", "만기까지 자동 차감"],
-      ["05", "출타 인원 알림", "넘친 날짜만 선택해서"],
+      ["02", "친구 달력", "친구 휴가와 겹치는 날 확인"],
+      ["03", "혼잡 신호", "겹치는 날 미리 확인"],
+      ["04", "재원별 잔여", "연가부터 청원휴가까지"],
+      ["05", "친구 활동 알림", "친구 요청·새 휴가 바로 확인"],
       ["06", "정기외박 주기", "주기별 사용량 자동 계산"],
     ],
   },

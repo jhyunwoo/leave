@@ -1,6 +1,6 @@
 # App Store Connect — English (U.S.)
 
-> App: Leave · Bundle ID: `app.leave.mobile` · Version 1.0.0
+> App: Leave · Bundle ID: `app.leave.mobile` · Version 1.2.0
 
 ## App Name
 
@@ -17,7 +17,7 @@ Group schedule reference tool
 ## Promotional Text
 
 ```text
-View shared leave plans and check date-by-date capacity signals calculated from user-entered schedules and a group setting. An unofficial reference tool, not an approval system.
+Days to discharge and your remaining leave, now on Apple Watch too — pin the D-day to your watch face. See friends' leave right on your calendar.
 ```
 
 ## Description
@@ -31,6 +31,8 @@ FEATURES
 • In-app and optional push notifications
 • Quick schedule entry with title, dates, and an optional note
 • Personal leave-balance planning
+• Friends: pick friends to overlay their leave on your calendar, and get notified about requests and new plans
+• Apple Watch: days to discharge, service progress, duty days left, and next leave on your wrist, plus watch-face complications
 • In-app account and data deletion
 
 PRIVACY AND SECURITY
@@ -52,11 +54,10 @@ leave,calendar,schedule,planner,shared calendar,group schedule,time off,capacity
 ## What's New
 
 ```text
-Leave 1.0
-• Shared leave calendar
-• Capacity signals and over-limit notices
-• Optional push notifications
-• In-app account deletion
+Apple Watch app
+• Days to discharge, service progress, duty days left, and next leave on your wrist
+• Watch face complications: discharge, next leave, and next outing D-days
+• Works over cellular even without your iPhone nearby
 
 This is an unofficial reference tool. Actual leave remains subject to commander approval and unit rules.
 ```
