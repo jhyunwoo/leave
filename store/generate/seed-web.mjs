@@ -36,6 +36,13 @@ const API = process.env.SEED_API_URL || "http://localhost:8787";
  * 받을 수 없으니, 로컬 전용 시드이므로 miniflare의 D1 파일에 인증 시각을 직접 심는다.
  */
 function markEmailVerified(email) {
+  if (!isLoopback(API)) {
+    console.warn(
+      `  ! ${email}: 원격 대상은 로컬 D1을 건드릴 수 없어 이메일 인증을 건너뜁니다. ` +
+        `이어지는 요청은 email_verification_required(403)로 막힐 수 있어요.`,
+    );
+    return;
+  }
   const dbDir = path.join(
     API_DIR,
     ".wrangler",
@@ -69,18 +76,22 @@ function markEmailVerified(email) {
  * 아무 주소나 넣으면 그대로 따라갔다. 정말 원격에 넣어야 한다면
  * `SEED_ALLOW_REMOTE=1`을 함께 지정해 스스로 그 선택을 밝히게 한다.
  */
-function assertLocalTarget(url) {
-  if (process.env.SEED_ALLOW_REMOTE === "1") return;
+function isLoopback(url) {
   const { hostname } = new URL(url);
-  const loopback =
+  return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname === "::1" ||
-    hostname === "[::1]";
-  if (!loopback) {
+    hostname === "[::1]"
+  );
+}
+
+function assertLocalTarget(url) {
+  if (process.env.SEED_ALLOW_REMOTE === "1") return;
+  if (!isLoopback(url)) {
     throw new Error(
       `이 스크립트는 로컬 전용입니다. 데모 계정은 모두 같은 비밀번호를 쓰므로 ` +
-        `${hostname}에는 넣지 않습니다. 정말 필요하면 SEED_ALLOW_REMOTE=1을 함께 지정하세요.`,
+        `${new URL(url).hostname}에는 넣지 않습니다. 정말 필요하면 SEED_ALLOW_REMOTE=1을 함께 지정하세요.`,
     );
   }
 }
