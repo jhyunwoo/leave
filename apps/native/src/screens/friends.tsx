@@ -9,22 +9,29 @@
  * 화면을 나눴다(friend-search.tsx). 목록이 늘어날수록 매번 입력칸을 지나쳐
  * 스크롤해야 하는 값이 커지기 때문이다.
  *
- * 이름을 누르면 프로필로 간다. 삭제·비교는 목록에 남긴다 — 이미 친구인 사람에게
- * 자주 하는 일이라 한 번 더 들어갔다 나오게 할 이유가 없다.
+ * 카드마다 전역·다음 휴가 D-day를 보여준다. 친구 목록을 여는 이유가 대개 "이 친구
+ * 언제 나오지"이기 때문이다. 이름을 누르면 프로필로 가고, 친구 삭제는 거기서 한다 —
+ * 자주 하지 않고 되돌릴 수 없는 일이라 목록마다 빨간 버튼을 두면 잘못 누르기 쉽다.
  *
  * 내가 친구에게 보여줄 항목은 툴바의 "공유 설정"이 여는 화면에서 고른다
  * (friend-sharing.tsx). 한 번 정하면 잘 바꾸지 않는 값이라 목록 사이에 두지 않았다.
  */
 
-import { formatUsername, MAX_FRIEND_CALENDAR_SELECTION } from "@leave/shared";
 import {
+  formatUsername,
+  MAX_FRIEND_CALENDAR_SELECTION,
+  todayInSeoul,
+} from "@leave/shared";
+import {
+  friendDischargeDday,
+  friendNextLeaveDday,
   useAcceptFriendRequest,
   useDeclineFriendRequest,
   useFriends,
   useIncomingFriendRequests,
   useMe,
   useOutgoingFriendRequests,
-  useRemoveFriend,
+  type Friend,
 } from "@leave/client";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
@@ -43,7 +50,6 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
-import { confirmAction } from "@/lib/dialog";
 import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
@@ -61,10 +67,10 @@ export function FriendsScreen() {
   const refresh = useRefresh(friends, incoming, outgoing);
   const accept = useAcceptFriendRequest();
   const decline = useDeclineFriendRequest();
-  const remove = useRemoveFriend();
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const pending = accept.isPending || decline.isPending || remove.isPending;
+  const pending = accept.isPending || decline.isPending;
+  const today = todayInSeoul(new Date(now));
   const outgoingCount = outgoing.data?.requests.length ?? 0;
   const run = async (promise: Promise<unknown>) => {
     try {
@@ -98,16 +104,6 @@ export function FriendsScreen() {
       pathname: "/(tabs)/(calendar)/friend-calendar",
       params: { friendIds: selected.join(",") },
     });
-  const removeFriend = async (userId: string, name: string) => {
-    const confirmed = await confirmAction({
-      title: "친구 삭제",
-      message: `${name}님을 친구에서 삭제할까요?`,
-      confirmLabel: "삭제",
-      destructive: true,
-    });
-    if (!confirmed) return;
-    await run(remove.mutateAsync(userId));
-  };
 
   const outgoingPanel = (
     <>
@@ -341,26 +337,19 @@ export function FriendsScreen() {
                             </Text>
                           ) : null}
                         </View>
+                        {friend.username ? (
+                          <Text style={styles.chevron} aria-hidden>
+                            ›
+                          </Text>
+                        ) : null}
                       </Pressable>
-                      <Button
-                        icon="userRemove"
-                        title="삭제"
-                        size="sm"
-                        variant="danger"
-                        disabled={pending}
-                        onPress={() =>
-                          void removeFriend(friend.userId, friend.name)
-                        }
-                      />
                     </View>
+                    <FriendDdays friend={friend} today={today} />
                     <FriendServiceProgress
                       friend={friend}
                       active={active}
                       now={now}
                     />
-                    {friend.leaveScheduleShared ? null : (
-                      <Text style={styles.caption}>휴가 일정 비공개</Text>
-                    )}
                   </View>
                 );
               })
@@ -389,6 +378,39 @@ export function FriendsScreen() {
       </View>
       {isCompact && outgoingPanel}
     </ScrollView>
+  );
+}
+
+/**
+ * 전역·다음 휴가 D-day 두 칸. 문구와 비공개·없음의 구분은 `@leave/client`가
+ * 정한다 — 웹 친구 화면과 같은 말을 해야 한다.
+ */
+function FriendDdays({ friend, today }: { friend: Friend; today: string }) {
+  const styles = useStyles();
+  const items = [
+    ["discharge", friendDischargeDday(friend, today)],
+    ["leave", friendNextLeaveDday(friend, today)],
+  ] as const;
+  return (
+    <View style={styles.ddays}>
+      {items.map(([key, item]) => (
+        <View
+          key={key}
+          style={styles.dday}
+          accessible
+          accessibilityLabel={`${friend.name} ${item.spoken}`}
+          testID={`friend-dday-${key}`}
+        >
+          <Text style={styles.ddayLabel}>{item.label}</Text>
+          <Text
+            style={[styles.ddayValue, item.muted && styles.ddayMuted]}
+            numberOfLines={1}
+          >
+            {item.value}
+          </Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -456,4 +478,23 @@ const useStyles = makeStyles(({ colors }) => ({
   checkmark: { color: colors.onBrand, fontWeight: "900" },
   disabled: { opacity: 0.45 },
   pressed: { transform: [{ scale: 0.98 }] },
+  chevron: { fontSize: 22, color: colors.mute },
+  ddays: { flexDirection: "row", gap: spacing.sm },
+  dday: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceCard,
+  },
+  ddayLabel: { fontSize: 12, fontWeight: "600", color: colors.mute },
+  ddayValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.ink,
+    fontVariant: ["tabular-nums"],
+  },
+  ddayMuted: { fontSize: 15, color: colors.mute },
 }));

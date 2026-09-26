@@ -12,6 +12,8 @@ import "./workspace.css";
 import { ActionIcon } from "../components/ActionIcon";
 
 import {
+  friendDischargeDday,
+  friendNextLeaveDday,
   useAcceptFriendRequest,
   useCancelFriendRequest,
   useDeclineFriendRequest,
@@ -19,7 +21,6 @@ import {
   useFriendSharing,
   useIncomingFriendRequests,
   useOutgoingFriendRequests,
-  useRemoveFriend,
   useUpdateFriendSharing,
   useUserSearch,
   type Friend,
@@ -31,6 +32,7 @@ import {
   isUsernameQuery,
   MAX_FRIEND_CALENDAR_SELECTION,
   normalizeUsernameQuery,
+  todayInSeoul,
   type FriendSharingInput,
 } from "@leave/shared";
 import { useEffect, useState } from "react";
@@ -236,6 +238,42 @@ function SharingToggle(props: {
 }
 
 /**
+ * 전역·다음 휴가 D-day 두 칸. 문구와 비공개·없음의 구분은 `@leave/client`가
+ * 정한다 — 앱의 친구 탭과 같은 말을 해야 한다.
+ */
+function FriendDdays(props: { friend: Friend }) {
+  const { friend } = props;
+  const today = todayInSeoul();
+  const items = [
+    ["discharge", friendDischargeDday(friend, today)],
+    ["leave", friendNextLeaveDday(friend, today)],
+  ] as const;
+  return (
+    <div className="friend-ddays">
+      {items.map(([key, item]) => (
+        <div
+          key={key}
+          className="friend-dday"
+          data-testid={`friend-dday-${key}`}
+        >
+          {/* "D-12"를 그대로 읽으면 뜻이 사라진다. 스크린리더에는 문장을 준다. */}
+          <span className="caption text-mute" aria-hidden="true">
+            {item.label}
+          </span>
+          <strong
+            className={item.muted ? "friend-dday-muted" : undefined}
+            aria-hidden="true"
+          >
+            {item.value}
+          </strong>
+          <span className="visually-hidden">{item.spoken}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * 친구가 공유한 만큼만 그린다. null은 "없음"이 아니라 공유하지 않은 것이다 —
  * 빈 자리로 두면 "휴가가 없다"거나 "셀 날이 없다"로 읽힌다.
  */
@@ -251,9 +289,10 @@ function FriendSharedStatus(props: { friend: Friend }) {
         flexBasis: "100%",
         minWidth: 0,
         display: "grid",
-        gap: "var(--sp-xs)",
+        gap: "var(--sp-sm)",
       }}
     >
+      <FriendDdays friend={friend} />
       {friend.enlistedAt !== null && friend.dischargeAt !== null ? (
         <div data-testid="friend-service-progress">
           <ServiceProgress
@@ -267,9 +306,6 @@ function FriendSharedStatus(props: { friend: Friend }) {
       ) : (
         <p className="caption text-mute">복무율 비공개 · {dutyDays}</p>
       )}
-      {friend.leaveScheduleShared ? null : (
-        <p className="caption text-mute">휴가 일정 비공개</p>
-      )}
     </div>
   );
 }
@@ -281,17 +317,12 @@ export function FriendsPage(props: { me: Me }) {
   const accept = useAcceptFriendRequest();
   const decline = useDeclineFriendRequest();
   const cancel = useCancelFriendRequest();
-  const remove = useRemoveFriend();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const pending =
-    accept.isPending ||
-    decline.isPending ||
-    cancel.isPending ||
-    remove.isPending;
+  const pending = accept.isPending || decline.isPending || cancel.isPending;
 
   // 타이핑 도중 글자마다 서버에 묻지 않는다. 규칙 판정은 즉시, 요청만 늦춘다.
   useEffect(() => {
@@ -552,24 +583,6 @@ export function FriendsPage(props: { me: Me }) {
                       >
                         <ActionIcon name="calendar" />
                         비교
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        disabled={pending}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `${friend.name}님을 친구에서 삭제할까요?`,
-                            )
-                          )
-                            void run(
-                              remove.mutateAsync(friend.userId),
-                              "친구를 삭제했어요.",
-                            );
-                        }}
-                      >
-                        <ActionIcon name="userRemove" />
-                        삭제
                       </button>
                       <FriendSharedStatus friend={friend} />
                     </div>

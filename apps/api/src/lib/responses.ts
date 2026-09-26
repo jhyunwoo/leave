@@ -252,6 +252,13 @@ export const friendSummarySchema = z
     dutyDays: z.number().int().nonnegative().nullable(),
     /** false면 달력·일정 조회에 이 사람의 휴가가 실리지 않는다. */
     leaveScheduleShared: z.boolean(),
+    /**
+     * 다음 휴가(외출 제외). 이미 나가 있으면 그 휴가다. 잡힌 휴가가 없거나
+     * 휴가 일정을 공유하지 않으면 null — 둘은 `leaveScheduleShared`로 가른다.
+     */
+    nextLeave: z
+      .object({ startDate: z.string(), endDate: z.string() })
+      .nullable(),
   })
   .openapi("FriendSummary");
 

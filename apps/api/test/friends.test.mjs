@@ -633,6 +633,69 @@ test("친구별 일과일은 소속 휴일을 분리하고 전역자는 0으로 
   assert.equal("unitId" in response.data.friends[0], false);
 });
 
+test("친구 목록은 외출·초안을 뺀 다음 휴가를 싣고, 휴가 일정을 끈 친구는 비운다", async () => {
+  const viewer = await signup({ name: "보는이" });
+  const planner = await signup({ name: "계획한이" });
+  const away = await signup({ name: "나가있는이" });
+  const hider = await signup({ name: "숨기는이" });
+  const idle = await signup({ name: "없는이" });
+  for (const user of [viewer, planner, away, hider, idle]) {
+    await createUnit(user.token);
+  }
+  for (const friend of [planner, away, hider, idle]) {
+    assert.equal((await requestFriend(viewer, friend)).status, 200);
+    assert.equal((await acceptFriend(friend, viewer)).status, 200);
+  }
+  const createLeave = async (user, status, category, from, to) => {
+    const created = await req("POST", "/leaves", {
+      token: user.token,
+      body: {
+        title: "휴가",
+        status,
+        segments: [
+          {
+            category,
+            startDate: isoDaysFromToday(from),
+            endDate: isoDaysFromToday(to),
+          },
+        ],
+      },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.data));
+  };
+  // 내일 외출과 사흘 뒤 초안은 "다음 휴가"가 아니다.
+  await createLeave(planner, "shared", "outing", 1, 1);
+  await createLeave(planner, "draft", "annual", 3, 4);
+  await createLeave(planner, "shared", "annual", 20, 22);
+  await createLeave(planner, "approved", "annual", 10, 12);
+  // 이미 나가 있으면 그 휴가다.
+  await createLeave(away, "approved", "annual", 0, 2);
+  await createLeave(away, "shared", "annual", 30, 31);
+  await createLeave(hider, "shared", "annual", 5, 6);
+  await req("PATCH", "/friends/sharing", {
+    token: hider.token,
+    body: { leaveSchedule: false },
+  });
+
+  const response = await req("GET", "/friends", { token: viewer.token });
+  assert.equal(response.status, 200, JSON.stringify(response.data));
+  const nextLeaves = Object.fromEntries(
+    response.data.friends.map((row) => [row.userId, row.nextLeave]),
+  );
+  assert.deepEqual(nextLeaves, {
+    [planner.data.user.id]: {
+      startDate: isoDaysFromToday(10),
+      endDate: isoDaysFromToday(12),
+    },
+    [away.data.user.id]: {
+      startDate: isoDaysFromToday(0),
+      endDate: isoDaysFromToday(2),
+    },
+    [hider.data.user.id]: null,
+    [idle.data.user.id]: null,
+  });
+});
+
 /**
  * 공유 설정 — 친구에게 무엇을 보여줄지는 본인이 고른다.
  *

@@ -188,6 +188,71 @@ async function outingLeaveIds(
   );
 }
 
+/**
+ * 사람마다 끝나지 않은 가장 가까운 휴가 한 건 — 친구 목록의 "다음 휴가 D-day".
+ *
+ * 외출은 뺀다. 내 휴가 카드(`nextLeaveCountdowns`)가 휴가와 외출을 따로 세는 것과
+ * 같은 이유다 — 내일 외출이 다음 주 연가를 가리면 정작 휴가가 언제인지 모른다.
+ * 판정은 친구 달력의 `kind`와 같은 `isOutingSegments`다.
+ *
+ * 구간을 휴가와 조인해 읽으므로 행은 구간 단위로 온다. 사람 id는 D1 바인드 상한
+ * (100) 안에서 문장을 나누되, 문장들은 batch 하나로 보낸다.
+ */
+async function readNextLeavesForUsers(
+  db: Db,
+  userIds: readonly string[],
+  today: string,
+) {
+  const result = new Map<string, { startDate: string; endDate: string }>();
+  if (!userIds.length) return result;
+  // 사람 id 90개 + 상태 4개 + 오늘 1개로 한 문장이 100을 넘지 않는다.
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < userIds.length; offset += 90) {
+    chunks.push(userIds.slice(offset, offset + 90));
+  }
+  const statements = chunks.map((chunk) =>
+    db
+      .select({
+        leaveId: leaves.id,
+        userId: leaves.userId,
+        startDate: leaves.startDate,
+        endDate: leaves.endDate,
+        category: leaveSegments.category,
+      })
+      .from(leaveSegments)
+      .innerJoin(leaves, eq(leaveSegments.leaveId, leaves.id))
+      .where(
+        and(
+          inArray(leaves.userId, chunk),
+          inArray(leaves.status, COUNTED_LEAVE_STATUSES),
+          gte(leaves.endDate, today),
+        ),
+      ),
+  );
+  const [first, ...rest] = statements;
+  const rows = (await db.batch([first!, ...rest])).flat();
+
+  const byLeave = new Map<string, (typeof rows)[number][]>();
+  for (const row of rows) {
+    const segments = byLeave.get(row.leaveId) ?? [];
+    segments.push(row);
+    byLeave.set(row.leaveId, segments);
+  }
+  for (const segments of byLeave.values()) {
+    if (isOutingSegments(segments)) continue;
+    const { userId, startDate, endDate } = segments[0]!;
+    const current = result.get(userId);
+    if (
+      !current ||
+      startDate < current.startDate ||
+      (startDate === current.startDate && endDate < current.endDate)
+    ) {
+      result.set(userId, { startDate, endDate });
+    }
+  }
+  return result;
+}
+
 async function buildFriendCalendars(input: {
   db: Db;
   viewer: { id: string; name: string; username: string | null };
@@ -321,13 +386,24 @@ export const friendRoutes = app
       (row): row is typeof row & { acceptedAt: string } =>
         row.status === "accepted" && row.acceptedAt !== null,
     );
-    // 공유하지 않는 사람의 일과일은 세지도 않는다 — 보내지 않을 값에 D1 왕복을 쓰지 않는다.
-    const dutyDays = await readRemainingDutyDaysForUsers(
-      drizzle(c.env.DB),
-      rows
-        .filter((row) => row.sharing.dutyDays)
-        .map((row) => ({ ...row, id: row.otherUserId })),
-    );
+    // 공유하지 않는 사람의 일과일·휴가는 읽지도 않는다 — 보내지 않을 값에 D1 왕복을
+    // 쓰지 않고, 읽지 않은 것은 어디로도 새지 않는다.
+    const db = drizzle(c.env.DB);
+    const [dutyDays, nextLeaves] = await Promise.all([
+      readRemainingDutyDaysForUsers(
+        db,
+        rows
+          .filter((row) => row.sharing.dutyDays)
+          .map((row) => ({ ...row, id: row.otherUserId })),
+      ),
+      readNextLeavesForUsers(
+        db,
+        rows
+          .filter((row) => row.sharing.leaveSchedule)
+          .map((row) => row.otherUserId),
+        todayInSeoul(),
+      ),
+    ]);
     noStore(c);
     return c.json(
       {
@@ -350,6 +426,7 @@ export const friendRoutes = app
             ? dutyDays.get(row.otherUserId)!.dutyDays
             : null,
           leaveScheduleShared: row.sharing.leaveSchedule,
+          nextLeave: nextLeaves.get(row.otherUserId) ?? null,
         })),
       },
       200,
