@@ -8,6 +8,11 @@
  * 따라 버튼이 정해진다 — 화면이 친구 목록을 뒤져 관계를 계산하면, 목록 캐시가
  * 낡은 동안 "친구 추가"를 눌러 이미 친구인 사람에게 요청을 보내게 된다.
  *
+ * 친구면 친구 목록 카드와 같은 공유 정보(전역·다음 휴가 D-day, 복무율, 남은
+ * 일과일)를 맨 위에 보여준다. 그 값은 `GET /friends`의 행을 그대로 쓴다 — 목록과
+ * 프로필이 같은 응답을 읽어야 두 화면의 숫자가 어긋나지 않는다. 관계는 여전히
+ * 서버의 `relationship`으로만 정하고, 목록은 보여줄 값을 꺼내는 데만 쓴다.
+ *
  * 친구가 아닐 때는 일정 섹션 자체를 렌더하지 않는다. 서버도 403을 주지만, 요청을
  * 아예 보내지 않는 편이 낫다 — 화면에 잠깐이라도 빈 일정 카드가 뜨면 "이 사람은
  * 휴가가 없다"는 잘못된 정보가 된다.
@@ -19,6 +24,7 @@ import {
   useAcceptFriendRequest,
   useCancelFriendRequest,
   useDeclineFriendRequest,
+  useFriends,
   useFriendSchedule,
   useRemoveFriend,
   useSendFriendRequest,
@@ -37,6 +43,7 @@ import {
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Avatar } from "../components/Avatar";
+import { FriendSharedStatus } from "../components/FriendSharedStatus";
 
 /**
  * 프로필 링크 공유.
@@ -87,6 +94,47 @@ function ShareProfile(props: { username: string }) {
         {copied ? "링크를 복사했어요" : url.replace("https://", "")}
       </p>
     </div>
+  );
+}
+
+/**
+ * 친구가 공유한 전역·휴가 D-day와 복무율.
+ *
+ * 수락 직후처럼 목록 캐시에 아직 이 친구가 없을 수 있다. 수락·삭제는 목록을
+ * 무효화하므로(`invalidateFriendLifecycle`) 곧 다시 받아 온다 — 그동안은 빈 값을
+ * "비공개"로 그리지 않고 불러오는 중으로 둔다. 다 받았는데도 없으면 오류로 말한다.
+ */
+function FriendSharedSection(props: { userId: string }) {
+  const friends = useFriends();
+  const friend = friends.data?.friends.find(
+    (row) => row.userId === props.userId,
+  );
+
+  return (
+    <section
+      className="card"
+      style={{
+        padding: "var(--sp-xl)",
+        display: "grid",
+        gap: "var(--sp-md)",
+      }}
+      data-testid="profile-friend-status"
+    >
+      <h2 className="display-xs">공유 정보</h2>
+      {friend ? (
+        <FriendSharedStatus friend={friend} />
+      ) : friends.isFetching ? (
+        <div
+          className="spinner"
+          role="status"
+          aria-label="공유 정보 불러오는 중"
+        />
+      ) : (
+        <p role="alert" className="field-error">
+          공유 정보를 불러오지 못했어요.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -368,6 +416,10 @@ export function UserProfilePage() {
             >
               {message}
             </p>
+          ) : null}
+
+          {profile.data.relationship === "friends" ? (
+            <FriendSharedSection userId={profile.data.userId} />
           ) : null}
 
           <section

@@ -9,6 +9,11 @@
  * 값으로 버튼이 정해진다 — 화면이 친구 목록을 뒤져 관계를 계산하면 목록 캐시가
  * 낡은 동안 이미 친구인 사람에게 "친구 추가"를 누르게 된다.
  *
+ * 친구면 친구 탭 카드와 같은 공유 정보(전역·다음 휴가 D-day, 복무율, 남은
+ * 일과일)를 맨 위에 보여준다. 값은 `GET /friends`의 행을 그대로 쓴다 — 목록과
+ * 프로필이 같은 응답을 읽어야 두 화면의 숫자가 어긋나지 않는다. 관계는 여전히
+ * 서버의 `relationship`으로만 정하고, 목록은 보여줄 값을 꺼내는 데만 쓴다.
+ *
  * 친구가 아닐 때는 일정 섹션을 아예 그리지 않는다. 서버도 403을 주지만, 빈 일정
  * 카드가 한 프레임이라도 뜨면 "이 사람은 휴가가 없다"는 잘못된 정보가 된다.
  */
@@ -17,6 +22,7 @@ import {
   useAcceptFriendRequest,
   useCancelFriendRequest,
   useDeclineFriendRequest,
+  useFriends,
   useFriendSchedule,
   useRemoveFriend,
   useSendFriendRequest,
@@ -37,9 +43,46 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
+import { FriendDdays } from "@/components/friend-ddays";
+import { FriendServiceProgress } from "@/components/friend-service-progress";
 import { ProfileShareButton } from "@/components/profile-share-button";
 import { confirmAction } from "@/lib/dialog";
+import { useActiveGate, useServiceTicker } from "@/lib/service-progress-clock";
 import { makeStyles, radius, spacing, useColors } from "@/theme";
+
+/**
+ * 친구가 공유한 전역·휴가 D-day와 복무율.
+ *
+ * 수락 직후처럼 목록 캐시에 아직 이 친구가 없을 수 있다. 수락·삭제는 목록을
+ * 무효화하므로(`invalidateFriendLifecycle`) 곧 다시 받아 온다 — 그동안은 빈 값을
+ * "비공개"로 그리지 않고 불러오는 중으로 둔다. 다 받았는데도 없으면 오류로 말한다.
+ */
+function FriendSharedSection(props: { userId: string }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const active = useActiveGate();
+  const now = useServiceTicker(active);
+  const friends = useFriends();
+  const friend = friends.data?.friends.find(
+    (row) => row.userId === props.userId,
+  );
+
+  return (
+    <ContentPanel style={styles.card} testID="profile-friend-status">
+      <Text style={styles.heading}>공유 정보</Text>
+      {friend ? (
+        <>
+          <FriendDdays friend={friend} today={todayInSeoul(new Date(now))} />
+          <FriendServiceProgress friend={friend} active={active} now={now} />
+        </>
+      ) : friends.isFetching ? (
+        <ActivityIndicator color={colors.ink} />
+      ) : (
+        <Text style={styles.error}>공유 정보를 불러오지 못했어요.</Text>
+      )}
+    </ContentPanel>
+  );
+}
 
 function SharedSchedule(props: { userId: string }) {
   const styles = useStyles();
@@ -274,6 +317,9 @@ export function UserProfileScreen() {
                 {message}
               </Text>
             </ContentPanel>
+          ) : null}
+          {profile.data.relationship === "friends" ? (
+            <FriendSharedSection userId={profile.data.userId} />
           ) : null}
           <ContentPanel style={styles.card}>
             <RelationshipActions

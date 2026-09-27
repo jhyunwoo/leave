@@ -147,6 +147,16 @@ test("사용자 이름 검색 → 프로필 → 요청 → 명시적 수락 → 
   // 6) 요청을 보낸 쪽 프로필이 친구 상태가 되고 일정 섹션이 열린다.
   await page.reload();
   await expect(page.getByTestId("profile-remove-friend")).toBeVisible();
+  // 친구 목록 카드와 같은 공유 정보(D-day 두 칸과 복무율)가 프로필에도 뜬다.
+  const sharedStatus = page.getByTestId("profile-friend-status");
+  await expect(sharedStatus.getByTestId("friend-dday-discharge")).toContainText(
+    /D-(\d+|DAY)/,
+  );
+  await expect(sharedStatus.getByTestId("friend-dday-leave")).toContainText(
+    "없음",
+  );
+  await expect(sharedStatus.getByRole("progressbar")).toBeVisible();
+  await expect(sharedStatus).toContainText(/남은 일과일 \d+일/);
   await expect(
     page.getByRole("heading", { name: "공유된 휴가 일정" }),
   ).toBeVisible();

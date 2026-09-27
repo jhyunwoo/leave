@@ -23,15 +23,12 @@ import {
   todayInSeoul,
 } from "@leave/shared";
 import {
-  friendDischargeDday,
-  friendNextLeaveDday,
   useAcceptFriendRequest,
   useDeclineFriendRequest,
   useFriends,
   useIncomingFriendRequests,
   useMe,
   useOutgoingFriendRequests,
-  type Friend,
 } from "@leave/client";
 import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
@@ -44,6 +41,7 @@ import {
   View,
 } from "react-native";
 import { sideColumnWidth, useWindowSizeClass } from "@/adaptive";
+import { FriendDdays } from "@/components/friend-ddays";
 import { FriendServiceProgress } from "@/components/friend-service-progress";
 import { useActiveGate, useServiceTicker } from "@/lib/service-progress-clock";
 import { Avatar } from "@/components/avatar";
@@ -381,39 +379,6 @@ export function FriendsScreen() {
   );
 }
 
-/**
- * 전역·다음 휴가 D-day 두 칸. 문구와 비공개·없음의 구분은 `@leave/client`가
- * 정한다 — 웹 친구 화면과 같은 말을 해야 한다.
- */
-function FriendDdays({ friend, today }: { friend: Friend; today: string }) {
-  const styles = useStyles();
-  const items = [
-    ["discharge", friendDischargeDday(friend, today)],
-    ["leave", friendNextLeaveDday(friend, today)],
-  ] as const;
-  return (
-    <View style={styles.ddays}>
-      {items.map(([key, item]) => (
-        <View
-          key={key}
-          style={styles.dday}
-          accessible
-          accessibilityLabel={`${friend.name} ${item.spoken}`}
-          testID={`friend-dday-${key}`}
-        >
-          <Text style={styles.ddayLabel}>{item.label}</Text>
-          <Text
-            style={[styles.ddayValue, item.muted && styles.ddayMuted]}
-            numberOfLines={1}
-          >
-            {item.value}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 const useStyles = makeStyles(({ colors }) => ({
   content: {
     padding: spacing.lg,
@@ -479,22 +444,4 @@ const useStyles = makeStyles(({ colors }) => ({
   disabled: { opacity: 0.45 },
   pressed: { transform: [{ scale: 0.98 }] },
   chevron: { fontSize: 22, color: colors.mute },
-  ddays: { flexDirection: "row", gap: spacing.sm },
-  dday: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceCard,
-  },
-  ddayLabel: { fontSize: 12, fontWeight: "600", color: colors.mute },
-  ddayValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.ink,
-    fontVariant: ["tabular-nums"],
-  },
-  ddayMuted: { fontSize: 15, color: colors.mute },
 }));
