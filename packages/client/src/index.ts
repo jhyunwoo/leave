@@ -18,6 +18,7 @@ export * from "./friend-countdown";
 export * from "./next-leave-countdown";
 export * from "./leave-holdings";
 export * from "./balance-segments";
+export * from "./solo-day-roster";
 
 export * from "./hooks/auth";
 export * from "./hooks/units";

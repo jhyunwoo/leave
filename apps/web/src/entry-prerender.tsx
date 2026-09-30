@@ -31,12 +31,19 @@ export {
 } from "./seo/head";
 export {
   APP_SHELL_FILE,
+  FRIEND_INVITE_SHELL_FILE,
   NOT_FOUND_FILE,
   PRERENDERED_PAGES,
   TITLE_SUFFIX,
 } from "./seo/routes";
 export { buildRobotsTxt, buildSitemapXml } from "./seo/robots";
-export { SITE_NAME } from "./seo/site";
+export {
+  FRIEND_INVITE_OG_DESCRIPTION,
+  FRIEND_INVITE_OG_IMAGE_ALT,
+  FRIEND_INVITE_OG_IMAGE_PATH,
+  FRIEND_INVITE_OG_TITLE,
+  SITE_NAME,
+} from "./seo/site";
 
 /** 한 경로의 `#root` 안쪽 마크업. */
 export function renderRoute(path: string): string {

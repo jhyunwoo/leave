@@ -37,6 +37,12 @@ import { buildNotificationPushMessage, sendExpoPushMessages } from "./push";
 
 type Recipient = { id: string; expoPushToken: string | null };
 
+/**
+ * 친구 요청 알림의 제목. 보낸 사람 열(`friend_request_user_id`)이 생기기 전의
+ * 알림은 이 제목으로만 친구 요청임을 알 수 있어 알림 목록도 같은 값을 본다.
+ */
+export const FRIEND_REQUEST_NOTIFICATION_TITLE = "새 친구 요청";
+
 /** 인앱 알림을 넣고, 응답을 막지 않는 백그라운드에서 푸시와 발송 로그를 처리한다. */
 async function deliver(
   db: Db,
@@ -50,6 +56,8 @@ async function deliver(
       startDate: ISODate;
       endDate: ISODate;
     };
+    /** 친구 요청 알림이면 요청을 보낸 사람. 알림함이 그 요청으로 이어 준다. */
+    friendRequestUserId?: string;
     waitUntil: (promise: Promise<unknown>) => void;
   },
 ): Promise<void> {
@@ -77,6 +85,7 @@ async function deliver(
         friendLeaveJson: input.friendLeave
           ? JSON.stringify(input.friendLeave)
           : null,
+        friendRequestUserId: input.friendRequestUserId ?? null,
         read: false,
         createdAt: now,
       })),
@@ -127,7 +136,7 @@ async function deliver(
 export async function notifyFriendRequest(
   db: Db,
   input: {
-    requester: { name: string };
+    requester: { id: string; name: string };
     recipientId: string;
     waitUntil: (promise: Promise<unknown>) => void;
   },
@@ -147,8 +156,9 @@ export async function notifyFriendRequest(
 
   await deliver(db, {
     recipients: [{ id: recipient.id, expoPushToken: recipient.expoPushToken }],
-    title: "새 친구 요청",
+    title: FRIEND_REQUEST_NOTIFICATION_TITLE,
     body: `${input.requester.name}님이 친구 요청을 보냈어요. 친구 탭에서 확인해주세요.`,
+    friendRequestUserId: input.requester.id,
     waitUntil: input.waitUntil,
   });
 }

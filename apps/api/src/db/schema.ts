@@ -397,6 +397,8 @@ export const notifications = sqliteTable(
     leaveId: text("leave_id"),
     datesJson: text("dates_json"),
     friendLeaveJson: text("friend_leave_json"),
+    // 친구 요청 알림이면 요청을 보낸 사람. 알림함에서 그 요청으로 곧장 간다(0036).
+    friendRequestUserId: text("friend_request_user_id"),
     read: integer("read", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     // 사용자가 알림함에서 지운 시각. 값이 있으면 사용자 API에서 보이지 않는다.

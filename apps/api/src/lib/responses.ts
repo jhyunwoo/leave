@@ -367,6 +367,14 @@ export const friendLeaveNotificationSchema = z.object({
   endDate: z.iso.date(),
 });
 
+/**
+ * 친구 요청 알림이 가리키는 요청. `userId`는 요청을 보낸 사람이고, 보낸 사람을
+ * 기록하기 전에 쌓인 알림이면 null이다 — 그때도 친구 탭까지는 이어 준다.
+ */
+export const friendRequestNotificationSchema = z.object({
+  userId: z.string().nullable(),
+});
+
 export const notificationSchema = z
   .object({
     id: z.string(),
@@ -375,6 +383,7 @@ export const notificationSchema = z
     leaveId: z.string().nullable(),
     dates: z.array(z.string()),
     friendLeave: friendLeaveNotificationSchema.nullable(),
+    friendRequest: friendRequestNotificationSchema.nullable(),
     read: z.boolean(),
     createdAt: z.string(),
   })

@@ -10,6 +10,11 @@
  *
  * 라벨에서 "이 날부터"·"이 날에"를 뺀 것도 같은 이유다. 패널 제목이 이미
  * "선택한 날짜 / 9월 17일 (목)"이라 버튼마다 그 접두어를 반복할 이유가 없다.
+ *
+ * 부대가 없으면 `calendar`가 null이다. 그때도 패널은 그대로 뜬다 — 출타율·제한
+ * 기간·부대 일정만 빠지고, 명단 자리에는 내 휴가(`soloRoster`)가 들어간다.
+ * 예전에는 부대 달력이 올 때까지 패널을 통째로 기다려, 부대가 없는 사람은 날짜를
+ * 눌러도 휴가 등록 버튼을 볼 수 없었다.
  */
 
 import {
@@ -36,7 +41,10 @@ import { makeStyles, radius, spacing } from "@/theme";
 import { DayRoster } from "./day-roster";
 
 export function DayPanel(props: {
-  calendar: Calendar;
+  /** 부대 달력. 부대가 없으면 null이다. */
+  calendar: Calendar | null;
+  /** 부대가 없을 때 명단 자리에 그릴 내 휴가(`soloDayRoster`). */
+  soloRoster?: Calendar["attendees"];
   date: ISODate;
   onAddLeave: () => void;
   onAddPersonalEvent?: () => void;
@@ -61,26 +69,26 @@ export function DayPanel(props: {
 }) {
   const styles = useStyles();
   const { calendar, date } = props;
-  const stat = calendar.days.find((d) => d.date === date);
+  const stat = calendar?.days.find((d) => d.date === date);
   const exceeded = stat?.exceeded ?? false;
   const signal = stat ? availabilitySignal(stat.count, stat.allowed) : null;
   // 이 그룹이 외출을 비율에서 빼는데 그날 명단에 외출이 있으면, 비율과 명단 인원이
   // 다르게 읽힌다. 왜 다른지 그 자리에서 말해 준다.
   const outingUncounted =
-    calendar.unit.outingCounts === false &&
+    calendar?.unit.outingCounts === false &&
     calendar.attendees.some(
       (attendee) =>
         segmentOnDate(attendee.segments, date)?.category === "outing",
     );
   const holiday = getHoliday(date);
-  const blackout = calendar.blackouts.find(
+  const blackout = calendar?.blackouts.find(
     (b) => b.startDate <= date && date <= b.endDate,
   );
   // 하루짜리든 여러 날에 걸친 일정이든 이 날에 걸쳐 있으면 보여준다.
   const dayEvents = (props.personalEvents ?? []).filter(
     (event) => event.startDate <= date && date <= event.endDate,
   );
-  const unitDayEvents = (calendar.events ?? []).filter(
+  const unitDayEvents = (calendar?.events ?? []).filter(
     (event) => event.startDate <= date && date <= event.endDate,
   );
   const isUnitHoliday = unitDayEvents.some((event) => event.isHoliday);
@@ -150,7 +158,8 @@ export function DayPanel(props: {
       )}
 
       <DayRoster
-        attendees={calendar.attendees}
+        attendees={calendar?.attendees ?? props.soloRoster ?? []}
+        solo={!calendar}
         date={date}
         myUserId={props.myUserId}
         onOpenLeave={props.onOpenLeave}

@@ -28,6 +28,36 @@ export const OG_IMAGE_ALT =
   "리브 — 부대 휴가 일정을 함께 보는 캘린더. 하루 최대 출타 인원 초과일을 미리 알려줍니다.";
 
 /**
+ * 친구 추가 링크(`/u/{username}`)의 소셜 미리보기.
+ *
+ * 앱의 "프로필 링크 공유"가 내보내는 주소가 이것이다. 카카오톡에 붙였을 때 브랜드
+ * 카드가 뜨면 받는 사람은 그냥 앱 홍보 링크로 읽고 지나친다 — "나를 친구로 추가하라는
+ * 링크"라는 것이 미리보기에서 바로 보여야 한다.
+ *
+ * 사람마다 다른 값은 넣지 않는다(docs/seo.md 4절). 별칭·아이디를 미리보기로
+ * 퍼뜨리지 않는 것이 이 주소를 색인하지 않는 이유와 같다. 누가 보냈는지는 대화창이
+ * 이미 말해 준다.
+ *
+ * 이미지 속 문구도 여기 둔다. `scripts/generate-og-image.mjs`가 이 파일을 그대로
+ * 읽어 그리므로, 글꼴 서브셋(`fonts:generate`가 src의 문자열에서 뽑는다)에 글자가
+ * 빠지지 않는다.
+ */
+export const FRIEND_INVITE_OG_TITLE = "리브 친구 추가 링크";
+export const FRIEND_INVITE_OG_DESCRIPTION =
+  "링크를 열어 친구를 추가하면 서로 공유한 휴가 일정과 전역 D-day, 복무율을 함께 볼 수 있어요.";
+export const FRIEND_INVITE_OG_IMAGE_PATH =
+  "/og/leave-friend-invite-1200x630.png";
+export const FRIEND_INVITE_OG_IMAGE_ALT =
+  "리브 친구 추가 링크 — 링크를 열어 친구를 추가하고 서로의 휴가 일정을 함께 보세요.";
+export const FRIEND_INVITE_OG_CARD = {
+  eyebrow: "친구 추가 링크",
+  headline: ["리브에서", "친구 추가하기"],
+  body: "친구가 되면 서로 공유한 휴가 일정을 함께 볼 수 있어요.",
+  chips: ["휴가 달력 비교", "전역 D-day", "복무율"],
+  button: "친구 추가",
+} as const;
+
+/**
  * 서비스 운영자. 개인정보 처리방침·이용약관에 이미 공개된 값과 같아야 한다
  * (구조화 데이터는 화면에 보이는 사실만 담는다).
  */

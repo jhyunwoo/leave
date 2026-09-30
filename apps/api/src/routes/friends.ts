@@ -542,7 +542,7 @@ export const friendRoutes = app
     // 보낸 쪽이 버튼을 여러 번 눌러 받는 쪽 알림함을 채울 수 있다.
     if (outcome === "created") {
       await notifyFriendRequest(db, {
-        requester: { name: user.name },
+        requester: { id: user.id, name: user.name },
         recipientId: target.id,
         waitUntil: (promise) => c.executionCtx.waitUntil(promise),
       });

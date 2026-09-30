@@ -5,6 +5,9 @@
  * "이 주소로 가입했는가"에 대한 답이라 친구 찾기가 이메일 열거 수단이 됐고,
  * 무엇보다 상대의 이메일을 이미 알고 있어야 했다. 지금은 공개 사용자 이름으로
  * 찾는다 — 애초에 공개하려고 만든 식별자다.
+ *
+ * 알림함의 친구 요청 알림에서 오면 `?request=<보낸 사람 id>`로 그 요청을 짚어 준다.
+ * 이미 처리됐거나 상대가 취소한 요청이면 목록에 없으므로 그 사실을 한 줄로 알린다.
  */
 
 import "./workspace.css";
@@ -32,7 +35,7 @@ import {
   type FriendSharingInput,
 } from "@leave/shared";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Avatar } from "../components/Avatar";
 import { FriendSharedStatus } from "../components/FriendSharedStatus";
 
@@ -246,6 +249,43 @@ export function FriendsPage(props: { me: Me }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const pending = accept.isPending || decline.isPending || cancel.isPending;
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** 알림함에서 짚어 온 요청을 보낸 사람. */
+  const focusedRequestId = searchParams.get("request");
+  const clearFocusedRequest = () =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("request");
+        return next;
+      },
+      { replace: true },
+    );
+  /**
+   * 짚어 온 요청을 확인하려고 목록을 새로 받은 대상. 캐시된 목록은 알림보다 오래됐을
+   * 수 있어(방금 온 요청이 아직 없다) 그대로 믿으면 "이미 처리됐다"고 잘못 말한다.
+   */
+  const [checkedRequestId, setCheckedRequestId] = useState<string | null>(null);
+  const { refetch: refetchIncoming } = incoming;
+  const { refetch: refetchFriends } = friends;
+  useEffect(() => {
+    if (!focusedRequestId) return;
+    void Promise.all([refetchIncoming(), refetchFriends()]).then(() =>
+      setCheckedRequestId(focusedRequestId),
+    );
+  }, [focusedRequestId, refetchIncoming, refetchFriends]);
+  // 새로 받은 뒤에야 "없다"고 말할 수 있다. 친구 목록도 받아야 "이미 친구"를 가린다.
+  const focusedRequestGone =
+    focusedRequestId !== null &&
+    checkedRequestId === focusedRequestId &&
+    incoming.data !== undefined &&
+    friends.data !== undefined &&
+    !incoming.data.requests.some(
+      (request) => request.userId === focusedRequestId,
+    );
+  const focusedFriend = focusedRequestGone
+    ? friends.data?.friends.find((friend) => friend.userId === focusedRequestId)
+    : undefined;
 
   // 타이핑 도중 글자마다 서버에 묻지 않는다. 규칙 판정은 즉시, 요청만 늦춘다.
   useEffect(() => {
@@ -254,6 +294,8 @@ export function FriendsPage(props: { me: Me }) {
   }, [query]);
 
   const run = async (work: Promise<unknown>, success: string) => {
+    // 요청에 답하면 짚어 둔 표시도 거둔다. 남겨 두면 "이미 처리됐다"는 안내로 바뀐다.
+    clearFocusedRequest();
     try {
       await work;
       setMessage(success);
@@ -310,6 +352,34 @@ export function FriendsPage(props: { me: Me }) {
           {message}
         </p>
       ) : null}
+      {focusedRequestGone ? (
+        <div
+          role="status"
+          className="card"
+          data-testid="friends-request-gone"
+          style={{
+            padding: "var(--sp-md) var(--sp-lg)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--sp-md)",
+            flexWrap: "wrap",
+          }}
+        >
+          <p>
+            {focusedFriend
+              ? `${focusedFriend.name}님과 이미 친구예요.`
+              : "이 친구 요청은 이미 처리됐거나 상대가 취소했어요."}
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={clearFocusedRequest}
+          >
+            확인
+          </button>
+        </div>
+      ) : null}
 
       <div className="workspace-columns friends-workspace">
         <aside
@@ -346,7 +416,25 @@ export function FriendsPage(props: { me: Me }) {
           {(incoming.data?.requests.length ?? 0) > 0 ? (
             <Section title="받은 요청">
               {incoming.data!.requests.map((request) => (
-                <div key={request.userId} className="friend-row">
+                <div
+                  key={request.userId}
+                  className={
+                    request.userId === focusedRequestId
+                      ? "friend-row is-focused"
+                      : "friend-row"
+                  }
+                  data-testid={
+                    request.userId === focusedRequestId
+                      ? "friends-request-focused"
+                      : undefined
+                  }
+                  // 알림에서 짚어 온 요청은 화면 밖에 있을 수 있다. 처음 그려질 때 한 번 데려온다.
+                  ref={
+                    request.userId === focusedRequestId
+                      ? scrollIntoViewOnce
+                      : undefined
+                  }
+                >
                   <Link
                     to={`/u/${request.username ?? ""}`}
                     className="friend-row-main"
@@ -528,4 +616,9 @@ export function FriendsPage(props: { me: Me }) {
       </div>
     </div>
   );
+}
+
+/** ref 콜백. 붙는 순간 한 번 화면 안으로 스크롤한다. */
+function scrollIntoViewOnce(node: HTMLElement | null) {
+  node?.scrollIntoView({ block: "center", behavior: "smooth" });
 }

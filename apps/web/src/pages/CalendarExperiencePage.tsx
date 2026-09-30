@@ -22,6 +22,7 @@ import {
   balanceCountedSegments,
   buildMyLeaveDayMap,
   friendDayLeaves,
+  soloDayRoster,
   useCalendar,
   useFriendCalendar,
   useFriends,
@@ -418,6 +419,17 @@ export function CalendarPage(props: { me: Me }) {
     () => buildMyLeaveDayMap(myLeaves.data?.leaves),
     [myLeaves.data],
   );
+  // 부대가 없을 때 날짜 상세의 명단 자리에 들어갈 내 휴가.
+  const soloRoster = useMemo(
+    () =>
+      unit
+        ? undefined
+        : soloDayRoster(myLeaves.data?.leaves, {
+            id: props.me.user.id,
+            name: props.me.user.name,
+          }),
+    [unit, myLeaves.data, props.me.user.id, props.me.user.name],
+  );
   const regularOvernight = balances.data?.regularOvernight ?? null;
   // 갈래별 외출 설정 — 달력이 주기 시작일 마커를 그리는 데 쓴다.
   const outingConfigs = useMemo(() => {
@@ -527,9 +539,11 @@ export function CalendarPage(props: { me: Me }) {
         segments={balanceSegments}
         dischargeAt={dischargeAt}
       />
-      {panelCalendar.data ? (
+      {/* 부대가 없으면 기다릴 부대 달력이 없다. 내 휴가만으로 바로 그린다. */}
+      {panelCalendar.data || !unit ? (
         <DayPanel
-          calendar={panelCalendar.data}
+          calendar={panelCalendar.data ?? null}
+          soloRoster={soloRoster}
           date={selectedDate}
           myUserId={props.me.user.id}
           cycle={cycleForDisplay(regularOvernight, selectedDate, dischargeAt)}

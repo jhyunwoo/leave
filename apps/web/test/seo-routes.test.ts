@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   classifyPath,
+  FRIEND_INVITE_SHELL_FILE,
   normalizePath,
   PRERENDERED_PAGES,
   sitemapEntries,
@@ -61,6 +62,15 @@ describe("경로 판정", () => {
     if (result.kind !== "spa") return;
     // follow를 남기는 이유: 이 페이지의 홈 링크를 크롤러가 따라갈 수 있어야 한다.
     expect(result.route.robots).toBe("noindex, follow");
+    // 친구 추가 링크로 공유되는 주소라 친구 추가 카드를 가진 셸을 낸다.
+    expect(result.route.shell).toBe(FRIEND_INVITE_SHELL_FILE);
+  });
+
+  it("다른 앱 화면은 기본 셸을 쓴다", () => {
+    const result = classifyPath("/friends");
+    expect(result.kind).toBe("spa");
+    if (result.kind !== "spa") return;
+    expect(result.route.shell).toBeUndefined();
   });
 
   it("표에 없는 주소는 404 대상이다", () => {

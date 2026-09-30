@@ -56,6 +56,12 @@ export interface SpaRoute {
   readonly pattern: string;
   readonly title: string;
   readonly robots: RobotsDirective;
+  /**
+   * 이 경로에 낼 셸 파일. 없으면 `APP_SHELL_FILE`이다. 셸은 본문이 같고 `<head>`의
+   * 소셜 미리보기만 다르다 — 메신저 미리보기는 자바스크립트를 돌리지 않으므로
+   * 경로마다 다른 카드를 보이려면 처음 받는 HTML부터 달라야 한다.
+   */
+  readonly shell?: string;
 }
 
 /**
@@ -126,6 +132,9 @@ export const STATIC_HTML_PAGES: readonly StaticHtmlPage[] = [
   },
 ] as const;
 
+/** 친구 추가 링크(`/u/:username`)의 셸. `APP_SHELL_FILE`과 소셜 미리보기만 다르다. */
+export const FRIEND_INVITE_SHELL_FILE = "friend-invite.html";
+
 /**
  * SPA 경로 전부. 여기 없는 주소는 존재하지 않는 주소다.
  *
@@ -143,7 +152,13 @@ export const SPA_ROUTES: readonly SpaRoute[] = [
   { pattern: "/signup", title: "회원가입", robots: "noindex, follow" },
   { pattern: "/invite", title: "그룹 초대", robots: "noindex, follow" },
   { pattern: "/invite/:code", title: "그룹 초대", robots: "noindex, follow" },
-  { pattern: "/u/:username", title: "공개 프로필", robots: "noindex, follow" },
+  {
+    pattern: "/u/:username",
+    title: "공개 프로필",
+    robots: "noindex, follow",
+    // 앱의 "프로필 링크 공유"가 내보내는 주소다. 미리보기가 친구 추가 링크로 읽혀야 한다.
+    shell: FRIEND_INVITE_SHELL_FILE,
+  },
   { pattern: "/units", title: "내 그룹", robots: "noindex, follow" },
   { pattern: "/units/manage", title: "그룹 관리", robots: "noindex, follow" },
   { pattern: "/leaves", title: "내 휴가", robots: "noindex, follow" },

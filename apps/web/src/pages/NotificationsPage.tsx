@@ -1,5 +1,6 @@
 /**
- * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
+ * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로,
+ * 친구 요청 알림은 친구 화면의 그 요청으로 이어진다.
  */
 
 import "./workspace.css";
@@ -63,6 +64,15 @@ export function NotificationsPage() {
     notification: Notification,
     dates = notification.dates,
   ) => {
+    if (notification.friendRequest) {
+      // 수락·거절은 친구 화면에서만 한다. 보낸 사람을 기록하기 전의 알림이면
+      // 특정 요청을 짚지 않고 화면까지만 간다.
+      const { userId } = notification.friendRequest;
+      void navigate(
+        userId ? `/friends?request=${encodeURIComponent(userId)}` : "/friends",
+      );
+      return;
+    }
     if (notification.friendLeave) {
       setFriendDetail({ notification, date: dates[0] });
       return;
@@ -228,7 +238,7 @@ export function NotificationsPage() {
             data-testid="latest-notification"
             role="button"
             tabIndex={0}
-            aria-label={`최근 알림: ${latest.title}. 휴가 상세 보기`}
+            aria-label={`최근 알림: ${latest.title}. ${detailLabel(latest)}`}
             onClick={() => openNotification(latest)}
             onKeyDown={onCardKeyDown(latest)}
             style={{
@@ -292,7 +302,7 @@ export function NotificationsPage() {
                     className="content-row"
                     role="button"
                     tabIndex={0}
-                    aria-label={`${n.title}. 휴가 상세 보기`}
+                    aria-label={`${n.title}. ${detailLabel(n)}`}
                     onClick={() => openNotification(n)}
                     onKeyDown={onCardKeyDown(n)}
                     style={{
@@ -338,4 +348,11 @@ export function NotificationsPage() {
       )}
     </div>
   );
+}
+
+/** 카드를 누르면 어디로 가는지 스크린리더에 알린다. */
+function detailLabel(notification: Notification): string {
+  if (notification.friendRequest) return "친구 요청 보기";
+  if (notification.friendLeave) return "친구 휴가 상세 보기";
+  return "휴가 상세 보기";
 }

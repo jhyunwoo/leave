@@ -16,6 +16,7 @@ import {
 } from "@leave/client";
 import { todayInSeoul } from "@leave/shared";
 import { ServiceProgress } from "./ServiceProgress";
+import { SERVICE_PERCENT_DECIMALS } from "./service-progress-format";
 
 function FriendDdays(props: { friend: Friend }) {
   const { friend } = props;
@@ -78,7 +79,8 @@ export function FriendSharedStatus(props: { friend: Friend }) {
           <ServiceProgress
             enlistedAt={friend.enlistedAt}
             dischargeAt={friend.dischargeAt}
-            decimals={5}
+            // 동작 줄이기에서도 열 자리로 둔다. 생략하면 그때만 한 자리로 떨어진다.
+            decimals={SERVICE_PERCENT_DECIMALS}
             compact
             caption={dutyDays}
           />

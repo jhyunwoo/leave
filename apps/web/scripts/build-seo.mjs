@@ -8,7 +8,7 @@
  *
  * 하는 일은 넷이다.
  *   - dist/index.html 을 틀로 삼아 공개 페이지마다 <head>와 본문을 채워 넣는다.
- *   - SPA 셸(app.html)과 404 문서(404.html)를 만든다.
+ *   - SPA 셸(app.html, 친구 추가 링크용 friend-invite.html)과 404 문서(404.html)를 만든다.
  *   - robots.txt 와 sitemap.xml 을 라우트 표에서 만든다.
  *   - 중간 산출물(dist-prerender/)을 지운다.
  *
@@ -41,6 +41,11 @@ if (!existsSync(ssrEntry)) {
 
 const {
   APP_SHELL_FILE,
+  FRIEND_INVITE_OG_DESCRIPTION,
+  FRIEND_INVITE_OG_IMAGE_ALT,
+  FRIEND_INVITE_OG_IMAGE_PATH,
+  FRIEND_INVITE_OG_TITLE,
+  FRIEND_INVITE_SHELL_FILE,
   NOT_FOUND_FILE,
   PRERENDERED_PAGES,
   SESSION_FLAG_SCRIPT,
@@ -147,6 +152,27 @@ writeFileSync(
   }),
 );
 written.push(`${APP_SHELL_FILE}  (SPA 셸)`);
+
+// 친구 추가 링크(/u/:username)의 셸. 본문은 같고 소셜 미리보기만 친구 추가 카드다.
+// 카카오톡 같은 미리보기는 자바스크립트를 돌리지 않아, 셸 단계에서 갈라야 한다.
+writeFileSync(
+  join(distDir, FRIEND_INVITE_SHELL_FILE),
+  renderDocument({
+    head: headTagsForNonIndexable(
+      FRIEND_INVITE_OG_TITLE,
+      FRIEND_INVITE_OG_DESCRIPTION,
+      {
+        withSocialCard: true,
+        socialImage: {
+          path: FRIEND_INVITE_OG_IMAGE_PATH,
+          alt: FRIEND_INVITE_OG_IMAGE_ALT,
+        },
+      },
+    ),
+    body: "",
+  }),
+);
+written.push(`${FRIEND_INVITE_SHELL_FILE}  (친구 추가 링크 셸)`);
 
 // ── 404 ─────────────────────────────────────────────────────────────────
 // 이 화면 고유의 CSS는 브라우저 번들에 없다(NotFoundPage는 앱에서 import되지

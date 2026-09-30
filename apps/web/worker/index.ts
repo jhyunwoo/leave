@@ -72,11 +72,17 @@ export default {
     }
 
     if (classification.kind === "spa") {
-      return serveAsset(env, url, APP_SHELL_FILE, {
-        // 정본 호스트가 아니면 follow도 주지 않는다 — 미리보기 도메인의 링크를
-        // 따라가 봐야 같은 내용의 다른 호스트만 더 만든다.
-        robots: hostIsCanonical ? classification.route.robots : "noindex",
-      });
+      // 셸은 경로마다 다를 수 있다 — 친구 추가 링크는 자기 소셜 미리보기를 가진 셸을 낸다.
+      return serveAsset(
+        env,
+        url,
+        classification.route.shell ?? APP_SHELL_FILE,
+        {
+          // 정본 호스트가 아니면 follow도 주지 않는다 — 미리보기 도메인의 링크를
+          // 따라가 봐야 같은 내용의 다른 호스트만 더 만든다.
+          robots: hostIsCanonical ? classification.route.robots : "noindex",
+        },
+      );
     }
 
     return serveAsset(env, url, NOT_FOUND_FILE, {

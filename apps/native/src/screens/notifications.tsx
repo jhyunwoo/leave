@@ -11,7 +11,8 @@
  *              훑으며 어떤 날짜가 걸렸는지 비교할 수 있다. 위계는 카드 크기 대신
  *              선택 상태와 안 읽음 표시가 진다.
  *
- * 친구 휴가 알림은 비교 모달로, 초과 알림은 해당 날짜의 내 휴가로 연결한다.
+ * 친구 휴가 알림은 비교 모달로, 친구 요청 알림은 친구 탭의 그 요청으로,
+ * 초과 알림은 해당 날짜의 내 휴가로 연결한다.
  */
 
 import { fmtDateTimeShort, fmtDateShort } from "@leave/shared/calendar";
@@ -105,10 +106,26 @@ export function NotificationsScreen() {
     });
   };
 
+  /**
+   * 친구 탭으로 가서 이 요청을 짚어 준다. 수락·거절은 친구 탭에서만 한다 —
+   * 알림함에 버튼을 두면 요청 목록과 두 군데에서 같은 일을 하게 된다.
+   * 보낸 사람을 기록하기 전의 알림이면(userId가 null) 탭까지만 간다.
+   */
+  const openFriendRequest = (userId: string | null) => {
+    router.navigate({
+      pathname: "/(tabs)/(friends)",
+      params: userId ? { request: userId } : {},
+    });
+  };
+
   const openNotification = (
     notification: Notification,
     dates = notification.dates,
   ) => {
+    if (notification.friendRequest) {
+      openFriendRequest(notification.friendRequest.userId);
+      return;
+    }
     if (notification.friendLeave) {
       setFriendDetail({ notification, date: dates[0] });
       return;
@@ -279,7 +296,7 @@ export function NotificationsScreen() {
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`최근 알림: ${latest.title}. 휴가 상세 보기`}
+                  accessibilityLabel={`최근 알림: ${latest.title}. ${detailLabel(latest)}`}
                   testID="latest-notification"
                   onPress={() => openNotification(latest)}
                   style={styles.latestTap}
@@ -298,7 +315,7 @@ export function NotificationsScreen() {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${latest.title} 휴가 상세 보기`}
+                    accessibilityLabel={`${latest.title} ${detailLabel(latest)}`}
                     onPress={() => openNotification(latest)}
                     style={styles.detailButton}
                   >
@@ -397,9 +414,10 @@ export function NotificationsScreen() {
                       {fmtDateTimeShort(selected.createdAt)}
                     </Text>
 
-                    {selected.friendLeave && (
+                    {(selected.friendLeave || selected.friendRequest) && (
                       <Pressable
                         accessibilityRole="button"
+                        accessibilityLabel={`${selected.title} ${detailLabel(selected)}`}
                         onPress={() => openNotification(selected)}
                         style={styles.detailButton}
                       >
@@ -465,6 +483,13 @@ export function NotificationsScreen() {
       />
     </>
   );
+}
+
+/** "자세히"가 어디로 가는지 스크린리더에 알린다. */
+function detailLabel(notification: Notification): string {
+  if (notification.friendRequest) return "친구 요청 보기";
+  if (notification.friendLeave) return "친구 휴가 상세 보기";
+  return "휴가 상세 보기";
 }
 
 function NotificationsToolbar(props: {

@@ -12,8 +12,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { PRERENDERED_PAGES, STATIC_HTML_PAGES } from "../src/seo/routes";
-import { OG_IMAGE_PATH, SITE_ORIGIN } from "../src/seo/site";
+import {
+  FRIEND_INVITE_SHELL_FILE,
+  PRERENDERED_PAGES,
+  STATIC_HTML_PAGES,
+} from "../src/seo/routes";
+import {
+  FRIEND_INVITE_OG_IMAGE_PATH,
+  FRIEND_INVITE_OG_TITLE,
+  OG_IMAGE_PATH,
+  SITE_ORIGIN,
+} from "../src/seo/site";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(webRoot, "dist");
@@ -196,6 +205,37 @@ describe("SPA 셸(app.html)", () => {
   });
 });
 
+describe("친구 추가 링크 셸(friend-invite.html)", () => {
+  const html = read(FRIEND_INVITE_SHELL_FILE);
+
+  it("색인되지 않고 앱 번들을 싣는다", () => {
+    expect(metaContent(html, "name", "robots")).toBe("noindex, follow");
+    expect(html).toContain('<div id="root"></div>');
+    expect(html).toMatch(/<script type="module"[^>]*src="\/assets\//);
+  });
+
+  it("미리보기가 브랜드 카드가 아니라 친구 추가 카드다", () => {
+    // 카카오톡에 붙였을 때 친구 추가 링크라는 것이 보여야 한다.
+    expect(metaContent(html, "property", "og:title")).toBe(
+      FRIEND_INVITE_OG_TITLE,
+    );
+    expect(metaContent(html, "property", "og:image")).toBe(
+      `${SITE_ORIGIN}${FRIEND_INVITE_OG_IMAGE_PATH}`,
+    );
+    expect(metaContent(html, "name", "twitter:image")).toBe(
+      `${SITE_ORIGIN}${FRIEND_INVITE_OG_IMAGE_PATH}`,
+    );
+    expect(html).not.toContain(OG_IMAGE_PATH);
+    expect(html).not.toContain("og:url");
+  });
+
+  it("친구 추가 이미지가 존재한다", () => {
+    expect(
+      existsSync(join(dist, FRIEND_INVITE_OG_IMAGE_PATH.replace(/^\//, ""))),
+    ).toBe(true);
+  });
+});
+
 describe("404 문서", () => {
   const html = read("404.html");
 
@@ -260,7 +300,13 @@ describe("정적 파일", () => {
   });
 
   it("빌드 표시자가 남지 않는다", () => {
-    for (const file of ["index.html", "guide.html", "app.html", "404.html"]) {
+    for (const file of [
+      "index.html",
+      "guide.html",
+      "app.html",
+      FRIEND_INVITE_SHELL_FILE,
+      "404.html",
+    ]) {
       expect(read(file), file).not.toContain("seo-head");
       expect(read(file), file).not.toContain("app-html");
     }

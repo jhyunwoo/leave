@@ -13,6 +13,10 @@
  * 언제 나오지"이기 때문이다. 이름을 누르면 프로필로 가고, 친구 삭제는 거기서 한다 —
  * 자주 하지 않고 되돌릴 수 없는 일이라 목록마다 빨간 버튼을 두면 잘못 누르기 쉽다.
  *
+ * 알림함의 친구 요청 알림에서 오면 `request` 파라미터로 그 요청을 짚어 준다.
+ * 이미 수락·거절됐거나 상대가 취소했으면 요청 목록에 없으므로, 그 사실을 한 줄로
+ * 알린다 — 아무 표시 없이 목록만 보이면 알림이 엉뚱한 곳으로 보낸 것처럼 보인다.
+ *
  * 내가 친구에게 보여줄 항목은 툴바의 "공유 설정"이 여는 화면에서 고른다
  * (friend-sharing.tsx). 한 번 정하면 잘 바꾸지 않는 값이라 목록 사이에 두지 않았다.
  */
@@ -30,8 +34,8 @@ import {
   useMe,
   useOutgoingFriendRequests,
 } from "@leave/client";
-import { Stack, useRouter } from "expo-router";
-import { useState } from "react";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -67,6 +71,39 @@ export function FriendsScreen() {
   const decline = useDeclineFriendRequest();
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  /** 알림함에서 짚어 온 요청을 보낸 사람. */
+  const { request: focusedRequestId } = useLocalSearchParams<{
+    request?: string;
+  }>();
+  const clearFocusedRequest = () => router.setParams({ request: undefined });
+  /**
+   * 짚어 온 요청을 확인하려고 목록을 새로 받은 대상. 캐시된 목록은 알림보다 오래됐을
+   * 수 있어(방금 온 요청이 아직 없다) 그대로 믿으면 "이미 처리됐다"고 잘못 말한다.
+   */
+  const [checkedRequestId, setCheckedRequestId] = useState<string | null>(null);
+  const { refetch: refetchIncoming } = incoming;
+  const { refetch: refetchFriends } = friends;
+  useEffect(() => {
+    if (!focusedRequestId) return;
+    // 탭을 옮겨 오면 이전 스크롤 위치가 남아 있다. 요청 목록은 맨 위에 있으므로 올린다.
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    void Promise.all([refetchIncoming(), refetchFriends()]).then(() =>
+      setCheckedRequestId(focusedRequestId),
+    );
+  }, [focusedRequestId, refetchIncoming, refetchFriends]);
+  // 새로 받은 뒤에야 "없다"고 말할 수 있다. 친구 목록도 받아야 "이미 친구"를 가린다.
+  const focusedRequestGone =
+    Boolean(focusedRequestId) &&
+    checkedRequestId === focusedRequestId &&
+    incoming.data !== undefined &&
+    friends.data !== undefined &&
+    !incoming.data.requests.some(
+      (request) => request.userId === focusedRequestId,
+    );
+  const focusedFriend = focusedRequestGone
+    ? friends.data?.friends.find((friend) => friend.userId === focusedRequestId)
+    : undefined;
   const pending = accept.isPending || decline.isPending;
   const today = todayInSeoul(new Date(now));
   const outgoingCount = outgoing.data?.requests.length ?? 0;
@@ -123,8 +160,15 @@ export function FriendsScreen() {
     </>
   );
 
+  /** 요청에 답하면 짚어 둔 표시도 거둔다. 남겨 두면 "이미 처리됐다"는 안내로 바뀐다. */
+  const answer = (promise: Promise<unknown>) => {
+    clearFocusedRequest();
+    void run(promise);
+  };
+
   return (
     <ScrollView
+      ref={scrollRef}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.content, !isCompact && styles.wideContent]}
@@ -191,6 +235,21 @@ export function FriendsScreen() {
           <Text style={styles.error}>{error}</Text>
         </ContentPanel>
       ) : null}
+      {focusedRequestGone ? (
+        <ContentPanel style={styles.card} testID="friends-request-gone">
+          <Text style={styles.body} accessibilityLiveRegion="polite">
+            {focusedFriend
+              ? `${focusedFriend.name}님과 이미 친구예요.`
+              : "이 친구 요청은 이미 처리됐거나 상대가 취소했어요."}
+          </Text>
+          <Button
+            title="확인"
+            size="sm"
+            variant="secondary"
+            onPress={clearFocusedRequest}
+          />
+        </ContentPanel>
+      ) : null}
       <View style={[styles.workspace, !isCompact && styles.workspaceWide]}>
         <View
           style={[
@@ -216,7 +275,19 @@ export function FriendsScreen() {
             <ContentPanel style={styles.card}>
               <Text style={styles.heading}>받은 요청</Text>
               {incoming.data!.requests.map((request) => (
-                <View key={request.userId} style={styles.row}>
+                <View
+                  key={request.userId}
+                  style={[
+                    styles.row,
+                    request.userId === focusedRequestId &&
+                      styles.requestFocused,
+                  ]}
+                  testID={
+                    request.userId === focusedRequestId
+                      ? "friends-request-focused"
+                      : undefined
+                  }
+                >
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${request.name} 프로필 열기`}
@@ -237,9 +308,7 @@ export function FriendsScreen() {
                       title="수락"
                       size="sm"
                       disabled={pending}
-                      onPress={() =>
-                        void run(accept.mutateAsync(request.userId))
-                      }
+                      onPress={() => answer(accept.mutateAsync(request.userId))}
                     />
                     <Button
                       icon="close"
@@ -248,7 +317,7 @@ export function FriendsScreen() {
                       variant="secondary"
                       disabled={pending}
                       onPress={() =>
-                        void run(decline.mutateAsync(request.userId))
+                        answer(decline.mutateAsync(request.userId))
                       }
                     />
                   </View>
@@ -403,6 +472,15 @@ const useStyles = makeStyles(({ colors }) => ({
     flexWrap: "wrap",
   },
   actions: { flexDirection: "row", gap: spacing.sm },
+  // 알림에서 짚어 온 요청. 줄 전체를 친구 선택과 같은 색으로 띄운다.
+  requestFocused: {
+    padding: spacing.md,
+    margin: -spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    backgroundColor: colors.primaryPale,
+  },
   who: { flex: 1, minWidth: 0 },
   name: { fontSize: 16, fontWeight: "700", color: colors.ink },
   friendMain: {

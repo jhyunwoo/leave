@@ -32,6 +32,11 @@ import {
  */
 export function DayRoster(props: {
   attendees: Calendar["attendees"];
+  /**
+   * 부대 없이 내 휴가만 담긴 명단. 남이 없으니 "출타 N명"이 아니라 "내 휴가 N건"으로
+   * 읽히게 하고, 비었을 때는 부대에 들면 무엇이 더 보이는지 알린다.
+   */
+  solo?: boolean;
   date: ISODate;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
@@ -54,9 +59,15 @@ export function DayRoster(props: {
   if (dayAttendees.length === 0) {
     return (
       <ContentPanel tone="grouped" style={styles.empty}>
-        <Text style={styles.emptyTitle}>이 날 출타 예정인 사람이 없어요.</Text>
+        <Text style={styles.emptyTitle}>
+          {props.solo
+            ? "이 날 잡힌 내 휴가가 없어요."
+            : "이 날 출타 예정인 사람이 없어요."}
+        </Text>
         <Text style={styles.emptyCaption}>
-          내 계획을 먼저 시뮬레이션해보세요.
+          {props.solo
+            ? "부대에 가입하면 같은 부대의 출타 인원도 함께 볼 수 있어요."
+            : "내 계획을 먼저 시뮬레이션해보세요."}
         </Text>
       </ContentPanel>
     );
@@ -65,7 +76,9 @@ export function DayRoster(props: {
   return (
     <View style={{ gap: spacing.md }}>
       <Text style={styles.rosterTitle} selectable>
-        이 날 출타 {dayAttendees.length}명
+        {props.solo
+          ? `이 날 내 휴가 ${dayAttendees.length}건`
+          : `이 날 출타 ${dayAttendees.length}명`}
       </Text>
       {dayAttendees.map((attendee) => {
         // 날짜별 재원을 알 수 있으므로 그날 해당하는 재원만 보여준다.

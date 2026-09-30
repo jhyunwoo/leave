@@ -67,6 +67,7 @@ soft 404가 가장 나빴다. 오타 주소든 수집된 쓰레기 주소든 전
  └─ 아니오 ──→ worker/index.ts 가 src/seo/routes.ts 표를 본다
         ├─ SPA 경로(/login, /u/:username, /leaves/:id …)
         │    → dist/app.html 을 200 + X-Robots-Tag: noindex, follow
+        │      (/u/:username 만 dist/friend-invite.html — 친구 추가 미리보기)
         └─ 표에 없음
              → dist/404.html 을 **404** + X-Robots-Tag: noindex
 ```
@@ -123,8 +124,13 @@ sitemap·robots·메타·JSON-LD는 자동으로 따라온다.
 - 딥링크는 그대로다. `noindex`는 색인만 막고 Universal Link 검증·이동에는 관여하지
   않는다. `.well-known/apple-app-site-association`과 `assetlinks.json`은 손대지
   않았고 회귀 테스트로 고정했다(`test/seo-build.test.ts`).
-- 셸의 소셜 미리보기는 **브랜드 고정값**이다. 사람마다 다른 og:image·og:title을
-  만들지 않는다.
+- 이 주소는 앱의 "프로필 링크 공유"가 내보내는 **친구 추가 링크**다. 그래서 셸을
+  따로 둔다(`dist/friend-invite.html`, 표의 `shell`). 본문은 `app.html`과 같고
+  소셜 미리보기만 친구 추가 카드(`public/og/leave-friend-invite-1200x630.png`,
+  문구는 `src/seo/site.ts`의 `FRIEND_INVITE_OG_*`)다. 카카오톡은 자바스크립트를
+  돌리지 않으므로 처음 받는 HTML부터 달라야 한다.
+- 그 카드도 **고정값**이다. 사람마다 다른 og:image·og:title을 만들지 않는다 —
+  누가 보냈는지는 대화창이 이미 말해 준다.
 
 ---
 
@@ -140,8 +146,9 @@ sitemap·robots·메타·JSON-LD는 자동으로 따라온다.
 max-video-preview:-1`.
 - **Open Graph / 트위터**: `og:type/site_name/locale/title/description/url/image
 (+width/height/alt)`, `twitter:card=summary_large_image`.
-- **소셜 이미지**: `public/og/leave-og-1200x630.png` (1200×630, 1.91:1, 40KB).
-  `pnpm --filter @leave/web og:generate`로 다시 만든다. 브랜드만 담고 사용자·부대
+- **소셜 이미지**: `public/og/leave-og-1200x630.png` (1200×630, 1.91:1, 40KB)와
+  친구 추가 링크용 `public/og/leave-friend-invite-1200x630.png`.
+  `pnpm --filter @leave/web og:generate`로 둘 다 다시 만든다. 브랜드만 담고 사용자·부대
   정보는 담지 않는다. 빌드에 넣지 않은 이유는 크로미움이 필요해서다.
 
 ### JSON-LD

@@ -27,6 +27,7 @@ import {
   notificationSchema,
   okSchema,
 } from "../lib/responses";
+import { FRIEND_REQUEST_NOTIFICATION_TITLE } from "../lib/social-notify";
 import { authMiddleware } from "../middleware/auth";
 import { onboardingMiddleware } from "../middleware/onboarding";
 
@@ -170,6 +171,7 @@ export const notificationRoutes = app
           leaveId: notifications.leaveId,
           datesJson: notifications.datesJson,
           friendLeaveJson: notifications.friendLeaveJson,
+          friendRequestUserId: notifications.friendRequestUserId,
           read: notifications.read,
           createdAt: notifications.createdAt,
         })
@@ -203,6 +205,7 @@ export const notificationRoutes = app
           leaveId: row.leaveId,
           dates: parseDates(row),
           friendLeave: parseFriendLeave(row.friendLeaveJson),
+          friendRequest: parseFriendRequest(row),
           read: row.read,
           createdAt: row.createdAt,
         })),
@@ -323,6 +326,19 @@ export const notificationRoutes = app
   });
 
 // 이전 알림에는 연결 정보가 없다. 잘못된 저장 값도 알림함 전체를 막지 않는다.
+/**
+ * 친구 요청 알림이면 보낸 사람을 돌려준다. 보낸 사람 열이 생기기 전(0036)의 알림은
+ * 제목으로만 알아볼 수 있어, 그때는 요청을 짚지 않고 친구 탭까지만 잇는다.
+ */
+function parseFriendRequest(
+  row: Pick<NotificationRow, "title" | "friendRequestUserId">,
+) {
+  if (row.friendRequestUserId) return { userId: row.friendRequestUserId };
+  return row.title === FRIEND_REQUEST_NOTIFICATION_TITLE
+    ? { userId: null }
+    : null;
+}
+
 function parseFriendLeave(json: string | null) {
   if (!json) return null;
   try {

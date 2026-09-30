@@ -51,6 +51,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   balanceCountedSegments,
   buildMyLeaveDayMap,
+  soloDayRoster,
   summarizeHoldings,
   useCalendar,
   useLeaveBalances,
@@ -380,6 +381,19 @@ export function CalendarScreen() {
   const panelCalendar = useCalendar(unit?.id ?? null, panelMonth);
   // 그 달의 내 개인 일정. 달력 스크롤이 이미 채워 둔 캐시를 그대로 다시 쓴다.
   const panelPersonalEvents = usePersonalEvents(panelMonth);
+  // 부대가 없을 때 날짜 상세의 명단 자리에 들어갈 내 휴가.
+  const soloRoster = useMemo(
+    () =>
+      unit
+        ? undefined
+        : soloDayRoster(
+            myLeaves.data?.leaves,
+            me.data
+              ? { id: me.data.user.id, name: me.data.user.name }
+              : undefined,
+          ),
+    [unit, myLeaves.data, me.data],
+  );
 
   // 날짜 상세 시트 높이. 절대 높이 하나로 줘야 시트 안 RN 콘텐츠에도 같은 기준의
   // 높이를 못 박을 수 있고, 그래야 안쪽 스크롤이 바닥까지 닿는다. 못 박을 값을
@@ -557,9 +571,11 @@ export function CalendarScreen() {
               segments={balanceSegments}
               dischargeAt={dischargeAt}
             />
-            {panelCalendar.data ? (
+            {/* 부대가 없으면 기다릴 부대 달력이 없다. 내 휴가만으로 바로 그린다. */}
+            {panelCalendar.data || !unit ? (
               <DayPanel
-                calendar={panelCalendar.data}
+                calendar={panelCalendar.data ?? null}
+                soloRoster={soloRoster}
                 date={selectedDate}
                 myUserId={me.data?.user.id}
                 cycle={cycleForDisplay(
@@ -612,11 +628,11 @@ export function CalendarScreen() {
                 }
                 style={styles.inspectorDayPanel}
               />
-            ) : unit ? (
+            ) : (
               <View style={styles.inspectorLoading}>
                 <ActivityIndicator color={colors.ink} />
               </View>
-            ) : null}
+            )}
           </>
         ) : (
           <CalendarOverviewPanel
@@ -755,9 +771,11 @@ export function CalendarScreen() {
             />
           ) : null}
           {selectedDate &&
-            (panelCalendar.data ? (
+            // 부대가 없으면 기다릴 부대 달력이 없다. 내 휴가만으로 바로 그린다.
+            (panelCalendar.data || !unit ? (
               <DayPanel
-                calendar={panelCalendar.data}
+                calendar={panelCalendar.data ?? null}
+                soloRoster={soloRoster}
                 date={selectedDate}
                 myUserId={me.data?.user.id}
                 cycle={cycleForDisplay(
@@ -809,12 +827,11 @@ export function CalendarScreen() {
                     : undefined
                 }
               />
-            ) : unit ? (
-              // 부대가 없으면 부대 달력 조회가 꺼져 있어 기다릴 데이터가 없다.
+            ) : (
               <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
                 <ActivityIndicator color={colors.ink} />
               </View>
-            ) : null)}
+            ))}
         </SheetScaffold>
       </NativeBottomSheet>
 

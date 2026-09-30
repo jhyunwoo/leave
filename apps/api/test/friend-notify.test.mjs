@@ -48,6 +48,11 @@ test("친구 요청을 보내면 받는 사람의 알림함에 한 건이 쌓인
   const received = await notificationsOf(receiver);
   assert.equal(received.length, 1);
   assert.match(received[0].body, /보낸사람/);
+  // 알림함의 "자세히"가 친구 탭의 이 요청으로 곧장 이어지도록 보낸 사람을 담는다.
+  assert.deepEqual(received[0].friendRequest, {
+    userId: sender.data.user.id,
+  });
+  assert.equal(received[0].friendLeave, null);
   // 보낸 사람에게는 아무것도 가지 않는다.
   assert.equal((await notificationsOf(sender)).length, 0);
 });
@@ -115,6 +120,7 @@ test("휴가를 등록하면 수락된 친구에게만 알림이 간다", async 
   assert.match(friendNotifications[0].body, /휴가등록자/);
   // 내 휴가 상세 링크는 비워 두고, 친구 일정 조회에 쓸 연결 정보를 따로 담는다.
   assert.equal(friendNotifications[0].leaveId, null);
+  assert.equal(friendNotifications[0].friendRequest, null);
   assert.deepEqual(friendNotifications[0].friendLeave, {
     userId: actor.data.user.id,
     leaveId: created.data.leave.id,

@@ -12,7 +12,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useServicePercentClock } from "@/lib/service-progress-clock";
-import { percentBetween } from "@/lib/service-progress-format";
+import {
+  percentBetween,
+  SERVICE_PERCENT_DECIMALS,
+} from "@/lib/service-progress-format";
 import { makeStyles, radius, spacing } from "@/theme";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -84,8 +87,10 @@ function LiveProgress({
   useEffect(() => {
     reveal.value = active ? withTiming(1, { duration: 650 }) : 0;
   }, [active, reveal]);
-  // 다섯 자리 값이 바뀔 때만 텍스트 prop을 전달한다.
-  const label = useDerivedValue(() => `복무율 ${percent.value.toFixed(5)}%`);
+  // 프로필 카드와 같은 열 자리까지 흘린다. 친구 카드라고 덜 보여줄 이유가 없다.
+  const label = useDerivedValue(
+    () => `복무율 ${percent.value.toFixed(SERVICE_PERCENT_DECIMALS)}%`,
+  );
   const animatedProps = useAnimatedProps(() => ({
     text: label.value,
     defaultValue: label.value,
@@ -98,7 +103,9 @@ function LiveProgress({
     <View style={styles.root}>
       <View style={styles.meta}>
         {reducedMotion ? (
-          <Text style={styles.percent}>복무율 {slowPercent.toFixed(5)}%</Text>
+          <Text style={styles.percent}>
+            복무율 {slowPercent.toFixed(SERVICE_PERCENT_DECIMALS)}%
+          </Text>
         ) : (
           <AnimatedTextInput
             style={styles.percent}

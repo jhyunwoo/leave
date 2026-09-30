@@ -88,11 +88,17 @@ export function headTagsForPage(page: PrerenderedPage): string {
  * 메신저에 붙였을 때 미리보기가 비지 않게 하기 위해서다. 사람마다 다른 값을
  * 넣지 않는다 — 공개 프로필의 별칭·아이디를 미리보기로 퍼뜨리지 않는 것이
  * 이 화면의 목적에 맞는다. `og:url`도 넣지 않는다(주소가 문서마다 다르다).
+ *
+ * `socialImage`를 주면 브랜드 이미지 대신 그 이미지를 싣는다. 친구 추가 링크의
+ * 셸이 이렇게 자기 카드를 쓴다(`FRIEND_INVITE_SHELL_FILE`).
  */
 export function headTagsForNonIndexable(
   title: string,
   description: string,
-  options: { readonly withSocialCard: boolean },
+  options: {
+    readonly withSocialCard: boolean;
+    readonly socialImage?: { readonly path: string; readonly alt: string };
+  },
 ): string {
   const tags = [
     `<title>${escapeHtml(title)}</title>`,
@@ -100,7 +106,8 @@ export function headTagsForNonIndexable(
     metaTag("name", "robots", "noindex, follow"),
   ];
   if (options.withSocialCard) {
-    const image = absoluteUrl(OG_IMAGE_PATH);
+    const image = absoluteUrl(options.socialImage?.path ?? OG_IMAGE_PATH);
+    const imageAlt = options.socialImage?.alt ?? OG_IMAGE_ALT;
     tags.push(
       metaTag("property", "og:type", "website"),
       metaTag("property", "og:site_name", SITE_NAME),
@@ -110,12 +117,12 @@ export function headTagsForNonIndexable(
       metaTag("property", "og:image", image),
       metaTag("property", "og:image:width", String(OG_IMAGE_WIDTH)),
       metaTag("property", "og:image:height", String(OG_IMAGE_HEIGHT)),
-      metaTag("property", "og:image:alt", OG_IMAGE_ALT),
+      metaTag("property", "og:image:alt", imageAlt),
       metaTag("name", "twitter:card", "summary_large_image"),
       metaTag("name", "twitter:title", title),
       metaTag("name", "twitter:description", description),
       metaTag("name", "twitter:image", image),
-      metaTag("name", "twitter:image:alt", OG_IMAGE_ALT),
+      metaTag("name", "twitter:image:alt", imageAlt),
     );
   }
   return tags.join("\n    ");

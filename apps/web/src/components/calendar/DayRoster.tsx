@@ -21,6 +21,11 @@ import { Avatar } from "../Avatar";
  */
 export function DayRoster(props: {
   attendees: Calendar["attendees"];
+  /**
+   * 부대 없이 내 휴가만 담긴 명단. 남이 없으니 "출타 N명"이 아니라 "내 휴가 N건"으로
+   * 읽히게 하고, 비었을 때는 부대에 들면 무엇이 더 보이는지 알린다.
+   */
+  solo?: boolean;
   date: string;
   /** 출타 명단에서 내 행을 가려내는 데 쓴다. */
   myUserId?: string;
@@ -44,9 +49,15 @@ export function DayRoster(props: {
         className="card-sage"
         style={{ textAlign: "center", padding: "var(--sp-2xl) var(--sp-lg)" }}
       >
-        <p className="body-sm text-body">이 날 출타 예정인 사람이 없어요.</p>
+        <p className="body-sm text-body">
+          {props.solo
+            ? "이 날 잡힌 내 휴가가 없어요."
+            : "이 날 출타 예정인 사람이 없어요."}
+        </p>
         <p className="caption text-mute" style={{ marginTop: 4 }}>
-          내 계획을 먼저 시뮬레이션해보세요.
+          {props.solo
+            ? "부대에 가입하면 같은 부대의 출타 인원도 함께 볼 수 있어요."
+            : "내 계획을 먼저 시뮬레이션해보세요."}
         </p>
       </div>
     );
@@ -56,7 +67,11 @@ export function DayRoster(props: {
     <div
       style={{ display: "flex", flexDirection: "column", gap: "var(--sp-md)" }}
     >
-      <p className="body-sm strong">이 날 출타 {dayAttendees.length}명</p>
+      <p className="body-sm strong">
+        {props.solo
+          ? `이 날 내 휴가 ${dayAttendees.length}건`
+          : `이 날 출타 ${dayAttendees.length}명`}
+      </p>
       <ul
         style={{
           listStyle: "none",
