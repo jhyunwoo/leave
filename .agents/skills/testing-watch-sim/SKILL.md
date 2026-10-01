@@ -34,7 +34,7 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 SENTRY_DISABLE_AUTO_UPLOAD=true \
 Products:
 
 - `…/Debug-iphonesimulator/app.app` (embeds `Watch/watch.app`)
-- `…/Debug-watchsimulator/watch.app` and `watch-widget.appex`
+- `…/Debug-watchsimulator/watch.app` and `watchwidget.appex`
 
 Install both:
 
