@@ -206,10 +206,12 @@
           "android": {
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "enableMinifyInReleaseBuilds": true
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ],
+      "./plugins/with-android-r8-optimize",
       [
         "expo-widgets",
         {
