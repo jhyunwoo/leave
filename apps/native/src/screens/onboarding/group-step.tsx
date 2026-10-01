@@ -3,6 +3,10 @@
  *
  * 사용처: `screens/onboarding/index.tsx`.
  *
+ * 선택지 위에는 공유 그룹과 친구를 나란히 설명한다 — 초대코드를 친구 추가로
+ * 오해하는 사용자가 많았다(`ONBOARDING_GROUP_VS_FRIENDS`). 모양은
+ * `howto-step.tsx`의 왼쪽 선 목록과 같다.
+ *
  * 그룹 만들기는 이름과 최대 인원 두 가지를 함께 받는다. 둘을 다시 쪼개면 아직
  * 존재하지도 않는 그룹의 정원을 먼저 정하게 돼 오히려 헷갈린다.
  */
@@ -11,6 +15,7 @@ import {
   fmtDateTimeFull,
   inviteLink,
   LEGACY_INVITE_CODE_MIN_LENGTH,
+  ONBOARDING_GROUP_VS_FRIENDS,
   unitCreateSchema,
   unitJoinSchema,
 } from "@leave/shared";
@@ -20,7 +25,7 @@ import {
   type IssuedUnitInvite,
 } from "@leave/client";
 import { useState } from "react";
-import { Share, Text } from "react-native";
+import { Share, Text, View } from "react-native";
 import { ContentPanel } from "@/components/content-panel";
 import {
   clearPendingInvite,
@@ -97,7 +102,7 @@ export function GroupStep(props: {
     if (!invite) return;
     void Share.share({
       title: "리브 공유 그룹 초대",
-      message: `리브에서 함께 휴가를 관리해요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`,
+      message: `리브 공유 그룹에 들어와 출타 인원을 함께 맞춰요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`,
     });
   };
 
@@ -107,8 +112,8 @@ export function GroupStep(props: {
     return (
       <StepShell
         step="group"
-        title="동료를 초대해보세요"
-        lead="초대코드는 이 화면에서 한 번만 보여요."
+        title="부대원을 초대해보세요"
+        lead="초대코드는 이 화면에서 한 번만 보여요. 친구가 아니라 같은 부대원에게만 보내세요."
       >
         <ContentPanel>
           <Text selectable style={styles.code} testID="onboarding-invite-code">
@@ -143,11 +148,23 @@ export function GroupStep(props: {
     <StepShell step="group">
       {mode === "choice" ? (
         <>
+          <View style={styles.list} testID="onboarding-group-vs-friends">
+            {ONBOARDING_GROUP_VS_FRIENDS.map((card) => (
+              <View key={card.id} style={styles.card}>
+                <Text style={styles.cardTitle} selectable>
+                  {card.title}
+                </Text>
+                <Text style={styles.cardBody} selectable>
+                  {card.body}
+                </Text>
+              </View>
+            ))}
+          </View>
           <ChoiceCard
             asButton
             wide
             label="새 공유 그룹 만들기"
-            caption="초대코드를 받아 동료에게 전달해요"
+            caption="부대원에게 보낼 초대코드를 받아요"
             onPress={() => setMode("create")}
             testID="onboarding-group-create"
           />
@@ -155,7 +172,7 @@ export function GroupStep(props: {
             asButton
             wide
             label="초대코드로 참여"
-            caption="이미 만들어진 그룹에 들어가요"
+            caption="부대원이 보낸 초대코드를 입력해요"
             onPress={() => setMode("join")}
             testID="onboarding-group-join"
           />
@@ -172,7 +189,10 @@ export function GroupStep(props: {
         </>
       ) : mode === "join" ? (
         <>
-          <Field label="초대코드 6자리">
+          <Field
+            label="초대코드 6자리"
+            hint="공유 그룹을 만든 부대원에게 받은 코드예요. 친구 추가는 친구 탭에서 @아이디로 해요."
+          >
             <Input
               value={code}
               onChangeText={setCode}
@@ -226,6 +246,15 @@ export function GroupStep(props: {
 }
 
 const useStyles = makeStyles(({ colors }) => ({
+  list: { gap: spacing.md },
+  card: {
+    gap: 3,
+    paddingLeft: spacing.md,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primaryNeutral,
+  },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  cardBody: { fontSize: 13.5, lineHeight: 21, color: colors.body },
   code: {
     fontSize: 20,
     fontWeight: "800",

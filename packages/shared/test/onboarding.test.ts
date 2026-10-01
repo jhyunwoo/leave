@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BRANCHES,
   ONBOARDING_COPY,
+  ONBOARDING_GROUP_VS_FRIENDS,
   ONBOARDING_HOWTO,
   ONBOARDING_STEP_IDS,
   REGULAR_OVERNIGHT_DEFAULTS,
@@ -98,6 +99,26 @@ describe("사용법 카드", () => {
         "friends",
       ]),
     );
+  });
+});
+
+describe("공유 그룹과 친구 비교", () => {
+  it("그룹 단계에서 두 기능을 나란히 보여준다", () => {
+    expect(ONBOARDING_GROUP_VS_FRIENDS.map((card) => card.id)).toEqual([
+      "group",
+      "friends",
+    ]);
+  });
+
+  it("친구 설명이 초대코드와 다른 기능임을 밝힌다", () => {
+    // 초대코드로 부대원을 부르는 것을 친구 추가로 오해하는 사용자가 많았다.
+    const friends = ONBOARDING_GROUP_VS_FRIENDS.find(
+      (card) => card.id === "friends",
+    );
+    expect(friends?.body).toContain("@아이디");
+    expect(friends?.body).toContain("초대코드");
+    const howto = ONBOARDING_HOWTO.find((card) => card.id === "friends");
+    expect(howto?.body).toContain("초대코드");
   });
 });
 

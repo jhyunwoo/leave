@@ -70,7 +70,7 @@ env:
 - tapOn:
     id: "onboarding-overnight-skip"
 
-- assertVisible: "함께 쓸 그룹이 있나요?"
+- assertVisible: "같은 부대원과 출타 인원을 맞춰볼까요?"
 - tapOn:
     id: "onboarding-group-skip"
 

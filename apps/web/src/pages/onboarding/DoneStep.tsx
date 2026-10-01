@@ -68,7 +68,10 @@ export function DoneStep(props: {
           </div>
         ))}
       </dl>
-      <p className="ob-note">모두 프로필에서 언제든 바꿀 수 있어요.</p>
+      <p className="ob-note">
+        모두 프로필에서 언제든 바꿀 수 있어요. 친구는 친구 탭에서 @아이디로
+        추가해요.
+      </p>
       <StepError message={props.error} />
       <StepNext
         label="휴가 계획 시작하기"

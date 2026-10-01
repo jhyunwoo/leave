@@ -72,7 +72,7 @@ env:
 - tapOn:
     id: "onboarding-overnight-skip"
 
-- assertVisible: "함께 쓸 그룹이 있나요?"
+- assertVisible: "같은 부대원과 출타 인원을 맞춰볼까요?"
 - tapOn:
     id: "onboarding-group-create"
 - tapOn:
@@ -86,7 +86,7 @@ env:
     id: "onboarding-next"
 
 # 초대코드는 이 화면에서 한 번만 보인다.
-- assertVisible: "동료를 초대해보세요"
+- assertVisible: "부대원을 초대해보세요"
 - tapOn:
     id: "onboarding-invite-done"
 

@@ -6,6 +6,9 @@
  * 초대 링크를 타고 온 사람은 코드가 미리 채워져 있어 곧장 참여 모드로 연다.
  * 여기서 되묻는 건 이미 답한 걸 다시 묻는 셈이다.
  *
+ * 선택지 위에는 공유 그룹과 친구를 나란히 설명한다 — 초대코드를 친구 추가로
+ * 오해하는 사용자가 많았다(`ONBOARDING_GROUP_VS_FRIENDS`).
+ *
  * 그룹 만들기는 이름과 최대 인원 두 가지를 받는다. 둘을 다시 쪼개면 아직
  * 존재하지도 않는 그룹의 정원을 먼저 정하게 돼 오히려 헷갈린다.
  */
@@ -13,6 +16,7 @@
 import {
   fmtDateTimeFull,
   inviteLink,
+  ONBOARDING_GROUP_VS_FRIENDS,
   unitCreateSchema,
   unitJoinSchema,
 } from "@leave/shared";
@@ -85,7 +89,7 @@ export function GroupStep(props: {
 
   const share = async () => {
     if (!invite) return;
-    const text = `리브에서 함께 휴가를 관리해요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`;
+    const text = `리브 공유 그룹에 들어와 출타 인원을 함께 맞춰요.\n${inviteLink(invite.code)}\n초대코드: ${invite.code}`;
     if (navigator.share)
       await navigator.share({ title: "리브 공유 그룹 초대", text });
     else await navigator.clipboard.writeText(text);
@@ -97,8 +101,8 @@ export function GroupStep(props: {
     return (
       <StepShell
         step="group"
-        title="동료를 초대해보세요"
-        lead="초대코드는 이 화면에서 한 번만 보여요."
+        title="부대원을 초대해보세요"
+        lead="초대코드는 이 화면에서 한 번만 보여요. 친구가 아니라 같은 부대원에게만 보내세요."
       >
         <div className="ob-invite" data-testid="onboarding-invite-code">
           {invite.code}
@@ -134,29 +138,42 @@ export function GroupStep(props: {
   return (
     <StepShell step="group">
       {mode === "choice" ? (
-        <div className="ob-choices">
-          <button
-            type="button"
-            className="ob-choice is-wide"
-            onClick={() => setMode("create")}
-            data-testid="onboarding-group-create"
-          >
-            <strong>새 공유 그룹 만들기</strong>
-            <span>초대코드를 받아 동료에게 전달해요</span>
-          </button>
-          <button
-            type="button"
-            className="ob-choice is-wide"
-            onClick={() => setMode("join")}
-            data-testid="onboarding-group-join"
-          >
-            <strong>초대코드로 참여</strong>
-            <span>이미 만들어진 그룹에 들어가요</span>
-          </button>
-        </div>
+        <>
+          <ul className="ob-howto" data-testid="onboarding-group-vs-friends">
+            {ONBOARDING_GROUP_VS_FRIENDS.map((card) => (
+              <li key={card.id}>
+                <strong>{card.title}</strong>
+                <span>{card.body}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="ob-choices">
+            <button
+              type="button"
+              className="ob-choice is-wide"
+              onClick={() => setMode("create")}
+              data-testid="onboarding-group-create"
+            >
+              <strong>새 공유 그룹 만들기</strong>
+              <span>부대원에게 보낼 초대코드를 받아요</span>
+            </button>
+            <button
+              type="button"
+              className="ob-choice is-wide"
+              onClick={() => setMode("join")}
+              data-testid="onboarding-group-join"
+            >
+              <strong>초대코드로 참여</strong>
+              <span>부대원이 보낸 초대코드를 입력해요</span>
+            </button>
+          </div>
+        </>
       ) : mode === "join" ? (
         <>
-          <Field label="초대코드">
+          <Field
+            label="초대코드"
+            hint="공유 그룹을 만든 부대원에게 받은 코드예요. 친구 추가는 친구 탭에서 @아이디로 해요."
+          >
             <input
               className="input ob-input-lg"
               value={code}
