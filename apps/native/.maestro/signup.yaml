@@ -90,9 +90,22 @@ env:
 - tapOn:
     id: "onboarding-invite-done"
 
-# 묻지 않고 알려주는 화면. 여기서 앱을 어디서 쓰는지 익힌다.
-- assertVisible: "리브는 이렇게 써요"
-- assertVisible: "달력에서 휴가를 등록해요"
+# 묻지 않고 알려주는 화면. 기능마다 한 장씩 움직이는 그림으로 보여준다 — 다섯 장을 모두 넘긴다.
+- assertVisible:
+    id: "onboarding-tour-stage"
+- assertVisible: "달력에서 휴가·외박·외출을 등록해요"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "남은 휴가는 적립분 단위로 세요"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "부대원과 출타 인원을 맞춰요"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "부대가 달라도 @아이디로 친구를 맺어요"
+- tapOn:
+    id: "onboarding-next"
+- assertVisible: "복무율과 전역까지 남은 날을 봐요"
 - tapOn:
     id: "onboarding-next"
 

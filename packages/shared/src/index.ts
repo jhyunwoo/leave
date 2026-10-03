@@ -10,6 +10,7 @@
  *  - dates/calendar : 날짜 계산과 한국어 표기
  *  - rank           : 군 종류별 복무 기간과 자동 진급
  *  - onboarding     : 가입 직후 단계 구성과 히어로 일러스트 기하
+ *  - onboarding-tour: 사용법 단계의 기능별 모션 그래픽 장면 데이터
  *  - leave          : 휴가 종류·상태·구간의 정의
  *  - duty-days      : 전역까지 남은 일과일(평일 − 휴일 − 휴가)
  *  - leave-title    : 자동 제목과 사람이 지은 이름의 구분
@@ -40,6 +41,7 @@ export * from "./leave-merge";
 export * from "./leave-grants";
 export * from "./leave-cycle";
 export * from "./onboarding";
+export * from "./onboarding-tour";
 export * from "./regular-overnight";
 export * from "./regular-overnight-guidance";
 export * from "./outing";

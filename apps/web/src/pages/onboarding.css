@@ -714,6 +714,207 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================ 사용법 투어 */
+
+/* 무대. 캔버스(320×260)를 폭에 맞춰 zoom으로 키운다(TourStage 주석). 장면이
+   바뀌면 캔버스만 새로 마운트되고 바탕색은 그대로 옮겨 칠해진다 — 무대 전체가
+   깜빡이는 대신 색이 흘러가며 다음 기능으로 넘어간다. */
+.ob-tour-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 320 / 260;
+  border-radius: 28px;
+  overflow: hidden;
+  transition: background 520ms var(--ease-out);
+  /* 세로 스크롤은 브라우저에 맡기고 가로 쓸기만 받는다. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ob-tour-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  animation: ob-tour-in 520ms var(--ease-out) backwards;
+}
+
+@keyframes ob-tour-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+.ob-tour-node {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.ob-tour-text {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ob-tour-eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--brand);
+}
+
+.ob-tour-eyebrow span {
+  font-weight: 600;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.ob-tour-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: calc(var(--sp-xl) * -1 + var(--sp-sm));
+}
+
+.ob-tour-tabs button {
+  position: relative;
+  overflow: hidden;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--mute);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out);
+}
+
+.ob-tour-tabs button:hover {
+  color: var(--ink);
+  border-color: var(--muted-soft);
+}
+
+.ob-tour-tabs button.is-seen {
+  color: var(--ink);
+  background: var(--primary-pale);
+  border-color: var(--primary-neutral);
+}
+
+.ob-tour-tabs button.is-now {
+  color: var(--canvas);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* 지금 탭 아래 막대가 장면 한 바퀴 길이로 차오른다 — 그림과 같은 박자다. */
+.ob-tour-tabs button.is-now::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--primary);
+  transform-origin: left center;
+  animation: ob-tour-progress var(--tour-ms, 6000ms) linear infinite;
+}
+
+@keyframes ob-tour-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.ob-tour-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+}
+
+.ob-tour-copy > * {
+  animation: ob-step-in 420ms var(--ease-out) backwards;
+}
+
+.ob-tour-copy > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.ob-tour-copy > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.ob-tour-points {
+  margin: calc(var(--sp-xl) * -1 + var(--sp-xs)) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.ob-tour-points li {
+  position: relative;
+  padding-left: 26px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--body);
+}
+
+.ob-tour-points li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 12px;
+  height: 7px;
+  border-left: 2.5px solid var(--brand);
+  border-bottom: 2.5px solid var(--brand);
+  transform: rotate(-45deg);
+}
+
+.ob-tour-nav {
+  display: flex;
+  gap: var(--sp-sm);
+}
+
+.ob-tour-nav .ob-next {
+  flex: 1;
+}
+
+.ob-tour-skip {
+  flex: none;
+  min-height: 54px;
+  padding: 0 22px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.ob-tour-skip:hover {
+  color: var(--ink);
+  background: var(--canvas-soft);
+}
+
 /* -------------------------------------------------------- 좁은 화면 */
 
 @media (max-width: 900px) {
@@ -745,5 +946,33 @@
 
   .ob-choices.is-compact {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 탭 다섯 개가 두 줄로 꺾이면 무대와 버튼이 한 화면에 들지 않는다. 한 줄로
+     두고, 그래도 좁으면 옆으로 민다. */
+  .ob-tour-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: -20px;
+    padding-inline: 20px;
+  }
+
+  .ob-tour-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ob-tour-tabs button {
+    flex: none;
+    padding: 0 12px;
+    font-size: 12.5px;
+  }
+
+  .ob-tour-frame {
+    border-radius: 24px;
+  }
+
+  .ob-tour-points li {
+    font-size: 14px;
   }
 }

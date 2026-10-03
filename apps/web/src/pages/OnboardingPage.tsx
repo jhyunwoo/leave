@@ -6,6 +6,7 @@
  * 화면은 `ONBOARDING_STEP_IDS` 순서를 그대로 따라간다 — 군종에 따라 갈라지지 않는다
  * (`onboardingSteps`). 왼쪽 히어로는 답변이 쌓일수록 자라나므로 단계가 늘어난 만큼
  * 지루해지지 않는다. 마지막 두 단계(`howto`·`done`)는 묻지 않고 알려주는 화면이다.
+ * 사용법 단계에서만 히어로 자리에 기능별 모션 그래픽(`TourStage`)이 대신 선다.
  *
  * 서버 쓰기는 세 곳뿐이다.
  *  - 계급 단계의 "다음" : 프로필 다섯 필드를 한 벌로 PUT
@@ -22,6 +23,7 @@
 import { ActionIcon } from "../components/ActionIcon";
 
 import {
+  ONBOARDING_TOUR,
   REGULAR_OVERNIGHT_DEFAULTS,
   regularOvernightIntervalForm,
   regularOvernightIntervalPayload,
@@ -62,6 +64,7 @@ import {
   WelcomeStep,
 } from "./onboarding/ProfileSteps";
 import { ServiceHero } from "./onboarding/ServiceHero";
+import { TourStage } from "./onboarding/TourStage";
 import { UsernameStep } from "./onboarding/UsernameStep";
 import "./onboarding.css";
 
@@ -103,6 +106,10 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
     props.status.regularOvernight?.carryOver ?? false,
   );
   const [inGroup, setInGroup] = useState(Boolean(props.status.unitId));
+  // 사용법 투어에서 몇 번째 장면인지. 무대와 패널이 함께 보고, "뒤로"가 장면부터
+  // 되돌린다 — 그래서 HowtoStep 안이 아니라 여기서 든다.
+  const [tourIndex, setTourIndex] = useState(0);
+  const tourScene = ONBOARDING_TOUR[tourIndex] ?? ONBOARDING_TOUR[0];
   // 이름은 이 단계에서 곧바로 서버에 저장된다(UsernameStep 주석). 여기서 드는 값은
   // 뒤로 갔다 돌아왔을 때 입력칸을 비우지 않기 위한 것뿐이다.
   const [username, setUsername] = useState(props.status.username ?? "");
@@ -118,7 +125,10 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
 
   // 단계가 바뀌면 새 질문으로 포커스를 옮긴다. 이게 없으면 키보드·스크린리더
   // 사용자는 "다음"을 누른 뒤에도 사라진 버튼 자리에 남는다.
+  // 스크롤도 맨 위로 되돌린다. 긴 단계(그룹)의 아래쪽 버튼을 누르고 넘어오면 새
+  // 단계가 그 스크롤 자리에서 열려, 좁은 화면에서는 위쪽 그림이 잘린 채 시작했다.
   useEffect(() => {
+    window.scrollTo({ top: 0 });
     const heading =
       titleRef.current?.querySelector<HTMLElement>("[data-ob-title]");
     heading?.setAttribute("tabindex", "-1");
@@ -136,6 +146,7 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
   };
 
   const back = () => {
+    if (step === "howto" && tourIndex > 0) return setTourIndex(tourIndex - 1);
     const previous = order[index - 1];
     if (previous) go(previous);
   };
@@ -242,16 +253,30 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
 
       <div className="ob-body">
         <aside className="ob-stage">
-          <ServiceHero
-            step={step}
-            branch={branch}
-            name={name}
-            enlistedAt={enlistedAt}
-            dischargeAt={dischargeAt}
-            overnightStartDate={startDate}
-            inGroup={inGroup}
-            today={today}
-          />
+          {step === "howto" && tourScene ? (
+            <TourStage
+              scene={tourScene}
+              onSwipe={(direction) =>
+                setTourIndex((current) =>
+                  Math.min(
+                    Math.max(current + direction, 0),
+                    ONBOARDING_TOUR.length - 1,
+                  ),
+                )
+              }
+            />
+          ) : (
+            <ServiceHero
+              step={step}
+              branch={branch}
+              name={name}
+              enlistedAt={enlistedAt}
+              dischargeAt={dischargeAt}
+              overnightStartDate={startDate}
+              inGroup={inGroup}
+              today={today}
+            />
+          )}
         </aside>
 
         <section
@@ -339,7 +364,11 @@ export function OnboardingPage(props: { status: OnboardingStatus }) {
               onSkip={() => void submitOvernight(true)}
             />
           ) : step === "howto" ? (
-            <HowtoStep onNext={advance} />
+            <HowtoStep
+              index={tourIndex}
+              onIndexChange={setTourIndex}
+              onNext={advance}
+            />
           ) : step === "group" ? (
             <GroupStep
               pendingCode={readPendingInvite()}

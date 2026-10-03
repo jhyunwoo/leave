@@ -3,7 +3,6 @@ import {
   BRANCHES,
   ONBOARDING_COPY,
   ONBOARDING_GROUP_VS_FRIENDS,
-  ONBOARDING_HOWTO,
   ONBOARDING_STEP_IDS,
   REGULAR_OVERNIGHT_DEFAULTS,
   onboardingResumeStep,
@@ -77,31 +76,6 @@ describe("온보딩 단계", () => {
   });
 });
 
-describe("사용법 카드", () => {
-  it("웹과 앱이 같은 문구를 쓰도록 한 벌만 둔다", () => {
-    expect(ONBOARDING_HOWTO.length).toBeGreaterThanOrEqual(4);
-    const ids = ONBOARDING_HOWTO.map((card) => card.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const card of ONBOARDING_HOWTO) {
-      expect(card.title.length).toBeGreaterThan(0);
-      expect(card.body.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("달력·출타 인원·잔여·친구를 모두 설명한다", () => {
-    // 어느 하나가 빠지면 처음 들어온 사람이 그 화면을 못 찾는다.
-    expect(ONBOARDING_HOWTO.map((card) => card.id)).toEqual(
-      expect.arrayContaining([
-        "calendar",
-        "overage",
-        "notify",
-        "grants",
-        "friends",
-      ]),
-    );
-  });
-});
-
 describe("공유 그룹과 친구 비교", () => {
   it("그룹 단계에서 두 기능을 나란히 보여준다", () => {
     expect(ONBOARDING_GROUP_VS_FRIENDS.map((card) => card.id)).toEqual([
@@ -117,8 +91,6 @@ describe("공유 그룹과 친구 비교", () => {
     );
     expect(friends?.body).toContain("@아이디");
     expect(friends?.body).toContain("초대코드");
-    const howto = ONBOARDING_HOWTO.find((card) => card.id === "friends");
-    expect(howto?.body).toContain("초대코드");
   });
 });
 

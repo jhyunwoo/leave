@@ -74,10 +74,10 @@ env:
 - tapOn:
     id: "onboarding-group-skip"
 
-# 묻지 않고 알려주는 화면 하나를 지나 완료로 간다.
-- assertVisible: "리브는 이렇게 써요"
+# 묻지 않고 알려주는 사용법 투어는 건너뛰고 완료로 간다.
+- assertVisible: "달력에서 휴가·외박·외출을 등록해요"
 - tapOn:
-    id: "onboarding-next"
+    id: "onboarding-tour-skip"
 
 - assertVisible: "준비 끝났어요"
 - tapOn:

@@ -163,10 +163,21 @@ test("회원가입 후 이메일 인증과 한 화면 한 입력 온보딩 10단
   await expect(step("group")).toBeVisible();
   await page.getByTestId("onboarding-group-skip").click();
 
-  // 묻지 않고 알려주는 화면 — 처음 들어온 사람이 앱을 어디서 쓰는지 여기서 익힌다.
+  // 묻지 않고 알려주는 화면 — 기능마다 한 장씩 움직이는 그림으로 보여준다.
+  // "다음"은 장면을 넘기고, 상단 "뒤로"는 단계보다 장면을 먼저 되돌린다.
   await expect(step("howto")).toBeVisible();
-  await expect(step("howto")).toContainText("달력에서 휴가를 등록해요");
-  await expect(step("howto")).toContainText("보유 휴가에서 잔여를 확인해요");
+  await expect(page.getByTestId("onboarding-tour-stage")).toBeVisible();
+  const scene = (id: string) => page.getByTestId(`onboarding-tour-scene-${id}`);
+  await expect(scene("leave")).toContainText("달력에서 휴가·외박·외출을");
+  await next.click();
+  await expect(scene("grants")).toBeVisible();
+  await page.getByTestId("onboarding-back").click();
+  await expect(scene("leave")).toBeVisible();
+  for (const id of ["grants", "unit", "friends", "progress"]) {
+    await next.click();
+    await expect(scene(id)).toBeVisible();
+  }
+  await expect(next).toHaveText(/다 봤어요/);
   await next.click();
 
   // 마지막 요약에는 앞서 답한 값이 그대로 되짚어져야 한다.
