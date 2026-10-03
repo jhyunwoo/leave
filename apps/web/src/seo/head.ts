@@ -34,20 +34,26 @@ export const INDEXABLE_ROBOTS =
   "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
 
 /**
- * 첫 페인트 전에 세션 유무를 알려 주는 최소 스크립트.
+ * 첫 페인트 전에 `<html>`에 두 가지 표시를 남기는 최소 스크립트.
  *
- * 랜딩은 정적으로 미리 그려져 있어 HTML만으로 바로 보인다. 그런데 이미
- * 로그인한 사람이 `/`를 열면 그 홍보 화면이 잠깐 보였다가 앱으로 바뀐다.
- * 이 스크립트가 <html>에 표시를 남기면 CSS가 첫 페인트 전에 미리 그린 조각을
- * 감춰, 로그인 사용자의 화면 전환이 지금과 똑같이 유지된다.
+ * - `data-platform` — 아이폰·아이패드면 `ios`, 안드로이드면 `android`. 랜딩의
+ *   다운로드 버튼을 CSS가 이 표시로 고른다(`seo/platform.ts`의 `storePlatform`과
+ *   같은 판정). 첫 페인트 뒤에 고르면 휴대폰에서 로그인 버튼이 보였다가 스토어
+ *   배지로 바뀌며 자리가 흔들린다.
+ * - `data-session` — 랜딩은 정적으로 미리 그려져 있어 HTML만으로 바로 보인다.
+ *   그런데 이미 로그인한 사람이 `/`를 열면 그 홍보 화면이 잠깐 보였다가 앱으로
+ *   바뀐다. 이 표시가 있으면 CSS가 첫 페인트 전에 미리 그린 조각을 감춘다.
+ *
+ * 전역 변수를 남기지 않게 즉시 실행 함수로 감싼다. 기기 판정을 `try` 바깥에 두는 이유: 사파리 개인 정보 보호 모드처럼
+ * localStorage 접근이 던지는 환경에서도 다운로드 버튼은 맞게 나와야 한다.
  *
  * 인라인인 이유: 외부 파일로 두면 렌더를 막는 왕복이 하나 늘어 정작 검색
  * 유입(비로그인)의 LCP가 나빠진다. CSP는 `'unsafe-inline'` 대신 이 문자열의
  * sha256 해시 하나만 허용한다(`public/_headers`). 내용이 바뀌면
  * `test/seo-headers.test.ts`가 새 해시를 알려 준다.
  */
-export const SESSION_FLAG_SCRIPT =
-  'try{if(localStorage.getItem("leave.token"))document.documentElement.setAttribute("data-session","1")}catch(e){}';
+export const FIRST_PAINT_SCRIPT =
+  '(function(){var d=document.documentElement,u=navigator.userAgent,p=/Android/i.test(u)?"android":/iPhone|iPad|iPod/.test(u)||/Macintosh/.test(u)&&navigator.maxTouchPoints>1?"ios":"";if(p)d.setAttribute("data-platform",p);try{if(localStorage.getItem("leave.token"))d.setAttribute("data-session","1")}catch(e){}})()';
 
 function metaTag(attr: "name" | "property", key: string, value: string) {
   return `<meta ${attr}="${key}" content="${escapeHtml(value)}" />`;

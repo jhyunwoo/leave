@@ -1,4 +1,4 @@
-/** 알림 수신 설정 화면(초과 알림 등 종류별 on/off). */
+/** 알림 수신 설정 화면(초과 알림·친구·복무 기념일 등 종류별 on/off). */
 
 import { Link } from "react-router";
 import {
@@ -83,6 +83,53 @@ export function NotificationSettingsPage() {
           }
           testId="notification-pref-friend-leave"
           label="친구가 새 휴가를 등록했을 때"
+        />
+      </section>
+
+      {/* 복무 기념일 — 내 것과 친구 것, 전역 D-n과 진급을 따로 끈다. */}
+      <section
+        className="card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-md)",
+        }}
+      >
+        <h2 className="display-xs">복무 기념일</h2>
+        <p className="body-sm text-body">
+          전역 600·500·400·300·200·100·50·10일 전과 하루 전, 일병·상병·병장
+          진급일 아침에 축하 알림을 보내요. 친구 기념일 알림은 복무율을 공유한
+          친구의 것만 와요.
+        </p>
+        <PrefToggle
+          checked={prefs.data?.preferences.dischargeCountdown ?? true}
+          onChange={(dischargeCountdown) =>
+            void updatePrefs.mutateAsync({ dischargeCountdown })
+          }
+          testId="notification-pref-discharge-countdown"
+          label="내 전역 D-n"
+        />
+        <PrefToggle
+          checked={prefs.data?.preferences.promotion ?? true}
+          onChange={(promotion) => void updatePrefs.mutateAsync({ promotion })}
+          testId="notification-pref-promotion"
+          label="내 진급"
+        />
+        <PrefToggle
+          checked={prefs.data?.preferences.friendDischargeCountdown ?? true}
+          onChange={(friendDischargeCountdown) =>
+            void updatePrefs.mutateAsync({ friendDischargeCountdown })
+          }
+          testId="notification-pref-friend-discharge-countdown"
+          label="친구의 전역 D-n"
+        />
+        <PrefToggle
+          checked={prefs.data?.preferences.friendPromotion ?? true}
+          onChange={(friendPromotion) =>
+            void updatePrefs.mutateAsync({ friendPromotion })
+          }
+          testId="notification-pref-friend-promotion"
+          label="친구의 진급"
         />
       </section>
 

@@ -399,6 +399,9 @@ export const notifications = sqliteTable(
     friendLeaveJson: text("friend_leave_json"),
     // 친구 요청 알림이면 요청을 보낸 사람. 알림함에서 그 요청으로 곧장 간다(0036).
     friendRequestUserId: text("friend_request_user_id"),
+    // 복무 기념일 알림이면 어떤 기념일인지와 누구의 기념일인지(0037).
+    // 알림함이 내 것이면 축하 화면으로, 친구 것이면 그 친구 프로필로 잇는다.
+    milestoneJson: text("milestone_json"),
     read: integer("read", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     // 사용자가 알림함에서 지운 시각. 값이 있으면 사용자 API에서 보이지 않는다.
@@ -608,8 +611,42 @@ export const userNotificationPrefs = sqliteTable("user_notification_prefs", {
   friendLeave: integer("friend_leave", { mode: "boolean" })
     .notNull()
     .default(true),
+  // 복무 기념일 네 종류(0037). 내 것과 친구 것, 전역 D-n과 진급을 따로 끈다.
+  dischargeCountdown: integer("discharge_countdown", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  promotion: integer("promotion", { mode: "boolean" }).notNull().default(true),
+  friendDischargeCountdown: integer("friend_discharge_countdown", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(true),
+  friendPromotion: integer("friend_promotion", { mode: "boolean" })
+    .notNull()
+    .default(true),
   updatedAt: text("updated_at").notNull(),
 });
+
+/**
+ * 이미 보낸 복무 기념일. 같은 기념일 알림이 두 번 가지 않게 하는 장부다.
+ *
+ * cron은 하루에 두 번 돌고(재시도·수동 실행까지 치면 더), 그때마다 "오늘 기념일인
+ * 사람"을 다시 고른다. `(user_id, milestone_key, occurred_on)`이 기본키라
+ * `INSERT ... ON CONFLICT DO NOTHING RETURNING`이 돌려준 행만 새로 알리면 된다 —
+ * "보냈는지 보고 보낸다"는 두 실행이 겹치면 둘 다 보낸다.
+ */
+export const milestoneDeliveries = sqliteTable(
+  "milestone_deliveries",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    milestoneKey: text("milestone_key").notNull(),
+    occurredOn: text("occurred_on").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.milestoneKey, t.occurredOn] })],
+);
 
 /**
  * 친구에게 보여줄 항목. 모든 친구에게 같게 적용된다.

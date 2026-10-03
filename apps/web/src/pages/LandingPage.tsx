@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { APP_STORE_URL, PLAY_STORE_URL, storePlatform } from "../seo/platform";
 import { BrandLockup } from "../components/BrandLockup";
 import "./landing.css";
 
@@ -274,9 +275,69 @@ function useReveal() {
   }, []);
 }
 
+/**
+ * CTA 둘째 버튼 — 휴대폰이면 그 기기의 스토어 배지, 아니면 웹 로그인.
+ *
+ * 셋을 모두 그려 두고 CSS가 `<html data-platform>`으로 하나만 보인다. 미리 그린
+ * HTML에 기기 정보가 없으므로 React가 고르면 hydrate 뒤에야 바뀐다
+ * (`seo/platform.ts`). 지원하지 않는 기기(데스크톱 등)는 표시가 없어 로그인이 남는다.
+ */
+function StoreOrLogin() {
+  return (
+    <>
+      <a
+        className="lp-store lp-store--ios"
+        href={APP_STORE_URL}
+        target="_blank"
+        rel="noopener"
+      >
+        <img
+          src="/badges/app-store-ko.svg"
+          alt="App Store에서 다운로드하기"
+          width={156}
+          height={48}
+        />
+      </a>
+      <a
+        className="lp-store lp-store--android"
+        href={PLAY_STORE_URL}
+        target="_blank"
+        rel="noopener"
+      >
+        <img
+          src="/badges/google-play-ko.png"
+          alt="Google Play에서 다운로드"
+          width={124}
+          height={48}
+        />
+      </a>
+      <Link
+        to="/login"
+        className="lp-btn lp-btn--ghost lp-btn--lg lp-store-fallback"
+      >
+        로그인
+      </Link>
+    </>
+  );
+}
+
+/** 인라인 스크립트가 돌지 않은 채 랜딩에 온 경우(앱 안에서 넘어옴) 같은 표시를 남긴다. */
+function usePlatformFlag() {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (root.hasAttribute("data-platform")) return;
+    const platform = storePlatform(
+      navigator.userAgent,
+      navigator.maxTouchPoints,
+    );
+    if (platform) root.setAttribute("data-platform", platform);
+  }, []);
+}
+
 export function LandingPage() {
   const [stuck, setStuck] = useState(false);
   useReveal();
+  usePlatformFlag();
 
   useEffect(() => {
     const onScroll = () => setStuck(window.scrollY > 12);
@@ -329,9 +390,7 @@ export function LandingPage() {
                 >
                   무료로 시작하기
                 </Link>
-                <Link to="/login" className="lp-btn lp-btn--ghost lp-btn--lg">
-                  로그인
-                </Link>
+                <StoreOrLogin />
               </div>
               <p className="lp-hero-note">
                 국방부·각 군·소속 부대와 무관한 비공식 참고 도구입니다. 화면의
@@ -524,9 +583,7 @@ export function LandingPage() {
                 >
                   무료로 시작하기
                 </Link>
-                <Link to="/login" className="lp-btn lp-btn--ghost lp-btn--lg">
-                  로그인
-                </Link>
+                <StoreOrLogin />
               </div>
             </div>
           </div>

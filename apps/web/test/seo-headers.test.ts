@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { SESSION_FLAG_SCRIPT } from "../src/seo/head";
+import { FIRST_PAINT_SCRIPT } from "../src/seo/head";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const headers = readFileSync(join(webRoot, "public", "_headers"), "utf8");
@@ -21,7 +21,7 @@ const csp = /Content-Security-Policy:\s*(.+)/.exec(headers)?.[1]?.trim() ?? "";
 describe("CSP", () => {
   it("인라인 스크립트는 해시 하나만 허용한다", () => {
     const digest = createHash("sha256")
-      .update(SESSION_FLAG_SCRIPT, "utf8")
+      .update(FIRST_PAINT_SCRIPT, "utf8")
       .digest("base64");
     expect(
       csp,

@@ -48,6 +48,7 @@ import {
   queryPersistenceOptions,
 } from "@/lib/query-persistence";
 import { resolveStartupGate } from "@/lib/startup-gate";
+import { useMilestonePushNavigation } from "@/lib/milestone-navigation";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import type { WidgetState } from "@/widgets/payload";
 import { WidgetSync } from "@/widgets/widget-sync";
@@ -194,6 +195,8 @@ function RootNavigator() {
 
   // 인증·온보딩·이름 설정을 모두 지난 순간, 로그인 전에 눌렀던 프로필 링크로 간다.
   usePendingDeepLink(ready, canBrowse);
+  // 복무 기념일 푸시를 누르면 축하 화면(친구 기념일이면 그 친구)으로 간다.
+  useMilestonePushNavigation(canBrowse);
 
   const sessionReady = ready && token !== undefined;
 
@@ -281,6 +284,16 @@ function RootNavigator() {
             options={{
               headerShown: false,
               title: "복무율",
+              contentStyle: { backgroundColor: colors.canvasSoft },
+            }}
+          />
+          {/* 복무 기념일 축하. 알림함이나 기념일 푸시에서 열리고, 복무율처럼
+            탭바까지 덮는 전체 화면이라 화면 안의 닫기 버튼만 쓴다. */}
+          <Stack.Screen
+            name="celebrate"
+            options={{
+              headerShown: false,
+              title: "축하해요",
               contentStyle: { backgroundColor: colors.canvasSoft },
             }}
           />

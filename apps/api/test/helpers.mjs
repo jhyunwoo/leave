@@ -114,9 +114,15 @@ export function openTestDb() {
   return db;
 }
 
-/** cron 트리거를 로컬에서 실행시키는 wrangler dev의 진입점. */
-export async function runScheduled() {
-  const res = await fetch(`${BASE}/cdn-cgi/handler/scheduled`);
+/**
+ * cron 트리거를 로컬에서 실행시키는 wrangler dev의 진입점.
+ *
+ * @param time 예약 시각(epoch ms). 주면 그 시각에 깨어난 것처럼 돈다 — 기념일
+ *   알림처럼 "오늘"이 뜻을 가지는 단계를 원하는 날로 돌릴 때 쓴다.
+ */
+export async function runScheduled(time) {
+  const query = time === undefined ? "" : `?time=${time}`;
+  const res = await fetch(`${BASE}/cdn-cgi/handler/scheduled${query}`);
   assert.equal(res.status, 200, "scheduled 핸들러 호출 실패");
   // waitUntil 안에서 도는 작업이라 응답 뒤에도 잠깐 이어진다.
   await new Promise((r) => setTimeout(r, 800));

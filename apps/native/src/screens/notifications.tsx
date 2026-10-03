@@ -12,7 +12,8 @@
  *              선택 상태와 안 읽음 표시가 진다.
  *
  * 친구 휴가 알림은 비교 모달로, 친구 요청 알림은 친구 탭의 그 요청으로,
- * 초과 알림은 해당 날짜의 내 휴가로 연결한다.
+ * 초과 알림은 해당 날짜의 내 휴가로, 내 복무 기념일은 축하 화면으로, 친구의
+ * 기념일은 그 친구의 프로필로 연결한다.
  */
 
 import { fmtDateTimeShort, fmtDateShort } from "@leave/shared/calendar";
@@ -41,6 +42,7 @@ import { ContentPanel } from "@/components/content-panel";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { FriendLeaveNotificationModal } from "@/components/friend-leave-notification-modal";
 import { notify } from "@/lib/dialog";
+import { useOpenMilestone } from "@/lib/milestone-navigation";
 import { useRefresh } from "@/lib/use-refresh";
 import { layout, makeStyles, radius, spacing, useColors } from "@/theme";
 
@@ -68,6 +70,7 @@ export function NotificationsScreen() {
     date?: string;
   } | null>(null);
   const router = useRouter();
+  const openMilestone = useOpenMilestone();
 
   const [pickedId, setPickedId] = useState<string | null>(null);
 
@@ -128,6 +131,10 @@ export function NotificationsScreen() {
     }
     if (notification.friendLeave) {
       setFriendDetail({ notification, date: dates[0] });
+      return;
+    }
+    if (notification.milestone) {
+      openMilestone(notification.milestone);
       return;
     }
     if (dates.length === 0) {
@@ -489,6 +496,11 @@ export function NotificationsScreen() {
 function detailLabel(notification: Notification): string {
   if (notification.friendRequest) return "친구 요청 보기";
   if (notification.friendLeave) return "친구 휴가 상세 보기";
+  if (notification.milestone) {
+    return notification.milestone.userId
+      ? "친구 프로필 보기"
+      : "축하 화면 보기";
+  }
   return "휴가 상세 보기";
 }
 

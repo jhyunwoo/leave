@@ -2,7 +2,7 @@
  * 알림함·알림 설정 라우트.
  *
  * 마운트 위치: `/notifications` (apps/api/src/index.ts).
- * 알림 본문은 서버가 만들고(lib/overage.ts) 여기서는 조회·읽음 처리·삭제·수신 설정만 한다.
+ * 알림 본문은 서버가 만들고(lib/overage.ts, lib/social-notify.ts, lib/milestone-notify.ts) 여기서는 조회·읽음 처리·삭제·수신 설정만 한다.
  *
  * 삭제는 soft delete다 — `deletedAt`을 찍고 행은 남긴다. 그래서 여기의 모든 조회는
  * `isNull(notifications.deletedAt)`을 함께 걸어야 한다. 하나라도 빠뜨리면 지운 알림이
@@ -23,6 +23,7 @@ import {
   errorResponse,
   friendLeaveNotificationSchema,
   jsonContent,
+  milestoneNotificationSchema,
   notificationPrefsResponseSchema,
   notificationSchema,
   okSchema,
@@ -139,6 +140,10 @@ const DEFAULT_PREFS = {
   unitNotice: true,
   friendRequest: true,
   friendLeave: true,
+  dischargeCountdown: true,
+  promotion: true,
+  friendDischargeCountdown: true,
+  friendPromotion: true,
 };
 
 function parseDates(row: Pick<NotificationRow, "datesJson">): string[] {
@@ -172,6 +177,7 @@ export const notificationRoutes = app
           datesJson: notifications.datesJson,
           friendLeaveJson: notifications.friendLeaveJson,
           friendRequestUserId: notifications.friendRequestUserId,
+          milestoneJson: notifications.milestoneJson,
           read: notifications.read,
           createdAt: notifications.createdAt,
         })
@@ -206,6 +212,7 @@ export const notificationRoutes = app
           dates: parseDates(row),
           friendLeave: parseFriendLeave(row.friendLeaveJson),
           friendRequest: parseFriendRequest(row),
+          milestone: parseMilestone(row.milestoneJson),
           read: row.read,
           createdAt: row.createdAt,
         })),
@@ -287,6 +294,10 @@ export const notificationRoutes = app
               unitNotice: row.unitNotice,
               friendRequest: row.friendRequest,
               friendLeave: row.friendLeave,
+              dischargeCountdown: row.dischargeCountdown,
+              promotion: row.promotion,
+              friendDischargeCountdown: row.friendDischargeCountdown,
+              friendPromotion: row.friendPromotion,
             }
           : DEFAULT_PREFS,
       },
@@ -314,6 +325,20 @@ export const notificationRoutes = app
         DEFAULT_PREFS.friendRequest,
       friendLeave:
         input.friendLeave ?? existing?.friendLeave ?? DEFAULT_PREFS.friendLeave,
+      dischargeCountdown:
+        input.dischargeCountdown ??
+        existing?.dischargeCountdown ??
+        DEFAULT_PREFS.dischargeCountdown,
+      promotion:
+        input.promotion ?? existing?.promotion ?? DEFAULT_PREFS.promotion,
+      friendDischargeCountdown:
+        input.friendDischargeCountdown ??
+        existing?.friendDischargeCountdown ??
+        DEFAULT_PREFS.friendDischargeCountdown,
+      friendPromotion:
+        input.friendPromotion ??
+        existing?.friendPromotion ??
+        DEFAULT_PREFS.friendPromotion,
     };
     await db
       .insert(userNotificationPrefs)
@@ -337,6 +362,16 @@ function parseFriendRequest(
   return row.title === FRIEND_REQUEST_NOTIFICATION_TITLE
     ? { userId: null }
     : null;
+}
+
+function parseMilestone(json: string | null) {
+  if (!json) return null;
+  try {
+    const parsed = milestoneNotificationSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseFriendLeave(json: string | null) {

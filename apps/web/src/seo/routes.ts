@@ -182,6 +182,7 @@ export const SPA_ROUTES: readonly SpaRoute[] = [
     title: "복무 진행률",
     robots: "noindex, follow",
   },
+  { pattern: "/celebrate", title: "축하해요", robots: "noindex, follow" },
 ] as const;
 
 /** 로그인한 사용자가 `/`에서 보는 화면. 랜딩과 주소가 같아 표에 따로 둔다. */

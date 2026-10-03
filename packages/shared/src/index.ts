@@ -9,6 +9,7 @@
  * 구성:
  *  - dates/calendar : 날짜 계산과 한국어 표기
  *  - rank           : 군 종류별 복무 기간과 자동 진급
+ *  - milestones     : 전역 D-n·진급 기념일 판정과 알림 문구
  *  - onboarding     : 가입 직후 단계 구성과 히어로 일러스트 기하
  *  - onboarding-tour: 사용법 단계의 기능별 모션 그래픽 장면 데이터
  *  - leave          : 휴가 종류·상태·구간의 정의
@@ -28,6 +29,7 @@
 
 export * from "./dates";
 export * from "./rank";
+export * from "./milestones";
 export * from "./overage";
 export * from "./schemas";
 export * from "./calendar";

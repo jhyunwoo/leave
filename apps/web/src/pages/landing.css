@@ -163,6 +163,38 @@
   margin-top: 32px;
 }
 
+/*
+ * CTA의 스토어 배지. 기본은 숨기고, 첫 페인트 전 인라인 스크립트가 남긴
+ * <html data-platform>에 맞는 배지 하나만 보인다. 그때는 웹 로그인 버튼이 빠진다.
+ * 배지 높이는 옆의 큰 버튼(48px)에 맞춘다.
+ */
+.lp-store {
+  display: none;
+  flex-shrink: 0;
+  border-radius: 8px;
+  line-height: 0;
+}
+
+.lp-store img {
+  display: block;
+  width: auto;
+  height: 48px;
+}
+
+.lp-store:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+html[data-platform="ios"] .lp-store--ios,
+html[data-platform="android"] .lp-store--android {
+  display: inline-flex;
+}
+
+html[data-platform] .lp-store-fallback {
+  display: none;
+}
+
 .lp-cal {
   position: relative;
   padding: 0 20px 20px;

@@ -8,19 +8,22 @@
  *  2) CORS       — 허용 오리진은 환경변수로 받는다.
  *  3) 최소 버전  — 출타 계산 규칙이 바뀐 뒤의 구버전 앱을 끊는다.
  *
- * fetch 말고 `scheduled`도 내보낸다 — 보관 기간이 지난 로그와 만료 세션을 지우고,
- * 복귀일이 지난 계획을 "복귀 완료"로 굳힌다(wrangler.jsonc의 cron 트리거).
+ * fetch 말고 `scheduled`도 내보낸다 — 복무 기념일(전역 D-n·진급)을 알리고, 보관
+ * 기간이 지난 로그와 만료 세션을 지우고, 복귀일이 지난 계획을 "복귀 완료"로 굳힌다
+ * (wrangler.jsonc의 cron 트리거).
  *
  * 마지막에 체이닝된 `routes`의 타입이 그대로 `AppType`이 되고, 웹/앱이
  * `hc<AppType>()`으로 가져가 컴파일 타임에 경로·입력·응답을 맞춘다.
  * 즉 라우트를 고치면 클라이언트에서 타입 오류로 즉시 드러난다.
  */
 
+import { todayInSeoul } from "@leave/shared";
 import { Scalar } from "@scalar/hono-api-reference";
 import { drizzle } from "drizzle-orm/d1";
 import { cors } from "hono/cors";
 import { createApp, type AppBindings } from "./lib/app";
 import { completePastLeaves } from "./lib/leave-completion";
+import { notifyServiceMilestones } from "./lib/milestone-notify";
 import { pruneExpiredData, resolveRetentionDays } from "./lib/retention";
 import { accessLogMiddleware } from "./middleware/access-log";
 import { minVersionMiddleware } from "./middleware/min-version";
@@ -149,19 +152,34 @@ export default {
   fetch: app.fetch,
 
   /**
-   * 매일 도는 정기 작업.
+   * 매일 도는 정기 작업. cron이 둘이다(wrangler.jsonc) — 09:00 KST와 12:10 KST.
    *
-   *  1) 보관 기간이 지난 접속 기록·푸시 로그와 만료된 세션을 지운다.
-   *  2) 복귀일이 지난 계획을 "복귀 완료"로 굳힌다.
+   *  1) 오늘의 복무 기념일(전역 D-n·진급)을 본인과 친구들에게 알린다.
+   *  2) 보관 기간이 지난 접속 기록·푸시 로그와 만료된 세션을 지운다.
+   *  3) 복귀일이 지난 계획을 "복귀 완료"로 굳힌다.
    *
-   * 둘은 서로에게 기댈 것이 없다. 한 try로 묶으면 앞의 실패가 뒤를 통째로 건너뛰므로
+   * 어느 cron이든 셋을 모두 돈다. 셋 다 두 번 돌아도 결과가 같고(기념일은
+   * `milestone_deliveries` 장부로 한 번만 보낸다), 그래서 아침 실행이 실패해도
+   * 낮 실행이 기념일 알림을 이어서 보낸다. 아침 cron이 따로 있는 것은 축하 알림이
+   * 점심이 아니라 하루를 시작할 때 닿게 하려는 것이다.
+   *
+   * 셋은 서로에게 기댈 것이 없다. 한 try로 묶으면 앞의 실패가 뒤를 통째로 건너뛰므로
    * 단계마다 따로 감싼다. 순차로 도는 것은 D1 왕복을 겹치지 않게 하려는 것이다.
    */
   async scheduled(
-    _event: ScheduledController,
+    event: ScheduledController,
     env: AppBindings,
+    ctx: ExecutionContext,
   ): Promise<void> {
     const db = drizzle(env.DB);
+    await runScheduledStep("service-milestones", () =>
+      notifyServiceMilestones(db, {
+        // "오늘"은 cron이 예약된 시각에서 뽑는다. 늦게 깨어나도 그날의 기념일을 보내고,
+        // 테스트는 `?time=`으로 원하는 날을 고를 수 있다.
+        today: todayInSeoul(new Date(event.scheduledTime)),
+        waitUntil: (promise) => ctx.waitUntil(promise),
+      }),
+    );
     await runScheduledStep("retention", () =>
       pruneExpiredData(db, {
         retentionDays: resolveRetentionDays(env.LOG_RETENTION_DAYS),

@@ -1,6 +1,7 @@
 /**
  * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로,
- * 친구 요청 알림은 친구 화면의 그 요청으로 이어진다.
+ * 친구 요청 알림은 친구 화면의 그 요청으로, 내 복무 기념일 알림은 축하 화면으로,
+ * 친구의 기념일 알림은 그 친구의 프로필로 이어진다.
  */
 
 import "./workspace.css";
@@ -17,7 +18,7 @@ import {
   useNotifications,
   type NotificationList,
 } from "@leave/client";
-import { fmtDateTimeShort, fmtDateShort } from "@leave/shared";
+import { fmtDateTimeShort, fmtDateShort, milestoneParams } from "@leave/shared";
 
 type Notification = NotificationList["notifications"][number];
 
@@ -75,6 +76,17 @@ export function NotificationsPage() {
     }
     if (notification.friendLeave) {
       setFriendDetail({ notification, date: dates[0] });
+      return;
+    }
+    if (notification.milestone) {
+      // 내 기념일은 축하 화면으로, 친구의 기념일은 그 친구의 프로필로 간다.
+      // 옛 주소 `/friends/:userId`가 친구 목록에서 이름을 찾아 정본 프로필로 넘긴다.
+      const { userId, ...milestone } = notification.milestone;
+      void navigate(
+        userId
+          ? `/friends/${encodeURIComponent(userId)}`
+          : `/celebrate?${new URLSearchParams(milestoneParams(milestone))}`,
+      );
       return;
     }
     if (dates.length === 0) {
@@ -354,5 +366,10 @@ export function NotificationsPage() {
 function detailLabel(notification: Notification): string {
   if (notification.friendRequest) return "친구 요청 보기";
   if (notification.friendLeave) return "친구 휴가 상세 보기";
+  if (notification.milestone) {
+    return notification.milestone.userId
+      ? "친구 프로필 보기"
+      : "축하 화면 보기";
+  }
   return "휴가 상세 보기";
 }

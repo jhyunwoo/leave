@@ -2,6 +2,8 @@
  * 친구 관계에서 생기는 알림 — 요청이 왔을 때, 친구가 휴가를 등록했을 때.
  *
  * 사용처: `POST /friends/requests`, `POST /leaves` (routes/friends.ts, routes/leaves.ts).
+ * 알림을 넣고 푸시를 보내는 `deliverEach`는 복무 기념일 알림(`milestone-notify.ts`)도
+ * 함께 쓴다 — 발송 로그와 D1 상한 처리가 한 벌이어야 한쪽만 고쳐지지 않는다.
  *
  * `lib/`에 있는 이유는 여러 표를 순서대로 바꾸기 때문이다 — 수신자를 고르고
  * (친구 관계 + 차단 + 종류별 수신 설정 + 보내는 사람의 공유 설정), 인앱 알림을
@@ -20,7 +22,7 @@
  * 현재 권한을 다시 확인한다.
  */
 
-import { fmtRange, type ISODate } from "@leave/shared";
+import { fmtRange, type ISODate, type ServiceMilestone } from "@leave/shared";
 import { and, eq, inArray, or } from "drizzle-orm";
 import {
   friendships,
@@ -32,10 +34,14 @@ import {
 } from "../db/schema";
 import { insertStatements, runBatch } from "./d1";
 import type { Db } from "./db";
-import { friendSharingQuery, resolveFriendSharing } from "./friend-sharing";
+import {
+  friendSharingQuery,
+  resolveFriendSharing,
+  type FriendSharing,
+} from "./friend-sharing";
 import { buildNotificationPushMessage, sendExpoPushMessages } from "./push";
 
-type Recipient = { id: string; expoPushToken: string | null };
+export type Recipient = { id: string; expoPushToken: string | null };
 
 /**
  * 친구 요청 알림의 제목. 보낸 사람 열(`friend_request_user_id`)이 생기기 전의
@@ -43,78 +49,97 @@ type Recipient = { id: string; expoPushToken: string | null };
  */
 export const FRIEND_REQUEST_NOTIFICATION_TITLE = "새 친구 요청";
 
-/** 인앱 알림을 넣고, 응답을 막지 않는 백그라운드에서 푸시와 발송 로그를 처리한다. */
-async function deliver(
+/** 복무 기념일 알림이 가리키는 기념일. `userId`는 친구의 기념일일 때만 있다. */
+export type MilestoneLink = ServiceMilestone & { userId: string | null };
+
+/** 받는 사람 한 명에게 갈 알림 한 건. 기념일 알림은 사람마다 본문이 달라 한 건씩 받는다. */
+export type DeliveryItem = {
+  recipient: Recipient;
+  title: string;
+  body: string;
+  friendLeave?: {
+    userId: string;
+    leaveId: string;
+    startDate: ISODate;
+    endDate: ISODate;
+  };
+  /** 친구 요청 알림이면 요청을 보낸 사람. 알림함이 그 요청으로 이어 준다. */
+  friendRequestUserId?: string;
+  milestone?: MilestoneLink;
+};
+
+/**
+ * 인앱 알림을 넣고, 응답을 막지 않는 백그라운드에서 푸시와 발송 로그를 처리한다.
+ *
+ * 기념일 알림은 푸시 data에도 기념일을 싣는다 — 앱이 푸시를 눌렀을 때 알림함을
+ * 거치지 않고 축하 화면을 곧장 열 수 있게 하려는 것이다.
+ */
+export async function deliverEach(
   db: Db,
-  input: {
-    recipients: Recipient[];
-    title: string;
-    body: string;
-    friendLeave?: {
-      userId: string;
-      leaveId: string;
-      startDate: ISODate;
-      endDate: ISODate;
-    };
-    /** 친구 요청 알림이면 요청을 보낸 사람. 알림함이 그 요청으로 이어 준다. */
-    friendRequestUserId?: string;
-    waitUntil: (promise: Promise<unknown>) => void;
-  },
+  items: DeliveryItem[],
+  waitUntil: (promise: Promise<unknown>) => void,
 ): Promise<void> {
-  if (input.recipients.length === 0) return;
+  if (items.length === 0) return;
 
   const now = new Date().toISOString();
-  // 사용자별 인앱 알림 id를 미리 만들어 두면 푸시 발송 로그와 연결할 수 있다.
-  const notificationIdByUser = new Map(
-    input.recipients.map((recipient) => [recipient.id, crypto.randomUUID()]),
-  );
+  // 알림 id를 미리 만들어 두면 푸시 발송 로그와 연결할 수 있다.
+  const rows = items.map((item) => ({ ...item, id: crypto.randomUUID() }));
 
   await runBatch(
     db,
     insertStatements(
       db,
       notifications,
-      input.recipients.map((recipient) => ({
-        id: notificationIdByUser.get(recipient.id)!,
-        userId: recipient.id,
-        title: input.title,
-        body: input.body,
+      rows.map((row) => ({
+        id: row.id,
+        userId: row.recipient.id,
+        title: row.title,
+        body: row.body,
         // 내 휴가 상세 링크와 친구 일정 조회 정보를 구분한다.
         leaveId: null,
         datesJson: null,
-        friendLeaveJson: input.friendLeave
-          ? JSON.stringify(input.friendLeave)
+        friendLeaveJson: row.friendLeave
+          ? JSON.stringify(row.friendLeave)
           : null,
-        friendRequestUserId: input.friendRequestUserId ?? null,
+        friendRequestUserId: row.friendRequestUserId ?? null,
+        milestoneJson: row.milestone ? JSON.stringify(row.milestone) : null,
         read: false,
         createdAt: now,
       })),
     ),
   );
 
-  input.waitUntil(
+  waitUntil(
     (async () => {
       const results = await sendExpoPushMessages(
-        input.recipients.map((recipient) => ({
-          token: recipient.expoPushToken,
-          message: buildNotificationPushMessage({
-            id: notificationIdByUser.get(recipient.id)!,
-            title: input.title,
-            body: input.body,
-          }),
-        })),
+        rows.map((row) => {
+          const message = buildNotificationPushMessage({
+            id: row.id,
+            title: row.title,
+            body: row.body,
+          });
+          return {
+            token: row.recipient.expoPushToken,
+            message: row.milestone
+              ? {
+                  ...message,
+                  data: { ...message.data, milestone: row.milestone },
+                }
+              : message,
+          };
+        }),
       );
       const resultByToken = new Map(results.map((r) => [r.token, r]));
-      const logRows = input.recipients.map((recipient) => {
-        const token = recipient.expoPushToken;
+      const logRows = rows.map((row) => {
+        const token = row.recipient.expoPushToken;
         const result =
           token && token.startsWith("ExponentPushToken")
             ? resultByToken.get(token)
             : undefined;
         return {
           id: crypto.randomUUID(),
-          userId: recipient.id,
-          notificationId: notificationIdByUser.get(recipient.id) ?? null,
+          userId: row.recipient.id,
+          notificationId: row.id,
           direction: "send" as const,
           // 유효 토큰이 없으면 skipped, 있으면 발송 결과(ok/error)
           status: result ? result.status : ("skipped" as const),
@@ -123,6 +148,22 @@ async function deliver(
       });
       await runBatch(db, insertStatements(db, pushLogs, logRows));
     })(),
+  );
+}
+
+/** 모든 받는 사람에게 같은 알림을 보낸다. */
+async function deliver(
+  db: Db,
+  input: Omit<DeliveryItem, "recipient"> & {
+    recipients: Recipient[];
+    waitUntil: (promise: Promise<unknown>) => void;
+  },
+): Promise<void> {
+  const { recipients, waitUntil, ...content } = input;
+  await deliverEach(
+    db,
+    recipients.map((recipient) => ({ recipient, ...content })),
+    waitUntil,
   );
 }
 
@@ -163,28 +204,31 @@ export async function notifyFriendRequest(
   });
 }
 
+/** 친구 알림의 종류별 수신 설정 열. 설정 행이 없으면(null) 켜진 것으로 본다. */
+export type FriendNotificationPref =
+  "friendLeave" | "friendDischargeCountdown" | "friendPromotion";
+
 /**
- * 새로 등록한 휴가를 수락된 친구들에게 알린다.
- *
- * 초안(draft)에는 부르지 않는다 — 초안은 나만 보는 비공개 계획이라 그 존재를
- * 알리는 것 자체가 설계를 어기는 일이다(docs/architecture.md).
+ * 한 사람의 친구 중 알림을 받을 사람들.
  *
  * 대상은 **수락된** 친구뿐이고, 어느 방향으로든 차단이 있으면 뺀다. 친구 달력이
- * 매 요청마다 같은 두 가지를 다시 확인하는 것과 같은 판단이다.
+ * 매 요청마다 같은 두 가지를 다시 확인하는 것과 같은 판단이다. 그 알림 종류를
+ * 끈 사람도 뺀다.
  *
- * 휴가 일정을 공유하지 않는 사람이면 아무에게도 보내지 않는다. 알림 본문에 기간이
- * 들어가므로, 여기서 새면 달력에서 막은 것이 뜻을 잃는다(lib/friend-sharing.ts).
+ * 보내는 사람의 공유 설정 중 `sharingKey`가 꺼져 있으면 아무에게도 보내지 않는다 —
+ * 알림 본문에 그 정보가 들어가므로, 여기서 새면 화면에서 막은 것이 뜻을 잃는다
+ * (lib/friend-sharing.ts).
  */
-export async function notifyFriendsOfLeave(
+export async function friendRecipients(
   db: Db,
   input: {
-    actor: { id: string; name: string };
-    leave: { id: string; startDate: ISODate; endDate: ISODate };
-    waitUntil: (promise: Promise<unknown>) => void;
+    actorId: string;
+    pref: FriendNotificationPref;
+    sharingKey: keyof FriendSharing;
   },
-): Promise<void> {
+): Promise<Recipient[]> {
   const [actorSharing, relations, blockedRows] = await db.batch([
-    friendSharingQuery(db, input.actor.id),
+    friendSharingQuery(db, input.actorId),
     db
       .select({
         userAId: friendships.userAId,
@@ -195,8 +239,8 @@ export async function notifyFriendsOfLeave(
         and(
           eq(friendships.status, "accepted"),
           or(
-            eq(friendships.userAId, input.actor.id),
-            eq(friendships.userBId, input.actor.id),
+            eq(friendships.userAId, input.actorId),
+            eq(friendships.userBId, input.actorId),
           ),
         ),
       ),
@@ -208,22 +252,22 @@ export async function notifyFriendsOfLeave(
       .from(userBlocks)
       .where(
         or(
-          eq(userBlocks.userId, input.actor.id),
-          eq(userBlocks.blockedUserId, input.actor.id),
+          eq(userBlocks.userId, input.actorId),
+          eq(userBlocks.blockedUserId, input.actorId),
         ),
       ),
   ]);
-  if (!resolveFriendSharing(actorSharing[0]).leaveSchedule) return;
+  if (!resolveFriendSharing(actorSharing[0])[input.sharingKey]) return [];
 
   const blocked = new Set(
     blockedRows.map((row) =>
-      row.userId === input.actor.id ? row.blockedUserId : row.userId,
+      row.userId === input.actorId ? row.blockedUserId : row.userId,
     ),
   );
   const friendIds = relations
-    .map((row) => (row.userAId === input.actor.id ? row.userBId : row.userAId))
+    .map((row) => (row.userAId === input.actorId ? row.userBId : row.userAId))
     .filter((id) => !blocked.has(id));
-  if (friendIds.length === 0) return;
+  if (friendIds.length === 0) return [];
 
   /*
    * 친구는 부대와 달리 조인으로 좁힐 공통 컬럼이 없어 id 목록으로 조회할 수밖에
@@ -237,7 +281,7 @@ export async function notifyFriendsOfLeave(
       .select({
         id: users.id,
         expoPushToken: users.expoPushToken,
-        friendLeave: userNotificationPrefs.friendLeave,
+        enabled: userNotificationPrefs[input.pref],
       })
       .from(users)
       .leftJoin(
@@ -246,10 +290,35 @@ export async function notifyFriendsOfLeave(
       )
       .where(inArray(users.id, friendIds.slice(index, index + CHUNK)));
     for (const row of rows) {
-      if (row.friendLeave === false) continue;
+      if (row.enabled === false) continue;
       recipients.push({ id: row.id, expoPushToken: row.expoPushToken });
     }
   }
+  return recipients;
+}
+
+/**
+ * 새로 등록한 휴가를 수락된 친구들에게 알린다.
+ *
+ * 초안(draft)에는 부르지 않는다 — 초안은 나만 보는 비공개 계획이라 그 존재를
+ * 알리는 것 자체가 설계를 어기는 일이다(docs/architecture.md).
+ *
+ * 휴가 일정을 공유하지 않는 사람이면 아무에게도 보내지 않는다. 알림 본문에 기간이
+ * 들어가기 때문이다.
+ */
+export async function notifyFriendsOfLeave(
+  db: Db,
+  input: {
+    actor: { id: string; name: string };
+    leave: { id: string; startDate: ISODate; endDate: ISODate };
+    waitUntil: (promise: Promise<unknown>) => void;
+  },
+): Promise<void> {
+  const recipients = await friendRecipients(db, {
+    actorId: input.actor.id,
+    pref: "friendLeave",
+    sharingKey: "leaveSchedule",
+  });
 
   await deliver(db, {
     recipients,

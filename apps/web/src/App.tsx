@@ -116,6 +116,11 @@ const ServiceProgressDetailPage = lazy(() =>
     default: m.ServiceProgressDetailPage,
   })),
 );
+const CelebratePage = lazy(() =>
+  import("./pages/CelebratePage").then((m) => ({
+    default: m.CelebratePage,
+  })),
+);
 const SignupPage = lazy(() =>
   import("./pages/SignupPage").then((m) => ({ default: m.SignupPage })),
 );
@@ -193,6 +198,8 @@ function CompletedApp() {
         path="service-progress"
         element={<ServiceProgressDetailPage me={me.data} />}
       />
+      {/* 복무 기념일 축하도 내비게이션 없이 화면 전체를 쓴다. */}
+      <Route path="celebrate" element={<CelebratePage me={me.data} />} />
       <Route element={<AppLayout me={me.data} />}>
         <Route index element={<CalendarPage me={me.data} />} />
         <Route path="units" element={<UnitsPage me={me.data} />} />

@@ -190,6 +190,10 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     unitNotice: true,
     friendRequest: true,
     friendLeave: true,
+    dischargeCountdown: true,
+    promotion: true,
+    friendDischargeCountdown: true,
+    friendPromotion: true,
   });
 
   // 초과 알림만 끄고 나머지는 그대로 둔다.
@@ -204,6 +208,10 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     unitNotice: true,
     friendRequest: true,
     friendLeave: true,
+    dischargeCountdown: true,
+    promotion: true,
+    friendDischargeCountdown: true,
+    friendPromotion: true,
   });
 
   await req("POST", "/leaves", {

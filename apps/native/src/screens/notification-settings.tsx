@@ -132,6 +132,50 @@ export function NotificationSettingsScreen() {
             testID="notification-pref-friend-leave"
           />
         </ContentPanel>
+
+        {/* 복무 기념일 — 내 것과 친구 것, 전역 D-n과 진급을 따로 끈다. */}
+        <ContentPanel style={styles.preferenceCard}>
+          <Text selectable style={styles.preferenceTitle}>
+            복무 기념일
+          </Text>
+          <Text selectable style={styles.preferenceBody}>
+            전역 600·500·400·300·200·100·50·10일 전과 하루 전, 일병·상병·병장
+            진급일 아침에 축하 알림을 보내요. 친구 기념일 알림은 복무율을 공유한
+            친구의 것만 와요.
+          </Text>
+          <NativeCheckbox
+            value={prefs.data?.preferences.dischargeCountdown ?? true}
+            onValueChange={(dischargeCountdown) =>
+              void updatePrefs.mutateAsync({ dischargeCountdown })
+            }
+            label="내 전역 D-n"
+            testID="notification-pref-discharge-countdown"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.promotion ?? true}
+            onValueChange={(promotion) =>
+              void updatePrefs.mutateAsync({ promotion })
+            }
+            label="내 진급"
+            testID="notification-pref-promotion"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.friendDischargeCountdown ?? true}
+            onValueChange={(friendDischargeCountdown) =>
+              void updatePrefs.mutateAsync({ friendDischargeCountdown })
+            }
+            label="친구의 전역 D-n"
+            testID="notification-pref-friend-discharge-countdown"
+          />
+          <NativeCheckbox
+            value={prefs.data?.preferences.friendPromotion ?? true}
+            onValueChange={(friendPromotion) =>
+              void updatePrefs.mutateAsync({ friendPromotion })
+            }
+            label="친구의 진급"
+            testID="notification-pref-friend-promotion"
+          />
+        </ContentPanel>
       </ResponsiveGrid>
     </ScrollView>
   );

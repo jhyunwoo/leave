@@ -12,12 +12,14 @@ import { z } from "@hono/zod-openapi";
 import {
   BALANCE_KEYS,
   BRANCHES,
+  DISCHARGE_COUNTDOWN_DAYS,
   FRIEND_RELATIONSHIPS,
   LEAVE_CATEGORIES,
   LEAVE_KINDS,
   LEAVE_STATUSES,
   OUTING_KINDS,
   OVERNIGHT_KINDS,
+  PROMOTION_MILESTONE_RANKS,
   RANKS,
 } from "@leave/shared";
 
@@ -357,6 +359,14 @@ export const notificationPrefsResponseSchema = z
     friendRequest: z.boolean(),
     // 친구가 새 휴가를 등록했을 때
     friendLeave: z.boolean(),
+    // 내 전역 D-n(600·500·…·10일 전, 하루 전)
+    dischargeCountdown: z.boolean(),
+    // 내 진급(일병·상병·병장)
+    promotion: z.boolean(),
+    // 친구의 전역 D-n
+    friendDischargeCountdown: z.boolean(),
+    // 친구의 진급
+    friendPromotion: z.boolean(),
   })
   .openapi("NotificationPreferences");
 
@@ -375,6 +385,23 @@ export const friendRequestNotificationSchema = z.object({
   userId: z.string().nullable(),
 });
 
+/**
+ * 복무 기념일 알림이 가리키는 기념일. 전역 D-n이면 `days`, 진급이면 `rank`가 있다.
+ * `userId`는 친구의 기념일일 때 그 친구이고, 내 기념일이면 null이다.
+ */
+export const milestoneNotificationSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("discharge_countdown"),
+    days: z.literal(DISCHARGE_COUNTDOWN_DAYS),
+    userId: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal("promotion"),
+    rank: z.enum(PROMOTION_MILESTONE_RANKS),
+    userId: z.string().nullable(),
+  }),
+]);
+
 export const notificationSchema = z
   .object({
     id: z.string(),
@@ -384,6 +411,7 @@ export const notificationSchema = z
     dates: z.array(z.string()),
     friendLeave: friendLeaveNotificationSchema.nullable(),
     friendRequest: friendRequestNotificationSchema.nullable(),
+    milestone: milestoneNotificationSchema.nullable(),
     read: z.boolean(),
     createdAt: z.string(),
   })

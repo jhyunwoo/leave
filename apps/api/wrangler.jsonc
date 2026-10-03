@@ -26,10 +26,11 @@
       "id": "a22fbf38ce4a41e291915286e120d51f",
     },
   ],
-  // 매일 03:10 UTC(= 한국 12:10). 보관 기간이 지난 접속 기록·푸시 로그와
-  // 만료된 세션을 지운다 (src/index.ts의 scheduled 핸들러).
+  // 매일 00:00 UTC(= 한국 09:00)와 03:10 UTC(= 한국 12:10). 복무 기념일 알림,
+  // 보관 기간 정리, 지난 계획 굳히기를 돈다 (src/index.ts의 scheduled 핸들러).
+  // 아침 실행은 축하 알림을 하루 시작에 보내려는 것이고, 낮 실행은 그 재시도를 겸한다.
   "triggers": {
-    "crons": ["10 3 * * *"],
+    "crons": ["0 0 * * *", "10 3 * * *"],
   },
   "secrets": { "required": ["RESEND_API_KEY", "EMAIL_CODE_SECRET"] },
   "vars": {

@@ -1,0 +1,215 @@
+/* 복무 기념일 축하 화면. 공용 내비게이션 바깥에서 뷰포트를 모두 쓴다. */
+
+.celebrate {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(var(--sp-xl), env(safe-area-inset-top))
+    max(var(--sp-lg), env(safe-area-inset-right))
+    max(var(--sp-xl), env(safe-area-inset-bottom))
+    max(var(--sp-lg), env(safe-area-inset-left));
+  place-items: center;
+  overflow: hidden;
+  color: var(--ink);
+  background:
+    radial-gradient(
+      circle at 18% 8%,
+      rgba(159, 232, 112, 0.42),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 88% 92%,
+      rgba(255, 209, 26, 0.24),
+      transparent 26rem
+    ),
+    var(--canvas-soft);
+}
+
+.celebrate__confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.celebrate__piece {
+  position: absolute;
+  top: -24px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  box-shadow: 0 0 0 1px rgba(14, 15, 12, 0.06);
+  animation-name: celebrate-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
+  animation-iteration-count: 1;
+  /* 떨어진 뒤 사라진 상태로 남는다. transform만 쓰므로 fixed 요소를 가로채지 않는다. */
+  animation-fill-mode: forwards;
+}
+
+.celebrate__piece.is-wide {
+  width: 14px;
+  height: 8px;
+}
+
+@keyframes celebrate-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(var(--rotate));
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), 105vh, 0)
+      rotate(calc(var(--rotate) + 540deg));
+  }
+}
+
+.celebrate__close {
+  position: absolute;
+  z-index: 2;
+  top: max(var(--sp-xl), env(safe-area-inset-top));
+  right: max(var(--sp-xl), env(safe-area-inset-right));
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(14, 15, 12, 0.1);
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--glass-shadow);
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1;
+  text-decoration: none;
+  backdrop-filter: blur(18px);
+}
+
+.celebrate__card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 560px);
+  padding: clamp(var(--sp-xl), 5vw, var(--sp-3xl));
+  border: 1px solid var(--glass-chrome-border);
+  border-radius: var(--r-xl);
+  background: var(--glass-chrome);
+  box-shadow: var(--shadow-modal);
+  text-align: center;
+  backdrop-filter: blur(24px);
+  animation: celebrate-pop 520ms var(--ease-out) backwards;
+}
+
+@keyframes celebrate-pop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+
+.celebrate__eyebrow {
+  color: var(--brand);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.celebrate__hero {
+  margin-top: var(--sp-sm);
+  color: var(--ink-deep);
+  font-family: var(--font-display);
+  font-size: clamp(72px, 18vw, 128px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.celebrate__hero-unit {
+  margin-left: 0.08em;
+  color: var(--brand);
+  font-size: 0.32em;
+  letter-spacing: -0.02em;
+}
+
+.celebrate__headline {
+  margin-top: var(--sp-lg);
+  font-size: clamp(20px, 4.6vw, 26px);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.celebrate__message {
+  margin-top: var(--sp-sm);
+  color: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.celebrate__stats {
+  display: grid;
+  margin: var(--sp-xl) 0 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-sm);
+}
+
+.celebrate__stats > div {
+  padding: var(--sp-md) var(--sp-sm);
+  border-radius: var(--r-md);
+  background: var(--surface-card);
+}
+
+.celebrate__stats dt {
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.celebrate__stats dd {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.celebrate__progress {
+  height: 8px;
+  margin-top: var(--sp-lg);
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--surface-strong);
+}
+
+.celebrate__progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transform-origin: left center;
+}
+
+.celebrate__actions {
+  display: flex;
+  margin-top: var(--sp-xl);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+}
+
+@media (max-width: 380px) {
+  .celebrate__stats dd {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebrate__card {
+    animation: none;
+  }
+}

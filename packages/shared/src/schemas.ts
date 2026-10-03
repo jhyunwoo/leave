@@ -758,6 +758,14 @@ export const notificationPrefsSchema = z.object({
   unitNotice: z.boolean().optional(),
   friendRequest: z.boolean().optional(),
   friendLeave: z.boolean().optional(),
+  /** 내 전역 D-n(600·500·…·10일 전, 하루 전). */
+  dischargeCountdown: z.boolean().optional(),
+  /** 내 진급(일병·상병·병장). */
+  promotion: z.boolean().optional(),
+  /** 친구의 전역 D-n. */
+  friendDischargeCountdown: z.boolean().optional(),
+  /** 친구의 진급. */
+  friendPromotion: z.boolean().optional(),
 });
 
 /** 친구에게 보여줄 항목. 모든 친구에게 같게 적용되고, 보낸 항목만 바꾼다. */

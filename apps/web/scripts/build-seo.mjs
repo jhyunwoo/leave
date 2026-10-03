@@ -48,7 +48,7 @@ const {
   FRIEND_INVITE_SHELL_FILE,
   NOT_FOUND_FILE,
   PRERENDERED_PAGES,
-  SESSION_FLAG_SCRIPT,
+  FIRST_PAINT_SCRIPT,
   SITE_NAME,
   TITLE_SUFFIX,
   buildRobotsTxt,
@@ -128,7 +128,7 @@ for (const page of PRERENDERED_PAGES) {
   // `/`만 로그인 여부에 따라 다른 화면을 그린다. 그 경우에만 세션 표시
   // 스크립트를 넣어, 첫 페인트 전에 미리 그린 랜딩을 감출 수 있게 한다.
   const bootScript =
-    page.path === "/" ? `\n    <script>${SESSION_FLAG_SCRIPT}</script>` : "";
+    page.path === "/" ? `\n    <script>${FIRST_PAINT_SCRIPT}</script>` : "";
   const html = renderDocument({
     head: `${headTagsForPage(page)}${bootScript}`,
     body,

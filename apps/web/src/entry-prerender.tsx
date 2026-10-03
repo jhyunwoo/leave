@@ -27,7 +27,7 @@ import { createWebQueryClient } from "./query-client";
 export {
   headTagsForNonIndexable,
   headTagsForPage,
-  SESSION_FLAG_SCRIPT,
+  FIRST_PAINT_SCRIPT,
 } from "./seo/head";
 export {
   APP_SHELL_FILE,
