@@ -1,14 +1,15 @@
 /**
  * 내 휴가 화면(네이티브) — 잔여와 계획을 한자리에서 본다.
  *
- * 다가오는 일정과 지난 일정을 나누고, 재원별 잔여 요약과 보유 휴가로 가는 길을 준다.
+ * 다가오는 일정과 지난 일정을 나누고, 잔여 요약과 보유 휴가로 가는 길을 준다.
+ * 재원별 내역은 보유 휴가 화면에만 둔다 — 여기서는 합계만 본다.
  *
  * ## 창 폭에 따라 열이 늘어난다
  *
- *   compact  : 지금까지처럼 한 줄로 쌓는다(잔여 → 재원 → 목록).
- *   medium   : [잔여·재원] | [휴가 목록] 두 열. 스크롤 없이 "얼마 있고 뭘 잡아
+ *   compact  : 지금까지처럼 한 줄로 쌓는다(잔여 → 목록).
+ *   medium   : [잔여] | [휴가 목록] 두 열. 스크롤 없이 "얼마 있고 뭘 잡아
  *              뒀는지"를 동시에 본다.
- *   expanded : [잔여·재원] | [목록] | [고른 휴가 상세] 세 열. 목록에서 고르면
+ *   expanded : [잔여] | [목록] | [고른 휴가 상세] 세 열. 목록에서 고르면
  *              화면을 떠나지 않고 오른쪽에서 상세를 읽는다.
  *
  * 세 번째 열은 `/leave/[leaveId]` 라우트와 같은 본문(`LeaveDetailContent`)을
@@ -40,6 +41,7 @@ import {
   summarizeHoldings,
   useDeleteLeave,
   useLeaveBalances,
+  useLeaveGrants,
   useMyLeaves,
 } from "@leave/client";
 import {
@@ -71,7 +73,10 @@ export function LeavesScreen() {
   const canShowDetail = !isCompact && contentWidth >= 1200;
   const leaves = useMyLeaves();
   const balances = useLeaveBalances();
-  const refresh = useRefresh(leaves, balances);
+  // 총 휴가는 보유 휴가 화면의 합계를 그대로 쓴다. 잔여 API의 정기외박 총량은 이번
+  // 주기 몫뿐이라, 여기서 더하면 지난·앞으로의 주기가 빠져 두 화면 숫자가 갈린다.
+  const grants = useLeaveGrants();
+  const refresh = useRefresh(leaves, balances, grants);
   // 열이 여럿인 레이아웃에서는 어디를 당겨도 되도록 각 열에 같은 컨트롤을 단다.
   const refreshControl = (
     <RefreshControl
@@ -98,14 +103,6 @@ export function LeavesScreen() {
   ]
     .filter(Boolean)
     .join(" · ");
-
-  const visibleBalances = (balances.data?.balances ?? []).filter(
-    (item) =>
-      item.totalDays > 0 ||
-      item.usedDays > 0 ||
-      item.remainingDays > 0 ||
-      item.expiredDays > 0,
-  );
 
   const myLeaves = leaves.data?.leaves ?? [];
   // 탭은 화면 안의 사적인 필터다 — 선택한 휴가와 마찬가지로 라우트로 만들지 않는다.
@@ -169,75 +166,43 @@ export function LeavesScreen() {
         />
       ) : null}
       {balances.data ? (
-        <>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="보유 휴가 자세히 보기"
-            onPress={() => router.push("/leave-grants")}
-            style={styles.holdingsCard}
-          >
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.holdingsEyebrow} selectable>
-                보유 휴가
-              </Text>
-              <Text style={styles.holdingsValue} selectable>
-                남은 휴가 {holdings.remaining}일
-              </Text>
-              {holdings.planned > 0 ? (
-                <Text style={styles.holdingsHint} selectable>
-                  계획 {holdings.planned}일
-                </Text>
-              ) : null}
-              {holdingsWarning ? (
-                <Text style={styles.holdingsMeta} selectable>
-                  {holdingsWarning}
-                </Text>
-              ) : holdings.planned === 0 ? (
-                <Text style={styles.holdingsHint} selectable>
-                  만기 기한과 정기외박 주기를 관리해요
-                </Text>
-              ) : null}
-            </View>
-            <Text style={styles.detailLink}>자세히</Text>
-          </Pressable>
-
-          <ContentPanel style={styles.balancePanel}>
-            <Text style={styles.sectionTitle} selectable>
-              휴가 재원
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="보유 휴가 자세히 보기"
+          onPress={() => router.push("/leave-grants")}
+          style={styles.holdingsCard}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.holdingsEyebrow} selectable>
+              보유 휴가
             </Text>
-            {visibleBalances.map((item, index) => (
-              <View
-                key={item.key}
-                style={[styles.balanceRow, index > 0 && styles.rowDivider]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.balanceLabel} selectable>
-                    {item.label}
-                  </Text>
-                  {/* 주기 재원은 이월되지 않아 총량·사용량이 이번 주기 기준이다. */}
-                  <Text style={styles.balanceMeta} selectable>
-                    {item.cycleScoped ? "이번 주기 · " : ""}총 {item.totalDays}
-                    일 · 사용 {item.usedToDateDays}일
-                    {item.plannedDays > 0
-                      ? ` · 계획 ${item.plannedDays}일`
-                      : ""}
-                    {item.expiredDays > 0
-                      ? ` · 만료 ${item.expiredDays}일`
-                      : ""}
-                  </Text>
-                </View>
-                <Text style={styles.balanceValue} selectable>
-                  {item.remainingAsOfTodayDays}일
-                </Text>
-              </View>
-            ))}
-            {visibleBalances.length < balances.data.balances.length && (
-              <Text style={styles.balanceHint} selectable>
-                잔여가 없는 재원은 보유 휴가 상세에서 추가할 수 있어요.
+            <Text style={styles.holdingsValue} selectable>
+              남은 휴가 {holdings.remaining}일
+            </Text>
+            {grants.data || holdings.planned > 0 ? (
+              <Text style={styles.holdingsHint} selectable>
+                {[
+                  grants.data
+                    ? `총 휴가 ${grants.data.totals.totalDays}일`
+                    : null,
+                  holdings.planned > 0 ? `계획 ${holdings.planned}일` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
-            )}
-          </ContentPanel>
-        </>
+            ) : null}
+            {holdingsWarning ? (
+              <Text style={styles.holdingsMeta} selectable>
+                {holdingsWarning}
+              </Text>
+            ) : holdings.planned === 0 ? (
+              <Text style={styles.holdingsHint} selectable>
+                만기 기한과 정기외박 주기를 관리해요
+              </Text>
+            ) : null}
+          </View>
+          <Text style={styles.detailLink}>자세히</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -537,38 +502,15 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.md,
   },
   webTitle: { fontSize: 28, fontWeight: "800", color: colors.ink },
-  balancePanel: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: colors.ink,
     paddingBottom: spacing.sm,
   },
-  balanceRow: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-    paddingVertical: spacing.md,
-  },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
-  },
-  balanceLabel: { fontSize: 14, fontWeight: "600", color: colors.ink },
-  balanceValue: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: colors.ink,
-    fontVariant: ["tabular-nums"],
-  },
-  balanceMeta: { fontSize: 11, color: colors.mute, paddingTop: 2 },
-  balanceHint: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    paddingTop: spacing.md,
-    fontSize: 11,
-    color: colors.mute,
   },
   holdingsCard: {
     flexDirection: "row",

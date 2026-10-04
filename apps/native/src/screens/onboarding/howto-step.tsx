@@ -156,6 +156,7 @@ export function HowtoStep(props: {
           <Button
             title="건너뛰기"
             variant="secondary"
+            style={styles.skip}
             onPress={props.onNext}
             testID="onboarding-tour-skip"
           />
@@ -227,5 +228,9 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: "center",
     marginTop: spacing.sm,
   },
+  /* 네이티브 버튼은 글자 수로 폭을 어림하는데(button-width.ts), 큰 캡슐의
+     안쪽 여백이 어림보다 커서 "건너뛰기"가 두 줄로 접혔다. 남는 폭은 "다음 기능"이
+     가져가므로 이쪽은 한 줄에 맞는 폭을 고정으로 잡고 줄어들지 않게 한다. */
+  skip: { minWidth: 120, flexShrink: 0 },
   next: { flex: 1 },
 }));
