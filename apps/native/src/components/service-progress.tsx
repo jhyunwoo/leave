@@ -198,6 +198,8 @@ export function ServiceProgress(props: {
           <View style={styles.metaRow}>
             <Text style={styles.milestoneLabel}>{milestone.label}</Text>
             <Text style={styles.milestoneLabel}>
+              {milestone.daysLeft !== null &&
+                `${(milestone.progress * 100).toFixed(6)}% · `}
               {milestone.daysLeft === null
                 ? "예정 없음"
                 : milestone.daysLeft === 0
@@ -214,7 +216,7 @@ export function ServiceProgress(props: {
                 min: 0,
                 max: 100,
                 now: Math.round(milestone.progress * 100),
-                text: `${milestone.daysLeft}일 남음`,
+                text: `${(milestone.progress * 100).toFixed(6)}%, ${milestone.daysLeft}일 남음`,
               }}
             >
               <View

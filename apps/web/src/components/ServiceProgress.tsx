@@ -295,6 +295,8 @@ export function ServiceProgress(props: {
           >
             <span>{milestone.label}</span>
             <span style={{ fontVariantNumeric: "tabular-nums" }}>
+              {milestone.daysLeft !== null &&
+                `${(milestone.progress * 100).toFixed(6)}% · `}
               {milestone.daysLeft === null
                 ? "예정 없음"
                 : milestone.daysLeft === 0
@@ -309,7 +311,7 @@ export function ServiceProgress(props: {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(milestone.progress * 100)}
-              aria-valuetext={`${milestone.daysLeft}일 남음`}
+              aria-valuetext={`${(milestone.progress * 100).toFixed(6)}%, ${milestone.daysLeft}일 남음`}
               style={{
                 height: 6,
                 borderRadius: "var(--r-pill)",
