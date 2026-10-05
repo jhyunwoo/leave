@@ -33,13 +33,13 @@ function verify({
         const platform = args[1].split("-")[0];
         return {
           id: args[1],
-          project: { id: "project" },
+          app: { id: "project" },
           platform: platform.toUpperCase(),
           status: "FINISHED",
           distribution: "STORE",
           buildProfile: "production",
-          channel: "production",
-          runtimeVersion: platform,
+          updateChannel: { name: "production" },
+          runtime: { version: platform },
           ...invalid,
         };
       }
@@ -60,14 +60,14 @@ test("OTA requires matching runtimes on both platforms", () => {
 
 test("untrusted build metadata and EAS errors fail closed", () => {
   for (const invalid of [
-    { project: { id: "other" } },
+    { app: { id: "other" } },
     { platform: "ANDROID" },
     { status: "ERRORED" },
     { distribution: "INTERNAL" },
     { buildProfile: "preview" },
-    { channel: "preview" },
-    { runtimeVersion: null },
-    { runtimeVersion: "" },
+    { updateChannel: { name: "preview" } },
+    { runtime: null },
+    { runtime: { version: "" } },
     { id: "wrong" },
   ])
     assert.throws(() => verify({ invalid }), /Invalid production store build/);
@@ -183,8 +183,8 @@ fs.appendFileSync(process.env.OTA_TEST_LOG, JSON.stringify(args) + "\\n");
 const scenario = process.env.OTA_TEST_SCENARIO;
 if (args[0] === "build:view") {
   const platform = args[1].split("-")[0];
-  console.log(JSON.stringify({ id: args[1], project: { id: "project" }, platform: platform.toUpperCase(),
-    status: "FINISHED", distribution: "STORE", buildProfile: "production", channel: "production", runtimeVersion: platform }));
+  console.log(JSON.stringify({ id: args[1], app: { id: "project" }, platform: platform.toUpperCase(),
+    status: "FINISHED", distribution: "STORE", buildProfile: "production", updateChannel: { name: "production" }, runtime: { version: platform } }));
 }
 if (args[0] === "fingerprint:generate") console.log(JSON.stringify({ hash: scenario === "mismatch" && args[2] === "android" ? "changed" : args[2] }));
 if (args[0] === "env:exec" && args[2].includes("verify-sentry") && scenario === "sentry-error") process.exit(2);

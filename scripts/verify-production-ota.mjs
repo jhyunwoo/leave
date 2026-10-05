@@ -24,14 +24,14 @@ export function verifyProductionOta({
     const build = readJson(["build:view", ids[index], "--json"]);
     if (
       build.id !== ids[index] ||
-      build.project?.id !== projectId ||
+      build.app?.id !== projectId ||
       build.platform !== platform.toUpperCase() ||
       build.status !== "FINISHED" ||
       build.distribution !== "STORE" ||
       build.buildProfile !== "production" ||
-      build.channel !== "production" ||
-      typeof build.runtimeVersion !== "string" ||
-      !build.runtimeVersion.trim()
+      build.updateChannel?.name !== "production" ||
+      typeof build.runtime?.version !== "string" ||
+      !build.runtime?.version.trim()
     ) {
       throw new Error(
         `Invalid production store build for ${platform}: ${ids[index]}`,
@@ -50,9 +50,9 @@ export function verifyProductionOta({
       throw new Error(`Missing ${platform} fingerprint hash.`);
     }
     log(
-      `${platform}: local=${fingerprint.hash}, store=${build.runtimeVersion} (${build.id})`,
+      `${platform}: local=${fingerprint.hash}, store=${build.runtime?.version} (${build.id})`,
     );
-    if (fingerprint.hash !== build.runtimeVersion) mismatches.push(platform);
+    if (fingerprint.hash !== build.runtime?.version) mismatches.push(platform);
   }
   return mismatches.length
     ? {
