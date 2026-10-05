@@ -79,6 +79,18 @@ test("프로필 복무율은 열 자리로 흐르고 불필요할 때 멈춘다"
     /^복무 \d+\.\d%$/,
   );
 
+  for (const name of ["다음 진급 진행률", "다음 호봉 진행률"]) {
+    const milestone = page.getByRole("progressbar", { name });
+    await expect(milestone).toBeVisible();
+    await expect(milestone).toHaveAttribute("aria-valuetext", /^\d+일 남음$/);
+    const progress = Number(await milestone.getAttribute("aria-valuenow"));
+    expect(progress).toBeGreaterThanOrEqual(0);
+    expect(progress).toBeLessThanOrEqual(100);
+  }
+  await expect(page.getByTestId("profile-service-progress-card")).toContainText(
+    /D-\d+/,
+  );
+
   const first = await value.textContent();
   await expect.poll(() => value.textContent()).not.toBe(first);
 

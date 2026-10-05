@@ -177,11 +177,8 @@ export function ProfileScreen() {
                   dischargeAt={user.dischargeAt as ISODate}
                   daysLeft={user.daysUntilDischarge}
                   dutyDays={dutyDays.data?.dutyDays ?? null}
-                  caption={
-                    user.nextPromotionDate
-                      ? `다음 진급 ${fmtDateK(user.nextPromotionDate)}`
-                      : "더 이상 예정된 진급이 없어요"
-                  }
+                  rank={user.rank}
+                  nextPromotionDate={user.nextPromotionDate}
                 />
                 <View style={styles.progressDisclosure}>
                   <Text style={styles.progressDisclosureText}>

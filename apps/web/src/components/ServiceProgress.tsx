@@ -11,7 +11,7 @@
  * 아예 멈춘다.
  */
 
-import { kstMidnight, type ISODate } from "@leave/shared";
+import { kstMidnight, todayInSeoul, type ISODate } from "@leave/shared";
 import { useEffect, useRef, useState } from "react";
 import {
   formatPercent,
@@ -19,6 +19,9 @@ import {
   SERVICE_PERCENT_DECIMALS,
 } from "./service-progress-format";
 import { useReducedMotion } from "./use-reduced-motion";
+
+import { serviceMilestoneProgress } from "@leave/shared/service-milestone-progress";
+import type { Rank } from "@leave/shared/rank";
 
 const STATIC_DECIMALS = 1;
 const MAX_FPS = 120;
@@ -185,6 +188,7 @@ export function ServiceProgress(props: {
   enlistedAt: ISODate;
   dischargeAt: ISODate;
   caption: string;
+  milestones?: { rank: Rank; nextPromotionDate: ISODate | null };
   decimals?: number;
   compact?: boolean;
 }) {
@@ -196,6 +200,15 @@ export function ServiceProgress(props: {
   const end = kstMidnight(props.dischargeAt);
   const span = end > start ? end - start : 0;
   const slowPercent = percentBetween(start, span, clock.now);
+
+  const milestones = props.milestones
+    ? serviceMilestoneProgress({
+        ...props.milestones,
+        enlistedAt: props.enlistedAt,
+        dischargeAt: props.dischargeAt,
+        on: todayInSeoul(new Date(clock.now)),
+      })
+    : [];
 
   return (
     <div style={{ marginTop: props.compact ? 0 : "var(--sp-2xl)" }}>
@@ -269,6 +282,54 @@ export function ServiceProgress(props: {
           {props.caption}
         </span>
       </div>
+      {milestones.map((milestone) => (
+        <div key={milestone.kind} style={{ marginTop: "var(--sp-lg)" }}>
+          <div
+            className="caption text-mute"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "var(--sp-sm)",
+              marginBottom: "var(--sp-sm)",
+            }}
+          >
+            <span>{milestone.label}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+              {milestone.daysLeft === null
+                ? "예정 없음"
+                : milestone.daysLeft === 0
+                  ? "D-Day"
+                  : `D-${milestone.daysLeft}`}
+            </span>
+          </div>
+          {milestone.daysLeft !== null && (
+            <div
+              role="progressbar"
+              aria-label={`${milestone.label} 진행률`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(milestone.progress * 100)}
+              aria-valuetext={`${milestone.daysLeft}일 남음`}
+              style={{
+                height: 6,
+                borderRadius: "var(--r-pill)",
+                background: "var(--hairline)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${milestone.progress * 100}%`,
+                  height: "100%",
+                  borderRadius: "inherit",
+                  background:
+                    milestone.kind === "promotion" ? "#91a5af" : "#a5adb5",
+                }}
+              />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -18,7 +18,11 @@
 
 import { fmtDateK } from "@leave/shared/calendar";
 import { kstMidnight, todayInSeoul, type ISODate } from "@leave/shared/dates";
-import { isDischargedOn, serviceProgressAt } from "@leave/shared/rank";
+import {
+  isDischargedOn,
+  serviceProgressAt,
+  type Rank,
+} from "@leave/shared/rank";
 import { Text, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedProps,
@@ -32,6 +36,8 @@ import {
 } from "@/lib/service-progress-clock";
 import { SERVICE_PERCENT_DECIMALS } from "@/lib/service-progress-format";
 import { makeStyles, radius, spacing } from "@/theme";
+
+import { serviceMilestoneProgress } from "@leave/shared/service-milestone-progress";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -92,8 +98,8 @@ export function ServiceProgress(props: {
    * 도착하지 않았으면 null이고, 그 동안에는 전역일수만 보인다.
    */
   dutyDays: number | null;
-  /** 오른쪽 아래에 덧붙일 설명(예: "다음 진급 12월 1일"). */
-  caption: string;
+  rank: Rank;
+  nextPromotionDate: ISODate | null;
 }) {
   const styles = useStyles();
   const focused = useActiveGate();
@@ -127,7 +133,9 @@ export function ServiceProgress(props: {
    * 숫자는 맞지만 그 사람에게 남은 이야기가 아니다. 전체 화면(service-progress-detail)은
    * 이미 완료 상태를 따로 그리고 있었는데 카드만 그러지 못했다.
    */
-  const discharged = isDischargedOn(props.dischargeAt, todayInSeoul());
+  const on = todayInSeoul(new Date(now));
+  const discharged = isDischargedOn(props.dischargeAt, on);
+  const milestones = serviceMilestoneProgress({ ...props, on });
 
   if (discharged) {
     return (
@@ -184,8 +192,44 @@ export function ServiceProgress(props: {
           전역까지 {props.daysLeft}일
           {props.dutyDays === null ? "" : ` · 일과 ${props.dutyDays}일`}
         </Text>
-        <Text style={styles.caption}>{props.caption}</Text>
       </View>
+      {milestones.map((milestone) => (
+        <View key={milestone.kind} style={styles.milestone}>
+          <View style={styles.metaRow}>
+            <Text style={styles.milestoneLabel}>{milestone.label}</Text>
+            <Text style={styles.milestoneLabel}>
+              {milestone.daysLeft === null
+                ? "예정 없음"
+                : milestone.daysLeft === 0
+                  ? "D-Day"
+                  : `D-${milestone.daysLeft}`}
+            </Text>
+          </View>
+          {milestone.daysLeft !== null && (
+            <View
+              style={[styles.track, styles.milestoneTrack]}
+              accessibilityRole="progressbar"
+              accessibilityLabel={milestone.label}
+              accessibilityValue={{
+                min: 0,
+                max: 100,
+                now: Math.round(milestone.progress * 100),
+                text: `${milestone.daysLeft}일 남음`,
+              }}
+            >
+              <View
+                style={[
+                  styles.fill,
+                  milestone.kind === "promotion"
+                    ? styles.promotionFill
+                    : styles.payStepFill,
+                  { width: `${milestone.progress * 100}%` },
+                ]}
+              />
+            </View>
+          )}
+        </View>
+      ))}
     </View>
   );
 }
@@ -229,12 +273,15 @@ const useStyles = makeStyles(({ colors }) => ({
     // 않도록 둘 다 줄어들 수 있게 둔다.
     flexShrink: 1,
   },
-  caption: {
+  milestone: { gap: spacing.sm, marginTop: spacing.sm },
+  milestoneLabel: {
     fontSize: 12,
     color: colors.mute,
-    flexShrink: 1,
-    textAlign: "right",
+    fontVariant: ["tabular-nums"],
   },
+  milestoneTrack: { height: 6 },
+  promotionFill: { backgroundColor: "#91a5af" },
+  payStepFill: { backgroundColor: "#a5adb5" },
   celebration: {
     fontSize: 13,
     lineHeight: 19,

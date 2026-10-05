@@ -20,7 +20,6 @@ import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { ServiceProgress } from "../components/ServiceProgress";
 import { PasskeyManager } from "../components/PasskeyManager";
-import { fmtDateShort } from "@leave/shared";
 
 /**
  * 공개 사용자 이름 카드 — 지금 이름을 보여주고 그 자리에서 바꾼다.
@@ -230,11 +229,11 @@ export function ProfilePage(props: { me: Me }) {
           <ServiceProgress
             enlistedAt={user.enlistedAt}
             dischargeAt={user.dischargeAt}
-            caption={
-              user.nextPromotionDate
-                ? `다음 진급 ${fmtDateShort(user.nextPromotionDate)}`
-                : "최종 계급"
-            }
+            caption=""
+            milestones={{
+              rank: user.rank,
+              nextPromotionDate: user.nextPromotionDate,
+            }}
           />
           <div className="profile-service-progress-link__hint">
             <span>전체 화면으로 보기</span>
