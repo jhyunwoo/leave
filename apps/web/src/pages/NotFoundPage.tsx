@@ -31,7 +31,7 @@ export function NotFoundPage() {
             로그인
           </a>
           <a href="/signup" className="lp-btn lp-btn--primary">
-            무료로 시작하기
+            계정 만들기
           </a>
         </div>
       </nav>

@@ -1,17 +1,5 @@
-/**
- * 비로그인 첫 화면(홍보 랜딩)이자 이 사이트의 유일한 색인 대상 진입점.
- *
- * 검색 유입과 스토어 링크가 닿는 곳이라 두 가지를 동시에 지켜야 한다.
- *  1) 로그인 없이 서비스 성격과 법적 고지를 확인할 수 있어야 한다.
- *  2) 자바스크립트를 실행하지 않는 크롤러(네이버 Yeti, OAI-SearchBot 등)도
- *     같은 본문을 읽을 수 있어야 한다 → 이 컴포넌트는 빌드 시 그대로 HTML로
- *     구워진다(`scripts/build-seo.mjs`). 그래서 여기서는 첫 렌더에 데이터
- *     패칭이나 `window` 접근에 기대는 표현을 두지 않는다.
- *
- * 문구 규칙: 구현돼 있지 않은 기능을 적지 않는다. 하루 최대 출타 인원은
- * 그룹 관리자가 **인원수로 직접** 정한다(비율 입력은 없다 —
- * `components/LeaveLimitFields.tsx`). 공식성·소속을 암시하는 표현도 쓰지 않는다.
- */
+/** 공개 랜딩은 HTML로 미리 렌더하므로 첫 렌더가 fetch나 window에 의존하면 안 된다.
+ * 관리자 입력 인원 기준으로 계산하는 비공식 서비스이며, 군 기관 소속이나 승인을 암시하지 않는다. */
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -43,8 +31,8 @@ function HeroCalendar() {
   return (
     <div className="lp-cal lp-anim" aria-hidden="true">
       <div className="lp-cal-head">
-        <span className="lp-cal-month">7월</span>
-        <span className="lp-cal-cap lp-num">하루 최대 4명</span>
+        <span className="lp-cal-month">예시 · 7월</span>
+        <span className="lp-cal-cap lp-num">하루 최대 3명</span>
       </div>
       <div className="lp-cal-dow">
         {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
@@ -86,7 +74,7 @@ function HeroCalendar() {
                 <>
                   <span className="lp-pill lp-num lp-flip-from">2/3</span>
                   <span className="lp-pill lp-num is-over lp-flip-to">
-                    3/3 초과
+                    4/3 초과
                   </span>
                 </>
               )}
@@ -200,10 +188,7 @@ const PERSONAL = [
   },
 ];
 
-/**
- * 사람이 실제로 묻는 것만 담는다. 각 답은 저장소의 구현·약관에서 확인할 수
- * 있는 사실이어야 한다 — 이 문구가 곧 구조화 데이터와 AI 답변의 근거가 된다.
- */
+/** FAQ는 구조화 데이터에도 쓰이므로 답은 실제 구현과 약관에서 확인할 수 있어야 한다. */
 const FAQ = [
   {
     q: "리브는 어떤 서비스인가요?",
@@ -219,7 +204,7 @@ const FAQ = [
   },
   {
     q: "출타 인원이 넘치면 어떻게 되나요?",
-    a: "그 날짜가 달력에서 초과로 표시되고, 그날 휴가가 걸린 부대원 모두에게 알림이 갑니다. 리브가 휴가를 막거나 취소하지는 않아요 — 조율은 사람이 합니다.",
+    a: "그 날짜가 달력에서 초과로 표시되고, 그날 휴가가 걸린 부대원 모두에게 알림이 갑니다. 리브가 휴가를 막거나 취소하지는 않아요. 조율은 사람이 합니다.",
   },
   {
     q: "부대원의 휴가가 얼마나 보이나요?",
@@ -275,13 +260,7 @@ function useReveal() {
   }, []);
 }
 
-/**
- * CTA 둘째 버튼 — 휴대폰이면 그 기기의 스토어 배지, 아니면 웹 로그인.
- *
- * 셋을 모두 그려 두고 CSS가 `<html data-platform>`으로 하나만 보인다. 미리 그린
- * HTML에 기기 정보가 없으므로 React가 고르면 hydrate 뒤에야 바뀐다
- * (`seo/platform.ts`). 지원하지 않는 기기(데스크톱 등)는 표시가 없어 로그인이 남는다.
- */
+/** SSR에는 기기 정보가 없으므로 data-platform CSS로 스토어 배지나 로그인 링크를 고른다. */
 function StoreOrLogin() {
   return (
     <>
@@ -365,7 +344,7 @@ export function LandingPage() {
             로그인
           </Link>
           <Link to="/signup" className="lp-btn lp-btn--primary">
-            무료로 시작하기
+            계정 만들기
           </Link>
         </div>
       </nav>
@@ -388,7 +367,7 @@ export function LandingPage() {
                   to="/signup"
                   className="lp-btn lp-btn--primary lp-btn--lg"
                 >
-                  무료로 시작하기
+                  계정 만들기
                 </Link>
                 <StoreOrLogin />
               </div>
@@ -482,7 +461,7 @@ export function LandingPage() {
                   </div>
                   <p className="lp-notif-b">
                     <span className="lp-num">7월 24일</span> 출타 인원이{" "}
-                    <span className="lp-over-word lp-num">3/3명</span>으로 최대
+                    <span className="lp-over-word lp-num">4/3명</span>으로 최대
                     출타 인원을 넘었어요. 휴가가 겹친 부대원끼리 일정을 조율해
                     주세요.
                   </p>
@@ -581,7 +560,7 @@ export function LandingPage() {
                   to="/signup"
                   className="lp-btn lp-btn--primary lp-btn--lg"
                 >
-                  무료로 시작하기
+                  계정 만들기
                 </Link>
                 <StoreOrLogin />
               </div>

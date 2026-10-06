@@ -74,7 +74,7 @@ export const PRERENDERED_PAGES: readonly PrerenderedPage[] = [
   {
     path: "/",
     file: "index.html",
-    title: "리브(Leave) — 부대 휴가 일정 공유 캘린더",
+    title: "리브(Leave): 부대 휴가 일정 공유 캘린더",
     description:
       "부대원의 휴가를 한 달력에서 공유하고, 하루 최대 출타 인원을 넘는 날을 미리 확인하세요. 초과되면 그날 휴가인 부대원 모두에게 알림이 갑니다. 계급 자동 진급과 한국 공휴일 표시까지 웹·앱에서 무료로.",
     ogType: "website",
@@ -87,7 +87,7 @@ export const PRERENDERED_PAGES: readonly PrerenderedPage[] = [
   {
     path: "/guide",
     file: "guide.html",
-    title: "부대 휴가 일정 조율 가이드 — 리브 사용법",
+    title: "부대 휴가 일정 조율 가이드: 리브 사용법",
     description:
       "그룹을 만들어 부대원의 휴가를 한 달력에 모으고, 하루 최대 출타 인원 기준으로 초과일을 확인하는 방법. 계급 자동 진급·전역일·정기외박 주기의 계산 기준까지 정리했습니다.",
     ogType: "article",

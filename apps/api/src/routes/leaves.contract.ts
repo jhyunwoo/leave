@@ -126,7 +126,7 @@ export const grantsRoute = createRoute({
   method: "get",
   path: "/grants",
   tags: ["휴가"],
-  summary: "보유 휴가 — 적립분·주기 현황",
+  summary: "보유 휴가: 적립분·주기 현황",
   security: [{ Bearer: [] }],
   responses: {
     200: jsonContent(leaveGrantsPageSchema, "보유 휴가 현황"),

@@ -1,4 +1,4 @@
-# Google Play Console — English (U.S.)
+# Google Play Console: English (U.S.)
 
 > App: Leave · Package: `app.leave.mobile` · versionName 1.0.0
 
@@ -30,7 +30,7 @@ FEATURES
 PRIVACY AND SECURITY
 • Use an alias instead of a real name.
 • Do not enter real unit names or numbers, addresses, locations, service numbers, official documents, operations, training, inspections, or force-strength information.
-• Schedule titles and notes can be visible to members of the same group.
+• Schedule titles, reasons, and drafts are visible only to you. Group members can see your display name, rank, schedule dates, status, and daily capacity counts.
 • The app does not request camera, microphone, photo-library, location, or contacts permissions.
 
 IMPORTANT
@@ -48,7 +48,7 @@ Leave is an independently developed service and is not affiliated with or endors
 | In-app purchases | None                                     |
 | Target audience  | 18 and older; not directed to children   |
 
-Disclose user interaction and UGC because members share schedule titles and notes. Do not submit until in-app reporting and blocking requirements are satisfied.
+Disclose user interaction and UGC because members share display names, group names and descriptions, and schedule dates and statuses. Schedule titles, reasons, and drafts are private. Do not submit until in-app reporting and blocking requirements are satisfied.
 
 ## App access
 

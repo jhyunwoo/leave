@@ -25,7 +25,7 @@ export const OG_IMAGE_PATH = "/og/leave-og-1200x630.png";
 export const OG_IMAGE_WIDTH = 1200;
 export const OG_IMAGE_HEIGHT = 630;
 export const OG_IMAGE_ALT =
-  "리브 — 부대 휴가 일정을 함께 보는 캘린더. 하루 최대 출타 인원 초과일을 미리 알려줍니다.";
+  "리브: 부대 휴가 일정을 함께 보는 캘린더. 하루 최대 출타 인원 초과일을 미리 알려줍니다.";
 
 /**
  * 친구 추가 링크(`/u/{username}`)의 소셜 미리보기.
@@ -48,7 +48,7 @@ export const FRIEND_INVITE_OG_DESCRIPTION =
 export const FRIEND_INVITE_OG_IMAGE_PATH =
   "/og/leave-friend-invite-1200x630.png";
 export const FRIEND_INVITE_OG_IMAGE_ALT =
-  "리브 친구 추가 링크 — 링크를 열어 친구를 추가하고 서로의 휴가 일정을 함께 보세요.";
+  "리브 친구 추가 링크: 링크를 열어 친구를 추가하고 서로의 휴가 일정을 함께 보세요.";
 export const FRIEND_INVITE_OG_CARD = {
   eyebrow: "친구 추가 링크",
   headline: ["리브에서", "친구 추가하기"],
@@ -61,7 +61,7 @@ export const FRIEND_INVITE_OG_CARD = {
  * 서비스 운영자. 개인정보 처리방침·이용약관에 이미 공개된 값과 같아야 한다
  * (구조화 데이터는 화면에 보이는 사실만 담는다).
  */
-export const PUBLISHER_NAME = "Hyunwoo Jeon";
+export const PUBLISHER_NAME = "전현우";
 export const CONTACT_EMAIL = "jhyunwoo0228@gmail.com";
 
 /** 사이트 안 경로를 정본 절대 URL로. 질의 문자열·해시는 canonical에 싣지 않는다. */

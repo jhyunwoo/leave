@@ -1,11 +1,4 @@
-/**
- * 운영 현황(대시보드)과 로그 조회·CSV 내보내기 라우트.
- *
- * 마운트 위치: `/api` (worker/index.ts).
- *
- * "오늘"의 기준은 서울 시간이다(seoulDayBounds). 저장은 UTC로 하지만 운영자가
- * 보는 하루는 KST여야 숫자가 직관과 맞는다.
- */
+/** 저장 시각은 UTC지만 운영 현황의 하루는 서울 시간으로 집계한다. */
 
 import {
   accessLogs,
@@ -87,12 +80,11 @@ export const overviewLogRoutes = new Hono<AdminAppEnv>()
       },
       recentAccessLogs: recent,
       system: {
-        apiWorker: "ok",
-        d1: "ok",
-        r2: "ok",
-        kv: "ok",
-        push: "ok",
-        checkedAt: nowIso(),
+        apiWorker: "unknown",
+        d1: "readable",
+        kv: "unknown",
+        push: "unknown",
+        databaseReadAt: nowIso(),
       },
     });
   })

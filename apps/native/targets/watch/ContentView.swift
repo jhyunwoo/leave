@@ -79,7 +79,7 @@ struct ContentView: View {
                     gaugeRing(gauge, accent: accent)
                 }
             }
-            Text(metric?.compact ?? metric?.value ?? "—")
+            Text(metric?.compact ?? metric?.value ?? "-")
                 .font(.title2.weight(.bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

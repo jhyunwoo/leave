@@ -35,12 +35,7 @@ import {
   type LeaveCycleInterval,
 } from "./leave-cycle";
 
-/* ------------------------------------------------ 일반 주기 산술의 정기외박 이름
- *
- * 이 재수출들은 취향이 아니라 계약이다. `@leave/shared/regular-overnight`는 네이티브
- * 앱이 직접 import하는 경로이고, 이 이름들은 이미 화면 여러 곳에 박혀 있다
- * (docs/code-style.md — 프로세스를 벗어난 이름은 취향으로 바꾸지 않는다).
- */
+// 네이티브 앱의 기존 import 계약을 유지하기 위해 주기 함수 이름을 다시 내보낸다.
 
 export {
   cycleDateAfter,
@@ -75,8 +70,6 @@ export function regularOvernightCycleCount(
 ): number {
   return leaveCycleCount(config, through);
 }
-
-/* ------------------------------------------------------------ 정기외박 고유 판정 */
 
 /**
  * 화면에 그릴 주기. 전역일 다음 날부터는 아무 주기도 돌려주지 않는다.

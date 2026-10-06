@@ -83,8 +83,6 @@ export function isAcceptableInviteCode(normalized: string): boolean {
   );
 }
 
-/* ---------------------------------------------------------- 초대 링크 */
-
 /**
  * 초대 링크의 정본 출처. 프로필 링크와 같은 도메인이고 같은 이유로 HTTPS다 —
  * 앱이 있으면 앱에서(Universal Link / App Link), 없으면 웹에서 열린다.

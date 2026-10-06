@@ -217,7 +217,7 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingBottom: spacing.xs,
   },
   chip: {
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
@@ -236,7 +236,7 @@ const useStyles = makeStyles(({ colors }) => ({
   picker: { width: "100%" },
   clear: {
     alignSelf: "flex-start",
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: spacing.xs,
   },

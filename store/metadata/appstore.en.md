@@ -1,4 +1,4 @@
-# App Store Connect — English (U.S.)
+# App Store Connect: English (U.S.)
 
 > App: Leave · Bundle ID: `app.leave.mobile` · Version 1.2.0
 
@@ -17,7 +17,7 @@ Group schedule reference tool
 ## Promotional Text
 
 ```text
-Days to discharge and your remaining leave, now on Apple Watch too — pin the D-day to your watch face. See friends' leave right on your calendar.
+Days to discharge and your remaining leave, now on Apple Watch too. Pin the D-day to your watch face. See friends' leave right on your calendar.
 ```
 
 ## Description
@@ -38,7 +38,7 @@ FEATURES
 PRIVACY AND SECURITY
 • Use an alias instead of a real name.
 • Do not enter real unit names or numbers, addresses, locations, service numbers, official documents, operations, training, inspections, or force-strength information.
-• Schedule titles and notes can be visible to members of the same group.
+• Schedule titles, reasons, and drafts are visible only to you. Group members can see your display name, rank, schedule dates, status, and daily capacity counts.
 • The app does not request camera, microphone, photo-library, location, or contacts permissions.
 
 IMPORTANT
@@ -72,7 +72,7 @@ This is an unofficial reference tool. Actual leave remains subject to commander 
 | Tracking           | No                                |
 | Sign-in required   | Yes                               |
 
-Answer “Yes” for user-generated content because group members share schedule titles and notes. Do not submit until in-app reporting and blocking requirements are satisfied.
+Answer “Yes” for user-generated content because group members share display names, group names and descriptions, and schedule dates and statuses. Schedule titles, reasons, and drafts are private. Do not submit until in-app reporting and blocking requirements are satisfied.
 
 ## App Review Notes
 

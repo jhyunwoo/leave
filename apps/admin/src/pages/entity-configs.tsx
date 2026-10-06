@@ -124,7 +124,7 @@ function segmentsCell(item: Entity): ReactNode {
   const segments = Array.isArray(item.segments)
     ? (item.segments as LeaveSegment[])
     : [];
-  if (!segments.length) return "—";
+  if (!segments.length) return "없음";
   return (
     <span className="person-cell">
       {segments.map((segment) => (
@@ -249,7 +249,7 @@ export const entityConfigs: Record<EntityResource, ResourceConfig> = {
         label: "상태",
         render: (item) => (
           <StatusBadge
-            value={REPORT_STATUS_LABELS[String(item.status)] ?? "—"}
+            value={REPORT_STATUS_LABELS[String(item.status)] ?? "없음"}
           />
         ),
       },
@@ -317,7 +317,7 @@ export const entityConfigs: Record<EntityResource, ResourceConfig> = {
           <span
             className={Number(item.durationMs) >= 500 ? "text-negative" : ""}
           >
-            {item.durationMs == null ? "—" : `${text(item.durationMs)}ms`}
+            {item.durationMs == null ? "없음" : `${text(item.durationMs)}ms`}
           </span>
         ),
       },

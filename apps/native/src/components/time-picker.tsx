@@ -247,7 +247,7 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingBottom: spacing.xs,
   },
   chip: {
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
@@ -297,7 +297,7 @@ const useStyles = makeStyles(({ colors }) => ({
   cellTextSelected: { color: colors.onPrimary, fontWeight: "800" },
   clear: {
     alignSelf: "flex-start",
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: spacing.xs,
   },

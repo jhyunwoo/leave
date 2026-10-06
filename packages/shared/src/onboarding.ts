@@ -28,8 +28,6 @@ import {
 } from "./rank";
 import { REGULAR_OVERNIGHT_DEFAULTS } from "./regular-overnight-guidance";
 
-/* ------------------------------------------------------------------ 단계 */
-
 /**
  * 화면 순서. 한 화면에서 하나만 묻는다는 원칙이라 단계가 곧 질문 하나다.
  * `dates`만 예외로 입대일과 전역예정일을 함께 둔다 — 전역일은 입대일에서
@@ -148,8 +146,6 @@ export const ONBOARDING_COPY: Record<OnboardingStepId, OnboardingCopy> = {
   },
 };
 
-/* ------------------------------------------------------------ 기능 설명 */
-
 /** 그룹 단계에서 두 기능을 나란히 설명하는 카드 한 장. 사용법 투어는 `onboarding-tour.ts`. */
 export interface OnboardingHowtoCard {
   id: string;
@@ -181,8 +177,6 @@ export const ONBOARDING_GROUP_VS_FRIENDS: readonly OnboardingHowtoCard[] = [
     body: "부대가 달라도 괜찮아요. 친구 탭에서 @아이디로 요청하고 양쪽이 수락하면 서로의 출타 일정을 달력에서 나란히 봐요. 초대코드는 필요 없어요.",
   },
 ] as const;
-
-/* ------------------------------------------------------------ 군종별 색 */
 
 export interface BranchAccent {
   /** 히어로 배경 틴트. */
@@ -217,8 +211,6 @@ export const BRANCH_ACCENT: Record<
     dark: { tint: "#0d2f3d", line: "#9dd6ec", deep: "#c4e8f5" },
   },
 };
-
-/* -------------------------------------------------------------- 엠블럼 */
 
 export interface EmblemShape {
   d: string;
@@ -285,8 +277,6 @@ export const BRANCH_EMBLEM: Record<Branch, BranchEmblem> = {
     ],
   },
 };
-
-/* ------------------------------------------------------ 히어로 타임라인 */
 
 /** 히어로 SVG 좌표계. 웹과 네이티브가 같은 값을 쓴다. */
 export const HERO_VIEWBOX = { width: 360, height: 200 } as const;

@@ -157,8 +157,6 @@ export function isUsernameQuery(value: string): boolean {
   );
 }
 
-/* -------------------------------------------------------- 프로필 링크 */
-
 /**
  * 프로필 링크의 정본 출처.
  *

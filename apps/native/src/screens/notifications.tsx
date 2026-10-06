@@ -1,20 +1,5 @@
-/**
- * 알림함 화면(네이티브).
- * 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로 이어진다.
- *
- * ## 창 폭에 따라 읽는 방식이 달라진다
- *
- *   compact  : 최근 알림을 큰 카드로 떼어 놓고 그 아래에 이전 알림을 쌓는다.
- *              좁은 화면에서는 "가장 최근 것"이 곧 위계라 이게 가장 빠르다.
- *   medium+  : 왼쪽 목록 · 오른쪽 상세의 받은편지함. 알림 하나를 확인하려고
- *              화면을 떠났다가 뒤로 돌아오는 왕복이 사라지고, 목록에서 위아래로
- *              훑으며 어떤 날짜가 걸렸는지 비교할 수 있다. 위계는 카드 크기 대신
- *              선택 상태와 안 읽음 표시가 진다.
- *
- * 친구 휴가 알림은 비교 모달로, 친구 요청 알림은 친구 탭의 그 요청으로,
- * 초과 알림은 해당 날짜의 내 휴가로, 내 복무 기념일은 축하 화면으로, 친구의
- * 기념일은 그 친구의 프로필로 연결한다.
- */
+/** 좁은 창은 최근 알림을 강조하고, 넓은 창은 목록·상세를 나란히 비교한다.
+ * 알림 종류에 따라 휴가 비교, 친구 요청, 내 휴가, 기념일 또는 친구 프로필로 연결한다. */
 
 import { fmtDateTimeShort, fmtDateShort } from "@leave/shared/calendar";
 import { Stack, useRouter } from "expo-router";
@@ -39,6 +24,7 @@ import {
 import { inspectorWidth, useWindowSizeClass } from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
+import { QueryErrorState } from "@/components/query-error-state";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { FriendLeaveNotificationModal } from "@/components/friend-leave-notification-modal";
 import { notify } from "@/lib/dialog";
@@ -267,8 +253,25 @@ export function NotificationsScreen() {
     );
   }
 
+  if (list.isError && !list.data) {
+    return (
+      <QueryErrorState
+        title="알림을 불러오지 못했어요"
+        onRetry={() => void list.refetch()}
+        retrying={list.isFetching}
+      />
+    );
+  }
+
   return (
     <>
+      {list.isError && (
+        <QueryErrorState
+          title="알림을 새로 불러오지 못했어요"
+          onRetry={() => void list.refetch()}
+          retrying={list.isFetching}
+        />
+      )}
       {friendDetail?.notification.friendLeave && (
         <FriendLeaveNotificationModal
           target={friendDetail.notification.friendLeave}

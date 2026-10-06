@@ -1,21 +1,5 @@
-/**
- * 내 휴가 화면(네이티브) — 잔여와 계획을 한자리에서 본다.
- *
- * 다가오는 일정과 지난 일정을 나누고, 잔여 요약과 보유 휴가로 가는 길을 준다.
- * 재원별 내역은 보유 휴가 화면에만 둔다 — 여기서는 합계만 본다.
- *
- * ## 창 폭에 따라 열이 늘어난다
- *
- *   compact  : 지금까지처럼 한 줄로 쌓는다(잔여 → 목록).
- *   medium   : [잔여] | [휴가 목록] 두 열. 스크롤 없이 "얼마 있고 뭘 잡아
- *              뒀는지"를 동시에 본다.
- *   expanded : [잔여] | [목록] | [고른 휴가 상세] 세 열. 목록에서 고르면
- *              화면을 떠나지 않고 오른쪽에서 상세를 읽는다.
- *
- * 세 번째 열은 `/leave/[leaveId]` 라우트와 같은 본문(`LeaveDetailContent`)을
- * 쓴다. 딥링크·푸시·좁은 창은 여전히 라우트로 들어오고, 넓은 창에서만 그 본문이
- * 자리를 옮긴다.
- */
+/** 좁은 창은 잔여·목록을 쌓고, 넓은 창은 요약·목록·상세를 나란히 비교한다.
+ * 상세 본문은 딥링크 라우트와 공유하며 재원별 장부는 보유 휴가 화면에 둔다. */
 
 import { fmtRange } from "@leave/shared/calendar";
 import {
@@ -51,6 +35,7 @@ import {
 } from "@/adaptive";
 import { ActionMenu } from "@/components/action-menu";
 import { Button } from "@/components/button";
+import { QueryErrorState } from "@/components/query-error-state";
 import { ContentPanel } from "@/components/content-panel";
 import { LeaveStatusControl } from "@/components/leave-status-control";
 import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
@@ -265,10 +250,23 @@ export function LeavesScreen() {
 
   const leaveList = (
     <View style={styles.stack}>
+      {leaves.isError && leaves.data && (
+        <QueryErrorState
+          title="휴가 목록을 새로 불러오지 못했어요"
+          onRetry={() => void leaves.refetch()}
+          retrying={leaves.isFetching}
+        />
+      )}
       {leaves.isPending ? (
         <View style={{ padding: spacing.xxxl, alignItems: "center" }}>
           <ActivityIndicator color={colors.ink} />
         </View>
+      ) : leaves.isError && !leaves.data ? (
+        <QueryErrorState
+          title="휴가 목록을 불러오지 못했어요"
+          onRetry={() => void leaves.refetch()}
+          retrying={leaves.isFetching}
+        />
       ) : myLeaves.length === 0 ? (
         <ContentPanel style={styles.empty}>
           <Text style={styles.emptyTitle}>아직 등록한 휴가가 없어요</Text>

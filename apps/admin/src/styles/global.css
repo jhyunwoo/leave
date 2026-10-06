@@ -187,7 +187,7 @@ h3 {
 }
 
 .side-nav-link.is-active {
-  background: linear-gradient(90deg, var(--primary-pale), #c9efaf);
+  background: var(--primary-pale);
   font-weight: 650;
 }
 
@@ -774,8 +774,12 @@ textarea:hover {
 
 .data-table tbody tr[tabindex]:hover,
 .data-table tbody tr[tabindex]:focus {
-  outline: 0;
   background: #f7faf5;
+}
+
+.data-table tbody tr[tabindex]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
 }
 
 .data-table tbody tr:last-child td {

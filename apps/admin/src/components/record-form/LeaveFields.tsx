@@ -82,7 +82,7 @@ export function LeaveFields({
       </div>
 
       <div className="field">
-        <span>휴가 구간 — 언제부터 언제까지가 어떤 휴가인지</span>
+        <span>휴가 구간: 언제부터 언제까지가 어떤 휴가인지</span>
         {rangeValid ? (
           <>
             {resolvedDrafts.map((draft, index) => (

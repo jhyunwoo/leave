@@ -1,4 +1,4 @@
-# Google Play Console — 한국어
+# Google Play Console: 한국어
 
 > 앱: 리브(Leave) · 패키지명: app.leave.mobile · versionName 1.0.0
 

@@ -73,14 +73,7 @@ export function fmtRangeTiny(start: ISODate, end: ISODate): string {
   return `${fmtDateTiny(start)}–${fmtDateTiny(end)}`;
 }
 
-/* ------------------------------------------------------------------ *
- * 시각이 붙은 표기
- *
- * 위의 fmtDate*는 날짜 문자열(YYYY-MM-DD)을 다루므로 UTC 접근자를 쓴다 —
- * 타임존 때문에 하루가 밀리지 않게 하려는 것이다. 아래 둘은 반대로 "언제 일어난
- * 일인가"(알림 도착, 초대코드 만료)를 다루므로 기기의 로컬 시각으로 보여준다.
- * 사용자가 화면에서 읽는 시각과 손목시계가 어긋나면 안 되기 때문이다.
- * ------------------------------------------------------------------ */
+// 날짜만 있는 값은 UTC로 읽고, 실제 사건의 timestamp는 기기의 로컬 시각으로 표시한다.
 
 /** "8월 2일 14:05" — 목록에서 한 줄에 들어가야 하는 시각. */
 export function fmtDateTimeShort(timestamp: string): string {

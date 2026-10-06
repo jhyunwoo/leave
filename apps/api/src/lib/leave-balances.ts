@@ -675,7 +675,7 @@ export async function assertSegmentsAvailable(
     );
     throw new LeaveRuleError(
       blocked
-        ? `${BALANCE_LABELS[key]} — ${fmtDateShort(blocked)}에 쓸 수 있는 적립분이 없어요 (만료됐거나 잔여가 부족합니다)`
+        ? `${BALANCE_LABELS[key]}: ${fmtDateShort(blocked)}에 쓸 수 있는 적립분이 없어요 (만료됐거나 잔여가 부족합니다)`
         : `${BALANCE_LABELS[key]} 잔여 ${before[key].remainingDays}일보다 많이 사용할 수 없습니다`,
     );
   }

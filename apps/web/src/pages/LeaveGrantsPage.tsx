@@ -1,9 +1,4 @@
-/**
- * 보유 휴가 화면 — 재원별 적립분과 주기 재원(정기외박·외출)을 관리한다.
- *
- * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
- * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
- */
+/** 잔여량의 근거를 확인하도록 적립분의 부여·만기와 주기별 내역을 펼친다. */
 
 import { ActionIcon } from "../components/ActionIcon";
 
@@ -16,6 +11,7 @@ import { LeaveGrantModal } from "../components/LeaveGrantModal";
 import { OutingSettings } from "../components/OutingSettings";
 import { RegularOvernightSettings } from "../components/RegularOvernightSettings";
 import { fmtDateShort } from "@leave/shared";
+import { QueryErrorState } from "../components/QueryErrorState";
 
 /** 만기가 이 안으로 다가오면 임박으로 본다. */
 const EXPIRING_SOON = 30;
@@ -30,7 +26,7 @@ export function LeaveGrantsPage(props: { me: Me }) {
   const [editing, setEditing] = useState<Editing>(null);
   const [showPastCycles, setShowPastCycles] = useState(false);
 
-  if (page.isPending || !page.data) {
+  if (page.isPending) {
     return (
       <div
         style={{
@@ -41,6 +37,16 @@ export function LeaveGrantsPage(props: { me: Me }) {
       >
         <div className="spinner" role="status" aria-label="불러오는 중" />
       </div>
+    );
+  }
+
+  if (!page.data) {
+    return (
+      <QueryErrorState
+        title="보유 휴가를 불러오지 못했어요"
+        onRetry={() => void page.refetch()}
+        retrying={page.isFetching}
+      />
     );
   }
 
@@ -85,6 +91,13 @@ export function LeaveGrantsPage(props: { me: Me }) {
         gap: "var(--sp-xl)",
       }}
     >
+      {page.isError && (
+        <QueryErrorState
+          title="보유 휴가를 새로 불러오지 못했어요"
+          onRetry={() => void page.refetch()}
+          retrying={page.isFetching}
+        />
+      )}
       <header>
         <Link to="/leaves" className="body-sm text-mute">
           ‹ 내 휴가

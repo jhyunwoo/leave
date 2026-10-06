@@ -67,8 +67,6 @@ export function isOutingBalanceKey(key: BalanceKey): boolean {
   return outingKindOfBalanceKey(key) !== null;
 }
 
-/* ------------------------------------------------------------------ 주기 조회 */
-
 /** date가 속한 외출 주기. 설정이 없거나 첫 적립 전이면 null. */
 export function outingCycleFor(
   config: OutingConfig | null | undefined,
@@ -158,8 +156,6 @@ export function isOutingCycleBased(
 ): boolean {
   return activeLeaveCycleConfig(config) !== null;
 }
-
-/* ------------------------------------------------------------------ 사용량 */
 
 /** SegmentLike는 갈래가 null일 수 있어 재원 판별 전에 맞춰준다. */
 function balanceKeyOf(segment: SegmentLike): BalanceKey {
@@ -285,8 +281,6 @@ export function outingUsageByCycle(
   const covered = cycles.reduce((sum, entry) => sum + entry.usedDays, 0);
   return { cycles, beforeFirstGrantDays: totalDays - covered };
 }
-
-/* ------------------------------------------------------------------ 판정 */
 
 /**
  * 외출을 쓸 수 없는 이유. 없으면 null이 온다.

@@ -19,37 +19,23 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   hour12: false,
 });
 
-/**
- * ISO 문자열을 사람이 읽는 시각으로. 값이 없으면 "—",
- * 날짜로 해석되지 않으면 원문을 그대로 보여준다(디버깅에 필요하다).
- */
+/** 해석할 수 없는 날짜는 디버깅을 위해 원문으로 표시한다. */
 export function formatDateTime(value: unknown): string {
-  if (typeof value !== "string" || !value) return "—";
+  if (typeof value !== "string" || !value) return "없음";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
 }
 
-/**
- * 빈 값을 표 안에서 눈에 띄는 대시로 바꾼다.
- *
- * 관리자 표는 서버가 준 행을 스키마 없이 그대로 그린다. 값이 무엇이든 한 칸에
- * 찍어야 하므로 `unknown`을 String()에 넘기는 것이 이 함수의 목적이다.
- * 이 저장소에서 unknown을 문자열로 바꾸는 곳은 여기 하나로 모은다.
- */
+/** 서버의 임의 필드를 표시하는 경계이며, 비어 있는 값은 명시한다. */
 export function text(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "없음";
   // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 위 주석: 의도적인 표시 경계
   return String(value);
 }
 
-/**
- * 상세 서랍에서 한 필드를 보여줄 문자열.
- *
- * `text()`와 달리 객체는 접힌 JSON으로 펼친다 — 상세 화면은 원본을 확인하는
- * 곳이라 `[object Object]`로 뭉개면 쓸모가 없다.
- */
+/** 상세 화면에서는 객체를 JSON으로 펼쳐 원본 필드를 확인할 수 있게 한다. */
 export function detailText(value: unknown): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "없음";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
   // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 서버 원본 값을 그대로 보여주는 의도적 경계
   return String(value);

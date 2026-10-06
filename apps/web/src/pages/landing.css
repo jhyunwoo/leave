@@ -63,7 +63,7 @@
 
 .lp-btn {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   padding: 0 20px;
@@ -290,7 +290,11 @@ html[data-platform] .lp-store-fallback {
   font-weight: 600;
 }
 
-.lp-pill.is-full,
+.lp-pill.is-full {
+  color: var(--warning-content);
+  background: var(--warning);
+}
+
 .lp-pill.is-over {
   color: #ffffff;
   background: var(--negative);
@@ -632,7 +636,8 @@ html[data-platform] .lp-store-fallback {
 }
 
 .lp-footer-links a {
-  min-height: 32px;
+  min-height: 44px;
+  min-width: 44px;
   display: inline-flex;
   align-items: center;
   color: #d4d4d8;

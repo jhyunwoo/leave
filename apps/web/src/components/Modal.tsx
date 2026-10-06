@@ -1,19 +1,4 @@
-/**
- * 공용 모달 껍데기.
- *
- * 사용처: 휴가 등록/수정, 적립분 편집 등 웹의 모든 대화형 폼.
- * 열려 있는 동안 배경 스크롤을 잠그고 Esc로 닫는다.
- *
- * ## 왜 `document.body`로 포털을 쓰는가
- *
- * `position: fixed`의 기준은 뷰포트가 아니라 **transform이 걸린 가장 가까운
- * 조상**이다. 페이지 컨테이너 대부분이 쓰는 `.anim-rise`는
- * `animation-fill-mode: both`라 애니메이션이 끝난 뒤에도 마지막 키프레임의
- * `transform: translateY(0)`을 계속 물고 있어서, 모달을 페이지 트리 안에 그대로
- * 두면 오버레이가 화면이 아니라 그 페이지 칸을 덮는다. 목록이 길어질수록 모달은
- * 칸 한가운데(=화면 아래쪽)에 놓이고, 배경 스크롤은 잠겨 있으니 저장 버튼에
- * 닿을 방법이 없어진다. 조상의 스타일에 기대지 않도록 body로 꺼내 그린다.
- */
+/** body 포털을 사용해 조상의 transform이 fixed 모달의 기준을 바꾸지 않게 한다. */
 
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -90,13 +75,7 @@ export function Modal(props: {
     <div
       ref={overlayRef}
       role="presentation"
-      // 배경 클릭으로 닫되, **누른 곳과 뗀 곳이 모두 배경일 때만** 닫는다.
-      //
-      // `onClick`만 보면 안 되는 이유: click의 target은 누른 노드와 뗀 노드의
-      // 공통 조상이다. 모달 안에서 글자를 드래그하다가 손이 모달 밖으로 나간 채
-      // 버튼을 놓으면 공통 조상이 이 오버레이가 되어, 안에서 시작한 드래그인데도
-      // `e.target === e.currentTarget`이 참이 되고 모달이 닫힌다(입력 내용 유실).
-      // 데스크톱에서 텍스트를 조금만 길게 끌어도 재현된다.
+      // 모달 안에서 시작한 드래그가 폼을 닫지 않도록 양 끝이 배경일 때만 닫는다.
       onPointerDown={(e) => {
         pressedOverlay.current = e.target === e.currentTarget;
       }}
@@ -150,14 +129,11 @@ export function Modal(props: {
         style={{
           width: "100%",
           maxWidth: MAX_WIDTH[props.size ?? "regular"],
-          // dvh로 잰다. 모바일 주소창이 펼쳐져 있으면 90vh가 실제로 보이는 높이를
-          // 넘어서, 폼 맨 아래 버튼이 주소창 밑에 깔린다.
+          // 펼쳐진 모바일 주소창 아래로 폼이 가려지지 않도록 실제 뷰포트 높이를 쓴다.
           maxHeight: "90dvh",
           overflowY: "auto",
           boxShadow: "var(--shadow-modal)",
-          // fill-mode는 `backwards`. `both`면 등장 애니메이션이 끝난 뒤에도
-          // transform이 남아, 이 안에 그리는 폼이 `position: fixed`를 쓸 때
-          // 화면이 아니라 이 카드를 기준으로 놓인다(.anim-rise와 같은 함정).
+          // transform을 남기면 자식의 fixed UI가 뷰포트 대신 카드를 기준으로 놓인다.
           animation: "pop-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) backwards",
         }}
       >
@@ -177,7 +153,7 @@ export function Modal(props: {
             onClick={props.onClose}
             /* 테두리는 `.btn-icon`이 준 것을 그대로 둔다. 예전에는 여기서 껐는데
                배경이 --canvas(모달과 같은 흰색)라 남는 것이 ×자 하나뿐이었다. */
-            style={{ width: 36, height: 36 }}
+            style={{ width: 44, height: 44 }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <path

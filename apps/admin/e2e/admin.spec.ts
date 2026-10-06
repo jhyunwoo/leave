@@ -22,7 +22,7 @@ test("로그인부터 대시보드, 사용자 관리, 감사 로그까지 동작
 
   await page.getByLabel("이메일").fill(email);
   await page.getByLabel("비밀번호").fill(temporaryPassword);
-  await page.getByRole("button", { name: "로그인" }).click();
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
 
   await expect(
     page.getByRole("heading", { name: "임시 비밀번호를 변경해주세요" }),
@@ -84,7 +84,7 @@ test("로그인부터 대시보드, 사용자 관리, 감사 로그까지 동작
   await expect(page.getByRole("heading", { name: "사용자" })).toBeVisible();
   await page.getByRole("button", { name: "사용자 추가" }).click();
   await page.getByLabel("이메일").fill(`browser-${unique}@leave.local`);
-  await page.getByLabel("이름").fill("브라우저 테스트 사용자");
+  await page.getByLabel("이름", { exact: true }).fill("브라우저 테스트 사용자");
   await page.getByLabel("임시 비밀번호").fill("BrowserUser!2026");
   await page.getByLabel("군 종류").selectOption("army");
   await page.getByLabel("입대일").fill("2026-01-01");
@@ -94,10 +94,66 @@ test("로그인부터 대시보드, 사용자 관리, 감사 로그까지 동작
   await page.getByRole("button", { name: "생성" }).click();
 
   await expect(page.getByText("데이터를 생성했습니다")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page
     .getByPlaceholder("검색", { exact: true })
     .fill(`browser-${unique}`);
   await expect(page.getByText("브라우저 테스트 사용자").first()).toBeVisible();
+  const row = page
+    .getByRole("row")
+    .filter({ hasText: "브라우저 테스트 사용자" })
+    .first();
+  await page.keyboard.press("Tab");
+  await row.focus();
+  await expect(row).toHaveCSS("outline-style", "solid");
+  await row.press("Enter");
+  const drawer = page.getByRole("dialog", { name: "사용자 상세" });
+  const close = drawer.getByRole("button", { name: "닫기" });
+  const remove = drawer.getByRole("button", { name: "삭제", exact: true });
+  await expect(close).toBeFocused();
+  await remove.focus();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+  await remove.click();
+  const confirmation = page.getByRole("alertdialog", { name: "사용자 삭제" });
+  await expect(confirmation).toBeVisible();
+  await page.keyboard.press("Shift+Tab");
+  await expect
+    .poll(() =>
+      confirmation.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
+  await expect(drawer).toBeVisible();
+  await expect(remove).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(row).toBeFocused();
+  await expect
+    .poll(() =>
+      page
+        .locator("#root")
+        .evaluate((element) => (element as HTMLElement).inert),
+    )
+    .toBe(false);
+  await row.press("Enter");
+  await remove.click();
+  await confirmation.getByRole("textbox").fill("브라우저 테스트 사용자");
+  await confirmation.getByRole("button", { name: "영구 삭제" }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(drawer).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page
+        .locator("#root")
+        .evaluate((element) => (element as HTMLElement).inert),
+    )
+    .toBe(false);
+  await page.getByPlaceholder("검색", { exact: true }).fill("completed");
   await expect(page.locator("vite-error-overlay")).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });

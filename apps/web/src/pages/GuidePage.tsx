@@ -1,20 +1,5 @@
-/**
- * 공개 안내 문서 — `/guide`.
- *
- * 랜딩이 "무엇을 해 주는가"를 말한다면 여기는 "어떤 기준으로 계산하는가"를
- * 말한다. 두 번째 색인 대상 페이지이고, 랜딩과 같은 방식으로 빌드 시 HTML로
- * 구워진다(`scripts/build-seo.mjs`).
- *
- * 이 문서에 적는 숫자와 규칙은 전부 `packages/shared`의 구현에서 온 것이어야
- * 한다. 군 규정을 해설하지 않는다 — 리브가 무엇을 어떻게 계산하는지만 적고,
- * 실제 규정과 다를 수 있음을 분명히 한다. 규칙이 바뀌면 이 파일도 같이 바꾼다.
- *
- * 출처:
- *  - 진급·전역: `packages/shared/src/rank.ts` (SERVICE_MONTHS, PROMOTION_MONTHS)
- *  - 출타 신호: `packages/shared/src/availability.ts`
- *  - 초과 판정: `packages/shared/src/overage.ts`
- *  - 공휴일:   `packages/shared/src/holidays.ts`
- */
+/** 공개 가이드는 HTML로 미리 렌더하며 군 규정 대신 shared의 실제 계산을 설명한다.
+ * rank, availability, overage, holidays 규칙이 바뀌면 본문도 함께 갱신한다. */
 
 import { Link } from "react-router";
 import { BrandLockup } from "../components/BrandLockup";
@@ -55,7 +40,7 @@ const SECTIONS: Section[] = [
           그룹을 만든 사람이 그 그룹의 관리자가 됩니다. 관리자는 만들 때{" "}
           <strong>하루 최대 출타 인원을 인원수로 직접</strong> 정하고, 나중에
           그룹 관리 화면에서 언제든 바꿀 수 있습니다. 리브가 부대 정원을
-          알아내거나 비율로 대신 계산하지 않습니다 — 어떤 값이 적절한지는 그
+          알아내거나 비율로 대신 계산하지 않습니다. 어떤 값이 적절한지는 그
           부대만 알기 때문입니다.
         </p>
         <p>
@@ -87,16 +72,16 @@ const SECTIONS: Section[] = [
         </p>
         <ul>
           <li>
-            <strong>여유</strong> — 기준의 50% 미만
+            <strong>여유</strong>: 기준의 50% 미만
           </li>
           <li>
-            <strong>보통</strong> — 50% 이상 80% 미만
+            <strong>보통</strong>: 50% 이상 80% 미만
           </li>
           <li>
-            <strong>임박</strong> — 80% 이상, 아직 기준 이내
+            <strong>임박</strong>: 80% 이상, 아직 기준 이내
           </li>
           <li>
-            <strong>초과</strong> — 인원이 기준을 넘은 날
+            <strong>초과</strong>: 인원이 기준을 넘은 날
           </li>
         </ul>
         <p>
@@ -119,7 +104,7 @@ const SECTIONS: Section[] = [
         </p>
         <p>
           알림은 웹·앱 안의 알림 목록으로 항상 오고, 모바일 앱에서 알림 권한을
-          허용했다면 푸시로도 옵니다. 리브는 휴가를 막거나 취소하지 않습니다 —
+          허용했다면 푸시로도 옵니다. 리브는 휴가를 막거나 취소하지 않습니다.
           누가 일정을 옮길지는 사람이 정합니다.
         </p>
       </>
@@ -142,7 +127,12 @@ const SECTIONS: Section[] = [
           유지합니다(조기 진급 대응).
         </p>
         <p>전역 예정일의 기본값은 군종별 표준 복무기간에서 나옵니다.</p>
-        <div className="guide-table-wrap">
+        <div
+          className="guide-table-wrap"
+          role="region"
+          aria-label="군종별 진급 기준표"
+          tabIndex={0}
+        >
           <table className="guide-table">
             <caption>군종별 표준 복무기간과 계급 진급 시점</caption>
             <thead>
@@ -321,7 +311,7 @@ export function GuidePage() {
             로그인
           </Link>
           <Link to="/signup" className="lp-btn lp-btn--primary">
-            무료로 시작하기
+            계정 만들기
           </Link>
         </div>
       </nav>
@@ -374,7 +364,7 @@ export function GuidePage() {
             <p>가입은 무료입니다. 웹에서 바로 그룹을 만들 수 있어요.</p>
             <div className="lp-cta-row">
               <Link to="/signup" className="lp-btn lp-btn--primary lp-btn--lg">
-                무료로 시작하기
+                계정 만들기
               </Link>
               <Link to="/" className="lp-btn lp-btn--ghost lp-btn--lg">
                 리브 홈으로
@@ -387,17 +377,17 @@ export function GuidePage() {
             <ul>
               <li>
                 <a href="/privacy">
-                  개인정보 처리방침 — 어떤 정보를 얼마나 보관하는지
+                  개인정보 처리방침: 어떤 정보를 얼마나 보관하는지
                 </a>
               </li>
               <li>
-                <a href="/terms">이용약관 — 서비스 성격과 금지 정보</a>
+                <a href="/terms">이용약관: 서비스 성격과 금지 정보</a>
               </li>
               <li>
-                <a href="/support">지원·문의 — 신고와 계정 문제 접수</a>
+                <a href="/support">지원·문의: 신고와 계정 문제 접수</a>
               </li>
               <li>
-                <a href="/delete-account">계정 삭제 — 삭제 대상과 처리 결과</a>
+                <a href="/delete-account">계정 삭제: 삭제 대상과 처리 결과</a>
               </li>
             </ul>
           </nav>

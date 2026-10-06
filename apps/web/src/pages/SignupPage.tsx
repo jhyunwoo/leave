@@ -1,8 +1,4 @@
-/**
- * 회원가입 화면.
- * 입대일과 군 종류를 넣으면 전역 예정일과 현재 계급이 자동으로 계산된다
- * (@leave/shared의 rank 규칙). 사용자는 그 값을 확인만 하면 된다.
- */
+/** 가입에서는 이메일과 비밀번호만 받고 복무정보는 온보딩에서 설정한다. */
 
 import { ActionIcon } from "../components/ActionIcon";
 
@@ -15,13 +11,6 @@ import { Field } from "../components/Field";
 import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 
-/**
- * 출시 전 최소수집 가입 화면. 네이티브 `screens/signup.tsx`와 같은 계약을 쓴다.
- *
- * 현재 서버의 구버전 입력 계약에 남아 있는 군종·입대/전역일·계급에는 사용자에게서
- * 받은 값이 아니라 무의미한 고정값을 보낸다. 서버 마이그레이션 뒤에는 이 호환 필드도
- * 함께 제거한다. 따라서 웹도 군 복무 정보나 사진을 사용자에게 요청하지 않는다.
- */
 export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +34,7 @@ export function SignupPage() {
       return;
     }
     if (!termsAccepted || !privacyAccepted || !ageConfirmed) {
-      setError("필수 동의와 만 14세 이상 확인이 필요해요");
+      setError("필수 동의와 만 18세 이상 확인이 필요해요");
       return;
     }
 
@@ -95,7 +84,7 @@ export function SignupPage() {
       }}
     >
       <div className="anim-rise" style={{ textAlign: "center" }}>
-        <h1 className="display-md">60초 안에 시작하기</h1>
+        <h1 className="display-md">리브 계정 만들기</h1>
         <p className="body-sm text-body" style={{ marginTop: "var(--sp-sm)" }}>
           계정을 만든 뒤 필요한 복무정보만 안전하게 설정해요.
         </p>
@@ -149,7 +138,7 @@ export function SignupPage() {
             data-testid="signup-password-confirm"
           />
         </Field>
-        {/* 목적별 분리 동의 — 선택 항목을 거부해도 서비스는 이용할 수 있다. */}
+        {/* 선택 알림 동의를 거부해도 서비스는 이용할 수 있다. */}
         <div
           style={{
             display: "flex",
@@ -173,7 +162,7 @@ export function SignupPage() {
             checked={ageConfirmed}
             onChange={setAgeConfirmed}
             testId="signup-age-confirmation"
-            label="[필수] 만 14세 이상이며 소속 부대의 휴대전화·보안 지침을 우선하겠습니다."
+            label="[필수] 만 18세 이상이며 소속 부대의 휴대전화·보안 지침을 우선하겠습니다."
           />
           <ConsentCheckbox
             checked={notificationOptIn}

@@ -1,8 +1,4 @@
-/**
- * 내 휴가 목록 화면.
- * 휴가/외출 탭으로 갈래를 고르고, 그 안에서 다가오는 일정과 지난 일정을 나눈다.
- * 재원별 잔여 요약도 함께 보여준다.
- */
+/** 휴가·외출별 다가오는 일정과 지난 기록을 잔여량 옆에서 비교한다. */
 
 import "./workspace.css";
 
@@ -34,13 +30,9 @@ import {
 } from "../components/LazyLeaveFormModal";
 import { NextLeaveCards } from "../components/NextLeaveCard";
 import { LeaveStatusControl } from "../components/LeaveStatusControl";
+import { QueryErrorState } from "../components/QueryErrorState";
 
-/**
- * A large leave history is uncommon but can otherwise mount hundreds of
- * interactive rows synchronously. Keep the first useful screen bounded and
- * let the user opt into each small batch; manual expansion is predictable on
- * slow CPUs and remains discoverable to keyboard and screen-reader users.
- */
+/** Bound the first render on slow CPUs; keyboard-accessible expansion reveals the remaining history. */
 const LEAVE_SECTION_PAGE_SIZE = 20;
 
 export function LeavesPage() {
@@ -190,6 +182,13 @@ export function LeavesPage() {
           )}
         </aside>
         <div className="workspace-stack">
+          {leaves.isError && leaves.data && (
+            <QueryErrorState
+              title="휴가 목록을 새로 불러오지 못했어요"
+              onRetry={() => void leaves.refetch()}
+              retrying={leaves.isFetching}
+            />
+          )}
           {leaves.isPending ? (
             <div
               style={{
@@ -200,6 +199,12 @@ export function LeavesPage() {
             >
               <div className="spinner" role="status" aria-label="불러오는 중" />
             </div>
+          ) : leaves.isError && !leaves.data ? (
+            <QueryErrorState
+              title="휴가 목록을 불러오지 못했어요"
+              onRetry={() => void leaves.refetch()}
+              retrying={leaves.isFetching}
+            />
           ) : !leaves.data || leaves.data.leaves.length === 0 ? (
             <div
               className="card-sage"

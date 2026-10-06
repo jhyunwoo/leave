@@ -157,7 +157,7 @@ struct DischargeComplicationView: View {
                 )
             }
         } else {
-            Text("—")
+            Text("-")
         }
     }
 }
@@ -213,7 +213,7 @@ struct NextLeaveComplicationView: View {
                 )
             }
         } else {
-            Text("—")
+            Text("-")
         }
     }
 }
@@ -269,7 +269,7 @@ struct NextOutingComplicationView: View {
                 )
             }
         } else {
-            Text("—")
+            Text("-")
         }
     }
 }

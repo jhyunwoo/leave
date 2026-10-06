@@ -1,13 +1,4 @@
-/**
- * 관리자 화면 공용 UI 부품 모음.
- *
- * 사용처: 관리자 SPA 전체.
- * 담는 것: 로딩/오류 화면, 페이지 헤더, 표와 페이지네이션, 상태 배지,
- *          상세 서랍, 확인 대화상자, 토스트.
- *
- * 화면 열두 개가 같은 부품으로 조립되므로, 여기 부품 하나를 고치면 관리자 화면
- * 전체의 생김새와 접근성이 함께 움직인다.
- */
+/** 관리자 화면의 공통 상태와 대화상자 동작을 한 곳에서 유지한다. */
 
 import {
   AlertTriangle,
@@ -27,13 +18,14 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import type { ListMeta } from "../api/client";
 import { detailText } from "../lib/format";
+import { createPortal } from "react-dom";
+import { useModalFocus } from "./use-modal-focus";
 
 export function LoadingScreen({ label = "불러오는 중" }: { label?: string }) {
   return (
@@ -260,7 +252,7 @@ export function StatusBadge({
         ? "활성"
         : "비활성"
       : value == null
-        ? "—"
+        ? "없음"
         : String(value);
   const numeric = Number(text);
   const tone =
@@ -285,36 +277,39 @@ export function StatusBadge({
   return <span className={`status-badge ${tone}`}>{text}</span>;
 }
 
-export function Drawer({
-  title,
-  open,
-  onClose,
-  children,
-  footer,
-}: {
+type DrawerProps = {
   title: string;
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, open]);
+};
 
-  if (!open) return null;
-  return (
-    <div className="overlay" role="presentation" onMouseDown={onClose}>
+export function Drawer({ open, ...props }: DrawerProps) {
+  return open ? <DrawerBody {...props} /> : null;
+}
+
+function DrawerBody({
+  title,
+  onClose,
+  children,
+  footer,
+}: Omit<DrawerProps, "open">) {
+  const { overlayRef, dialogRef } = useModalFocus(onClose);
+  return createPortal(
+    <div
+      ref={overlayRef}
+      className="overlay"
+      role="presentation"
+      onMouseDown={onClose}
+    >
       <section
+        ref={dialogRef}
         className="drawer"
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header>
@@ -331,7 +326,8 @@ export function Drawer({
         <div className="drawer-body">{children}</div>
         {footer ? <footer className="drawer-footer">{footer}</footer> : null}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -369,8 +365,7 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  // 닫힌 동안에는 아예 마운트하지 않는다. 그래야 다시 열 때 입력이 비어 있는
-  // 상태로 시작한다 — effect로 비우면 열자마자 한 번 더 렌더된다.
+  // 새로 열 때 이전 확인 입력이 남지 않도록 닫힌 본문을 언마운트한다.
   if (!open) return null;
   return (
     <ConfirmDialogBody
@@ -406,18 +401,23 @@ function ConfirmDialogBody({
   onConfirm: () => void;
 }) {
   const [typed, setTyped] = useState("");
+  const { overlayRef, dialogRef } = useModalFocus(onCancel);
   const disabled =
     pending || (confirmationText !== undefined && typed !== confirmationText);
-  return (
+  return createPortal(
     <div
+      ref={overlayRef}
       className="overlay centered"
       role="presentation"
       onMouseDown={onCancel}
     >
       <section
+        ref={dialogRef}
         className="confirm-dialog"
         role="alertdialog"
         aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <span className={`confirm-icon ${destructive ? "danger" : "warning"}`}>
@@ -458,7 +458,8 @@ function ConfirmDialogBody({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

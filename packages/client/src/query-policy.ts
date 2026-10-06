@@ -1,12 +1,5 @@
-/**
- * React Query retry policy shared by clients.
- *
- * Validation/auth/permission failures are deterministic: repeating the same
- * request spends bandwidth and CPU without changing the answer. Request
- * timeout and rate-limit responses are the two client-error exceptions that
- * can become successful later, so they keep the same bounded retry path as
- * network and server failures.
- */
+/** Deterministic client errors are not retried.
+ * Timeouts (408) and rate limits (429) keep the bounded transient retry policy. */
 import { ApiError } from "@leave/shared";
 
 /** Two retries means at most three attempts including the initial request. */

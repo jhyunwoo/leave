@@ -71,7 +71,7 @@ export const OUTING_SOURCES = [
     url: "https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=2200000076719",
   },
   {
-    label: "찾기쉬운 생활법령정보 — 현역병의 외출·외박 및 면회",
+    label: "찾기쉬운 생활법령정보: 현역병의 외출·외박 및 면회",
     url: "https://easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=1461&ccfNo=2&cciNo=3&cnpClsNo=2",
   },
 ] as const;

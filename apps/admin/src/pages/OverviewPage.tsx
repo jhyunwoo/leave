@@ -1,9 +1,4 @@
-/**
- * 관리자 운영 현황(대시보드).
- *
- * 오늘의 요청 수·오류율·활성 세션과 최근 접속 로그, 각 인프라(D1·R2·KV·푸시)
- * 상태를 한 화면에 모은다. 1분마다 자동으로 다시 받는다.
- */
+/** 운영 집계는 1분마다 갱신하며, 측정하지 않은 서비스 상태는 확인되지 않았다고 표시한다. */
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,12 +6,10 @@ import {
   Building2,
   CalendarDays,
   Database,
-  HardDrive,
   Send,
   Server,
   UserPlus,
   Users,
-  Zap,
   FileClock,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -52,12 +45,11 @@ type Overview = {
   };
   recentAccessLogs: AccessRow[];
   system: {
-    apiWorker: "ok";
-    d1: "ok";
-    r2: "ok";
-    kv: "ok";
-    push: "ok";
-    checkedAt: string;
+    apiWorker: "unknown";
+    d1: "readable";
+    kv: "unknown";
+    push: "unknown";
+    databaseReadAt: string;
   };
 };
 
@@ -110,14 +102,14 @@ export function OverviewPage() {
     {
       key: "platform",
       label: "플랫폼",
-      render: (row) => row.platform ?? "—",
+      render: (row) => row.platform ?? "없음",
     },
     {
       key: "duration",
       label: "응답 시간",
       render: (row) =>
         row.durationMs == null ? (
-          "—"
+          "없음"
         ) : (
           <span className={row.durationMs >= 500 ? "text-negative" : ""}>
             {row.durationMs}ms
@@ -156,9 +148,7 @@ export function OverviewPage() {
           <div className="panel-heading">
             <h2>최근 접속 로그</h2>
             <div className="panel-filters">
-              <select aria-label="기간" defaultValue="today">
-                <option value="today">오늘</option>
-              </select>
+              <span>오늘</span>
               <select
                 aria-label="플랫폼"
                 defaultValue=""
@@ -230,21 +220,16 @@ export function OverviewPage() {
               label="D1 데이터베이스"
               status={system.d1}
             />
-            <SystemRow
-              icon={<HardDrive />}
-              label="R2 이미지 저장소"
-              status={system.r2}
-            />
-            <SystemRow icon={<Zap />} label="KV 캐시" status={system.kv} />
+            <SystemRow icon={<Database />} label="KV 캐시" status={system.kv} />
             <SystemRow
               icon={<Send />}
               label="푸시 서비스"
               status={system.push}
             />
             <div className="system-checked">
-              <span>마지막 점검</span>
-              <time dateTime={system.checkedAt}>
-                {formatDateTime(system.checkedAt)}
+              <span>DB 조회 시각</span>
+              <time dateTime={system.databaseReadAt}>
+                {formatDateTime(system.databaseReadAt)}
               </time>
             </div>
           </section>
@@ -300,9 +285,8 @@ function SystemRow({
         {icon}
         {label}
       </span>
-      <strong>
-        <i aria-hidden="true" />
-        {status === "ok" ? "정상" : status}
+      <strong data-status={status}>
+        {status === "readable" ? "조회 성공" : "상태 미확인"}
       </strong>
     </div>
   );

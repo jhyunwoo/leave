@@ -1,13 +1,4 @@
-/**
- * 보유 휴가 화면(네이티브) — 재원별 적립분과 정기외박 주기를 관리한다.
- *
- * "며칠 남았는가"만 보여주면 왜 그 숫자인지 알 수 없다. 언제 얼마가 부여됐고
- * 언제 만료되는지를 적립분 단위로 펼쳐, 사용자가 직접 장부를 맞출 수 있게 한다.
- *
- * 넓은 창에서는 왼쪽에 합계를 고정하고 오른쪽에 재원별 카드를 편다. 재원 카드는
- * 서로 비교하려고 보는 것이라, 한 줄로 쌓아 두면 위아래로 스크롤하며 숫자를
- * 외워야 한다. 주기 설정과 주기 목록은 아래에서 두 열로 나뉜다.
- */
+/** 잔여량의 근거를 확인하도록 부여·만기별 적립분을 펼치며, 넓은 창에서는 합계와 재원을 나란히 비교한다. */
 
 import { fmtDateShort, fmtRangeTiny, type BalanceKey } from "@leave/shared";
 import { useState } from "react";
@@ -22,6 +13,7 @@ import type { LeaveGrantFund, LeaveGrantItem } from "@leave/client";
 import { useDeleteLeaveGrant, useLeaveGrants, useMe } from "@leave/client";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { QueryErrorState } from "@/components/query-error-state";
 import { ActionMenu } from "@/components/action-menu";
 import { ContentPanel } from "@/components/content-panel";
 import {
@@ -65,11 +57,21 @@ export function LeaveGrantsScreen() {
   const [editing, setEditing] = useState<Editing>(null);
   const [showPastCycles, setShowPastCycles] = useState(false);
 
-  if (page.isPending || !page.data) {
+  if (page.isPending) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.ink} />
       </View>
+    );
+  }
+
+  if (!page.data) {
+    return (
+      <QueryErrorState
+        title="보유 휴가를 불러오지 못했어요"
+        onRetry={() => void page.refetch()}
+        retrying={page.isFetching}
+      />
     );
   }
 
@@ -98,6 +100,13 @@ export function LeaveGrantsScreen() {
 
   const summary = (
     <ContentPanel tone="accent" style={styles.dashboard}>
+      {page.isError && (
+        <QueryErrorState
+          title="보유 휴가를 새로 불러오지 못했어요"
+          onRetry={() => void page.refetch()}
+          retrying={page.isFetching}
+        />
+      )}
       <Text style={styles.eyebrow} selectable>
         보유 휴가
       </Text>

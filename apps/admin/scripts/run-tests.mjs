@@ -138,6 +138,18 @@ async function run() {
   const overview = await request("/overview");
   assert.equal(overview.response.status, 200);
   assert.equal(typeof overview.body.summary.totalUsers, "number");
+  assert.deepEqual(
+    {
+      apiWorker: overview.body.system.apiWorker,
+      d1: overview.body.system.d1,
+      kv: overview.body.system.kv,
+      push: overview.body.system.push,
+    },
+    { apiWorker: "unknown", d1: "readable", kv: "unknown", push: "unknown" },
+  );
+  assert.equal("r2" in overview.body.system, false);
+  assert.equal("checkedAt" in overview.body.system, false);
+  assert.ok(Number.isFinite(Date.parse(overview.body.system.databaseReadAt)));
 
   const unique = Date.now();
   const created = await request("/users", {

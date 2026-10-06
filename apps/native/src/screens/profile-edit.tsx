@@ -1,21 +1,5 @@
-/**
- * 내 정보 화면(네이티브) — 신원 수정, 사용자 이름, 계정과 개인정보.
- *
- * 사용처: 프로필 탭의 "내 정보 수정".
- *
- * 프로필 탭에서 떼어 온 이유는 관심사가 다르기 때문이다. 탭에 남은 것은 "지금
- * 내가 어떤 상태인가"(내 정보 요약·복무율·공유 그룹)이고, 여기 있는 것은 "그
- * 값을 어떻게 바꾸는가"다. 예전에는 둘이 한 화면에 카드 여섯 장으로 섞여 있어,
- * 복무율을 보러 들어온 사람이 계정 삭제 버튼까지 지나쳐 스크롤해야 했다.
- *
- * 표시 계급은 서버가 입대일에서 계산해 내려준다(getRankInfo). 그래서 "계급"을
- * 고치는 건 사실 진급 하한(signupRank)을 고치는 것이고, 입대일을 고치면 계급도
- * 따라 움직인다. 아래 폼의 안내 문구가 이 관계를 설명한다.
- *
- * 시트가 아니라 밀어 올리는 화면인 이유는 분량이다 — 폼 한 벌에 계정 관리까지
- * 들어가 시트 한 장에 담기지 않는다. 비밀번호 변경·패스키처럼 짧고 한 가지만
- * 묻는 것은 여기서도 시트로 연다.
- */
+/** 긴 정보·계정 편집은 별도 화면에 두고 짧은 비밀번호·패스키 작업만 시트로 연다.
+ * 표시 계급은 입대일에서 계산하므로 계급 편집은 진급 하한인 signupRank를 바꾼다. */
 
 import {
   BRANCH_LABELS,
@@ -55,6 +39,7 @@ import {
 import { KEYBOARD_AVOID_BEHAVIOR } from "@/components/keyboard-avoid";
 import { BuildInfo } from "@/components/build-info";
 import { Button } from "@/components/button";
+import { QueryErrorState } from "@/components/query-error-state";
 import { ContentPanel } from "@/components/content-panel";
 import { DatePickerRow } from "@/components/date-picker";
 import { Field, Input } from "@/components/field";
@@ -81,11 +66,21 @@ export function ProfileEditScreen() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [managingPasskeys, setManagingPasskeys] = useState(false);
 
-  if (me.isPending || !me.data) {
+  if (me.isPending) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} size="large" />
       </View>
+    );
+  }
+
+  if (!me.data) {
+    return (
+      <QueryErrorState
+        title="내 정보를 불러오지 못했어요"
+        onRetry={() => void me.refetch()}
+        retrying={me.isFetching}
+      />
     );
   }
 
@@ -112,6 +107,13 @@ export function ProfileEditScreen() {
 
   return (
     <>
+      {me.isError && (
+        <QueryErrorState
+          title="내 정보를 새로 불러오지 못했어요"
+          onRetry={() => void me.refetch()}
+          retrying={me.isFetching}
+        />
+      )}
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"

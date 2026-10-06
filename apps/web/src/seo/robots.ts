@@ -35,7 +35,7 @@ export function buildRobotsTxt(): string {
     ([agent, why]) => `# ${why}\nUser-agent: ${agent}\nAllow: /\n`,
   ).join("\n");
 
-  return `# 리브(Leave) — ${SITE_ORIGIN}
+  return `# 리브(Leave): ${SITE_ORIGIN}
 #
 # 이 파일은 빌드가 만든다. 고치려면 apps/web/src/seo/robots.ts 를 고칠 것.
 #

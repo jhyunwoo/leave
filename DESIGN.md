@@ -584,3 +584,7 @@ The brand uses surface contrast (`{colors.canvas-soft}` background vs `{colors.c
 - Don't render CTAs as sharp rectangles. The 24 px pill geometry is non-negotiable.
 - Don't pair the green CTA with a green background. The brand always sits Wise green on neutral surfaces (sage / white / ink).
 - Don't replace Wise Sans with a generic geometric sans for hero typography — the proprietary face IS the brand's voice.
+
+## Leave implementation design read
+
+The existing direction's ENERGY / RHYTHM / MOTION dials and implementation reasons are recorded in [antislop-decisions.md](design/antislop-decisions.md).

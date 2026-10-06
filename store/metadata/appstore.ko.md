@@ -1,4 +1,4 @@
-# App Store Connect — 한국어
+# App Store Connect: 한국어
 
 > 앱: 리브(Leave) · 번들 ID: app.leave.mobile · 버전 1.2.0
 
@@ -82,7 +82,7 @@
 | Support URL        | https://leave.moveto.kr/support |
 | Marketing URL      | 비워 둠                         |
 | Privacy Policy URL | https://leave.moveto.kr/privacy |
-| Copyright          | 2026 Hyunwoo Jeon               |
+| Copyright          | 2026 oveto Team                 |
 | Tracking           | 사용하지 않음                   |
 | Sign-in required   | 예                              |
 

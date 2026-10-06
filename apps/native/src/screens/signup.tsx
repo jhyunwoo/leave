@@ -1,8 +1,4 @@
-/**
- * 회원가입 화면(네이티브).
- * 입대일과 군 종류를 넣으면 전역 예정일과 현재 계급이 자동 계산된다
- * (@leave/shared의 rank 규칙).
- */
+/** 가입에서는 이메일과 비밀번호만 받고 복무정보는 온보딩에서 설정한다. */
 
 import { signupSchema } from "@leave/shared";
 import { Link } from "expo-router";
@@ -19,13 +15,6 @@ import { NativeCheckbox } from "@/components/native-checkbox";
 import { OfficialDisclaimer } from "@/components/official-disclaimer";
 import { makeStyles, spacing } from "@/theme";
 
-/**
- * 출시 전 최소수집 가입 화면.
- *
- * 현재 서버의 구버전 입력 계약에 남아 있는 군종·입대/전역일·계급에는 사용자에게서
- * 받은 값이 아니라 무의미한 고정값을 보낸다. 서버 마이그레이션 뒤에는 이 호환 필드도
- * 함께 제거한다. 따라서 앱은 군 복무 정보나 사진 권한을 사용자에게 요청하지 않는다.
- */
 export function SignupScreen() {
   const styles = useStyles();
   const [email, setEmail] = useState("");
@@ -45,7 +34,7 @@ export function SignupScreen() {
       return;
     }
     if (!termsAccepted || !privacyAccepted || !ageConfirmed) {
-      setError("필수 동의와 만 14세 이상 확인이 필요해요");
+      setError("필수 동의와 만 18세 이상 확인이 필요해요");
       return;
     }
 
@@ -95,7 +84,7 @@ export function SignupScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text selectable style={styles.title}>
-          60초 안에 시작하기
+          리브 계정 만들기
         </Text>
         <Text selectable style={styles.subtitle}>
           계정을 만든 뒤 필요한 복무정보만 안전하게 설정해요.
@@ -149,7 +138,7 @@ export function SignupScreen() {
             <NativeCheckbox
               value={ageConfirmed}
               onValueChange={setAgeConfirmed}
-              label="[필수] 만 14세 이상이며 소속 부대의 휴대전화·보안 지침을 우선하겠습니다."
+              label="[필수] 만 18세 이상이며 소속 부대의 휴대전화·보안 지침을 우선하겠습니다."
               testID="signup-age-confirmation"
             />
             <NativeCheckbox

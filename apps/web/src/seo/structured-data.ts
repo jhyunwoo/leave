@@ -123,7 +123,7 @@ function breadcrumbNode(page: PrerenderedPage): unknown {
       {
         "@type": "ListItem",
         position: 2,
-        name: page.title.split(" — ")[0]?.trim() ?? page.title,
+        name: page.title.split(": ")[0]?.trim() ?? page.title,
         item: absoluteUrl(page.path),
       },
     ],

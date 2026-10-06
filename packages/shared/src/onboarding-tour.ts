@@ -23,12 +23,8 @@
  * 문구 규칙은 `ONBOARDING_HOWTO`와 같다 — 저장소가 실제로 하는 일만 적는다.
  */
 
-/* ---------------------------------------------------------------- 캔버스 */
-
 /** 장면 좌표계. 그리는 쪽이 폭에 맞춰 통째로 확대한다. */
 export const TOUR_CANVAS = { width: 320, height: 260 } as const;
-
-/* ------------------------------------------------------------------- 색 */
 
 /**
  * 장면이 쓰는 색 이름. 값은 `TOUR_PALETTE`가 스킴별로 정한다.
@@ -164,8 +160,6 @@ export const TOUR_BACKDROP: Record<TourScheme, Record<TourBackdrop, string>> = {
   },
 };
 
-/* ---------------------------------------------------------------- 아이콘 */
-
 /** 24×24 좌표계의 선 아이콘. 굵기 2.2, 끝은 둥글게 그린다. */
 export const TOUR_ICONS = {
   bell: [
@@ -177,8 +171,6 @@ export const TOUR_ICONS = {
 } as const;
 
 export type TourIconName = keyof typeof TOUR_ICONS;
-
-/* ------------------------------------------------------------------ 노드 */
 
 /** 한 순간의 자세. 이동(x, y)은 노드 자리에서 얼마나 떨어졌는지다. */
 export interface TourPose {
@@ -263,8 +255,6 @@ export interface TourIconNode extends TourNodeBase {
 
 export type TourNode = TourBoxNode | TourTextNode | TourIconNode;
 
-/* ----------------------------------------------------------------- 샘플링 */
-
 function ease(kind: TourEase, t: number): number {
   switch (kind) {
     case "linear":
@@ -331,8 +321,6 @@ export function tourAnimatedProps(
     return values.some((value) => value !== REST[prop]);
   });
 }
-
-/* ------------------------------------------------------------ 키프레임 조각 */
 
 /** 모든 장면이 같은 박자로 사라졌다가 처음으로 돌아간다. */
 const EXIT_FROM = 0.93;
@@ -491,8 +479,6 @@ function finger(
   ];
 }
 
-/* ------------------------------------------------------------- 노드 조각 */
-
 type BoxOpts = Omit<TourBoxNode, "kind" | "id" | "x" | "y" | "w" | "h">;
 type TextOpts = Partial<
   Omit<TourTextNode, "kind" | "id" | "x" | "y" | "w" | "h" | "text">
@@ -576,7 +562,7 @@ function swapKeys(
   };
 }
 
-/* ======================================================== 장면 1: 휴가 등록 */
+/* 휴가 등록 장면 */
 
 const CAL = {
   colX: (col: number) => 27 + col * 38,
@@ -895,7 +881,7 @@ function leaveScene(): TourNode[] {
   return nodes;
 }
 
-/* ======================================================== 장면 2: 보유 휴가 */
+/* 보유 휴가 장면 */
 
 /** 휴가 계획 알약 — 오른쪽 밖에서 미끄러져 들어와 첫 적립분에 흡수된다. */
 const PLAN_KEYS: TourKey[] = [
@@ -1117,7 +1103,7 @@ function grantsScene(): TourNode[] {
   return nodes;
 }
 
-/* ======================================================== 장면 3: 공유 그룹 */
+/* 공유 그룹 장면 */
 
 function unitScene(): TourNode[] {
   const cardIn = life({ at: 0, from: { y: 14 }, dur: 0.07 });
@@ -1367,7 +1353,7 @@ function unitScene(): TourNode[] {
   return nodes;
 }
 
-/* ============================================================ 장면 4: 친구 */
+/* 친구 장면 */
 
 function friendsScene(): TourNode[] {
   const cardIn = life({ at: 0, from: { y: 14 }, dur: 0.07 });
@@ -1577,7 +1563,7 @@ function friendsScene(): TourNode[] {
   return nodes;
 }
 
-/* ========================================================== 장면 5: 복무율 */
+/* 복무율 장면 */
 
 function progressScene(): TourNode[] {
   const cardIn = life({ at: 0, from: { y: 14 }, dur: 0.07 });
@@ -1753,8 +1739,6 @@ function progressScene(): TourNode[] {
   });
   return nodes;
 }
-
-/* ------------------------------------------------------------------ 장면 */
 
 export type TourSceneId = "leave" | "grants" | "unit" | "friends" | "progress";
 

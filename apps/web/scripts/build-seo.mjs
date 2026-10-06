@@ -119,7 +119,6 @@ function renderDocument({
 
 const written = [];
 
-// ── 공개 페이지 ─────────────────────────────────────────────────────────
 for (const page of PRERENDERED_PAGES) {
   const body = renderRoute(page.path);
   if (body.trim().length === 0) {
@@ -138,7 +137,6 @@ for (const page of PRERENDERED_PAGES) {
   written.push(`${page.file}  (${page.path})`);
 }
 
-// ── SPA 셸 ──────────────────────────────────────────────────────────────
 // 워커가 로그인·앱 화면·공개 프로필에 이 문서를 200으로 낸다.
 const shellDescription =
   "리브는 부대원의 휴가를 한 달력에서 공유하고 하루 최대 출타 인원 초과일을 미리 알려주는 캘린더입니다.";
@@ -174,7 +172,6 @@ writeFileSync(
 );
 written.push(`${FRIEND_INVITE_SHELL_FILE}  (친구 추가 링크 셸)`);
 
-// ── 404 ─────────────────────────────────────────────────────────────────
 // 이 화면 고유의 CSS는 브라우저 번들에 없다(NotFoundPage는 앱에서 import되지
 // 않는다). 문서에 직접 넣어 자바스크립트도 추가 요청도 없이 완성되게 한다.
 const notFoundCss = readFileSync(
@@ -195,7 +192,6 @@ writeFileSync(
 );
 written.push(`${NOT_FOUND_FILE}  (404 본문)`);
 
-// ── robots.txt · sitemap.xml ────────────────────────────────────────────
 writeFileSync(join(distDir, "robots.txt"), buildRobotsTxt());
 written.push("robots.txt");
 

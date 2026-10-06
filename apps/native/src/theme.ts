@@ -1,22 +1,5 @@
-/**
- * 네이티브 디자인 토큰 — 색·간격·모서리.
- *
- * 사용처: apps/native/src 의 모든 컴포넌트.
- *
- * 색은 라이트/다크 두 벌을 명시적으로 적고, 훅으로 골라 쓴다. 예전에는
- * PlatformColor/DynamicColorIOS로 시스템에 위임했는데 두 가지가 문제였다.
- *
- *  1) DynamicColorIOS는 iOS에서만 동작한다. 안드로이드·웹은 라이트값만 받아
- *     브랜드색이 다크모드에서 그대로 밝게 남았다.
- *  2) 시스템 색(자동으로 뒤집힘)과 고정 hex(BALANCE_COLORS 등)가 한 화면에
- *     섞이면서 "일부만 뒤집힌" 어색한 다크모드가 됐다.
- *
- * 값이 JS에 있으면 스킴이 바뀔 때 리렌더로 반영되므로, @expo/ui·NativeTabs
- * 같은 네이티브 prop에도 확정된 hex를 그대로 넘길 수 있다.
- *
- * 훅이 아닌 평범한 모듈에서는 색을 읽을 수 없다(React 밖에는 스킴이 없다).
- * 그런 곳은 호출하는 컴포넌트에서 색을 인자로 받아 넘긴다.
- */
+/** 모든 플랫폼에 같은 확정 hex를 전달하도록 라이트/다크 팔레트를 JS에서 선택한다.
+ * React 밖의 모듈에는 호출하는 컴포넌트가 현재 색을 인자로 전달한다. */
 
 import {
   StyleSheet,
@@ -70,20 +53,11 @@ export type Palette = {
   negativeTint: string;
   /** 달력에서 현재 정기외박 주기 범위를 아주 옅게 깔아주는 배경. */
   cycleTint: string;
-  /**
-   * 달력에서 고른 날의 숫자를 감싸는 반투명 원. 숫자를 덮지 않고 비쳐 보이게
-   * 두는 것이 요점이라 채움은 옅게, 대신 같은 잉크색 테두리로 고른 티를 낸다.
-   */
+  /** 선택 날짜의 숫자는 비쳐 보이게 두고, 잉크색 테두리로 선택 상태를 구분한다. */
   selectedTint: string;
 };
 
-/**
- * 표면 3단 위계는 두 스킴에서 방향이 뒤집힌다.
- *   라이트: canvasSoft < surfaceCard < canvas   (페이지가 어둡고 카드가 희다)
- *   다크:   canvasSoft < canvas < surfaceCard   (페이지가 검고 카드가 밝다)
- * 예전 값은 iOS에서 canvas와 surfaceCard가 둘 다 #ffffff(라이트), canvas와
- * canvasSoft가 둘 다 #000000(다크)이라 입력창과 카드가 배경에 묻혔다.
- */
+/** 라이트는 canvasSoft < surfaceCard < canvas, 다크는 canvasSoft < canvas < surfaceCard로 표면을 구분한다. */
 const lightColors: Palette = {
   primary: "#9fe870",
   onPrimary: "#0e0f0c",
@@ -94,7 +68,7 @@ const lightColors: Palette = {
   ink: "#0e0f0c",
   inkDeep: "#163300",
   body: "#454745",
-  mute: "#868685",
+  mute: "#656963",
   mutedSoft: "#9a9c99",
   canvas: "#ffffff",
   canvasSoft: "#eceee9",
@@ -127,7 +101,7 @@ const darkColors: Palette = {
   ink: "#f2f4f0",
   inkDeep: "#d7ffbf",
   body: "#b9bdb6",
-  mute: "#8e918c",
+  mute: "#a0a59d",
   mutedSoft: "#6d706b",
   canvas: "#1c1c1e",
   canvasSoft: "#000000",
@@ -150,18 +124,8 @@ const darkColors: Palette = {
   selectedTint: "rgba(242, 244, 240, 0.16)",
 };
 
-/**
- * 휴가 재원별 색. 달력에서 내 휴가가 어떤 재원인지 한눈에 구분하는 용도라
- * 서로 충분히 다른 색조를 쓴다. bg는 칩 배경, fg는 그 위의 글자색.
- *
- * fg는 칩 위에서만 쓰이는 게 아니다 — cycle-banner는 fg를 페이지 배경 위
- * 글자로 직접 쓴다. 그래서 다크 fg는 canvas(#1c1c1e) 위에서도 읽혀야 한다.
- *
- * Record<BalanceKey, _>로 묶어서 한쪽 스킴에서 키가 빠지면 빌드가 깨지게 한다.
- *
- * 읽을 때는 `palette[key]`가 아니라 `balanceTone(palette, key)`를 쓴다 — 이유는
- * `balance-tone.ts` 머리주석에 있다.
- */
+/** 재원별 색은 balanceTone으로 읽으며, fg는 칩 bg와 페이지 canvas 양쪽에서 읽혀야 한다.
+ * BalancePalette는 두 스킴 모두에 모든 재원 키가 있도록 검사한다. */
 const lightBalance: BalancePalette = {
   annual: { fg: "#1f5e10", bg: "#d8f3c4" },
   award: { fg: "#8a4b00", bg: "#ffe8c7" },
@@ -176,7 +140,7 @@ const lightBalance: BalancePalette = {
   other: { fg: "#5a5c59", bg: "#eceee9" },
 };
 
-/** 같은 색조를 유지한 채 명도만 뒤집는다 — 달력 범례가 두 스킴에서 같은 뜻을 갖도록. */
+/** 달력 범례의 뜻이 유지되도록 스킴 간 색조를 유지하고 명도만 바꾼다. */
 const darkBalance: BalancePalette = {
   annual: { fg: "#b7e79a", bg: "#1e3311" },
   award: { fg: "#ffcf94", bg: "#40270a" },
@@ -202,17 +166,8 @@ const themes: Record<ColorScheme, Theme> = {
   dark: { scheme: "dark", colors: darkColors, balance: darkBalance },
 };
 
-/**
- * 시스템 색 구성.
- *
- * RN의 useColorScheme은 내부적으로 useSyncExternalStore(Appearance)라
- * tearing 없이 한 번의 렌더로 모든 구독자가 같은 값을 본다. 그래서 별도의
- * Context Provider를 두지 않는다 — index.js가 RootErrorBoundary를 ExpoRoot
- * 위에 올리기 때문에, provider를 쓰면 라우터가 죽었을 때 ErrorScreen이
- * 테마 없이 렌더된다.
- *
- * null·"unspecified"는 라이트로 접는다.
- */
+/** 라우터 밖의 오류 화면도 테마를 읽도록 별도 provider 없이 시스템 스킴을 구독한다.
+ * null과 unspecified는 라이트로 처리한다. */
 export function useAppColorScheme(): ColorScheme {
   return useColorScheme() === "dark" ? "dark" : "light";
 }
@@ -236,26 +191,8 @@ type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 // any를 쓰는 자리라 unknown으로는 대체되지 않는다.
 type AnyNamedStyles = NamedStyles<Record<string, unknown>>;
 
-/**
- * 스타일시트 팩토리 — StyleSheet.create의 테마 버전.
- *
- * 두 스킴 분량을 모듈 로드 시점에 한 번씩만 만들어 두고, 훅은 그중 하나를
- * 고르기만 한다. 렌더마다 StyleSheet.create가 다시 도는 일이 없고, 반환
- * 객체의 참조가 스킴별로 고정돼 하위 컴포넌트의 memo도 깨지지 않는다.
- * (렌더 중에 캐시를 채우지 않는 것도 중요하다 — React Compiler가 켜져 있어
- * 렌더 단계 부수효과는 피해야 한다.)
- *
- * 시그니처는 StyleSheet.create와 똑같이 맞췄다. 그래야 `fontWeight: "600"`
- * 같은 리터럴이 문맥 타입으로 좁혀져 styles.x 타입이 지금과 동일하게 남는다.
- *
- *   const useStyles = makeStyles(({ colors }) => ({
- *     root: { backgroundColor: colors.canvasSoft },
- *   }));
- *
- *   function Screen() {
- *     const styles = useStyles();   // 훅이므로 early return보다 위에서 부른다
- *   }
- */
+/** 렌더 중 부수효과와 참조 변화를 피하도록 스킴별 스타일을 모듈 로드 시 한 번 만든다.
+ * StyleSheet.create와 같은 문맥 타입을 유지하며, 반환 훅은 early return 전에 호출한다. */
 export function makeStyles<T extends NamedStyles<T> | AnyNamedStyles>(
   factory: (theme: Theme) => T & AnyNamedStyles,
 ): () => T {
@@ -287,14 +224,7 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
-/**
- * 폭에 관한 토큰.
- *
- * "읽는 콘텐츠"와 "작업하는 콘텐츠"를 구분한다. 산문·폼은 눈이 한 줄을 따라가는
- * 거리가 길어지면 읽기 어려워지므로 최대 폭을 건다. 반대로 달력·대시보드·목록은
- * 폭이 곧 한눈에 보이는 정보량이라 화면을 최대한 쓰되, 초대형 창에서 여백만
- * 늘어나지 않도록 상한만 둔다.
- */
+/** 읽는 폼은 줄 길이를 제한하고, 비교하는 워크스페이스는 화면 폭을 활용한다. */
 export const layout = {
   /** 산문·긴 목록: iPad 가로에서 읽기 거리가 지나치게 길어지지 않게 한다. */
   readableContent: 760,
@@ -308,15 +238,7 @@ export const layout = {
   sideColumn: { medium: 288, expanded: 320 },
 } as const;
 
-/**
- * 창 크기 클래스의 경계(논리 px). 기기가 아니라 **지금 앱이 차지한 창의 폭**을
- * 기준으로 삼는다 — 같은 iPad라도 Split View에서는 좁은 창이고, 폴더블은 한
- * 기기 안에서 두 크기를 오간다.
- *
- * 값과 판단 함수는 `window-size-class.ts`에 있다 — RN을 부르지 않는 순수 모듈이라
- * 단위 테스트로 고정할 수 있다. 토큰을 한 곳에서 읽는 흐름은 그대로 두려고 여기서
- * 다시 내보낸다.
- */
+/** 기기 종류가 아닌 현재 창 폭으로 분류하며, RN 없는 모듈에서 경계를 검사한다. */
 export { breakpoints } from "./window-size-class";
 
 export const type = {

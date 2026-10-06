@@ -1,8 +1,4 @@
-/**
- * 알림함 화면. 열면 전부 읽음 처리되고, 초과 알림은 해당 휴가 상세로,
- * 친구 요청 알림은 친구 화면의 그 요청으로, 내 복무 기념일 알림은 축하 화면으로,
- * 친구의 기념일 알림은 그 친구의 프로필로 이어진다.
- */
+/** 초과·친구·기념일 알림을 관련 휴가, 요청, 축하 화면 또는 프로필로 연결한다. */
 
 import "./workspace.css";
 
@@ -10,6 +6,7 @@ import { ActionIcon } from "../components/ActionIcon";
 
 import { useState, type KeyboardEvent } from "react";
 import { FriendLeaveNotificationModal } from "../components/FriendLeaveNotificationModal";
+import { QueryErrorState } from "../components/QueryErrorState";
 import { Link, useNavigate } from "react-router";
 import {
   useDeleteNotification,
@@ -219,6 +216,13 @@ export function NotificationsPage() {
           전체 {notifications.length}건 · 읽지 않음 {list.data.unreadCount}건
         </p>
       )}
+      {list.isError && list.data && (
+        <QueryErrorState
+          title="알림을 새로 불러오지 못했어요"
+          onRetry={() => void list.refetch()}
+          retrying={list.isFetching}
+        />
+      )}
       {list.isPending ? (
         <div
           style={{
@@ -229,6 +233,12 @@ export function NotificationsPage() {
         >
           <div className="spinner" role="status" aria-label="불러오는 중" />
         </div>
+      ) : list.isError && !list.data ? (
+        <QueryErrorState
+          title="알림을 불러오지 못했어요"
+          onRetry={() => void list.refetch()}
+          retrying={list.isFetching}
+        />
       ) : !latest ? (
         <div
           className="card-sage"

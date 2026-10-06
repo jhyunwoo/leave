@@ -108,14 +108,12 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const editing = options.editing ?? null;
   const fallbackDate = options.initialDate ?? "";
 
-  /* --- 서버 데이터 --------------------------------------------------- */
   const me = useMe();
   const balances = useLeaveBalances();
   const myLeaves = useMyLeaves();
   const create = useCreateLeave();
   const update = useUpdateLeave();
 
-  /* --- 폼 상태 -------------------------------------------------------- */
   const [title, setTitle] = useState(editing?.title ?? "");
   const [reason, setReason] = useState(editing?.reason ?? "");
   const [returnTime, setReturnTime] = useState(editing?.returnTime ?? "21:00");
@@ -150,7 +148,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
   const validRange = Boolean(startDate) && duration > 0;
   const endDate = validRange ? draftsEndDate(startDate, drafts) : "";
 
-  /* --- 달력(혼잡도·추천의 근거) --------------------------------------- */
+  // 혼잡도와 추천 날짜는 같은 달력 집계를 사용한다.
   // 추천은 선택 구간 밖 ±RECOMMENDATION_RADIUS_DAYS까지 살펴보므로, 그 범위가
   // 걸치는 달을 모두 받아야 월초·월말 후보가 빠지지 않는다.
   const calendarMonths = useMemo(() => {
@@ -233,14 +231,12 @@ export function useLeaveForm(options: LeaveFormOptions) {
     });
   }, [calendar.days, duration, selfCount, startDate, validRange]);
 
-  /* --- 구간(어느 날짜에 어떤 재원을 쓰는가) ---------------------------- */
   /** 초안 구간에 실제 시작·종료일과 일수를 채워 넣은 것. 화면은 이걸 그린다. */
   const resolved = useMemo(
     () => (validRange ? resolveDrafts(startDate, drafts) : []),
     [validRange, startDate, drafts],
   );
 
-  /* --- 재원 잔여 계산 -------------------------------------------------- */
   // 수정 중이면 이 휴가가 이미 쓰고 있던 몫을 되돌려줘야 자기 자신과 부딪히지 않는다.
   const remainingByKey = useMemo(() => {
     const result = new Map<BalanceKey, number>(
@@ -423,7 +419,7 @@ export function useLeaveForm(options: LeaveFormOptions) {
   /** 시작일만 옮긴다. 종류와 개수는 그대로 따라간다(추천 날짜가 쓴다). */
   const moveToStart = (nextStart: string) => setStartDate(nextStart);
 
-  /* --- 구간 편집 (화면은 이 넷만 부른다) ------------------------------- */
+  // 화면의 구간 편집은 이 네 동작을 통해서만 상태를 바꾼다.
   const setDraftDaysAt = (index: number, days: number) =>
     setDrafts((current) => setDraftDays(current, index, days));
 
@@ -565,7 +561,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
     return result;
   };
 
-  /* --- 저장 가능 여부 --------------------------------------------------- */
   const overused = [...availableByKey.entries()].filter(
     ([, remaining]) => remaining < 0,
   );
@@ -632,7 +627,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
                 : (outingShapeBlocker ?? (balanceBlockMessage || null));
   const canSubmit = submitBlocker === null;
 
-  /* --- 종류 더하기 도우미 ---------------------------------------------- */
   const lastDraft = resolved[resolved.length - 1];
   /**
    * "다른 종류를 이어 쓰기"를 눌렀을 때 새 구간에 넣을 재원.
@@ -658,7 +652,6 @@ export function useLeaveForm(options: LeaveFormOptions) {
         })()
       : undefined;
 
-  /* --- 저장 ------------------------------------------------------------ */
   /**
    * 서버에 저장한다. 성공하면 결과를, 검증 실패나 서버 오류면 null을 돌려주고
    * `error`에 사유를 담는다. 저장 후 화면 처리(닫기·알림)는 호출한 쪽 몫이다.

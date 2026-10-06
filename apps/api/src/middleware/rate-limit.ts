@@ -52,7 +52,7 @@ function resolveLimit(env: AppEnv["Bindings"], options: RateLimitOptions) {
       ? value
       : options.limit;
   } catch {
-    console.error("RATE_LIMITS 파싱 실패 — 기본 상한을 사용합니다");
+    console.error("RATE_LIMITS 파싱 실패. 기본 상한을 사용합니다");
     return options.limit;
   }
 }
