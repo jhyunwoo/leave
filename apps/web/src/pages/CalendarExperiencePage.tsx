@@ -43,6 +43,8 @@ import type { CalendarScrollHandle } from "../components/calendar/CalendarScroll
 import { CalendarScroll } from "../components/calendar/CalendarScroll";
 import { useCompactCalendar } from "../components/calendar/compact";
 import { DayPanel } from "../components/calendar/DayPanel";
+import { LeaveSidePanel } from "../components/calendar/LeaveSidePanel";
+import { MyDayLeaves } from "../components/calendar/MyDayLeaves";
 import { OutingCycleNote } from "../components/calendar/OutingCycleNote";
 import {
   FriendCalendarScroll,
@@ -393,6 +395,14 @@ export function CalendarPage(props: { me: Me }) {
     (params.get("friends") ?? "").split(","),
   );
   const [selectedDate, setSelectedDate] = useState<ISODate | null>(null);
+  /**
+   * 옆 칸을 차지한 휴가 정보 창. 연 날짜를 함께 들고 있어서, 다른 날을 고르거나
+   * 선택을 풀면 따로 닫지 않아도 날짜 상세로 돌아간다.
+   */
+  const [openLeave, setOpenLeave] = useState<{
+    date: ISODate;
+    id: string;
+  } | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PersonalEvent>();
@@ -470,6 +480,16 @@ export function CalendarPage(props: { me: Me }) {
     return first && today < first && first <= dischargeAt ? first : null;
   }, [regularOvernight, today, dischargeAt]);
   const panelCalendar = useCalendar(unit?.id ?? null, selectedMonth);
+  // 삭제됐거나 다른 휴가에 흡수돼 목록에서 사라지면 날짜 상세로 돌아간다.
+  const openedLeave =
+    !compact && openLeave && openLeave.date === selectedDate
+      ? myLeaves.data?.leaves.find((leave) => leave.id === openLeave.id)
+      : undefined;
+  // 좁은 화면에는 옆 칸이 없으므로 지금처럼 상세 페이지로 간다.
+  const openMyLeave = (leaveId: string) => {
+    if (compact || !selectedDate) void navigate(`/leaves/${leaveId}`);
+    else setOpenLeave({ date: selectedDate, id: leaveId });
+  };
   const selectDate = useCallback(
     (date: ISODate) =>
       setSelectedDate((current) => (current === date ? null : date)),
@@ -510,6 +530,11 @@ export function CalendarPage(props: { me: Me }) {
    */
   const unitDayDetail = selectedDate ? (
     <>
+      <MyDayLeaves
+        leaves={myLeaves.data?.leaves}
+        date={selectedDate}
+        onOpen={openMyLeave}
+      />
       {panelCalendar.data ? (
         <UnitItems
           events={panelCalendar.data.events ?? []}
@@ -548,7 +573,7 @@ export function CalendarPage(props: { me: Me }) {
           myUserId={props.me.user.id}
           cycle={cycleForDisplay(regularOvernight, selectedDate, dischargeAt)}
           dischargeAt={dischargeAt}
-          onOpenLeave={(leaveId) => void navigate(`/leaves/${leaveId}`)}
+          onOpenLeave={openMyLeave}
           onPreloadAddLeave={preloadLeaveFormModal}
           onAddLeave={() => setLeaveOpen(true)}
         />
@@ -692,9 +717,10 @@ export function CalendarPage(props: { me: Me }) {
           className="cal-layout"
           style={{
             display: "grid",
+            // 정보 창은 수정 양식(구간 편집 줄)을 그대로 품어야 해서 더 넓다.
             gridTemplateColumns:
               !compact && selectedDate
-                ? "minmax(0, 1fr) 340px"
+                ? `minmax(0, 1fr) ${openedLeave ? 460 : 340}px`
                 : "minmax(0, 1fr)",
             gap: "var(--sp-lg)",
             alignItems: "start",
@@ -758,7 +784,16 @@ export function CalendarPage(props: { me: Me }) {
               </span>
             </div>
           </div>
-          {!compact && unitDayDetail ? (
+          {openedLeave ? (
+            <LeaveSidePanel
+              key={openedLeave.id}
+              leave={openedLeave}
+              onBack={() => setOpenLeave(null)}
+              onReplaced={(id) =>
+                setOpenLeave((current) => current && { ...current, id })
+              }
+            />
+          ) : !compact && unitDayDetail ? (
             <div style={{ display: "grid", gap: "var(--sp-md)" }}>
               {unitDayDetail}
             </div>

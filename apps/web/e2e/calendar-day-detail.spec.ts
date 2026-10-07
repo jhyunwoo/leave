@@ -134,3 +134,52 @@ test("넓은 화면: 날짜 상세는 달력 옆 칸에 그대로 붙는다", as
   await expect(page.getByRole("heading", { name: "개인 일정" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "날짜 상세" })).toHaveCount(0);
 });
+
+test("넓은 화면: 내 휴가를 누르면 옆 칸이 정보 창 하나가 되고 그 자리에서 수정한다", async ({
+  page,
+  request,
+}) => {
+  const token = await signup(request, "wide-leave");
+  const unit = await request.post(`${API}/units`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { name: `옆칸부대-${Date.now()}`, maxLeaveCount: 5 },
+  });
+  expect(unit.ok(), await unit.text()).toBeTruthy();
+  const today = todayInSeoul();
+  const created = await request.post(`${API}/leaves`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      title: "옆칸 휴가",
+      segments: [{ category: "annual", startDate: today, endDate: today }],
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  await signIn(page, token);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+
+  await page.getByTestId(`cal-cell-${today}`).click();
+
+  // 옆 칸의 첫 카드가 내 휴가다.
+  const firstCard = page.locator(".cal-layout > :nth-child(2) > :first-child");
+  await expect(
+    firstCard.getByRole("heading", { name: "내 휴가" }),
+  ).toBeVisible();
+  await firstCard.getByRole("button", { name: /옆칸 휴가/ }).click();
+
+  await expect(page.getByRole("heading", { name: "개인 일정" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "옆칸 휴가" })).toBeVisible();
+
+  await page.getByRole("button", { name: "수정", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const title = page.getByPlaceholder("예: 제주도 가족여행");
+  await expect(title).toHaveValue("옆칸 휴가");
+  await title.fill("고친 휴가");
+  await page.getByRole("button", { name: "변경사항 저장" }).click();
+
+  await expect(page.getByRole("heading", { name: "고친 휴가" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "‹ 날짜 상세" }).click();
+  await expect(page.getByRole("heading", { name: "개인 일정" })).toBeVisible();
+});

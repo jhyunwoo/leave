@@ -14,12 +14,16 @@ import {
   type ReactNode,
 } from "react";
 import type {
+  LeaveForm as LeaveFormComponent,
   LeaveFormModal as LeaveFormModalComponent,
   LeaveFormModalProps,
 } from "./LeaveFormModal";
 import { Modal } from "./Modal";
 
-type LeaveFormModule = { LeaveFormModal: typeof LeaveFormModalComponent };
+type LeaveFormModule = {
+  LeaveForm: typeof LeaveFormComponent;
+  LeaveFormModal: typeof LeaveFormModalComponent;
+};
 
 let modulePromise: Promise<LeaveFormModule> | undefined;
 
@@ -34,6 +38,10 @@ function loadLeaveFormModal(): Promise<LeaveFormModule> {
 
 const DeferredLeaveFormModal = lazy(() =>
   loadLeaveFormModal().then((module) => ({ default: module.LeaveFormModal })),
+);
+
+const DeferredLeaveForm = lazy(() =>
+  loadLeaveFormModal().then((module) => ({ default: module.LeaveForm })),
 );
 
 /** 실제로 폼을 열 가능성이 높은 hover/focus에서만 호출한다. */
@@ -51,24 +59,30 @@ function LeaveFormLoading(
       onClose={props.onClose}
       size="wide"
     >
-      <div
-        role="status"
-        aria-live="polite"
-        aria-busy="true"
-        tabIndex={-1}
-        data-modal-initial-focus
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "var(--sp-md)",
-          minHeight: 96,
-        }}
-      >
-        <div className="spinner" aria-hidden="true" />
-        <span className="body-sm strong">휴가 양식을 불러오는 중…</span>
-      </div>
+      <LeaveFormLoadingBody />
     </Modal>
+  );
+}
+
+function LeaveFormLoadingBody() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      tabIndex={-1}
+      data-modal-initial-focus
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "var(--sp-md)",
+        minHeight: 96,
+      }}
+    >
+      <div className="spinner" aria-hidden="true" />
+      <span className="body-sm strong">휴가 양식을 불러오는 중…</span>
+    </div>
   );
 }
 
@@ -77,6 +91,8 @@ type LeaveFormErrorBoundaryProps = Pick<
   "editing" | "onClose"
 > & {
   children: ReactNode;
+  /** 모달 대신 놓인 자리에 그대로 실패 안내를 그린다. */
+  inline?: boolean;
 };
 
 /** 청크 다운로드 실패를 이 화면 안에 가두고, 안전하게 새 문서에서 다시 받는다. */
@@ -93,47 +109,48 @@ class LeaveFormErrorBoundary extends ReactComponent<
   override render() {
     if (!this.state.failed) return this.props.children;
 
+    const message = (
+      <div role="alert">
+        <p className="body-lg strong">휴가 양식을 불러오지 못했어요.</p>
+        <p className="body-sm text-body" style={{ marginTop: "var(--sp-sm)" }}>
+          연결을 확인한 뒤 페이지를 새로고침해 주세요. 아직 양식이 열리지 않아
+          입력한 내용은 없어요.
+        </p>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "var(--sp-sm)",
+            marginTop: "var(--sp-xl)",
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={this.props.onClose}
+          >
+            닫기
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => window.location.reload()}
+            autoFocus
+          >
+            <ActionIcon name="refresh" />
+            페이지 새로고침
+          </button>
+        </div>
+      </div>
+    );
+    if (this.props.inline) return message;
     return (
       <Modal
         title={this.props.editing ? "휴가 수정" : "휴가 등록"}
         onClose={this.props.onClose}
         size="wide"
       >
-        <div role="alert">
-          <p className="body-lg strong">휴가 양식을 불러오지 못했어요.</p>
-          <p
-            className="body-sm text-body"
-            style={{ marginTop: "var(--sp-sm)" }}
-          >
-            연결을 확인한 뒤 페이지를 새로고침해 주세요. 아직 양식이 열리지 않아
-            입력한 내용은 없어요.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "var(--sp-sm)",
-              marginTop: "var(--sp-xl)",
-            }}
-          >
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={this.props.onClose}
-            >
-              닫기
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => window.location.reload()}
-              autoFocus
-            >
-              <ActionIcon name="refresh" />
-              페이지 새로고침
-            </button>
-          </div>
-        </div>
+        {message}
       </Modal>
     );
   }
@@ -160,6 +177,21 @@ export function LazyLeaveFormModal(props: LeaveFormModalProps) {
         fallback={<LeaveFormLoading editing={props.editing} onClose={close} />}
       >
         <DeferredLeaveFormModal {...props} onClose={close} />
+      </Suspense>
+    </LeaveFormErrorBoundary>
+  );
+}
+
+/** 모달 없이 놓인 자리에서 여는 폼. 같은 청크를 받으므로 미리 받기도 함께 듣는다. */
+export function LazyLeaveForm(props: LeaveFormModalProps) {
+  return (
+    <LeaveFormErrorBoundary
+      editing={props.editing}
+      onClose={props.onClose}
+      inline
+    >
+      <Suspense fallback={<LeaveFormLoadingBody />}>
+        <DeferredLeaveForm {...props} />
       </Suspense>
     </LeaveFormErrorBoundary>
   );
