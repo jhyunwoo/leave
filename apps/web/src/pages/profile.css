@@ -1,0 +1,40 @@
+/* 좁은 화면은 한 줄로 쌓는다. 넓은 화면에서는 복무 카드와 신원 카드를 왼쪽에
+   두고 계정 설정을 오른쪽에 쌓는다. 두 묶음의 DOM 순서가 모바일 순서와 같아
+   어느 폭에서도 읽는 순서가 바뀌지 않는다. */
+.profile-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--sp-2xl) 0 var(--sp-3xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-lg);
+}
+
+.profile-columns,
+.profile-aside,
+.profile-main {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-lg);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .profile-page {
+    max-width: 1120px;
+  }
+
+  .profile-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--sp-xl);
+    align-items: start;
+  }
+}
+
+/* 왼쪽 묶음이 화면보다 길면 고정했을 때 아래쪽이 가려진다. 높이가 넉넉할 때만 붙인다. */
+@media (min-width: 1024px) and (min-height: 820px) {
+  .profile-aside {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--sp-xl));
+  }
+}

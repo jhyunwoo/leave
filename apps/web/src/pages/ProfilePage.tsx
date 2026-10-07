@@ -20,6 +20,7 @@ import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { ServiceProgress } from "../components/ServiceProgress";
 import { PasskeyManager } from "../components/PasskeyManager";
+import "./profile.css";
 
 /**
  * 공개 사용자 이름 카드 — 지금 이름을 보여주고 그 자리에서 바꾼다.
@@ -162,17 +163,7 @@ export function ProfilePage(props: { me: Me }) {
   };
 
   return (
-    <div
-      className="anim-rise"
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        padding: "var(--sp-2xl) 0 var(--sp-3xl)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--sp-lg)",
-      }}
-    >
+    <div className="anim-rise profile-page">
       <header style={{ padding: "var(--sp-lg) 0 var(--sp-sm)" }}>
         <p className="eyebrow">내 정보</p>
         <h1 className="display-md" style={{ marginTop: 6 }}>
@@ -180,169 +171,179 @@ export function ProfilePage(props: { me: Me }) {
         </h1>
       </header>
 
-      {/* 계급/전역 — DESIGN.md의 절제된 제품 UI 패널 */}
-      <Link
-        to="/service-progress"
-        className="profile-service-progress-link"
-        data-testid="profile-service-progress-card"
-      >
-        <section className="card-dark" style={{ padding: "var(--sp-2xl)" }}>
-          <div
+      <div className="profile-columns">
+        <div className="profile-aside">
+          {/* 계급/전역 — DESIGN.md의 절제된 제품 UI 패널 */}
+          <Link
+            to="/service-progress"
+            className="profile-service-progress-link"
+            data-testid="profile-service-progress-card"
+          >
+            <section className="card-dark" style={{ padding: "var(--sp-2xl)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "var(--sp-lg)",
+                }}
+              >
+                <div>
+                  <p className="eyebrow">현재 계급</p>
+                  <p className="display-md" style={{ marginTop: 6 }}>
+                    {user.rankLabel}
+                  </p>
+                  <p
+                    className="body-sm text-body"
+                    style={{ marginTop: "var(--sp-md)" }}
+                  >
+                    {user.branchLabel} · {user.name}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p className="eyebrow">전역까지</p>
+                  <p className="display-md" style={{ marginTop: 6 }}>
+                    D-{user.daysUntilDischarge}
+                  </p>
+                  {/* 서버가 세는 값이라 D-day보다 한 박자 늦게 도착한다. 자리를
+                  비워 두면 카드가 흔들리므로 도착하기 전에는 아예 그리지 않는다. */}
+                  {dutyDays.data ? (
+                    <p
+                      className="body-sm text-body"
+                      style={{ marginTop: "var(--sp-xs)" }}
+                      data-testid="profile-duty-days"
+                    >
+                      일과 {dutyDays.data.dutyDays}일
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <ServiceProgress
+                enlistedAt={user.enlistedAt}
+                dischargeAt={user.dischargeAt}
+                caption=""
+                milestones={{
+                  rank: user.rank,
+                  nextPromotionDate: user.nextPromotionDate,
+                }}
+              />
+              <div className="profile-service-progress-link__hint">
+                <span>전체 화면으로 보기</span>
+                <span aria-hidden="true">→</span>
+              </div>
+            </section>
+          </Link>
+
+          {/* 프로필 정보 */}
+          <section
+            className="card"
             style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
+              flexDirection: "column",
               gap: "var(--sp-lg)",
             }}
           >
-            <div>
-              <p className="eyebrow">현재 계급</p>
-              <p className="display-md" style={{ marginTop: 6 }}>
-                {user.rankLabel}
-              </p>
-              <p
-                className="body-sm text-body"
-                style={{ marginTop: "var(--sp-md)" }}
-              >
-                {user.branchLabel} · {user.name}
-              </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sp-lg)",
+              }}
+            >
+              <Avatar name={user.name} size={64} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p className="display-xs">{user.name}</p>
+                {user.username ? (
+                  <p className="caption text-mute">
+                    {formatUsername(user.username)}
+                  </p>
+                ) : null}
+                <p className="caption text-mute">{user.email}</p>
+              </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <p className="eyebrow">전역까지</p>
-              <p className="display-md" style={{ marginTop: 6 }}>
-                D-{user.daysUntilDischarge}
-              </p>
-              {/* 서버가 세는 값이라 D-day보다 한 박자 늦게 도착한다. 자리를
-                  비워 두면 카드가 흔들리므로 도착하기 전에는 아예 그리지 않는다. */}
-              {dutyDays.data ? (
-                <p
-                  className="body-sm text-body"
-                  style={{ marginTop: "var(--sp-xs)" }}
-                  data-testid="profile-duty-days"
-                >
-                  일과 {dutyDays.data.dutyDays}일
-                </p>
-              ) : null}
-            </div>
-          </div>
+            <p className="caption text-body">
+              별칭만 표시합니다. 실명·군번·계급·기수·사진은 프로필에 저장하지
+              마세요.
+            </p>
 
-          <ServiceProgress
-            enlistedAt={user.enlistedAt}
-            dischargeAt={user.dischargeAt}
-            caption=""
-            milestones={{
-              rank: user.rank,
-              nextPromotionDate: user.nextPromotionDate,
-            }}
-          />
-          <div className="profile-service-progress-link__hint">
-            <span>전체 화면으로 보기</span>
-            <span aria-hidden="true">→</span>
-          </div>
-        </section>
-      </Link>
-
-      {/* 프로필 정보 */}
-      <section
-        className="card"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--sp-lg)",
-        }}
-      >
-        <div
-          style={{ display: "flex", alignItems: "center", gap: "var(--sp-lg)" }}
-        >
-          <Avatar name={user.name} size={64} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p className="display-xs">{user.name}</p>
-            {user.username ? (
-              <p className="caption text-mute">
-                {formatUsername(user.username)}
-              </p>
-            ) : null}
-            <p className="caption text-mute">{user.email}</p>
-          </div>
+            <dl style={{ margin: 0 }}>
+              <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
+            </dl>
+          </section>
         </div>
-        <p className="caption text-body">
-          별칭만 표시합니다. 실명·군번·계급·기수·사진은 프로필에 저장하지
-          마세요.
-        </p>
 
-        <dl style={{ margin: 0 }}>
-          <InfoItem label="공유 그룹" value={unit?.name ?? "참여 전"} />
-        </dl>
-      </section>
+        <div className="profile-main">
+          <UsernameCard username={user.username} />
 
-      <UsernameCard username={user.username} />
+          <PasskeyManager />
 
-      <PasskeyManager />
+          <OfficialDisclaimer />
 
-      <OfficialDisclaimer />
+          {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
+          <Link to="/leaves/grants" className="btn btn-secondary">
+            보유 휴가
+          </Link>
 
-      {/* 휴가 총량·만기·정기외박 설정은 모두 보유 휴가 화면으로 옮겼다. */}
-      <Link to="/leaves/grants" className="btn btn-secondary">
-        보유 휴가
-      </Link>
+          <section
+            className="card"
+            style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ flex: 1 }}
+              onClick={() => void navigate("/units")}
+            >
+              <ActionIcon name="users" />
+              공유 그룹
+            </button>
+            <button
+              type="button"
+              className="btn btn-tertiary"
+              style={{ flex: 1 }}
+              disabled={logout.isPending}
+              onClick={() => {
+                void logout.mutateAsync().then(() => navigate("/login"));
+              }}
+            >
+              <ActionIcon name="logout" />
+              로그아웃
+            </button>
+          </section>
 
-      <section
-        className="card"
-        style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}
-      >
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ flex: 1 }}
-          onClick={() => void navigate("/units")}
-        >
-          <ActionIcon name="users" />
-          공유 그룹
-        </button>
-        <button
-          type="button"
-          className="btn btn-tertiary"
-          style={{ flex: 1 }}
-          disabled={logout.isPending}
-          onClick={() => {
-            void logout.mutateAsync().then(() => navigate("/login"));
-          }}
-        >
-          <ActionIcon name="logout" />
-          로그아웃
-        </button>
-      </section>
+          <section
+            className="card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-md)",
+            }}
+          >
+            <h2 className="display-xs">개인정보와 계정</h2>
+            <p className="body-sm text-body">
+              앱을 삭제한 뒤에도 공개 삭제 요청 페이지에서 계정 삭제 방법을
+              확인할 수 있어요. 여기서는 아래 버튼으로 바로 요청할 수 있습니다.
+            </p>
+            <LegalLinks />
+          </section>
 
-      <section
-        className="card"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--sp-md)",
-        }}
-      >
-        <h2 className="display-xs">개인정보와 계정</h2>
-        <p className="body-sm text-body">
-          앱을 삭제한 뒤에도 공개 삭제 요청 페이지에서 계정 삭제 방법을 확인할
-          수 있어요. 여기서는 아래 버튼으로 바로 요청할 수 있습니다.
-        </p>
-        <LegalLinks />
-      </section>
-
-      {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공).
+          {/* 계정 삭제 (앱스토어/플레이 정책상 계정 삭제 경로 제공).
           밑줄 친 글자였던 자리다 — 이 화면에서 유일하게 되돌릴 수 없는 동작인데
           버튼으로 보이지 않아 안내문의 일부로 읽혔다. 위험 변형을 쓰되 폭은
           글자에 맞춰, 눈에 걸리되 실수로 눌리지는 않게 둔다. */}
-      <button
-        type="button"
-        className="btn btn-danger btn-sm"
-        onClick={onDeleteAccount}
-        disabled={deleteAccount.isPending}
-        style={{ alignSelf: "center" }}
-      >
-        <ActionIcon name="trash" />
-        {deleteAccount.isPending ? "삭제 중…" : "계정 삭제"}
-      </button>
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={onDeleteAccount}
+            disabled={deleteAccount.isPending}
+            style={{ justifySelf: "center" }}
+          >
+            <ActionIcon name="trash" />
+            {deleteAccount.isPending ? "삭제 중…" : "계정 삭제"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

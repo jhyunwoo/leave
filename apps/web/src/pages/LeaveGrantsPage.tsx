@@ -12,6 +12,7 @@ import { OutingSettings } from "../components/OutingSettings";
 import { RegularOvernightSettings } from "../components/RegularOvernightSettings";
 import { fmtDateShort } from "@leave/shared";
 import { QueryErrorState } from "../components/QueryErrorState";
+import "./leave-grants.css";
 
 /** 만기가 이 안으로 다가오면 임박으로 본다. */
 const EXPIRING_SOON = 30;
@@ -80,17 +81,7 @@ export function LeaveGrantsPage(props: { me: Me }) {
   };
 
   return (
-    <div
-      className="anim-rise"
-      style={{
-        maxWidth: 720,
-        margin: "0 auto",
-        padding: "var(--sp-lg) 0 var(--sp-3xl)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--sp-xl)",
-      }}
-    >
+    <div className="anim-rise grants-page">
       {page.isError && (
         <QueryErrorState
           title="보유 휴가를 새로 불러오지 못했어요"
@@ -175,56 +166,62 @@ export function LeaveGrantsPage(props: { me: Me }) {
         </p>
       </section>
 
-      {active.map((fund) => (
-        <FundCard
-          key={fund.key}
-          fund={fund}
-          onAdd={() => setEditing({ newKey: fund.key })}
-          onEdit={(grant) => setEditing({ grant })}
-          onDelete={removeGrant}
-        />
-      ))}
+      <div className="grants-funds">
+        {active.map((fund) => (
+          <FundCard
+            key={fund.key}
+            fund={fund}
+            onAdd={() => setEditing({ newKey: fund.key })}
+            onEdit={(grant) => setEditing({ grant })}
+            onDelete={removeGrant}
+          />
+        ))}
 
-      {empty.length > 0 && (
-        <section
-          className="card"
-          style={{ display: "grid", gap: "var(--sp-md)" }}
-        >
-          <h2 className="body-lg strong">다른 재원 추가</h2>
-          <div
-            style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-xs)" }}
+        {empty.length > 0 && (
+          <section
+            className="card"
+            style={{ display: "grid", gap: "var(--sp-md)" }}
           >
-            {empty.map((fund) => (
-              <button
-                key={fund.key}
-                aria-label={`${fund.label} 추가`}
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setEditing({ newKey: fund.key })}
-              >
-                <ActionIcon name="plus" />
-                {fund.label}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+            <h2 className="body-lg strong">다른 재원 추가</h2>
+            <div
+              style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-xs)" }}
+            >
+              {empty.map((fund) => (
+                <button
+                  key={fund.key}
+                  aria-label={`${fund.label} 추가`}
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setEditing({ newKey: fund.key })}
+                >
+                  <ActionIcon name="plus" />
+                  {fund.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
-      {/* 육군도 분기마다 정기외박을 운영한다 — 군종으로 가리지 않는다. */}
-      <RegularOvernightSettings
-        branch={props.me.user.branch}
-        config={regularOvernight}
-      />
-      <CycleList
-        cycles={regularOvernight.cycles}
-        carryOver={regularOvernight.carryOver}
-        expanded={showPastCycles}
-        onToggle={() => setShowPastCycles((open) => !open)}
-      />
+      <div className="grants-settings">
+        <div>
+          {/* 육군도 분기마다 정기외박을 운영한다 — 군종으로 가리지 않는다. */}
+          <RegularOvernightSettings
+            branch={props.me.user.branch}
+            config={regularOvernight}
+          />
+          <CycleList
+            cycles={regularOvernight.cycles}
+            carryOver={regularOvernight.carryOver}
+            expanded={showPastCycles}
+            onToggle={() => setShowPastCycles((open) => !open)}
+          />
+        </div>
 
-      {/* 외출은 위 총합에 들어가지 않는다 — 일이 아니라 횟수라서 "남은 휴가 N일"에
+        {/* 외출은 위 총합에 들어가지 않는다 — 일이 아니라 횟수라서 "남은 휴가 N일"에
           더하면 없는 휴가를 있다고 말하게 된다. 그래서 제 단위로 따로 그린다. */}
-      <OutingSettings branch={props.me.user.branch} funds={outing} />
+        <OutingSettings branch={props.me.user.branch} funds={outing} />
+      </div>
 
       {editing && (
         <LeaveGrantModal

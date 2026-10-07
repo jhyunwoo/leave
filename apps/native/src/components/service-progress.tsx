@@ -34,16 +34,19 @@ import {
   useServicePercentClock,
   useServiceTicker,
 } from "@/lib/service-progress-clock";
-import { SERVICE_PERCENT_DECIMALS } from "@/lib/service-progress-format";
+import {
+  percentBetween,
+  SERVICE_PERCENT_DECIMALS,
+} from "@/lib/service-progress-format";
 import { makeStyles, radius, spacing } from "@/theme";
 
 import { serviceMilestoneProgress } from "@leave/shared/service-milestone-progress";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-function formatPercent(percent: number): string {
+function formatPercent(prefix: string, percent: number): string {
   "worklet";
-  return `복무 ${percent.toFixed(SERVICE_PERCENT_DECIMALS)}%`;
+  return `${prefix}${percent.toFixed(SERVICE_PERCENT_DECIMALS)}%`;
 }
 
 /**
@@ -52,6 +55,7 @@ function formatPercent(percent: number): string {
  * 네이티브 텍스트 갱신도 생기지 않는다.
  */
 function LivePercentReadout(props: {
+  prefix: string;
   start: number;
   span: number;
   active: boolean;
@@ -64,7 +68,8 @@ function LivePercentReadout(props: {
     props.active,
     props.initialNow,
   );
-  const label = useDerivedValue(() => formatPercent(percent.value));
+  const prefix = props.prefix;
+  const label = useDerivedValue(() => formatPercent(prefix, percent.value));
   const animatedProps = useAnimatedProps(() => ({
     text: label.value,
     defaultValue: label.value,
@@ -172,6 +177,7 @@ export function ServiceProgress(props: {
         </Text>
       ) : (
         <LivePercentReadout
+          prefix="복무 "
           start={start}
           span={span}
           active={live}
@@ -193,45 +199,75 @@ export function ServiceProgress(props: {
           {props.dutyDays === null ? "" : ` · 일과 ${props.dutyDays}일`}
         </Text>
       </View>
-      {milestones.map((milestone) => (
-        <View key={milestone.kind} style={styles.milestone}>
-          <View style={styles.metaRow}>
-            <Text style={styles.milestoneLabel}>{milestone.label}</Text>
-            <Text style={styles.milestoneLabel}>
-              {milestone.daysLeft !== null &&
-                `${(milestone.progress * 100).toFixed(6)}% · `}
-              {milestone.daysLeft === null
-                ? "예정 없음"
-                : milestone.daysLeft === 0
-                  ? "D-Day"
-                  : `D-${milestone.daysLeft}`}
-            </Text>
-          </View>
-          {milestone.daysLeft !== null && (
-            <View
-              style={[styles.track, styles.milestoneTrack]}
-              accessibilityRole="progressbar"
-              accessibilityLabel={milestone.label}
-              accessibilityValue={{
-                min: 0,
-                max: 100,
-                now: Math.round(milestone.progress * 100),
-                text: `${(milestone.progress * 100).toFixed(6)}%, ${milestone.daysLeft}일 남음`,
-              }}
-            >
-              <View
-                style={[
-                  styles.fill,
-                  milestone.kind === "promotion"
-                    ? styles.promotionFill
-                    : styles.payStepFill,
-                  { width: `${milestone.progress * 100}%` },
-                ]}
-              />
+      {milestones.map((milestone) => {
+        const upcoming = milestone.daysLeft !== null;
+        const milestoneStart = kstMidnight(milestone.startDate);
+        const milestoneSpan =
+          milestone.endDate === null
+            ? 0
+            : Math.max(kstMidnight(milestone.endDate) - milestoneStart, 0);
+        const milestonePercent = percentBetween(
+          milestoneStart,
+          milestoneSpan,
+          now,
+        );
+        const dDay =
+          milestone.daysLeft === null
+            ? "예정 없음"
+            : milestone.daysLeft === 0
+              ? "D-Day"
+              : `D-${milestone.daysLeft}`;
+        return (
+          <View key={milestone.kind} style={styles.milestone}>
+            <View style={styles.metaRow}>
+              <Text style={styles.milestoneLabel}>{milestone.label}</Text>
+              <View style={styles.milestoneValue}>
+                {upcoming &&
+                  (reducedMotion ? (
+                    <Text style={styles.milestoneLabel}>
+                      {milestonePercent.toFixed(1)}%
+                    </Text>
+                  ) : (
+                    <LivePercentReadout
+                      prefix=""
+                      start={milestoneStart}
+                      span={milestoneSpan}
+                      active={focused && milestoneSpan > 0}
+                      initialNow={now}
+                      style={[styles.milestoneLabel, styles.milestoneLive]}
+                    />
+                  ))}
+                <Text style={styles.milestoneLabel}>
+                  {upcoming ? ` · ${dDay}` : dDay}
+                </Text>
+              </View>
             </View>
-          )}
-        </View>
-      ))}
+            {upcoming && (
+              <View
+                style={[styles.track, styles.milestoneTrack]}
+                accessibilityRole="progressbar"
+                accessibilityLabel={milestone.label}
+                accessibilityValue={{
+                  min: 0,
+                  max: 100,
+                  now: Math.round(milestonePercent),
+                  text: `${milestonePercent.toFixed(1)}%, ${milestone.daysLeft}일 남음`,
+                }}
+              >
+                <View
+                  style={[
+                    styles.fill,
+                    milestone.kind === "promotion"
+                      ? styles.promotionFill
+                      : styles.payStepFill,
+                    { width: `${milestonePercent}%` },
+                  ]}
+                />
+              </View>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -280,6 +316,13 @@ const useStyles = makeStyles(({ colors }) => ({
     fontSize: 12,
     color: colors.mute,
     fontVariant: ["tabular-nums"],
+  },
+  milestoneValue: { flexDirection: "row", alignItems: "baseline" },
+  // TextInput은 Text와 기본 여백이 달라 같은 줄에서 기준선이 어긋난다.
+  milestoneLive: {
+    padding: 0,
+    includeFontPadding: false,
+    pointerEvents: "none",
   },
   milestoneTrack: { height: 6 },
   promotionFill: { backgroundColor: "#91a5af" },

@@ -6,6 +6,9 @@ export interface ServiceMilestoneProgress {
   label: string;
   daysLeft: number | null;
   progress: number;
+  /** 진행률 구간. 화면이 KST 자정 기준으로 실시간 값을 다시 그릴 때 쓴다. */
+  startDate: ISODate;
+  endDate: ISODate | null;
 }
 
 /** 호봉은 매월 1일 갱신하며, 진급 진행률은 현재 계급의 표준 진급일부터 센다. */
@@ -39,6 +42,8 @@ export function serviceMilestoneProgress(params: {
             1,
           )
         : 0,
+      startDate: start,
+      endDate: end,
     };
   }
 

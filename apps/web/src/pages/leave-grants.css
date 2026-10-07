@@ -1,0 +1,31 @@
+/* 좁은 화면은 한 줄. 넓은 화면에서는 재원 카드와 자동 적립 설정을 두 열로 펼친다.
+   카드 높이가 제각각이라 같은 행이 늘어나지 않도록 위에 붙인다. */
+.grants-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-lg) 0 var(--sp-3xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+}
+
+.grants-funds,
+.grants-settings,
+.grants-settings > * {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-xl);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .grants-page {
+    max-width: 1120px;
+  }
+
+  .grants-funds,
+  .grants-settings {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}

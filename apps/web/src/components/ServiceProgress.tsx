@@ -1,5 +1,5 @@
 /**
- * 웹 프로필의 복무 진행률.
+ * 웹 프로필의 복무·진급·호봉 진행률.
  *
  * 소수점 열 자리 숫자는 최대 120fps로 흐르지만 React 상태는 분 단위 값만 가진다.
  * 매 프레임에는 고정 폭 숫자 안의 Text 노드 하나만 바꿔 프로필 전체 리렌더와
@@ -87,6 +87,9 @@ function LivePercentReadout(props: {
   active: boolean;
   initialNow: number;
   decimals: number;
+  testId: string;
+  /** 오른쪽 정렬이면 자릿수가 줄어든 칸이 뒤따르는 글자 앞에 빈틈으로 남지 않는다. */
+  align?: "right";
 }) {
   const valueRef = useRef<HTMLSpanElement>(null);
   const initial = formatPercent(
@@ -175,8 +178,12 @@ function LivePercentReadout(props: {
   return (
     <span
       ref={valueRef}
-      style={{ ...numberStyle, width: `${props.decimals + 5}ch` }}
-      data-testid="profile-service-progress-value"
+      style={{
+        ...numberStyle,
+        width: `${props.decimals + 5}ch`,
+        textAlign: props.align,
+      }}
+      data-testid={props.testId}
     >
       {initial}
     </span>
@@ -271,6 +278,7 @@ export function ServiceProgress(props: {
               active={clock.visible}
               initialNow={initialNow}
               decimals={decimals}
+              testId="profile-service-progress-value"
             />
           )}
         </span>
@@ -282,56 +290,91 @@ export function ServiceProgress(props: {
           {props.caption}
         </span>
       </div>
-      {milestones.map((milestone) => (
-        <div key={milestone.kind} style={{ marginTop: "var(--sp-lg)" }}>
-          <div
-            className="caption text-mute"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "var(--sp-sm)",
-              marginBottom: "var(--sp-sm)",
-            }}
-          >
-            <span>{milestone.label}</span>
-            <span style={{ fontVariantNumeric: "tabular-nums" }}>
-              {milestone.daysLeft !== null &&
-                `${(milestone.progress * 100).toFixed(6)}% · `}
-              {milestone.daysLeft === null
-                ? "예정 없음"
-                : milestone.daysLeft === 0
-                  ? "D-Day"
-                  : `D-${milestone.daysLeft}`}
-            </span>
-          </div>
-          {milestone.daysLeft !== null && (
+      {milestones.map((milestone) => {
+        const upcoming = milestone.daysLeft !== null;
+        const milestoneStart = kstMidnight(milestone.startDate);
+        const milestoneSpan =
+          milestone.endDate === null
+            ? 0
+            : Math.max(kstMidnight(milestone.endDate) - milestoneStart, 0);
+        const milestonePercent = percentBetween(
+          milestoneStart,
+          milestoneSpan,
+          clock.now,
+        );
+        return (
+          <div key={milestone.kind} style={{ marginTop: "var(--sp-lg)" }}>
             <div
-              role="progressbar"
-              aria-label={`${milestone.label} 진행률`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(milestone.progress * 100)}
-              aria-valuetext={`${(milestone.progress * 100).toFixed(6)}%, ${milestone.daysLeft}일 남음`}
+              className="caption text-mute"
               style={{
-                height: 6,
-                borderRadius: "var(--r-pill)",
-                background: "var(--hairline)",
-                overflow: "hidden",
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "var(--sp-sm)",
+                marginBottom: "var(--sp-sm)",
               }}
             >
-              <div
+              <span>{milestone.label}</span>
+              <span
+                aria-hidden="true"
+                data-testid={`profile-${milestone.kind}-progress`}
                 style={{
-                  width: `${milestone.progress * 100}%`,
-                  height: "100%",
-                  borderRadius: "inherit",
-                  background:
-                    milestone.kind === "promotion" ? "#91a5af" : "#a5adb5",
+                  fontVariantNumeric: "tabular-nums",
+                  whiteSpace: "nowrap",
                 }}
-              />
+              >
+                {upcoming &&
+                  (reducedMotion ? (
+                    formatPercent(milestonePercent, STATIC_DECIMALS)
+                  ) : (
+                    <LivePercentReadout
+                      start={milestoneStart}
+                      span={milestoneSpan}
+                      active={clock.visible}
+                      initialNow={initialNow}
+                      decimals={decimals}
+                      testId={`profile-${milestone.kind}-progress-value`}
+                      align="right"
+                    />
+                  ))}
+                {upcoming && " · "}
+                {milestone.daysLeft === null
+                  ? "예정 없음"
+                  : milestone.daysLeft === 0
+                    ? "D-Day"
+                    : `D-${milestone.daysLeft}`}
+              </span>
             </div>
-          )}
-        </div>
-      ))}
+            {upcoming && (
+              <div
+                role="progressbar"
+                aria-label={`${milestone.label} 진행률`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(milestonePercent)}
+                aria-valuetext={`${milestonePercent.toFixed(STATIC_DECIMALS)}%, ${milestone.daysLeft}일 남음`}
+                style={{
+                  height: 6,
+                  borderRadius: "var(--r-pill)",
+                  background: "var(--hairline)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    transform: `scaleX(${milestonePercent / 100})`,
+                    transformOrigin: "left center",
+                    height: "100%",
+                    borderRadius: "inherit",
+                    background:
+                      milestone.kind === "promotion" ? "#91a5af" : "#a5adb5",
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

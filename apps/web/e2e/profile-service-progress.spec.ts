@@ -79,17 +79,26 @@ test("프로필 복무율은 열 자리로 흐르고 불필요할 때 멈춘다"
     /^복무 \d+\.\d%$/,
   );
 
-  for (const name of ["다음 진급 진행률", "다음 호봉 진행률"]) {
+  for (const [name, kind] of [
+    ["다음 진급 진행률", "promotion"],
+    ["다음 호봉 진행률", "pay-step"],
+  ] as const) {
     const milestone = page.getByRole("progressbar", { name });
     await expect(milestone).toBeVisible();
     await expect(milestone).toHaveAttribute(
       "aria-valuetext",
-      /^\d+\.\d{6}%, \d+일 남음$/,
+      /^\d+\.\d%, \d+일 남음$/,
     );
-    await expect(milestone.locator("..")).toContainText(/\d+\.\d{6}% · D-\d+/);
+    await expect(page.getByTestId(`profile-${kind}-progress`)).toHaveText(
+      /^\d{1,3}\.\d{10}% · D-\d+$/,
+    );
     const progress = Number(await milestone.getAttribute("aria-valuenow"));
     expect(progress).toBeGreaterThanOrEqual(0);
     expect(progress).toBeLessThanOrEqual(100);
+
+    const milestoneValue = page.getByTestId(`profile-${kind}-progress-value`);
+    const before = await milestoneValue.textContent();
+    await expect.poll(() => milestoneValue.textContent()).not.toBe(before);
   }
   await expect(page.getByTestId("profile-service-progress-card")).toContainText(
     /D-\d+/,

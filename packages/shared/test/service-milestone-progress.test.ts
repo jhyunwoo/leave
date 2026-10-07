@@ -16,6 +16,18 @@ describe("serviceMilestoneProgress", () => {
     expect(payStep).toMatchObject({ daysLeft: 31, progress: 0 });
   });
 
+  it("실시간 진행률을 그릴 수 있게 구간의 시작일과 끝일을 함께 준다", () => {
+    const [promotion, payStep] = serviceMilestoneProgress(profile);
+    expect(promotion).toMatchObject({
+      startDate: "2026-04-01",
+      endDate: "2026-10-01",
+    });
+    expect(payStep).toMatchObject({
+      startDate: "2026-07-01",
+      endDate: "2026-08-01",
+    });
+  });
+
   it("입대 첫 달은 입대일부터 세고, 윤년과 연말을 처리한다", () => {
     expect(
       serviceMilestoneProgress({
