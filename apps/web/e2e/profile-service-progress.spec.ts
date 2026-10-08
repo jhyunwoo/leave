@@ -196,7 +196,7 @@ test("프로필 복무율은 열 자리로 흐르고 불필요할 때 멈춘다"
   }
 });
 
-test("복무율 카드는 전체 화면의 실시간 숫자와 두 막대로 이어진다", async ({
+test("복무율 카드는 전체 화면의 실시간 숫자와 막대로 이어진다", async ({
   page,
   request,
 }) => {
@@ -214,22 +214,22 @@ test("복무율 카드는 전체 화면의 실시간 숫자와 두 막대로 이
   const value = page.getByTestId("service-progress-value");
   const main = page.getByTestId("service-progress-main");
   const mainFill = page.getByTestId("service-progress-main-fill");
-  const zoom = page.getByTestId("service-progress-zoom");
-  const zoomFill = page.getByTestId("service-progress-zoom-fill");
 
   await expect(detail).toBeVisible();
   await expect(value).toHaveText(/^\d{1,3}\.\d{10}%$/);
   await expect(main).toHaveAttribute("aria-valuetext", /^\d+\.\d%$/);
-  await expect(zoom).toContainText("실시간 확대");
-  await expect(zoom).toContainText("소수점 5번째 자리");
+  await expect(page.getByTestId("service-progress-zoom")).toHaveCount(0);
 
   const firstValue = await value.textContent();
-  const firstZoomTransform = await zoomFill.getAttribute("style");
   await expect(mainFill).toHaveAttribute("style", /scaleX\(0\.\d+\)/);
   await expect.poll(() => value.textContent()).not.toBe(firstValue);
-  await expect
-    .poll(() => zoomFill.getAttribute("style"))
-    .not.toBe(firstZoomTransform);
+  // 막대는 복무 기간 전체가 축척이라 몇 초 안에는 눈에 띄게 움직이지 않는다.
+
+  // 넓은 화면에서는 막대가 화면 폭 대부분을 쓴다.
+  const barWidth = await main.evaluate(
+    (element) => element.getBoundingClientRect().width / window.innerWidth,
+  );
+  expect(barWidth).toBeGreaterThan(0.8);
 
   const viewportCoverage = await detail.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -248,12 +248,12 @@ test("복무율 카드는 전체 화면의 실시간 숫자와 두 막대로 이
   );
 
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(zoom).toContainText("동작 줄이기 설정");
+  await waitForFrames(page, 2);
   const reducedValue = await value.textContent();
-  const reducedZoomTransform = await zoomFill.getAttribute("style");
+  const reducedFillTransform = await mainFill.getAttribute("style");
   await waitForFrames(page, 8);
   await expect(value).toHaveText(reducedValue ?? "");
-  await expect(zoomFill).toHaveAttribute("style", reducedZoomTransform ?? "");
+  await expect(mainFill).toHaveAttribute("style", reducedFillTransform ?? "");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(detail).toBeVisible();

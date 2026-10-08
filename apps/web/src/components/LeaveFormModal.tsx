@@ -28,6 +28,7 @@ import { Field } from "./Field";
 import { Modal } from "./Modal";
 import { OfficialDisclaimer } from "./OfficialDisclaimer";
 import { TimeField } from "./TimeField";
+import "./leave-segments.css";
 
 /** 복귀 시각으로 가장 자주 적히는 값들. 그 밖의 시각은 드롭다운으로 고른다. */
 const RETURN_TIME_PRESETS = ["18:00", "20:00", "21:00", "22:00"] as const;
@@ -216,53 +217,57 @@ export function LeaveForm(props: LeaveFormModalProps) {
         </div>
 
         {validRange ? (
-          <div style={{ display: "grid", gap: "var(--sp-sm)" }}>
+          <div className="seg-list">
             {resolved.map((draft, index) => {
               const available = form.rowAvailable(
                 draft.startDate,
                 draft.endDate,
               );
+              const unit = balanceUnitLabel(draft.key);
+              const multiple = resolved.length > 1;
               return (
-                <div
-                  key={index}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "minmax(0, 1fr) auto minmax(0, 1fr) auto auto",
-                    alignItems: "center",
-                    gap: "var(--sp-sm)",
-                  }}
-                >
-                  <select
-                    className="input"
-                    value={draft.key}
-                    aria-label={`${index + 1}번째 구간 휴가 재원`}
-                    onChange={(event) =>
-                      form.setDrafts((current) =>
-                        current.map((item, i) =>
-                          i === index
-                            ? {
-                                ...item,
-                                key: event.target.value as BalanceKey,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                  >
-                    {BALANCE_KEYS.map((key) => (
-                      <option key={key} value={key}>
-                        {BALANCE_LABELS[key]} (잔여 {available.get(key) ?? 0}
-                        {balanceUnitLabel(key)})
-                      </option>
-                    ))}
-                  </select>
+                <div key={index} className="seg-row">
+                  <div className="seg-row__head">
+                    <select
+                      className="input"
+                      value={draft.key}
+                      aria-label={`${index + 1}번째 구간 휴가 재원`}
+                      onChange={(event) =>
+                        form.setDrafts((current) =>
+                          current.map((item, i) =>
+                            i === index
+                              ? {
+                                  ...item,
+                                  key: event.target.value as BalanceKey,
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      {BALANCE_KEYS.map((key) => (
+                        <option key={key} value={key}>
+                          {BALANCE_LABELS[key]} (잔여 {available.get(key) ?? 0}
+                          {balanceUnitLabel(key)})
+                        </option>
+                      ))}
+                    </select>
+                    {multiple && (
+                      <button
+                        type="button"
+                        className="seg-btn"
+                        aria-label={`${index + 1}번째 구간 삭제`}
+                        onClick={() => form.removeDraftAt(index)}
+                      >
+                        <ActionIcon name="close" />
+                      </button>
+                    )}
+                  </div>
 
                   {draft.key === "regular_overnight" &&
                   (form.regularCycleChoices[index]?.length ?? 0) > 1 ? (
                     <select
                       className="input"
-                      style={{ gridColumn: "1 / -1" }}
                       value={draft.regularOvernightCycleStart ?? ""}
                       aria-label={`${index + 1}번째 정기외박 차감 주기`}
                       onChange={(event) =>
@@ -279,58 +284,73 @@ export function LeaveForm(props: LeaveFormModalProps) {
                     </select>
                   ) : null}
 
-                  {/* 날짜가 아니라 개수를 고른다. 시작·종료일은 여기서 파생된다. */}
-                  <input
-                    className="input"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={MAX_DATE_RANGE_DAYS}
-                    step={1}
-                    value={draft.days}
-                    style={{ width: "5.5rem" }}
-                    aria-label={`${index + 1}번째 구간 사용 일수`}
-                    onChange={(event) =>
-                      form.setDraftDays(index, Number(event.target.value))
-                    }
-                  />
+                  <div className="seg-row__foot">
+                    {/* 날짜가 아니라 개수를 고른다. 시작·종료일은 여기서 파생된다. */}
+                    <span className="seg-stepper">
+                      <button
+                        type="button"
+                        className="seg-btn"
+                        disabled={draft.days <= 1}
+                        aria-label={`${index + 1}번째 구간 1${unit} 줄이기`}
+                        onClick={() => form.setDraftDays(index, draft.days - 1)}
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={MAX_DATE_RANGE_DAYS}
+                        step={1}
+                        value={draft.days}
+                        aria-label={`${index + 1}번째 구간 사용 일수`}
+                        onChange={(event) =>
+                          form.setDraftDays(index, Number(event.target.value))
+                        }
+                      />
+                      <span className="seg-stepper__unit" aria-hidden="true">
+                        {unit}
+                      </span>
+                      <button
+                        type="button"
+                        className="seg-btn"
+                        disabled={draft.days >= MAX_DATE_RANGE_DAYS}
+                        aria-label={`${index + 1}번째 구간 1${unit} 늘리기`}
+                        onClick={() => form.setDraftDays(index, draft.days + 1)}
+                      >
+                        +
+                      </button>
+                    </span>
 
-                  <span className="caption text-mute">
-                    {fmtDateShort(draft.startDate)} –{" "}
-                    {fmtDateShort(draft.endDate)}
-                  </span>
+                    <span className="caption text-mute seg-row__dates">
+                      {fmtDateShort(draft.startDate)} –{" "}
+                      {fmtDateShort(draft.endDate)}
+                    </span>
 
-                  {/* 웹에서는 드래그 대신 위/아래 버튼으로 순서를 바꾼다. */}
-                  <span style={{ display: "flex", gap: "var(--sp-xs)" }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={index === 0}
-                      aria-label={`${index + 1}번째 구간 위로`}
-                      onClick={() => form.moveDraft(index, index - 1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={index === resolved.length - 1}
-                      aria-label={`${index + 1}번째 구간 아래로`}
-                      onClick={() => form.moveDraft(index, index + 1)}
-                    >
-                      ↓
-                    </button>
-                  </span>
-
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    disabled={resolved.length <= 1}
-                    aria-label={`${index + 1}번째 구간 삭제`}
-                    onClick={() => form.removeDraftAt(index)}
-                  >
-                    ✕
-                  </button>
+                    {/* 웹에서는 드래그 대신 위/아래 버튼으로 순서를 바꾼다. */}
+                    {multiple && (
+                      <span className="seg-row__order">
+                        <button
+                          type="button"
+                          className="seg-btn"
+                          disabled={index === 0}
+                          aria-label={`${index + 1}번째 구간 위로`}
+                          onClick={() => form.moveDraft(index, index - 1)}
+                        >
+                          <ActionIcon name="up" />
+                        </button>
+                        <button
+                          type="button"
+                          className="seg-btn"
+                          disabled={index === resolved.length - 1}
+                          aria-label={`${index + 1}번째 구간 아래로`}
+                          onClick={() => form.moveDraft(index, index + 1)}
+                        >
+                          <ActionIcon name="down" />
+                        </button>
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}

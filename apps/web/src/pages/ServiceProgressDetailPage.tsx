@@ -1,14 +1,14 @@
 /**
  * 프로필 복무율 카드에서 여는 전체 화면.
  *
- * 숫자와 두 막대는 하나의 requestAnimationFrame 루프에서 최대 120fps로 갱신한다.
+ * 숫자와 막대는 하나의 requestAnimationFrame 루프에서 최대 120fps로 갱신한다.
  * 프레임마다 React 상태를 바꾸지 않고 Text 노드와 transform만 써서 화면 전체의
  * 재렌더와 레이아웃 계산을 피한다.
  */
 
 import type { Me } from "@leave/client";
 import { useMyDutyDays } from "@leave/client";
-import { kstMidnight } from "@leave/shared";
+import { fmtDateShort, kstMidnight, type ISODate } from "@leave/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
@@ -16,15 +16,17 @@ import {
   percentBetween,
   SERVICE_PERCENT_DECIMALS,
   splitPercentText,
-  ZOOM_DECIMAL_PLACE,
-  zoomFraction,
-  zoomSweepSeconds,
 } from "../components/service-progress-format";
 import { useReducedMotion } from "../components/use-reduced-motion";
 import "./service-progress-detail.css";
 
 const MAX_FPS = 120;
 const DRAW_INTERVAL_MS = 1000 / MAX_FPS;
+
+/** "2026년 3월 23일". 막대 양 끝 이름표라 요일은 뺀다. */
+function fmtDateYear(date: ISODate): string {
+  return `${date.slice(0, 4)}년 ${fmtDateShort(date)}`;
+}
 
 function textParts(percent: number) {
   return splitPercentText(
@@ -42,15 +44,12 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
   const headRef = useRef<HTMLSpanElement>(null);
   const tailRef = useRef<HTMLSpanElement>(null);
   const mainFillRef = useRef<HTMLDivElement>(null);
-  const zoomFillRef = useRef<HTMLDivElement>(null);
 
   const start = kstMidnight(user.enlistedAt);
   const end = kstMidnight(user.dischargeAt);
   const span = end > start ? end - start : 0;
   const initialPercent = percentBetween(start, span, initialNow);
   const initialParts = textParts(initialPercent);
-  const initialZoom = zoomFraction(initialPercent, ZOOM_DECIMAL_PLACE);
-  const sweep = zoomSweepSeconds(span, ZOOM_DECIMAL_PLACE);
   const finished = initialPercent >= 100;
   const notStarted = initialNow <= start;
 
@@ -59,13 +58,11 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
     const headText = headRef.current?.firstChild;
     const tailText = tailRef.current?.firstChild;
     const mainFill = mainFillRef.current;
-    const zoomFill = zoomFillRef.current;
     if (
       !root ||
       !(headText instanceof Text) ||
       !(tailText instanceof Text) ||
       !mainFill ||
-      !zoomFill ||
       reducedMotion
     ) {
       return;
@@ -84,7 +81,6 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
       if (headText.data !== parts.head) headText.data = parts.head;
       if (tailText.data !== parts.tail) tailText.data = parts.tail;
       mainFill.style.transform = `scaleX(${percent / 100})`;
-      zoomFill.style.transform = `scaleX(${zoomFraction(percent, ZOOM_DECIMAL_PLACE)})`;
       return now;
     };
 
@@ -164,14 +160,6 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
     : notStarted
       ? "입대 전이에요"
       : `전역까지 ${user.daysUntilDischarge}일${dutyDaysSuffix}`;
-  const zoomDescription = finished
-    ? "전역 시점에서 멈췄어요."
-    : notStarted
-      ? "입대일부터 움직이기 시작해요."
-      : reducedMotion
-        ? "동작 줄이기 설정에 따라 현재 위치에 멈춰 있어요."
-        : `${sweep.toFixed(1)}초마다 한 칸을 실제 속도로 확대해 보여줘요.`;
-
   return (
     <main
       ref={rootRef}
@@ -208,53 +196,29 @@ export function ServiceProgressDetailPage(props: { me: Me }) {
           <p className="service-progress-detail__status">{status}</p>
         </section>
 
-        <div className="service-progress-detail__panels">
-          <section
-            className="service-progress-detail__panel service-progress-detail__panel--main"
-            role="progressbar"
-            aria-label="전체 복무율"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(initialPercent)}
-            aria-valuetext={`${initialPercent.toFixed(1)}%`}
-            data-testid="service-progress-main"
-          >
-            <div className="service-progress-detail__panel-heading">
-              <h2>전체 복무</h2>
-              <span>0% → 100%</span>
-            </div>
-            <div className="service-progress-detail__main-track">
-              <div
-                ref={mainFillRef}
-                className="service-progress-detail__main-fill"
-                style={{ transform: `scaleX(${initialPercent / 100})` }}
-                data-testid="service-progress-main-fill"
-              />
-            </div>
-          </section>
-
-          <section
-            className="service-progress-detail__panel service-progress-detail__panel--zoom"
-            data-testid="service-progress-zoom"
-          >
-            <div className="service-progress-detail__panel-heading">
-              <h2>실시간 확대</h2>
-              <span>소수점 {ZOOM_DECIMAL_PLACE}번째 자리</span>
-            </div>
-            <p>{zoomDescription}</p>
+        <section
+          className="service-progress-detail__panel"
+          role="progressbar"
+          aria-label="전체 복무율"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(initialPercent)}
+          aria-valuetext={`${initialPercent.toFixed(1)}%`}
+          data-testid="service-progress-main"
+        >
+          <div className="service-progress-detail__main-track">
             <div
-              className="service-progress-detail__zoom-track"
-              aria-hidden="true"
-            >
-              <div
-                ref={zoomFillRef}
-                className="service-progress-detail__zoom-fill"
-                style={{ transform: `scaleX(${initialZoom})` }}
-                data-testid="service-progress-zoom-fill"
-              />
-            </div>
-          </section>
-        </div>
+              ref={mainFillRef}
+              className="service-progress-detail__main-fill"
+              style={{ transform: `scaleX(${initialPercent / 100})` }}
+              data-testid="service-progress-main-fill"
+            />
+          </div>
+          <div className="service-progress-detail__ends">
+            <span>입대 {fmtDateYear(user.enlistedAt)}</span>
+            <span>전역 {fmtDateYear(user.dischargeAt)}</span>
+          </div>
+        </section>
       </div>
     </main>
   );

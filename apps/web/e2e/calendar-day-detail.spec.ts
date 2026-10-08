@@ -174,6 +174,29 @@ test("넓은 화면: 내 휴가를 누르면 옆 칸이 정보 창 하나가 되
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const title = page.getByPlaceholder("예: 제주도 가족여행");
   await expect(title).toHaveValue("옆칸 휴가");
+
+  // 460px 옆 칸에서도 재원 이름이 잘리지 않아야 고를 수 있다.
+  const kind = page.getByRole("combobox", { name: "1번째 구간 휴가 재원" });
+  expect((await kind.boundingBox())?.width ?? 0).toBeGreaterThan(240);
+  const days = page.getByRole("spinbutton", { name: "1번째 구간 사용 일수" });
+  await page.getByRole("button", { name: "1번째 구간 1일 늘리기" }).click();
+  await expect(days).toHaveValue("2");
+  await page.getByRole("button", { name: "1번째 구간 1일 줄이기" }).click();
+  await expect(days).toHaveValue("1");
+
+  // 수정 양식이 길어 페이지를 끝까지 내려도 달력은 내비 아래에 붙어 있다.
+  const calendar = page.locator(".cal-main");
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await expect
+    .poll(async () => (await calendar.boundingBox())?.y ?? -1)
+    .toBe(64 + 16);
+  const calendarBox = await calendar.boundingBox();
+  expect(
+    (calendarBox?.y ?? 0) + (calendarBox?.height ?? 0),
+  ).toBeLessThanOrEqual(900);
+
   await title.fill("고친 휴가");
   await page.getByRole("button", { name: "변경사항 저장" }).click();
 

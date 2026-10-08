@@ -1,0 +1,142 @@
+/* 휴가 폼의 구간 편집기(LeaveForm) 전용.
+ *
+ * 달력 옆 칸(460px)에서도 재원 이름이 잘리지 않도록 한 구간을 두 줄로 쌓는다.
+ * 윗줄은 재원, 아랫줄은 일수·날짜·순서다.
+ */
+
+.seg-list {
+  display: grid;
+  gap: var(--sp-sm);
+}
+
+.seg-row {
+  display: grid;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+}
+
+.seg-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.seg-row__head .input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.seg-row__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-sm) var(--sp-md);
+}
+
+.seg-row__dates {
+  flex: 1;
+  min-width: max-content;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 좁은 화면에서 줄이 넘어가도 순서 버튼은 오른쪽 끝에 남는다. */
+.seg-row__order {
+  display: flex;
+  gap: var(--sp-xs);
+  margin-left: auto;
+}
+
+/* 일수 −/+ 묶음. 숫자 칸은 세 자리(최대 366)만 들어가면 된다. */
+.seg-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+}
+
+.seg-stepper:focus-within {
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.seg-stepper input {
+  width: 3.5ch;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* 묶음 테두리(:focus-within)가 포커스를 보여 주므로 칸 자체의 링은 겹친다. */
+.seg-stepper input:focus-visible {
+  outline: none;
+}
+
+.seg-stepper input::-webkit-inner-spin-button,
+.seg-stepper input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.seg-stepper__unit {
+  padding-right: var(--sp-xs);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.seg-btn {
+  display: inline-grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  background: var(--canvas);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 160ms var(--ease-out);
+}
+
+.seg-stepper .seg-btn {
+  border: 0;
+}
+
+.seg-btn:disabled {
+  color: var(--muted-soft);
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .seg-btn:hover:not(:disabled) {
+    background: var(--surface-card);
+  }
+}
+
+/* 손가락으로 누르는 화면에서는 최소 터치 크기 44px을 지킨다. */
+@media (pointer: coarse) {
+  .seg-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .seg-stepper input {
+    min-height: 44px;
+  }
+}

@@ -728,3 +728,17 @@ button.unit-event-card {
 .cal-day-detail > .card + .card {
   border-top: 1px solid rgba(14, 15, 12, 0.08);
 }
+
+/* 넓은 화면에서 옆 칸(휴가 정보·수정 양식)이 길어져 페이지를 내려도 달력은
+ * 내비 아래에 붙어 있게 한다. 붙은 채로 바닥이 잘리지 않도록 스크롤 박스
+ * 높이를 화면 높이에 맞춰 줄인다. 좁은 화면은 페이지가 달력 자체를 스크롤하므로
+ * 붙이지 않는다(compact.ts의 900px 기준과 같다). */
+@media (min-width: 901px) {
+  .cal-main {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--sp-lg));
+  }
+  .cal-main .cal-scroll {
+    max-height: min(70vh, 720px, calc(100dvh - var(--nav-h) - 170px));
+  }
+}

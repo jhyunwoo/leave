@@ -727,7 +727,7 @@ export function CalendarPage(props: { me: Me }) {
           }}
         >
           <div
-            className="card"
+            className="card cal-main"
             style={{ padding: "var(--sp-md)", minWidth: 0 }}
           >
             {currentCycle ? (
@@ -839,7 +839,7 @@ export function CalendarPage(props: { me: Me }) {
           }}
         >
           <div
-            className="card"
+            className="card cal-main"
             style={{ padding: "var(--sp-md)", minWidth: 0 }}
           >
             <FriendCalendarScroll
