@@ -1,6 +1,6 @@
 # 네이티브 오류 관측
 
-`apps/native`는 Sentry를 원격 오류·충돌 백엔드로 사용한다. Expo Insights는 기존의 앱 실행·업데이트 사용량 분석을 계속 맡고, Sentry에는 장애 진단에 필요한 저빈도 이벤트만 보낸다.
+`apps/native`는 Sentry를 원격 오류·충돌 백엔드로 사용한다. Expo Insights는 기존의 앱 실행·업데이트 사용량 분석을 계속 맡고, Sentry에는 장애 진단에 필요한 저빈도 이벤트만 보낸다. 시작·화면 진입 성능(콜드/웜 실행, TTR, TTI, 라우트별 진입 시간)은 EAS Observe(`expo-observe`)가 맡는다. 설정은 `src/app/_layout.tsx` 위쪽에 있고, 결과는 EAS 대시보드의 Observe 탭이나 `eas observe:metrics-summary`로 본다.
 
 Expo SDK 57이 검증한 네이티브 모듈 버전은 `@sentry/react-native ~7.11.0`이다. 이 저장소는 fingerprint 런타임 정책 때문에 네이티브 의존성을 정확한 `7.11.0`으로 고정한다. Metro 설정은 Expo의 pnpm/모노레포 해석을 그대로 사용하고 Sentry Debug ID와 소스 맵 직렬화만 더한다.
 
@@ -19,7 +19,7 @@ index.js
        -> Router ErrorBoundary
 ```
 
-Sentry의 `ReactNativeErrorHandlers` 통합은 `onerror: false`로 교체한다. 따라서 `ErrorUtils`의 소유자는 항상 기존 `fatal-error.ts` 하나뿐이며, Sentry가 나중에 덮어쓰지 않는다. Sentry 통합은 별도의 미처리 Promise 추적만 유지한다. 초기화·정제·전송 API는 모두 동기적인 fail-safe 경계로 감싸며, DSN이 없거나 SDK가 실패해도 앱 등록과 기존 오류 화면은 계속 동작한다.
+Sentry의 `ReactNativeErrorHandlers` 통합은 `onerror: false`로 교체한다. 따라서 `ErrorUtils`의 소유자는 항상 기존 `fatal-error.ts` 하나뿐이며, Sentry가 나중에 덮어쓰지 않는다. 예외는 `expo-observe`다. import되는 순간(`_layout.tsx` 평가 때) `fatal-error.ts`의 핸들러를 감싸 오류를 Observe의 `exception` 이벤트로 남긴 뒤 이전 핸들러를 그대로 부른다. 57.0.25에는 이를 끄는 옵션이 없다. 복구 정책과 Sentry 보고는 바뀌지 않지만, 핸들러 체인을 디버깅할 때는 이 한 겹을 감안한다. Sentry 통합은 별도의 미처리 Promise 추적만 유지한다. 초기화·정제·전송 API는 모두 동기적인 fail-safe 경계로 감싸며, DSN이 없거나 SDK가 실패해도 앱 등록과 기존 오류 화면은 계속 동작한다.
 
 - `RootErrorBoundary`: Router 위의 렌더 오류, 원본 `Error`와 React component stack을 보고하고 기존 복구 화면·SecureStore 기록을 유지한다.
 - Expo Router `ErrorBoundary`: 라우트 트리 오류를 보고하되 `notify: false`로 Root 오버레이를 띄우지 않아 복구 UI가 두 개 생기지 않는다.

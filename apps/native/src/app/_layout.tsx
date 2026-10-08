@@ -22,6 +22,7 @@ import {
   useRouter,
 } from "expo-router";
 import * as Linking from "expo-linking";
+import { AppMetrics, Observe, ObserveRoot } from "expo-observe";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
@@ -62,6 +63,15 @@ import { useColors, useTheme } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 configureQueryOnlineManager();
+
+// EAS Observe의 라우트별 진입 시간. 화면이 마운트되기 전에 켜야 하고, 켠 뒤에 다시
+// 부르면 던진다. 공개 이름과 초대 코드는 기기 밖으로 보내지 않는다 — 걸러진 이벤트는
+// 실제 주소 대신 라우트 패턴(`/u/[username]`)만 남긴다.
+Observe.configure({
+  integrations: {
+    "expo-router": { filteredParams: ["username", "code"] },
+  },
+});
 
 /**
  * 라우트 트리 안에서 난 렌더 오류를 잡는다. 이게 없으면 프로덕션에서 렌더 오류가
@@ -219,6 +229,9 @@ function RootNavigator() {
   // 그릴 화면이 생긴 순간에 내린다. 그 전에 내리면 스플래시와 첫 화면 사이가 빈다.
   useEffect(() => {
     if (gate !== "loading") void SplashScreen.hideAsync();
+    // 앱 시작 TTI. 실제 화면이 그려진 때만 찍는다 — 연결 실패 화면은 쓸 수 있는 상태가 아니다.
+    // 세션당 첫 호출만 기록되므로 gate가 다시 바뀌어도 상관없다.
+    if (gate === "ready") AppMetrics.markInteractive();
   }, [gate]);
 
   /**
@@ -428,7 +441,7 @@ function RootNavigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const theme = useTheme();
   const colors = theme.colors;
 
@@ -467,6 +480,9 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// 첫 렌더까지의 시간(TTR)을 잰다.
+export default ObserveRoot.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
