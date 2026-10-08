@@ -52,6 +52,9 @@ struct WatchFaceData: Codable {
     let state: String
     let discharge: Discharge?
     let progress: Double?
+    /// 복무율 컴플리케이션이 엔트리 시각마다 비율을 다시 세는 데 쓴다.
+    /// 이 필드가 없던 아이폰 앱이 보낸 값도 읽히도록 옵셔널.
+    let enlistedAt: String?
     let dutyDays: Int?
     let nextLeave: Countdown?
     let nextOuting: Countdown?

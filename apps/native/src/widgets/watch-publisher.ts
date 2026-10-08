@@ -5,6 +5,8 @@ export type LeaveWatchFaceData = {
   state: WidgetState;
   discharge: { days: number; date: string } | null;
   progress: number | null;
+  /** 복무율 컴플리케이션이 엔트리 시각마다 비율을 다시 센다. `progress`는 자정 값이다. */
+  enlistedAt: string | null;
   dutyDays: number | null;
   /** `date`는 카운트다운의 목표 날짜 — 워치가 자정이 지나도 days를 다시 센다. */
   nextLeave: {

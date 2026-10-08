@@ -27,33 +27,35 @@ struct ContentView: View {
     private func metricsView(props: LeaveWatchProps) -> some View {
         ScrollView {
             VStack(spacing: 8) {
-                // 전역일 타일을 누르면 복무율이 화면 가득 실시간으로 차오른다.
+                metricTile(metric: props.metrics["discharge"], accent: .orange)
+                metricTile(metric: props.metrics["dutyDays"], accent: .green)
+                // 복무율 타일을 누르면 복무율이 화면 가득 실시간으로 차오른다.
                 if session.service != nil {
                     NavigationLink {
                         ServiceProgressView()
                     } label: {
-                        tileContent(
-                            metric: props.metrics["discharge"], accent: .orange
+                        metricTile(
+                            metric: props.metrics["progress"],
+                            accent: .blue,
+                            gauge: props.metrics["progress"]?.gauge
                         )
                     }
                     .buttonStyle(.plain)
                 } else {
-                    metricTile(metric: props.metrics["discharge"], accent: .orange)
+                    metricTile(
+                        metric: props.metrics["progress"],
+                        accent: .blue,
+                        gauge: props.metrics["progress"]?.gauge
+                    )
                 }
-                metricTile(metric: props.metrics["dutyDays"], accent: .green)
-                metricTile(
-                    metric: props.metrics["progress"],
-                    accent: .blue,
-                    gauge: props.metrics["progress"]?.gauge
-                )
                 metricTile(metric: props.metrics["nextLeave"], accent: .purple)
+                // 외출이 잡혀 있지 않은 사람이 많다. 값이 없으면 빈 타일 대신 아예 뺀다.
+                if let outing = props.metrics["nextOuting"] {
+                    metricTile(metric: outing, accent: .teal)
+                }
             }
             .padding(.horizontal, 2)
         }
-    }
-
-    private func tileContent(metric: WatchMetricValue?, accent: Color) -> some View {
-        tileBody(metric: metric, accent: accent, gauge: nil)
     }
 
     private func metricTile(

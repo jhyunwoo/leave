@@ -44,7 +44,7 @@ export function isMetricKey(value: unknown): value is MetricKey {
  * **다음 네이티브 빌드를 낼 때 `app.json`에 넣고 이 목록을 비운다.**
  * 비우지 않아도 위젯은 동작하지만, 그만큼 iOS 편집 메뉴가 계속 뒤처진다.
  */
-export const METRICS_PENDING_IOS_MENU: readonly MetricKey[] = ["nextOuting"];
+export const METRICS_PENDING_IOS_MENU: readonly MetricKey[] = [];
 
 /** 위젯 편집 메뉴와 설정 화면에 쓰는 이름. 문장이 아니라 항목 이름이다. */
 export const METRIC_TITLES: Record<MetricKey, string> = {

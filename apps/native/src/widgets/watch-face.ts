@@ -1,5 +1,5 @@
 /**
- * 애플워치 페이스 컴플리케이션이 읽는 값 — 전역·다음 휴가·다음 외출 D-day.
+ * 애플워치 페이스 컴플리케이션이 읽는 값 — 전역·다음 휴가·다음 외출 D-day와 복무율.
  *
  * 세는 규칙은 화면이 쓰는 `nextLeaveCountdowns`와 `serviceProgressAt` 그대로다.
  * 따로 두면 "내 휴가 카드는 D-3인데 페이스는 D-4"처럼 어긋나므로, 타임라인을 만든
@@ -47,6 +47,7 @@ export function buildWatchFaceData(
       enlistedAt && dischargeAt
         ? serviceProgressAt(enlistedAt, dischargeAt, kstMidnight(today))
         : null,
+    enlistedAt,
     dutyDays: source.dutyDaysToday ?? null,
     nextLeave: countdownToJson(countdowns.leave),
     nextOuting: countdownToJson(countdowns.outing),

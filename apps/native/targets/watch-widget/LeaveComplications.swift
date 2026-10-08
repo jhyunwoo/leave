@@ -10,7 +10,8 @@ struct LeaveFaceEntry: TimelineEntry {
 /// App Group에 저장된 최신 값을 읽어 현재 시각 엔트리 하나를 만든다.
 /// 워치 앱이 새 값을 쓸 때 WidgetCenter.reloadTimelines을 부르므로
 /// 장시간 정책만 두면 된다 — 자정이 지나면 D-day도 다시 세야 해서
-/// 다음 자정까지의 만료 엔트리도 같이 둔다.
+/// 다음 자정까지의 만료 엔트리도 같이 두고, 복무율 정수 퍼센트가 그 사이에
+/// 바뀌면 그 순간에도 엔트리를 둔다.
 struct LeaveFaceProvider: TimelineProvider {
     func placeholder(in _: Context) -> LeaveFaceEntry {
         LeaveFaceEntry(date: Date(), face: nil)
@@ -24,15 +25,22 @@ struct LeaveFaceProvider: TimelineProvider {
         in _: Context,
         completion: @escaping (Timeline<LeaveFaceEntry>) -> Void
     ) {
-        var entries = [LeaveFaceEntry(date: Date(), face: LeaveFaceData.load())]
+        let now = Date()
+        let face = LeaveFaceData.load()
+        var entries = [LeaveFaceEntry(date: now, face: face)]
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
         if let midnight = calendar.nextDate(
-            after: Date(), matching: DateComponents(hour: 0), matchingPolicy: .nextTime
+            after: now, matching: DateComponents(hour: 0), matchingPolicy: .nextTime
         ) {
-            entries.append(LeaveFaceEntry(date: midnight, face: LeaveFaceData.load()))
+            entries.append(LeaveFaceEntry(date: midnight, face: face))
         }
-        completion(Timeline(entries: entries, policy: .after(midnightSafe(in: calendar))))
+        let reload = midnightSafe(in: calendar)
+        if let change = face?.nextPercentChange(after: now), change < reload {
+            entries.append(LeaveFaceEntry(date: change, face: face))
+        }
+        entries.sort { $0.date < $1.date }
+        completion(Timeline(entries: entries, policy: .after(reload)))
     }
 
     private func midnightSafe(in calendar: Calendar) -> Date {
@@ -107,7 +115,7 @@ struct DischargeComplicationView: View {
             case .accessoryCircular:
                 ZStack {
                     AccessoryWidgetBackground()
-                    if let p = entry.face?.progress {
+                    if let p = entry.face?.liveProgress(at: entry.date) {
                         // 배터리 원형처럼 링 안에 값을 얹는다 — 링이 곧 레이아웃이라
                         // 텍스트가 링 아래로 밀려 잘리는 일이 없다.
                         Gauge(value: p) {
@@ -136,7 +144,7 @@ struct DischargeComplicationView: View {
                     .minimumScaleFactor(0.6)
                     .widgetLabel {
                         // 배터리 코너처럼 라벨 텍스트와 함께 베젤을 따라 도는 용량 아치.
-                        if let p = entry.face?.progress {
+                        if let p = entry.face?.liveProgress(at: entry.date) {
                             Gauge(value: p) {
                                 Text("전역")
                             }
@@ -153,7 +161,7 @@ struct DischargeComplicationView: View {
                     header: inlineText(["전역", d.date]),
                     value: "D-\(d.daysLeft(at: entry.date))",
                     accent: .orange,
-                    gauge: entry.face?.progress
+                    gauge: entry.face?.liveProgress(at: entry.date)
                 )
             }
         } else {
@@ -172,6 +180,71 @@ struct DischargeComplication: Widget {
         }
         .configurationDisplayName("전역")
         .description("전역까지 남은 날짜")
+        .supportedFamilies([
+            .accessoryCircular, .accessoryRectangular,
+            .accessoryCorner, .accessoryInline,
+        ])
+    }
+}
+
+// MARK: - 복무율
+
+/// 배터리 컴플리케이션과 같은 문법: 용량 링·막대가 곧 값이고 숫자는 정수 퍼센트.
+/// 내림이라 100%는 전역일 자정에야 찍힌다(아이폰 위젯의 Math.floor와 같다).
+struct ServiceProgressComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: LeaveFaceEntry
+
+    var body: some View {
+        if let p = entry.face?.liveProgress(at: entry.date) {
+            let percent = "\(Int(p * 100))%"
+            switch family {
+            case .accessoryCircular:
+                Gauge(value: p) {
+                    Text("복무율")
+                } currentValueLabel: {
+                    Text(percent)
+                        .font(.title3.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.45)
+                }
+                .gaugeStyle(.accessoryCircularCapacity)
+                .tint(.blue)
+            case .accessoryCorner:
+                Text(percent)
+                    .font(.headline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .widgetLabel {
+                        Gauge(value: p) {
+                            Text("복무율")
+                        }
+                        .gaugeStyle(.accessoryCircularCapacity)
+                        .tint(.blue)
+                    }
+            case .accessoryInline:
+                Text("복무율 \(percent)")
+            default:
+                countdownView(
+                    header: "복무율", value: percent, accent: .blue, gauge: p
+                )
+            }
+        } else {
+            Text("-")
+        }
+    }
+}
+
+struct ServiceProgressComplication: Widget {
+    let kind = "LeaveServiceProgress"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: LeaveFaceProvider()) { entry in
+            ServiceProgressComplicationView(entry: entry)
+                .containerBackground(for: .widget) {}
+        }
+        .configurationDisplayName("복무율")
+        .description("입대일부터 전역일까지 지나온 비율")
         .supportedFamilies([
             .accessoryCircular, .accessoryRectangular,
             .accessoryCorner, .accessoryInline,
@@ -295,6 +368,7 @@ struct NextOutingComplication: Widget {
 struct LeaveComplications: WidgetBundle {
     var body: some Widget {
         DischargeComplication()
+        ServiceProgressComplication()
         NextLeaveComplication()
         NextOutingComplication()
     }

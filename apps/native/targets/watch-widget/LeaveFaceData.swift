@@ -33,10 +33,41 @@ struct LeaveFaceData: Decodable {
 
     let state: String
     let discharge: Discharge?
+    /// 저장 시점(아이폰은 그날 자정) 기준 복무율. 엔트리에는 liveProgress(at:)를 쓴다.
     let progress: Double?
+    let enlistedAt: String?
     let dutyDays: Int?
     let nextLeave: Countdown?
     let nextOuting: Countdown?
+
+    /// 엔트리 시각의 복무율. shared serviceProgressAt과 같은 계산.
+    /// 입대일이 없으면(이 필드 이전의 아이폰 앱이 쓴 값, 전역 후) 저장값 그대로.
+    func liveProgress(at entryDate: Date) -> Double? {
+        guard let span = serviceSpan else { return progress }
+        let ratio = entryDate.timeIntervalSince(span.start) /
+            span.end.timeIntervalSince(span.start)
+        return min(max(ratio, 0), 1)
+    }
+
+    /// 정수 퍼센트가 다음으로 바뀌는 시각. 컴플리케이션이 그 순간에 엔트리를 둔다.
+    func nextPercentChange(after date: Date) -> Date? {
+        guard let span = serviceSpan, let ratio = liveProgress(at: date) else { return nil }
+        let next = (ratio * 100).rounded(.down) + 1
+        guard next <= 100 else { return nil }
+        // 경계 그 순간은 부동소수 오차로 아직 이전 정수일 수 있어 1초 뒤에 둔다.
+        return span.start
+            .addingTimeInterval(span.end.timeIntervalSince(span.start) * next / 100)
+            .addingTimeInterval(1)
+    }
+
+    private var serviceSpan: (start: Date, end: Date)? {
+        guard let enlistedAt, let dischargeAt = discharge?.date,
+              let start = Self.midnight(of: enlistedAt),
+              let end = Self.midnight(of: dischargeAt),
+              end > start
+        else { return nil }
+        return (start, end)
+    }
 
     static func load() -> LeaveFaceData? {
         guard let json = UserDefaults(suiteName: "group.app.leave.mobile")?
@@ -57,16 +88,18 @@ struct LeaveFaceData: Decodable {
         return String(format: "%04d-%02d-%02d", parts.year!, parts.month!, parts.day!)
     }
 
-    /// 두 ISODate 차이(일). b - a.
-    static func diffDays(_ a: String, _ b: String) -> Int {
+    /// ISODate가 가리키는 서울 자정.
+    static func midnight(of iso: String) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
-        func midnight(_ iso: String) -> Date? {
-            let p = iso.split(separator: "-").compactMap { Int($0) }
-            guard p.count == 3 else { return nil }
-            return calendar.date(from: DateComponents(year: p[0], month: p[1], day: p[2]))
-        }
-        guard let from = midnight(a), let to = midnight(b) else { return 0 }
+        let p = iso.split(separator: "-").compactMap { Int($0) }
+        guard p.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: p[0], month: p[1], day: p[2]))
+    }
+
+    /// 두 ISODate 차이(일). b - a.
+    static func diffDays(_ a: String, _ b: String) -> Int {
+        guard let from = midnight(of: a), let to = midnight(of: b) else { return 0 }
         return Int((to.timeIntervalSince(from) / 86400).rounded())
     }
 }

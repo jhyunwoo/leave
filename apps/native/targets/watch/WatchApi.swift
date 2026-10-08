@@ -97,8 +97,11 @@ enum WatchApi {
             caption: "남은 일과일", compact: "일과 \(dutyDays.dutyDays)일",
             gauge: nil
         )
-        if let next = nextLeave(leaves.leaves, today: today) {
+        if let next = nextLeave(leaves.leaves, today: today, outing: false) {
             metrics["nextLeave"] = next
+        }
+        if let next = nextLeave(leaves.leaves, today: today, outing: true) {
+            metrics["nextOuting"] = next
         }
 
         let service: WatchServiceDates?
@@ -139,6 +142,7 @@ enum WatchApi {
             state: "ready",
             discharge: discharge,
             progress: progress,
+            enlistedAt: me.user.enlistedAt,
             dutyDays: dutyDays.dutyDays,
             nextLeave: nextCountdown(leaves, today: today, outingsOnly: false),
             nextOuting: nextCountdown(leaves, today: today, outingsOnly: true)
@@ -177,11 +181,18 @@ enum WatchApi {
         )
     }
 
-    /// client의 nextLeaveCountdown(휴가만)과 같은 규칙 — 외출 제외, 진행 중이면 복귀까지.
-    private static func nextLeave(_ leaves: [WatchLeave], today: String) -> WatchMetricValue? {
+    /// client의 nextLeaveCountdowns와 같은 규칙: 휴가(외출 제외) 또는 외출만,
+    /// 진행 중이면 복귀까지.
+    private static func nextLeave(
+        _ leaves: [WatchLeave], today: String, outing: Bool
+    ) -> WatchMetricValue? {
         let countedStatuses: Set<String> = ["shared", "requested", "approved", "completed"]
         let counted = leaves.filter { countedStatuses.contains($0.status) }
-            .filter { !(($0.segments.count > 0) && $0.segments.allSatisfy { $0.category == "outing" }) }
+            .filter { leave in
+                let allOuting = !leave.segments.isEmpty &&
+                    leave.segments.allSatisfy { $0.category == "outing" }
+                return outing ? allOuting : !allOuting
+            }
         let upcoming = counted
             .filter { $0.endDate >= today }
             .sorted { $0.startDate == $1.startDate ? $0.endDate < $1.endDate : $0.startDate < $1.startDate }
@@ -195,19 +206,20 @@ enum WatchApi {
             }
         guard let leave = upcoming.first else { return nil }
 
+        let noun = outing ? "외출" : "휴가"
         let onLeave = leave.startDate <= today
         let days = max(SeoulDate.diffDays(today, onLeave ? leave.endDate : leave.startDate), 0)
         let range = SeoulDate.rangeTiny(leave.startDate, leave.endDate)
         if onLeave {
             return WatchMetricValue(
-                value: "복귀 \(days == 0 ? "오늘" : "D-\(days)")", label: "휴가 중",
+                value: "복귀 \(days == 0 ? "오늘" : "D-\(days)")", label: "\(noun) 중",
                 caption: "\(leave.title) · \(range)", compact: "복귀 \(days == 0 ? "오늘" : "D-\(days)")",
                 gauge: nil
             )
         }
         return WatchMetricValue(
-            value: "D-\(days)", label: "다음 휴가",
-            caption: "\(leave.title) · \(range)", compact: "휴가 D-\(days)", gauge: nil
+            value: "D-\(days)", label: "다음 \(noun)",
+            caption: "\(leave.title) · \(range)", compact: "\(noun) D-\(days)", gauge: nil
         )
     }
 }

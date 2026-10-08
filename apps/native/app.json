@@ -257,6 +257,10 @@
                         "value": "nextLeave"
                       },
                       {
+                        "name": "다음 외출 D-Day",
+                        "value": "nextOuting"
+                      },
+                      {
                         "name": "다음 휴가일 출타 여유",
                         "value": "headroom"
                       },
