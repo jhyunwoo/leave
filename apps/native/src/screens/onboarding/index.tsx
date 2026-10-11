@@ -9,6 +9,9 @@
  * 만큼 지루해지지 않는다. 마지막 두 단계(`howto`·`done`)는 묻지 않고 알려주는 화면이다.
  * 사용법 단계에서만 히어로 자리에 기능별 모션 그래픽(`TourStage`)이 대신 선다.
  *
+ * 앱에서는 `done` 앞에 알림 단계(`notifications`)를 하나 더 끼운다. 웹은 푸시를
+ * 받지 않으므로 공유 목록에는 넣지 않고 여기서만 붙인다.
+ *
  * 서버 쓰기는 세 곳뿐이다.
  *  - 계급 단계의 "다음" : 프로필 다섯 필드를 한 벌로 PUT
  *  - 정기외박 단계     : 주기 설정 PUT (건너뛰면 enabled:false)
@@ -26,7 +29,6 @@ import {
   isValidISODate,
   onboardingProfileSchema,
   onboardingResumeStep,
-  onboardingStepIndex,
   onboardingSteps,
   scheduledRank,
   standardDischargeDate,
@@ -56,6 +58,7 @@ import { makeStyles, radius, spacing } from "@/theme";
 import { DoneStep } from "./done-step";
 import { GroupStep } from "./group-step";
 import { HowtoStep } from "./howto-step";
+import { NotificationsStep } from "./notifications-step";
 import { OvernightStep } from "./overnight-step";
 import {
   BranchStep,
@@ -68,6 +71,17 @@ import { ServiceHero } from "./service-hero";
 import { TourStage } from "./tour-stage";
 import { UsernameStep } from "./username-step";
 
+/** 공유 단계 + 앱 전용 알림 단계. */
+type Step = OnboardingStepId | "notifications";
+
+/** 웹 타깃은 푸시 토큰을 받을 수 없어 알림 단계를 건너뛴다. */
+function nativeOnboardingSteps(): Step[] {
+  const steps: Step[] = onboardingSteps();
+  if (process.env.EXPO_OS !== "web")
+    steps.splice(steps.indexOf("done"), 0, "notifications");
+  return steps;
+}
+
 export function OnboardingScreen() {
   const query = useOnboardingStatus();
   if (!query.data) return null;
@@ -79,9 +93,7 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
   const today = useMemo(() => todayInSeoul(), []);
   const profile = status.profile;
 
-  const [step, setStep] = useState<OnboardingStepId>(() =>
-    onboardingResumeStep(status),
-  );
+  const [step, setStep] = useState<Step>(() => onboardingResumeStep(status));
   const [name, setName] = useState(profile?.name ?? "");
   const [branch, setBranch] = useState<Branch>(profile?.branch ?? "army");
   const [enlistedAt, setEnlistedAt] = useState(profile?.enlistedAt ?? "");
@@ -126,10 +138,10 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
   const saveRegular = useSaveOnboardingRegularOvernight();
   const complete = useCompleteOnboarding();
 
-  const order = onboardingSteps();
-  const index = onboardingStepIndex(step);
+  const order = nativeOnboardingSteps();
+  const index = order.indexOf(step);
 
-  const go = (next: OnboardingStepId) => {
+  const go = (next: Step) => {
     setError(null);
     setStep(next);
   };
@@ -269,7 +281,8 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
           />
         ) : (
           <ServiceHero
-            step={step}
+            // 알림 단계는 히어로 레이어 규칙에 없다 — 완성된 그림(`done`)을 보여준다.
+            step={step === "notifications" ? "done" : step}
             branch={branch}
             name={name}
             enlistedAt={enlistedAt}
@@ -366,6 +379,8 @@ function OnboardingContent({ status }: { status: OnboardingStatus }) {
               onIndexChange={setTourIndex}
               onNext={advance}
             />
+          ) : step === "notifications" ? (
+            <NotificationsStep onNext={advance} />
           ) : step === "group" ? (
             <GroupStep
               inGroup={inGroup}

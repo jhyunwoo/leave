@@ -21,14 +21,15 @@ import Animated, {
 import { Button } from "@/components/button";
 import { makeStyles, spacing } from "@/theme";
 
-export function StepShell(props: {
-  step: OnboardingStepId;
-  title?: string;
-  lead?: string;
-  children: ReactNode;
-}) {
+export function StepShell(
+  props: (
+    | { step: OnboardingStepId; title?: string; lead?: string }
+    // 공유 단계 목록에 없는 앱 전용 단계(알림)는 문구를 직접 준다.
+    | { step?: undefined; title: string; lead: string }
+  ) & { children: ReactNode },
+) {
   const styles = useStyles();
-  const copy = ONBOARDING_COPY[props.step];
+  const copy = props.step ? ONBOARDING_COPY[props.step] : undefined;
   return (
     <Animated.View
       // key가 단계마다 바뀌므로(부모가 지정) 새 질문이 오른쪽에서 밀려 들어온다.
@@ -41,9 +42,9 @@ export function StepShell(props: {
         accessibilityRole="header"
         accessibilityLiveRegion="polite"
       >
-        {props.title ?? copy.title}
+        {props.title ?? copy?.title}
       </Text>
-      <Text style={styles.lead}>{props.lead ?? copy.lead}</Text>
+      <Text style={styles.lead}>{props.lead ?? copy?.lead}</Text>
       <View style={styles.body}>{props.children}</View>
     </Animated.View>
   );

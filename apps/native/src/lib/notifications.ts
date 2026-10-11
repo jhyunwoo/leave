@@ -22,28 +22,49 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * 푸시 권한 요청 + Expo 푸시 토큰 발급.
+ * 푸시 권한이 있는지 보고, `ask`면 없을 때 묻는다. 웹·시뮬레이터는 false.
+ * 안드로이드 13+는 채널이 있어야 권한 창이 뜨므로 채널부터 만든다.
+ */
+async function ensurePushPermission(ask: boolean): Promise<boolean> {
+  if (process.env.EXPO_OS === "web" || !Device.isDevice) return false;
+
+  if (process.env.EXPO_OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "기본 알림",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#9fe870",
+    });
+  }
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === "granted") return true;
+  if (!ask) return false;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === "granted";
+}
+
+/**
+ * 권한만 묻는다(온보딩용). 토큰 등록은 서버가 온보딩 완료 전에는 428로 거절하므로
+ * 온보딩이 끝난 뒤 `usePushTokenSync`가 한다.
+ */
+export async function requestPushPermission(): Promise<boolean> {
+  try {
+    return await ensurePushPermission(true);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Expo 푸시 토큰 발급. `askPermission`이 false면 권한 창을 띄우지 않고, 권한이 없으면 null.
  * 시뮬레이터/권한 거부/Expo Go 제약 등 실패 상황에서는 null을 반환하고 앱 흐름을 막지 않는다.
  */
-export async function getPushToken(): Promise<string | null> {
+export async function getPushToken({
+  askPermission = true,
+}: { askPermission?: boolean } = {}): Promise<string | null> {
   try {
-    if (process.env.EXPO_OS === "web" || !Device.isDevice) return null;
-
-    if (process.env.EXPO_OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "기본 알림",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#9fe870",
-      });
-    }
-
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    let status = existing;
-    if (existing !== "granted") {
-      ({ status } = await Notifications.requestPermissionsAsync());
-    }
-    if (status !== "granted") return null;
+    if (!(await ensurePushPermission(askPermission))) return null;
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??

@@ -51,6 +51,7 @@ import {
 import { resolveStartupGate } from "@/lib/startup-gate";
 import { useMilestonePushNavigation } from "@/lib/milestone-navigation";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
+import { usePushTokenSync } from "@/lib/use-push-token-sync";
 import type { WidgetState } from "@/widgets/payload";
 import { WidgetSync } from "@/widgets/widget-sync";
 import { tokenAtom } from "@/state/auth";
@@ -198,6 +199,8 @@ function RootNavigator() {
   const emailVerified = onboarding.data?.emailVerified !== false;
   useNotificationLogging(isAuthed && emailVerified);
   const onboardingComplete = onboarding.data?.completed === true;
+  // 서버가 온보딩 완료 전 토큰 등록을 428로 막으므로 그 뒤부터 켠다.
+  usePushTokenSync(isAuthed && emailVerified && onboardingComplete);
   // 0023 이전에 가입해 아직 공개 이름이 없는 계정은 1회성 설정 화면을 지난다.
   const hasUsername = Boolean(onboarding.data?.username);
   const canBrowse =
