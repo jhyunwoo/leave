@@ -14,6 +14,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { api, ApiError, type AdminAccount } from "./api/client";
 import { AppShell } from "./components/AppShell";
 import { LoadingScreen, ToastProvider } from "./components/ui";
+import { BroadcastPage } from "./pages/BroadcastPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { EntityPage } from "./pages/EntityPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -70,6 +71,7 @@ function AuthenticatedApp({
               path="notifications"
               element={<EntityPage resource="notifications" />}
             />
+            <Route path="broadcast" element={<BroadcastPage admin={admin} />} />
             <Route
               path="access-logs"
               element={<EntityPage resource="access-logs" />}

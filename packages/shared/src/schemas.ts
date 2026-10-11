@@ -766,6 +766,8 @@ export const notificationPrefsSchema = z.object({
   friendDischargeCountdown: z.boolean().optional(),
   /** 친구의 진급. */
   friendPromotion: z.boolean().optional(),
+  /** 관리자가 보내는 운영 공지(전체 발송). */
+  announcement: z.boolean().optional(),
 });
 
 /** 친구에게 보여줄 항목. 모든 친구에게 같게 적용되고, 보낸 항목만 바꾼다. */

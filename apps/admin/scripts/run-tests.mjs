@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { csvCell } from "../worker/csv.ts";
 
@@ -205,6 +205,70 @@ async function run() {
     },
   );
   assert.equal(notificationRemoved.response.status, 200);
+
+  // 전체 공지: 운영 공지를 끈 사용자는 빠지고 나머지는 인앱 알림을 받는다.
+  // 수신 설정은 사용자 앱에서만 바꿀 수 있어 로컬 D1에 직접 넣는다.
+  const optedOut = await request("/users", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `admin-e2e-optout-${unique}@leave.local`,
+      password: "UserTemporary!2026",
+      name: "공지 거부 사용자",
+      branch: "army",
+      enlistedAt: "2026-01-01",
+      dischargeAt: "2027-06-30",
+      signupRank: "private",
+      unitId: null,
+      dataConsent: true,
+    }),
+  });
+  assert.equal(optedOut.response.status, 201);
+  const optedOutId = optedOut.body.item.id;
+  const prefInsert = spawnSync(
+    "pnpm",
+    [
+      "exec",
+      "wrangler",
+      "d1",
+      "execute",
+      "leave-db",
+      "--local",
+      "--command",
+      `INSERT INTO user_notification_prefs (user_id, announcement, updated_at) VALUES ('${optedOutId}', 0, '2026-01-01T00:00:00.000Z');`,
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(prefInsert.status, 0, prefInsert.stderr);
+
+  const preview = await request("/notifications/broadcast");
+  assert.equal(preview.response.status, 200);
+  assert.equal(typeof preview.body.recipients, "number");
+  assert.equal(typeof preview.body.pushTargets, "number");
+
+  const emptyBroadcast = await request("/notifications/broadcast", {
+    method: "POST",
+    body: JSON.stringify({ title: " ", body: "내용" }),
+  });
+  assert.equal(emptyBroadcast.response.status, 400);
+
+  const broadcastTitle = `전체 공지 테스트 ${unique}`;
+  const broadcast = await request("/notifications/broadcast", {
+    method: "POST",
+    body: JSON.stringify({ title: broadcastTitle, body: "통합 테스트 공지" }),
+  });
+  assert.equal(broadcast.response.status, 201);
+  assert.equal(broadcast.body.recipients, preview.body.recipients);
+
+  const titled = (items) =>
+    items.filter((item) => item.title === broadcastTitle).length;
+  const received = await request(`/notifications?userId=${userId}`);
+  assert.equal(titled(received.body.items), 1);
+  const skipped = await request(`/notifications?userId=${optedOutId}`);
+  assert.equal(titled(skipped.body.items), 0);
+  const optedOutRemoved = await request(`/users/${optedOutId}`, {
+    method: "DELETE",
+  });
+  assert.equal(optedOutRemoved.response.status, 200);
 
   for (const resource of [
     "/leaves",

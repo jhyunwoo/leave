@@ -624,6 +624,10 @@ export const userNotificationPrefs = sqliteTable("user_notification_prefs", {
   friendPromotion: integer("friend_promotion", { mode: "boolean" })
     .notNull()
     .default(true),
+  // 관리자 전체 발송(운영 공지)을 받을지(0038).
+  announcement: integer("announcement", { mode: "boolean" })
+    .notNull()
+    .default(true),
   updatedAt: text("updated_at").notNull(),
 });
 

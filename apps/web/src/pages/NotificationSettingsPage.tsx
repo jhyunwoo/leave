@@ -133,6 +133,28 @@ export function NotificationSettingsPage() {
         />
       </section>
 
+      <section
+        className="card"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-md)",
+        }}
+      >
+        <h2 className="display-xs">운영 공지</h2>
+        <p className="body-sm text-body">
+          서비스 점검, 새 기능처럼 리브가 모든 사용자에게 보내는 안내예요.
+        </p>
+        <PrefToggle
+          checked={prefs.data?.preferences.announcement ?? true}
+          onChange={(announcement) =>
+            void updatePrefs.mutateAsync({ announcement })
+          }
+          testId="notification-pref-announcement"
+          label="운영 공지 받기"
+        />
+      </section>
+
       <p className="caption text-mute">
         기기 잠금화면 알림은 모바일 앱에서 직접 켤 수 있어요.
       </p>

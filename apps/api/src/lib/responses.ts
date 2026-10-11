@@ -367,6 +367,8 @@ export const notificationPrefsResponseSchema = z
     friendDischargeCountdown: z.boolean(),
     // 친구의 진급
     friendPromotion: z.boolean(),
+    // 관리자가 보내는 운영 공지(전체 발송)
+    announcement: z.boolean(),
   })
   .openapi("NotificationPreferences");
 

@@ -16,7 +16,11 @@ export {
   segmentInsertStatements,
   segmentsForLeaves,
 } from "./lib/leave-balances";
-export { buildNotificationPushMessage, sendExpoPush } from "./lib/push";
+export {
+  buildNotificationPushMessage,
+  sendExpoPush,
+  sendExpoPushMessages,
+} from "./lib/push";
 export type { PushMessage, PushSendResult } from "./lib/push";
 export {
   ADMIN_PASSKEY_ORIGINS,

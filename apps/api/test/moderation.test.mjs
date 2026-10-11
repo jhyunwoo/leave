@@ -194,6 +194,7 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     promotion: true,
     friendDischargeCountdown: true,
     friendPromotion: true,
+    announcement: true,
   });
 
   // 초과 알림만 끄고 나머지는 그대로 둔다.
@@ -212,7 +213,17 @@ test("알림 종류별 설정을 저장하고 초과 알림을 끄면 알림이 
     promotion: true,
     friendDischargeCountdown: true,
     friendPromotion: true,
+    announcement: true,
   });
+
+  // 운영 공지는 다른 종류와 따로 끈다(관리자 전체 발송의 수신 거부).
+  const announcementOff = await req("PATCH", "/notifications/preferences", {
+    token: owner.token,
+    body: { announcement: false },
+  });
+  assert.equal(announcementOff.status, 200);
+  assert.equal(announcementOff.data.preferences.announcement, false);
+  assert.equal(announcementOff.data.preferences.overage, false);
 
   await req("POST", "/leaves", {
     token: owner.token,

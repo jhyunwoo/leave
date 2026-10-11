@@ -144,6 +144,7 @@ const DEFAULT_PREFS = {
   promotion: true,
   friendDischargeCountdown: true,
   friendPromotion: true,
+  announcement: true,
 };
 
 function parseDates(row: Pick<NotificationRow, "datesJson">): string[] {
@@ -298,6 +299,7 @@ export const notificationRoutes = app
               promotion: row.promotion,
               friendDischargeCountdown: row.friendDischargeCountdown,
               friendPromotion: row.friendPromotion,
+              announcement: row.announcement,
             }
           : DEFAULT_PREFS,
       },
@@ -339,6 +341,10 @@ export const notificationRoutes = app
         input.friendPromotion ??
         existing?.friendPromotion ??
         DEFAULT_PREFS.friendPromotion,
+      announcement:
+        input.announcement ??
+        existing?.announcement ??
+        DEFAULT_PREFS.announcement,
     };
     await db
       .insert(userNotificationPrefs)

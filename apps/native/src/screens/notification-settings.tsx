@@ -176,6 +176,23 @@ export function NotificationSettingsScreen() {
             testID="notification-pref-friend-promotion"
           />
         </ContentPanel>
+
+        <ContentPanel style={styles.preferenceCard}>
+          <Text selectable style={styles.preferenceTitle}>
+            운영 공지
+          </Text>
+          <Text selectable style={styles.preferenceBody}>
+            서비스 점검, 새 기능처럼 리브가 모든 사용자에게 보내는 안내예요.
+          </Text>
+          <NativeCheckbox
+            value={prefs.data?.preferences.announcement ?? true}
+            onValueChange={(announcement) =>
+              void updatePrefs.mutateAsync({ announcement })
+            }
+            label="운영 공지 받기"
+            testID="notification-pref-announcement"
+          />
+        </ContentPanel>
       </ResponsiveGrid>
     </ScrollView>
   );
