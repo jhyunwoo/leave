@@ -47,38 +47,38 @@
 
 **릴리스 1**
 
-| 파일 | 책임 |
-|---|---|
-| `packages/shared/src/ics.ts` (생성) | `FeedItem[]` → iCalendar 문자열. 이스케이프·접기 |
-| `packages/shared/src/calendar-feed.ts` (생성) | `FeedItem` 타입, DB 행 → `FeedItem[]`, 조회 시작일, 구독 링크(webcal·구글) |
-| `packages/shared/src/index.ts` (수정) | 위 두 모듈 내보내기 |
-| `packages/shared/test/ics.test.ts`, `calendar-feed.test.ts` (생성) | 순수 함수 테스트 |
-| `apps/api/src/db/schema.ts` (수정) | `calendarFeeds` 표 |
-| `apps/api/migrations/0039_calendar_feeds.sql` (생성) | 표 생성 |
-| `apps/api/src/lib/delete-account.ts` (수정) | 지워지는 목록에 `calendar_feeds` |
-| `apps/api/src/lib/calendar-feed.ts` (생성) | 사용자 한 명의 피드 항목 조회(D1 batch) |
-| `apps/api/src/routes/calendar-feed.contract.ts` (생성) | 인증 라우트 OpenAPI 명세 |
-| `apps/api/src/routes/calendar-feed.ts` (생성) | 링크 조회·발급·끄기, JSON 항목 |
-| `apps/api/src/routes/calendar-public.ts` (생성) | `GET /calendar/:file` 무인증 피드 |
-| `apps/api/src/middleware/access-log.ts` (수정) | 피드 토큰 가리기 |
-| `apps/api/src/index.ts` (수정) | 두 라우터 마운트 |
-| `apps/api/test/calendar-feed.test.mjs` (생성) | 통합 테스트 |
-| `packages/client/src/query-keys.ts`, `hooks/calendar-feed.ts`, `index.ts` (수정·생성) | 훅 |
-| `apps/web/src/components/CalendarFeedCard.tsx` (생성), `pages/ProfilePage.tsx` (수정) | 웹 화면 |
-| `apps/native/src/screens/calendar-export.tsx`, `app/calendar-export.tsx` (생성), `app/_layout.tsx`, `screens/profile.tsx` (수정) | 앱 화면 |
+| 파일                                                                                                                             | 책임                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `packages/shared/src/ics.ts` (생성)                                                                                              | `FeedItem[]` → iCalendar 문자열. 이스케이프·접기                           |
+| `packages/shared/src/calendar-feed.ts` (생성)                                                                                    | `FeedItem` 타입, DB 행 → `FeedItem[]`, 조회 시작일, 구독 링크(webcal·구글) |
+| `packages/shared/src/index.ts` (수정)                                                                                            | 위 두 모듈 내보내기                                                        |
+| `packages/shared/test/ics.test.ts`, `calendar-feed.test.ts` (생성)                                                               | 순수 함수 테스트                                                           |
+| `apps/api/src/db/schema.ts` (수정)                                                                                               | `calendarFeeds` 표                                                         |
+| `apps/api/migrations/0039_calendar_feeds.sql` (생성)                                                                             | 표 생성                                                                    |
+| `apps/api/src/lib/delete-account.ts` (수정)                                                                                      | 지워지는 목록에 `calendar_feeds`                                           |
+| `apps/api/src/lib/calendar-feed.ts` (생성)                                                                                       | 사용자 한 명의 피드 항목 조회(D1 batch)                                    |
+| `apps/api/src/routes/calendar-feed.contract.ts` (생성)                                                                           | 인증 라우트 OpenAPI 명세                                                   |
+| `apps/api/src/routes/calendar-feed.ts` (생성)                                                                                    | 링크 조회·발급·끄기, JSON 항목                                             |
+| `apps/api/src/routes/calendar-public.ts` (생성)                                                                                  | `GET /calendar/:file` 무인증 피드                                          |
+| `apps/api/src/middleware/access-log.ts` (수정)                                                                                   | 피드 토큰 가리기                                                           |
+| `apps/api/src/index.ts` (수정)                                                                                                   | 두 라우터 마운트                                                           |
+| `apps/api/test/calendar-feed.test.mjs` (생성)                                                                                    | 통합 테스트                                                                |
+| `packages/client/src/query-keys.ts`, `hooks/calendar-feed.ts`, `index.ts` (수정·생성)                                            | 훅                                                                         |
+| `apps/web/src/components/CalendarFeedCard.tsx` (생성), `pages/ProfilePage.tsx` (수정)                                            | 웹 화면                                                                    |
+| `apps/native/src/screens/calendar-export.tsx`, `app/calendar-export.tsx` (생성), `app/_layout.tsx`, `screens/profile.tsx` (수정) | 앱 화면                                                                    |
 
 **릴리스 2**
 
-| 파일 | 책임 |
-|---|---|
-| `apps/native/app.json`, `package.json` (수정) | `expo-calendar` 플러그인·권한 |
-| `apps/native/src/device-calendar-export/convert.ts` (생성) | `FeedItem` → 기기 일정 입력, 내용 서명 (순수) |
-| `apps/native/src/device-calendar-export/preferences.ts`, `storage.ts`, `storage.native.ts`, `use-export-preferences.ts` (생성) | 켜짐·캘린더 ID·마지막 서명 (기기 로컬) |
-| `apps/native/src/device-calendar-export/bridge.ts`, `bridge.android.ts` (생성) | `expo-calendar` 감싸개 (안드로이드 외 no-op) |
-| `apps/native/src/device-calendar-export/calendar-export-sync.tsx`, `.android.tsx` (생성) | 화면 없는 동기화 컴포넌트 |
-| `packages/client/src/hooks/invalidate.ts`, `personal-events.ts`, `unit-events.ts` (수정) | 항목 쿼리 무효화 |
-| `apps/native/src/app/_layout.tsx`, `api/provider.tsx` (수정) | 동기화 마운트, 로그아웃 정리 |
-| `apps/native/test/device-calendar-export.test.ts` (생성) | 순수 함수 테스트 |
+| 파일                                                                                                                           | 책임                                          |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `apps/native/app.json`, `package.json` (수정)                                                                                  | `expo-calendar` 플러그인·권한                 |
+| `apps/native/src/device-calendar-export/convert.ts` (생성)                                                                     | `FeedItem` → 기기 일정 입력, 내용 서명 (순수) |
+| `apps/native/src/device-calendar-export/preferences.ts`, `storage.ts`, `storage.native.ts`, `use-export-preferences.ts` (생성) | 켜짐·캘린더 ID·마지막 서명 (기기 로컬)        |
+| `apps/native/src/device-calendar-export/bridge.ts`, `bridge.android.ts` (생성)                                                 | `expo-calendar` 감싸개 (안드로이드 외 no-op)  |
+| `apps/native/src/device-calendar-export/calendar-export-sync.tsx`, `.android.tsx` (생성)                                       | 화면 없는 동기화 컴포넌트                     |
+| `packages/client/src/hooks/invalidate.ts`, `personal-events.ts`, `unit-events.ts` (수정)                                       | 항목 쿼리 무효화                              |
+| `apps/native/src/app/_layout.tsx`, `api/provider.tsx` (수정)                                                                   | 동기화 마운트, 로그아웃 정리                  |
+| `apps/native/test/device-calendar-export.test.ts` (생성)                                                                       | 순수 함수 테스트                              |
 
 ---
 
@@ -95,10 +95,12 @@ git switch -c feat/calendar-feed
 ## Task 1: ICS 렌더러 (`packages/shared/src/ics.ts`)
 
 **Files:**
+
 - Create: `packages/shared/src/ics.ts`
 - Create: `packages/shared/test/ics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `FeedItem` 타입 (Task 2에서 정의 — 이 Task에서 `calendar-feed.ts`에 타입만 먼저 만든다)
 - Produces: `escapeIcsText(value: string): string`, `foldIcsLine(line: string): string`, `renderIcs(items: readonly FeedItem[], options: { calendarName: string; now: Date }): string`
 
@@ -214,16 +216,26 @@ describe("renderIcs", () => {
   });
 
   it("달·해 경계를 넘는 종일 일정도 다음 날로 끝난다", () => {
-    const ics = renderIcs([item({ startDate: "2026-12-31", endDate: "2026-12-31" })], {
-      calendarName: "리브",
-      now: NOW,
-    });
+    const ics = renderIcs(
+      [item({ startDate: "2026-12-31", endDate: "2026-12-31" })],
+      {
+        calendarName: "리브",
+        now: NOW,
+      },
+    );
     expect(ics).toContain("DTEND;VALUE=DATE:20270101\r\n");
   });
 
   it("시각 일정은 서울 시간대로 적는다", () => {
     const ics = renderIcs(
-      [item({ startDate: "2026-10-01", endDate: "2026-10-02", startTime: "09:30", endTime: "18:00" })],
+      [
+        item({
+          startDate: "2026-10-01",
+          endDate: "2026-10-02",
+          startTime: "09:30",
+          endTime: "18:00",
+        }),
+      ],
       { calendarName: "리브", now: NOW },
     );
     expect(ics).toContain("DTSTART;TZID=Asia/Seoul:20261001T093000\r\n");
@@ -232,7 +244,13 @@ describe("renderIcs", () => {
 
   it("끝 시간이 없는 시각 일정은 DTEND를 두지 않는다", () => {
     const ics = renderIcs(
-      [item({ startDate: "2026-10-01", endDate: "2026-10-01", startTime: "09:30" })],
+      [
+        item({
+          startDate: "2026-10-01",
+          endDate: "2026-10-01",
+          startTime: "09:30",
+        }),
+      ],
       { calendarName: "리브", now: NOW },
     );
     expect(ics).toContain("DTSTART;TZID=Asia/Seoul:20261001T093000\r\n");
@@ -240,14 +258,19 @@ describe("renderIcs", () => {
   });
 
   it("UID·DTSTAMP·SUMMARY·DESCRIPTION을 싣는다", () => {
-    const ics = renderIcs([item({ description: "사유: 가족, 행사\n복귀 21:00" })], {
-      calendarName: "리브",
-      now: NOW,
-    });
+    const ics = renderIcs(
+      [item({ description: "사유: 가족, 행사\n복귀 21:00" })],
+      {
+        calendarName: "리브",
+        now: NOW,
+      },
+    );
     expect(ics).toContain("UID:leave-1@leave.moveto.kr\r\n");
     expect(ics).toContain("DTSTAMP:20261012T030405Z\r\n");
     expect(ics).toContain("SUMMARY:[휴가] 여름 휴가\r\n");
-    expect(unfold(ics)).toContain("DESCRIPTION:사유: 가족\\, 행사\\n복귀 21:00\r\n");
+    expect(unfold(ics)).toContain(
+      "DESCRIPTION:사유: 가족\\, 행사\\n복귀 21:00\r\n",
+    );
   });
 
   it("설명이 없으면 DESCRIPTION을 두지 않는다", () => {
@@ -412,11 +435,13 @@ git commit -m "feat(shared): 외부 캘린더 구독 피드용 iCalendar 렌더�
 ## Task 2: 피드 항목 조립과 구독 링크 (`packages/shared/src/calendar-feed.ts`)
 
 **Files:**
+
 - Modify: `packages/shared/src/calendar-feed.ts` (Task 1에서 만든 타입 아래에 추가)
 - Modify: `packages/shared/src/index.ts`
 - Create: `packages/shared/test/calendar-feed.test.ts`
 
 **Interfaces:**
+
 - Consumes: `FeedItem` (Task 1), `isOutingSegments`, `segmentBalanceKey`, `balanceLabel`, `LEAVE_STATUS_LABELS` (`./leave`), `addMonthsClamped` (`./dates`)
 - Produces:
   - `FEED_EXCLUDED_LEAVE_STATUSES: readonly LeaveStatus[]` = `["rejected", "cancelled"]`
@@ -449,22 +474,43 @@ function leave(overrides: Partial<FeedLeaveInput> = {}): FeedLeaveInput {
     reason: null,
     status: "approved",
     segments: [
-      { category: "annual", overnightKind: null, outingKind: null, startDate: "2026-08-02", endDate: "2026-08-05" },
-      { category: "overnight", overnightKind: "regular", outingKind: null, startDate: "2026-08-06", endDate: "2026-08-09" },
+      {
+        category: "annual",
+        overnightKind: null,
+        outingKind: null,
+        startDate: "2026-08-02",
+        endDate: "2026-08-05",
+      },
+      {
+        category: "overnight",
+        overnightKind: "regular",
+        outingKind: null,
+        startDate: "2026-08-06",
+        endDate: "2026-08-09",
+      },
     ],
     ...overrides,
   };
 }
 
-const empty = { leaves: [], personalEvents: [], unitEvents: [], unitName: null };
+const empty = {
+  leaves: [],
+  personalEvents: [],
+  unitEvents: [],
+  unitName: null,
+};
 
 describe("buildFeedItems — 휴가", () => {
   it("휴가 한 건을 일정 하나로, 구간·상태·복귀·사유를 설명에 담는다", () => {
-    const [item] = buildFeedItems({ ...empty, leaves: [leave({ reason: "가족 행사" })] });
+    const [item] = buildFeedItems({
+      ...empty,
+      leaves: [leave({ reason: "가족 행사" })],
+    });
     expect(item).toEqual({
       uid: "leave-l1",
       title: "[휴가] 여름 휴가",
-      description: "8/2~8/5 연가 · 8/6~8/9 정기외박\n상태: 확정\n복귀 21:00\n사유: 가족 행사",
+      description:
+        "8/2~8/5 연가 · 8/6~8/9 정기외박\n상태: 확정\n복귀 21:00\n사유: 가족 행사",
       startDate: "2026-08-02",
       endDate: "2026-08-09",
       startTime: null,
@@ -474,14 +520,33 @@ describe("buildFeedItems — 휴가", () => {
 
   it("구간이 전부 외출이면 [외출], 전부 외박이면 [외박]", () => {
     const outing = leave({
-      segments: [{ category: "outing", overnightKind: null, outingKind: "weekend", startDate: "2026-08-02", endDate: "2026-08-02" }],
+      segments: [
+        {
+          category: "outing",
+          overnightKind: null,
+          outingKind: "weekend",
+          startDate: "2026-08-02",
+          endDate: "2026-08-02",
+        },
+      ],
     });
     const overnight = leave({
       id: "l2",
-      segments: [{ category: "overnight", overnightKind: "other", outingKind: null, startDate: "2026-08-02", endDate: "2026-08-03" }],
+      segments: [
+        {
+          category: "overnight",
+          overnightKind: "other",
+          outingKind: null,
+          startDate: "2026-08-02",
+          endDate: "2026-08-03",
+        },
+      ],
     });
     const items = buildFeedItems({ ...empty, leaves: [outing, overnight] });
-    expect(items.map((i) => i.title)).toEqual(["[외출] 여름 휴가", "[외박] 여름 휴가"]);
+    expect(items.map((i) => i.title)).toEqual([
+      "[외출] 여름 휴가",
+      "[외박] 여름 휴가",
+    ]);
     expect(items[0]!.description).toContain("8/2 주말 외출");
   });
 
@@ -500,7 +565,14 @@ describe("buildFeedItems — 휴가", () => {
 });
 
 describe("buildFeedItems — 개인·부대 일정", () => {
-  const base = { id: "e1", title: "면접", startDate: "2026-10-01", endDate: "2026-10-01", startTime: null, endTime: null };
+  const base = {
+    id: "e1",
+    title: "면접",
+    startDate: "2026-10-01",
+    endDate: "2026-10-01",
+    startTime: null,
+    endTime: null,
+  };
 
   it("개인 일정은 메모를 설명으로, 부대 일정은 그룹 이름을 제목 앞에", () => {
     const items = buildFeedItems({
@@ -510,29 +582,66 @@ describe("buildFeedItems — 개인·부대 일정", () => {
       unitName: "3중대",
     });
     expect(items).toEqual([
-      { uid: "personal-e1", title: "면접", description: "정장", startDate: "2026-10-01", endDate: "2026-10-01", startTime: null, endTime: null },
-      { uid: "unit-event-u1", title: "[3중대] 체육대회", description: "운동복", startDate: "2026-10-01", endDate: "2026-10-01", startTime: null, endTime: null },
+      {
+        uid: "personal-e1",
+        title: "면접",
+        description: "정장",
+        startDate: "2026-10-01",
+        endDate: "2026-10-01",
+        startTime: null,
+        endTime: null,
+      },
+      {
+        uid: "unit-event-u1",
+        title: "[3중대] 체육대회",
+        description: "운동복",
+        startDate: "2026-10-01",
+        endDate: "2026-10-01",
+        startTime: null,
+        endTime: null,
+      },
     ]);
   });
 
   it("시작·끝 시간이 있으면 시각 일정", () => {
     const [item] = buildFeedItems({
       ...empty,
-      personalEvents: [{ ...base, endDate: "2026-10-02", startTime: "09:00", endTime: "18:00", note: null }],
+      personalEvents: [
+        {
+          ...base,
+          endDate: "2026-10-02",
+          startTime: "09:00",
+          endTime: "18:00",
+          note: null,
+        },
+      ],
     });
     expect([item!.startTime, item!.endTime]).toEqual(["09:00", "18:00"]);
   });
 
   it("하루짜리에 시작 시간만 있으면 시각 일정, 끝은 없음", () => {
-    const [item] = buildFeedItems({ ...empty, personalEvents: [{ ...base, startTime: "09:00", note: null }] });
-    expect([item!.startTime, item!.endTime, item!.description]).toEqual(["09:00", null, null]);
+    const [item] = buildFeedItems({
+      ...empty,
+      personalEvents: [{ ...base, startTime: "09:00", note: null }],
+    });
+    expect([item!.startTime, item!.endTime, item!.description]).toEqual([
+      "09:00",
+      null,
+      null,
+    ]);
   });
 
   it("여러 날에 시작 시간만 있거나 끝 시간만 있으면 종일 + 설명 첫 줄에 시간", () => {
     const items = buildFeedItems({
       ...empty,
       personalEvents: [
-        { ...base, id: "a", endDate: "2026-10-03", startTime: "09:00", note: "메모" },
+        {
+          ...base,
+          id: "a",
+          endDate: "2026-10-03",
+          startTime: "09:00",
+          note: "메모",
+        },
         { ...base, id: "b", endTime: "18:00", note: null },
       ],
     });
@@ -547,10 +656,37 @@ describe("buildFeedItems — 순서", () => {
   it("시작일, 그다음 uid 순으로 정렬해 매번 같은 출력을 낸다", () => {
     const items = buildFeedItems({
       ...empty,
-      leaves: [leave({ id: "b", startDate: "2026-09-01", endDate: "2026-09-01", segments: [] }), leave({ id: "a", startDate: "2026-09-01", endDate: "2026-09-01", segments: [] })],
-      personalEvents: [{ id: "p", title: "x", startDate: "2026-08-01", endDate: "2026-08-01", startTime: null, endTime: null, note: null }],
+      leaves: [
+        leave({
+          id: "b",
+          startDate: "2026-09-01",
+          endDate: "2026-09-01",
+          segments: [],
+        }),
+        leave({
+          id: "a",
+          startDate: "2026-09-01",
+          endDate: "2026-09-01",
+          segments: [],
+        }),
+      ],
+      personalEvents: [
+        {
+          id: "p",
+          title: "x",
+          startDate: "2026-08-01",
+          endDate: "2026-08-01",
+          startTime: null,
+          endTime: null,
+          note: null,
+        },
+      ],
     });
-    expect(items.map((i) => i.uid)).toEqual(["personal-p", "leave-a", "leave-b"]);
+    expect(items.map((i) => i.uid)).toEqual([
+      "personal-p",
+      "leave-a",
+      "leave-b",
+    ]);
   });
 });
 
@@ -565,13 +701,17 @@ describe("구독 링크", () => {
   const url = "https://api.leave.moveto.kr/calendar/abc_DEF-123.ics";
 
   it("webcal 주소는 스킴만 바꾼다", () => {
-    expect(calendarFeedWebcalUrl(url)).toBe("webcal://api.leave.moveto.kr/calendar/abc_DEF-123.ics");
+    expect(calendarFeedWebcalUrl(url)).toBe(
+      "webcal://api.leave.moveto.kr/calendar/abc_DEF-123.ics",
+    );
   });
 
   it("구글 추가 주소는 webcal 주소를 cid로 인코딩해 싣는다", () => {
     expect(googleCalendarSubscribeUrl(url)).toBe(
       "https://calendar.google.com/calendar/r?cid=" +
-        encodeURIComponent("webcal://api.leave.moveto.kr/calendar/abc_DEF-123.ics"),
+        encodeURIComponent(
+          "webcal://api.leave.moveto.kr/calendar/abc_DEF-123.ics",
+        ),
     );
   });
 });
@@ -800,11 +940,13 @@ git commit -m "feat(shared): 외부 캘린더 피드 항목 조립과 구독 링
 ## Task 3: `calendar_feeds` 표
 
 **Files:**
+
 - Modify: `apps/api/src/db/schema.ts` (`personalEvents` 정의 뒤, 타입 export 목록)
 - Create: `apps/api/migrations/0039_calendar_feeds.sql`
 - Modify: `apps/api/src/lib/delete-account.ts`
 
 **Interfaces:**
+
 - Produces: `calendarFeeds` 표 (`userId` PK, `token` unique, `createdAt`), `type CalendarFeedRow`
 
 - [ ] **Step 1: 스키마 추가** — `apps/api/src/db/schema.ts`의 `personalEvents` 정의 바로 뒤:
@@ -877,6 +1019,7 @@ git commit -m "feat(api): 외부 캘린더 구독 링크 표"
 ## Task 4: 링크 관리·항목 API (`/calendar-feed`)
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-10-12-calendar-feed-design.md` (스펙 변경 반영)
 - Create: `apps/api/src/lib/calendar-feed.ts`
 - Create: `apps/api/src/routes/calendar-feed.contract.ts`
@@ -885,6 +1028,7 @@ git commit -m "feat(api): 외부 캘린더 구독 링크 표"
 - Create: `apps/api/test/calendar-feed.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `buildFeedItems`, `feedRangeStart`, `FeedItem` (Task 2), `calendarFeeds` (Task 3), `generateSessionToken` (`lib/crypto.ts`)
 - Produces:
   - `loadFeedItems(db: Db, userId: string, today: ISODate): Promise<FeedItem[]>` (`apps/api/src/lib/calendar-feed.ts`)
@@ -954,7 +1098,11 @@ test("링크는 꺼진 채 시작하고, 켜기·재발급·끄기가 링크 수
 
   const second = await enableFeed(token);
   assert.notEqual(second, first);
-  assert.equal((await fetchFeed(first)).status, 404, "재발급한 옛 링크는 즉시 죽는다");
+  assert.equal(
+    (await fetchFeed(first)).status,
+    404,
+    "재발급한 옛 링크는 즉시 죽는다",
+  );
   assert.equal((await fetchFeed(second)).status, 200);
 
   const off = await req("DELETE", "/calendar-feed", { token });
@@ -1273,9 +1421,7 @@ export const calendarFeedRoutes = app
       .limit(1);
     return c.json(
       {
-        url: row
-          ? feedUrlFor(originOf(c.env, c.req.url), row.token)
-          : null,
+        url: row ? feedUrlFor(originOf(c.env, c.req.url), row.token) : null,
       },
       200,
     );
@@ -1338,12 +1484,14 @@ git commit -m "feat(api): 외부 캘린더 구독 링크 관리와 내보낼 일
 ## Task 5: 무인증 피드 `GET /calendar/:token.ics` + 접속 기록 가리기
 
 **Files:**
+
 - Create: `apps/api/src/routes/calendar-public.ts`
 - Modify: `apps/api/src/middleware/access-log.ts`
 - Modify: `apps/api/src/index.ts`
 - Modify: `apps/api/test/calendar-feed.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `loadFeedItems` (Task 4), `renderIcs` (Task 1), `rateLimit`
 - Produces: `GET /calendar/{token}.ics` → `200 text/calendar` | `404`; `maskSecretPath(path: string): string` (access-log.ts, export)
 
@@ -1361,15 +1509,28 @@ test("피드는 iCalendar로, 내 휴가·개인 일정과 소속 그룹 일정�
   });
   const day = isoDaysFromToday(20);
 
-  await req("POST", "/leaves", { token: owner.token, body: leaveBody("내 휴가", day, day) });
-  await req("POST", "/leaves", { token: peer.token, body: leaveBody("동료 휴가", day, day) });
+  await req("POST", "/leaves", {
+    token: owner.token,
+    body: leaveBody("내 휴가", day, day),
+  });
+  await req("POST", "/leaves", {
+    token: peer.token,
+    body: leaveBody("동료 휴가", day, day),
+  });
   await req("POST", "/personal-events", {
     token: peer.token,
     body: { title: "동료 개인", startDate: day, endDate: day },
   });
   await req("POST", "/personal-events", {
     token: owner.token,
-    body: { title: "내 개인", startDate: day, endDate: day, startTime: "09:30", endTime: "11:00", note: "메모, 쉼표" },
+    body: {
+      title: "내 개인",
+      startDate: day,
+      endDate: day,
+      startTime: "09:30",
+      endTime: "11:00",
+      note: "메모, 쉼표",
+    },
   });
   const event = await req("POST", `/units/${unitId}/events`, {
     token: owner.token,
@@ -1394,13 +1555,19 @@ test("피드는 iCalendar로, 내 휴가·개인 일정과 소속 그룹 일정�
     token: owner.token,
     body: { userId: peer.data.user.id },
   });
-  assert.equal((await req("POST", "/units/leave", { token: owner.token })).status, 200);
+  assert.equal(
+    (await req("POST", "/units/leave", { token: owner.token })).status,
+    200,
+  );
   assert.ok(!(await fetchFeed(url)).text.includes("체육대회"));
 });
 
 test("모르는 토큰과 .ics가 아닌 경로는 404", async () => {
   const base = process.env.API_URL ?? "http://localhost:8799";
-  assert.equal((await fetchFeed(`${base}/calendar/${"x".repeat(43)}.ics`)).status, 404);
+  assert.equal(
+    (await fetchFeed(`${base}/calendar/${"x".repeat(43)}.ics`)).status,
+    404,
+  );
   assert.equal((await fetchFeed(`${base}/calendar/abc`)).status, 404);
 });
 
@@ -1414,7 +1581,11 @@ test("피드 rate limit은 IP가 아니라 피드 주인 단위다", async () =>
     lastA = (await fetch(a, { headers })).status;
   }
   assert.equal(lastA, 429, "한 피드를 10분에 61번 받으면 막힌다");
-  assert.equal((await fetch(b, { headers })).status, 200, "다른 사용자의 피드는 막히지 않는다");
+  assert.equal(
+    (await fetch(b, { headers })).status,
+    200,
+    "다른 사용자의 피드는 막히지 않는다",
+  );
 });
 
 test("접속 기록에는 피드 토큰이 남지 않는다", async () => {
@@ -1492,10 +1663,14 @@ export const calendarPublicRoutes = app.get(
       c.get("user").id,
       todayInSeoul(),
     );
-    return c.body(renderIcs(items, { calendarName: "리브", now: new Date() }), 200, {
-      "Content-Type": "text/calendar; charset=utf-8",
-      "Cache-Control": "private, max-age=300",
-    });
+    return c.body(
+      renderIcs(items, { calendarName: "리브", now: new Date() }),
+      200,
+      {
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Cache-Control": "private, max-age=300",
+      },
+    );
   },
 );
 ```
@@ -1570,11 +1745,13 @@ git commit -m "feat(api): 무인증 iCalendar 구독 피드와 접속 기록의 
 ## Task 6: 클라이언트 훅 (`packages/client`)
 
 **Files:**
+
 - Modify: `packages/client/src/query-keys.ts`
 - Create: `packages/client/src/hooks/calendar-feed.ts`
 - Modify: `packages/client/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `GET/POST/DELETE /calendar-feed`, `GET /calendar-feed/items` (Task 4)
 - Produces:
   - `queryKeys.calendarFeed = ["calendarFeed"]`, `queryKeys.calendarFeedItems = ["calendarFeed", "items"]`
@@ -1617,10 +1794,7 @@ export function useCalendarFeed() {
     queryKey: queryKeys.calendarFeed,
     queryFn: (context) =>
       adapter.client["calendar-feed"]
-        .$get(
-          {},
-          queryRequestOptions(adapter.useRequestAbortSignal, context),
-        )
+        .$get({}, queryRequestOptions(adapter.useRequestAbortSignal, context))
         .then((response) => adapter.unwrap<CalendarFeed>(response)),
   });
 }
@@ -1667,10 +1841,7 @@ export function useCalendarFeedItems(enabled: boolean) {
     enabled,
     queryFn: (context) =>
       adapter.client["calendar-feed"].items
-        .$get(
-          {},
-          queryRequestOptions(adapter.useRequestAbortSignal, context),
-        )
+        .$get({}, queryRequestOptions(adapter.useRequestAbortSignal, context))
         .then((response) => adapter.unwrap<{ items: FeedItem[] }>(response)),
   });
 }
@@ -1701,10 +1872,12 @@ git commit -m "feat(client): 외부 캘린더 구독 링크 훅"
 ## Task 7: 웹 — 프로필의 외부 캘린더 카드
 
 **Files:**
+
 - Create: `apps/web/src/components/CalendarFeedCard.tsx`
 - Modify: `apps/web/src/pages/ProfilePage.tsx`
 
 **Interfaces:**
+
 - Consumes: `useCalendarFeed`, `useEnableCalendarFeed`, `useDisableCalendarFeed` (Task 6), `calendarFeedWebcalUrl`, `googleCalendarSubscribeUrl` (Task 2)
 
 - [ ] **Step 1: 컴포넌트** — `apps/web/src/components/CalendarFeedCard.tsx`
@@ -1770,8 +1943,8 @@ export function CalendarFeedCard() {
     >
       <h2 className="display-xs">외부 캘린더</h2>
       <p className="body-sm text-body">
-        외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서
-        볼 수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
+        외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서 볼
+        수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
       </p>
       {feed.isPending ? null : url === null ? (
         <button
@@ -1785,7 +1958,9 @@ export function CalendarFeedCard() {
         </button>
       ) : (
         <>
-          <div style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}>
+          <div
+            style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}
+          >
             <a className="btn btn-secondary" href={calendarFeedWebcalUrl(url)}>
               iPhone·Mac 캘린더에 추가
             </a>
@@ -1797,7 +1972,11 @@ export function CalendarFeedCard() {
             >
               Google 캘린더에 추가
             </a>
-            <button type="button" className="btn btn-secondary" onClick={() => void copy()}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void copy()}
+            >
               {copied ? "복사했어요" : "링크 복사"}
             </button>
           </div>
@@ -1805,11 +1984,23 @@ export function CalendarFeedCard() {
             구글 캘린더는 바뀐 일정이 반영되기까지 최대 하루가 걸릴 수 있어요.
             링크를 가진 사람은 누구나 일정을 볼 수 있으니 공유하지 마세요.
           </p>
-          <div style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}>
-            <button type="button" className="btn btn-tertiary" disabled={busy} onClick={rotate}>
+          <div
+            style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap" }}
+          >
+            <button
+              type="button"
+              className="btn btn-tertiary"
+              disabled={busy}
+              onClick={rotate}
+            >
               링크 재발급
             </button>
-            <button type="button" className="btn btn-tertiary" disabled={busy} onClick={turnOff}>
+            <button
+              type="button"
+              className="btn btn-tertiary"
+              disabled={busy}
+              onClick={turnOff}
+            >
               끄기
             </button>
           </div>
@@ -1850,12 +2041,14 @@ git commit -m "feat(web): 프로필에서 외부 캘린더 구독 링크 관리"
 ## Task 8: 앱 — 외부 캘린더 화면 (구독 링크)
 
 **Files:**
+
 - Create: `apps/native/src/screens/calendar-export.tsx`
 - Create: `apps/native/src/app/calendar-export.tsx`
 - Modify: `apps/native/src/app/_layout.tsx` (`widget-settings` Stack.Screen 다음)
 - Modify: `apps/native/src/screens/profile.tsx` (위젯 카드 다음)
 
 **Interfaces:**
+
 - Consumes: Task 6 훅, Task 2 링크 함수, `expo-clipboard`, `expo-linking`
 - Produces: 라우트 `/calendar-export`, `CalendarExportScreen`, `testID="open-calendar-export"`. Task 15가 이 화면 맨 위에 안드로이드 영역을 끼운다 — 그 자리에 `{/* ANDROID_DEVICE_EXPORT */}` 같은 표시는 두지 않는다. Task 15는 `ScrollView`의 첫 자식으로 넣는다.
 
@@ -1886,7 +2079,11 @@ import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
 import { layout, makeStyles, spacing } from "@/theme";
 
-function confirm(title: string, message: string, action: string): Promise<boolean> {
+function confirm(
+  title: string,
+  message: string,
+  action: string,
+): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(title, message, [
       { text: "취소", style: "cancel", onPress: () => resolve(false) },
@@ -1941,8 +2138,8 @@ export function CalendarExportScreen() {
           캘린더 구독 링크
         </Text>
         <Text selectable style={styles.sectionBody}>
-          외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서 볼
-          수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
+          외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서
+          볼 수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
         </Text>
         {feed.isPending ? null : url === null ? (
           <Button
@@ -1965,7 +2162,9 @@ export function CalendarExportScreen() {
               icon="calendarAdd"
               title="Google 캘린더에 추가"
               variant="secondary"
-              onPress={() => void Linking.openURL(googleCalendarSubscribeUrl(url))}
+              onPress={() =>
+                void Linking.openURL(googleCalendarSubscribeUrl(url))
+              }
             />
             <Button
               icon="copy"
@@ -2040,21 +2239,21 @@ export default function CalendarExportRoute() {
 - [ ] **Step 4: 프로필 카드** — `apps/native/src/screens/profile.tsx`의 위젯 `ContentPanel` 바로 다음에:
 
 ```tsx
-        <ContentPanel style={styles.card}>
-          <Text selectable style={styles.sectionTitle}>
-            외부 캘린더
-          </Text>
-          <Text selectable style={styles.sectionBody}>
-            리브 일정을 아이폰·구글·삼성 캘린더에서 함께 볼 수 있어요.
-          </Text>
-          <Button
-            icon="calendar"
-            title="외부 캘린더 연결"
-            variant="secondary"
-            onPress={() => router.push("/calendar-export")}
-            testID="open-calendar-export"
-          />
-        </ContentPanel>
+<ContentPanel style={styles.card}>
+  <Text selectable style={styles.sectionTitle}>
+    외부 캘린더
+  </Text>
+  <Text selectable style={styles.sectionBody}>
+    리브 일정을 아이폰·구글·삼성 캘린더에서 함께 볼 수 있어요.
+  </Text>
+  <Button
+    icon="calendar"
+    title="외부 캘린더 연결"
+    variant="secondary"
+    onPress={() => router.push("/calendar-export")}
+    testID="open-calendar-export"
+  />
+</ContentPanel>
 ```
 
 - [ ] **Step 5: 타입·린트·테스트** — 메모리 `deploy-workflow`: native tsc는 힙을 늘려야 한다.
@@ -2091,6 +2290,7 @@ Expected: 전부 PASS. 실패하면 메모리 `web-e2e-pitfalls`의 원인(8787 
 ## Task 10: `expo-calendar` 설치와 권한 (릴리스 2 시작)
 
 **Files:**
+
 - Modify: `apps/native/package.json`, `pnpm-lock.yaml`
 - Modify: `apps/native/app.json`
 
@@ -2139,10 +2339,12 @@ git commit -m "chore(native): 안드로이드 기기 캘린더 쓰기용 expo-ca
 ## Task 11: 기기 일정 변환과 내용 서명 (순수)
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar-export/convert.ts`
 - Create: `apps/native/test/device-calendar-export.test.ts`
 
 **Interfaces:**
+
 - Consumes: `FeedItem` (`@leave/shared/calendar-feed`), `addDays` (`@leave/shared/dates`)
 - Produces:
   - `type DeviceEventInput = { title: string; notes: string; startDate: Date; endDate: Date; allDay: boolean; timeZone: string }`
@@ -2183,7 +2385,12 @@ describe("toDeviceEvent", () => {
 
   it("시각 일정은 서울 시각으로", () => {
     const event = toDeviceEvent(
-      item({ startDate: "2026-10-01", endDate: "2026-10-02", startTime: "09:30", endTime: "18:00" }),
+      item({
+        startDate: "2026-10-01",
+        endDate: "2026-10-02",
+        startTime: "09:30",
+        endTime: "18:00",
+      }),
     );
     expect(event.allDay).toBe(false);
     expect(event.timeZone).toBe("Asia/Seoul");
@@ -2192,7 +2399,13 @@ describe("toDeviceEvent", () => {
   });
 
   it("끝 시간이 없는 시각 일정은 시작과 같은 시각에 끝난다", () => {
-    const event = toDeviceEvent(item({ startDate: "2026-10-01", endDate: "2026-10-01", startTime: "09:30" }));
+    const event = toDeviceEvent(
+      item({
+        startDate: "2026-10-01",
+        endDate: "2026-10-01",
+        startTime: "09:30",
+      }),
+    );
     expect(event.endDate.getTime()).toBe(event.startDate.getTime());
   });
 
@@ -2204,8 +2417,12 @@ describe("toDeviceEvent", () => {
 describe("itemsSignature", () => {
   it("같은 항목은 같은 서명, 하나라도 바뀌면 다른 서명", () => {
     const a = [item(), item({ uid: "leave-2" })];
-    expect(itemsSignature(a)).toBe(itemsSignature([item(), item({ uid: "leave-2" })]));
-    expect(itemsSignature(a)).not.toBe(itemsSignature([item(), item({ uid: "leave-2", title: "바뀜" })]));
+    expect(itemsSignature(a)).toBe(
+      itemsSignature([item(), item({ uid: "leave-2" })]),
+    );
+    expect(itemsSignature(a)).not.toBe(
+      itemsSignature([item(), item({ uid: "leave-2", title: "바뀜" })]),
+    );
     expect(itemsSignature([])).not.toBe(itemsSignature(a));
   });
 });
@@ -2305,12 +2522,14 @@ git commit -m "feat(native): 피드 항목을 안드로이드 기기 일정으�
 ## Task 12: 기기 내보내기 설정 (기기 로컬)
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar-export/storage.ts`, `storage.native.ts`
 - Create: `apps/native/src/device-calendar-export/preferences.ts`
 - Create: `apps/native/src/device-calendar-export/use-export-preferences.ts`
 - Modify: `apps/native/test/device-calendar-export.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `type ExportPreferences = { enabled: boolean; calendarId: string | null; signature: string | null }`
   - `normalizeExportPreferences(value: unknown): ExportPreferences`
@@ -2324,11 +2543,21 @@ import { normalizeExportPreferences } from "../src/device-calendar-export/prefer
 
 describe("normalizeExportPreferences", () => {
   it("저장된 적 없으면 꺼짐", () => {
-    expect(normalizeExportPreferences(undefined)).toEqual({ enabled: false, calendarId: null, signature: null });
+    expect(normalizeExportPreferences(undefined)).toEqual({
+      enabled: false,
+      calendarId: null,
+      signature: null,
+    });
   });
 
   it("모양이 어긋난 값은 버린다", () => {
-    expect(normalizeExportPreferences({ enabled: "yes", calendarId: 3, signature: ["x"] })).toEqual({
+    expect(
+      normalizeExportPreferences({
+        enabled: "yes",
+        calendarId: 3,
+        signature: ["x"],
+      }),
+    ).toEqual({
       enabled: false,
       calendarId: null,
       signature: null,
@@ -2422,7 +2651,9 @@ export const defaultExportPreferences: ExportPreferences = {
 };
 
 export function normalizeExportPreferences(value: unknown): ExportPreferences {
-  const raw = (value ?? {}) as Partial<Record<keyof ExportPreferences, unknown>>;
+  const raw = (value ?? {}) as Partial<
+    Record<keyof ExportPreferences, unknown>
+  >;
   return {
     enabled: raw.enabled === true,
     calendarId: typeof raw.calendarId === "string" ? raw.calendarId : null,
@@ -2516,10 +2747,12 @@ git commit -m "feat(native): 기기 캘린더 내보내기 설정 저장"
 ## Task 13: 기기 캘린더 bridge (안드로이드)
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar-export/bridge.ts`
 - Create: `apps/native/src/device-calendar-export/bridge.android.ts`
 
 **Interfaces:**
+
 - Consumes: `toDeviceEvent` (Task 11), 설정 스토어 (Task 12)
 - Produces (두 파일 같은 시그니처):
   - `deviceExportSupported: boolean` (android만 true)
@@ -2595,7 +2828,9 @@ export async function hasExportPermission(): Promise<boolean> {
 }
 
 async function calendarExists(id: string): Promise<boolean> {
-  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+  const calendars = await Calendar.getCalendarsAsync(
+    Calendar.EntityTypes.EVENT,
+  );
   return calendars.some((calendar) => calendar.id === id);
 }
 
@@ -2670,11 +2905,13 @@ git commit -m "feat(native): 안드로이드 리브 기기 캘린더 쓰기 brid
 ## Task 14: 일정 쓰기 뒤 항목 쿼리 무효화
 
 **Files:**
+
 - Modify: `packages/client/src/hooks/invalidate.ts`
 - Modify: `packages/client/src/hooks/personal-events.ts`
 - Modify: `packages/client/src/hooks/unit-events.ts`
 
 **Interfaces:**
+
 - Consumes: `queryKeys.calendarFeedItems` (Task 6)
 
 - [ ] **Step 1: 휴가** — `invalidate.ts`의 `LEAVE_MUTATION_KEYS` 배열 끝에 `queryKeys.calendarFeedItems,`를 넣고, 바로 위 주석 끝에 한 줄: `외부 캘린더로 내보내는 일정도 함께 낡는다.`
@@ -2682,13 +2919,13 @@ git commit -m "feat(native): 안드로이드 리브 기기 캘린더 쓰기 brid
 - [ ] **Step 2: 개인 일정** — `personal-events.ts`의 `invalidateEventMonths` 함수 안, `Promise.all` 앞에:
 
 ```ts
-  void queryClient.invalidateQueries({ queryKey: queryKeys.calendarFeedItems });
+void queryClient.invalidateQueries({ queryKey: queryKeys.calendarFeedItems });
 ```
 
 - [ ] **Step 3: 부대 일정** — `unit-events.ts`의 `invalidateUnitEventMonths` 함수 안, `dutyDays` 무효화 줄 다음에:
 
 ```ts
-  void queryClient.invalidateQueries({ queryKey: queryKeys.calendarFeedItems });
+void queryClient.invalidateQueries({ queryKey: queryKeys.calendarFeedItems });
 ```
 
 그룹 가입·탈퇴(`hooks/units.ts`)는 이미 모든 쿼리를 무효화하므로 손대지 않는다.
@@ -2710,6 +2947,7 @@ git commit -m "feat(client): 일정이 바뀌면 외부 캘린더 내보내기 �
 ## Task 15: 동기화 컴포넌트, 로그아웃 정리, 안드로이드 토글
 
 **Files:**
+
 - Create: `apps/native/src/device-calendar-export/calendar-export-sync.tsx`
 - Create: `apps/native/src/device-calendar-export/calendar-export-sync.android.tsx`
 - Modify: `apps/native/src/app/_layout.tsx`
@@ -2717,6 +2955,7 @@ git commit -m "feat(client): 일정이 바뀌면 외부 캘린더 내보내기 �
 - Modify: `apps/native/src/screens/calendar-export.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 11–14 전부, `useCalendarFeedItems` (Task 6), `captureHandledError` (`@/lib/observability`)
 - Produces: `CalendarExportSync({ authenticated }: { authenticated: boolean })`
 
@@ -2769,10 +3008,16 @@ function ReadyCalendarExportSync() {
       try {
         if (!(await hasExportPermission())) {
           // 기기 설정에서 권한을 거둬 갔다. 화면 토글이 꺼짐으로 보이게 한다.
-          await saveExportPreferences({ ...getExportPreferences(), enabled: false });
+          await saveExportPreferences({
+            ...getExportPreferences(),
+            enabled: false,
+          });
           return;
         }
-        const calendarId = await writeItems(data, getExportPreferences().calendarId);
+        const calendarId = await writeItems(
+          data,
+          getExportPreferences().calendarId,
+        );
         // 쓰는 동안 사용자가 껐으면 켜짐으로 되돌려 놓지 않는다. 끄기가 캘린더를 지운다.
         if (getExportPreferences().enabled) {
           await saveExportPreferences({ enabled: true, calendarId, signature });
@@ -2790,7 +3035,11 @@ function ReadyCalendarExportSync() {
   return null;
 }
 
-export function CalendarExportSync({ authenticated }: { authenticated: boolean }) {
+export function CalendarExportSync({
+  authenticated,
+}: {
+  authenticated: boolean;
+}) {
   // 로그아웃 상태에서는 항목 요청이 아예 나가지 않도록 컴포넌트를 갈아 끼운다.
   return authenticated ? <ReadyCalendarExportSync /> : null;
 }
@@ -2805,7 +3054,9 @@ import: `import { CalendarExportSync } from "@/device-calendar-export/calendar-e
 `lifecycle` 프래그먼트의 `WidgetSync` 줄 다음에:
 
 ```tsx
-      {widgetState === "ready" ? <CalendarExportSync authenticated /> : null}
+{
+  widgetState === "ready" ? <CalendarExportSync authenticated /> : null;
+}
 ```
 
 (`ready`는 로그인 + 온보딩 완료다. 온보딩 전에는 `/calendar-feed/items`가 onboarding 미들웨어에 막힌다.)
@@ -2817,13 +3068,13 @@ import: `import { removeExportCalendar } from "@/device-calendar-export/bridge";
 `setUnauthorizedHandler` 콜백 안 `void resetWidgetSession(false);` 다음 줄에:
 
 ```ts
-      void removeExportCalendar();
+void removeExportCalendar();
 ```
 
 `setSessionToken`의 `if (token === null) {` 블록 맨 앞에:
 
 ```ts
-          await removeExportCalendar();
+await removeExportCalendar();
 ```
 
 탈퇴는 성공 후 `setSessionToken(null)`을 거치므로 따로 처리하지 않는다 — 탈퇴 흐름이 정말 그 함수를 부르는지 `useDeleteAccount`(packages/client)에서 확인하고, 아니면 멈추고 보고한다.
@@ -2846,49 +3097,57 @@ import { useExportPreferences } from "@/device-calendar-export/use-export-prefer
 컴포넌트 안 훅 선언부에:
 
 ```tsx
-  const exportPreferences = useExportPreferences();
-  const [deviceError, setDeviceError] = useState<string | null>(null);
+const exportPreferences = useExportPreferences();
+const [deviceError, setDeviceError] = useState<string | null>(null);
 
-  const toggleDeviceExport = async (next: boolean) => {
-    setDeviceError(null);
-    if (!next) {
-      await removeExportCalendar();
-      return;
-    }
-    if (!(await requestExportPermission())) {
-      setDeviceError("캘린더 권한이 없어 추가할 수 없어요. 기기 설정에서 허용해 주세요.");
-      return;
-    }
-    // 켜기만 저장한다. 실제 쓰기는 CalendarExportSync가 항목을 받아 맡는다.
-    await saveExportPreferences({ ...exportPreferences, enabled: true, signature: null });
-  };
+const toggleDeviceExport = async (next: boolean) => {
+  setDeviceError(null);
+  if (!next) {
+    await removeExportCalendar();
+    return;
+  }
+  if (!(await requestExportPermission())) {
+    setDeviceError(
+      "캘린더 권한이 없어 추가할 수 없어요. 기기 설정에서 허용해 주세요.",
+    );
+    return;
+  }
+  // 켜기만 저장한다. 실제 쓰기는 CalendarExportSync가 항목을 받아 맡는다.
+  await saveExportPreferences({
+    ...exportPreferences,
+    enabled: true,
+    signature: null,
+  });
+};
 ```
 
 `ScrollView`의 첫 자식으로(구독 링크 `ContentPanel` 앞에):
 
 ```tsx
-      {deviceExportSupported ? (
-        <ContentPanel style={styles.card}>
-          <Text selectable style={styles.sectionTitle}>
-            휴대폰 캘린더에 바로 추가
-          </Text>
-          <Text selectable style={styles.sectionBody}>
-            이 휴대폰에 `리브` 캘린더를 만들고 일정을 넣어요. 삼성 캘린더에서 바로
-            보여요. 앱을 열 때마다 맞춰요.
-          </Text>
-          <NativeCheckbox
-            value={exportPreferences.enabled}
-            onValueChange={(next) => void toggleDeviceExport(next)}
-            label="휴대폰 캘린더에 추가"
-            testID="device-calendar-export-toggle"
-          />
-          {deviceError ? (
-            <Text selectable style={styles.error}>
-              {deviceError}
-            </Text>
-          ) : null}
-        </ContentPanel>
+{
+  deviceExportSupported ? (
+    <ContentPanel style={styles.card}>
+      <Text selectable style={styles.sectionTitle}>
+        휴대폰 캘린더에 바로 추가
+      </Text>
+      <Text selectable style={styles.sectionBody}>
+        이 휴대폰에 `리브` 캘린더를 만들고 일정을 넣어요. 삼성 캘린더에서 바로
+        보여요. 앱을 열 때마다 맞춰요.
+      </Text>
+      <NativeCheckbox
+        value={exportPreferences.enabled}
+        onValueChange={(next) => void toggleDeviceExport(next)}
+        label="휴대폰 캘린더에 추가"
+        testID="device-calendar-export-toggle"
+      />
+      {deviceError ? (
+        <Text selectable style={styles.error}>
+          {deviceError}
+        </Text>
       ) : null}
+    </ContentPanel>
+  ) : null;
+}
 ```
 
 본문의 백틱은 쓰지 말고 `‘리브’ 캘린더`처럼 따옴표로 바꾼다(JSX 텍스트에 백틱이 그대로 보인다).

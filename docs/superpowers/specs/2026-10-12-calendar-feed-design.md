@@ -28,10 +28,10 @@
 
 ## 배포 — 두 번에 나눈다
 
-| 릴리스 | 내용 | 경로 |
-|---|---|---|
-| 1 | 구독 URL, API, 웹, 앱 설정 화면 | 서버 배포 + 웹 배포 + **OTA** |
-| 2 | 안드로이드 기기 캘린더 쓰기 | **새 EAS 빌드 + 스토어 심사** |
+| 릴리스 | 내용                            | 경로                          |
+| ------ | ------------------------------- | ----------------------------- |
+| 1      | 구독 URL, API, 웹, 앱 설정 화면 | 서버 배포 + 웹 배포 + **OTA** |
+| 2      | 안드로이드 기기 캘린더 쓰기     | **새 EAS 빌드 + 스토어 심사** |
 
 릴리스 1은 새 네이티브 모듈이 없다. `expo-clipboard`와 `expo-linking`은 이미 들어 있다.
 
@@ -119,11 +119,11 @@ export const calendarFeeds = sqliteTable("calendar_feeds", {
 
 **API** (인증 필요, `routes/calendar-feed.ts`를 `/calendar-feed`에 붙인다):
 
-| 경로 | 동작 |
-|---|---|
-| `GET /calendar-feed` | `{ url: string \| null }` |
-| `POST /calendar-feed` | 만들거나 **재발급**. 새 토큰으로 덮어써 예전 URL은 즉시 404 |
-| `DELETE /calendar-feed` | 끄기. 행을 지운다 |
+| 경로                    | 동작                                                        |
+| ----------------------- | ----------------------------------------------------------- |
+| `GET /calendar-feed`    | `{ url: string \| null }`                                   |
+| `POST /calendar-feed`   | 만들거나 **재발급**. 새 토큰으로 덮어써 예전 URL은 즉시 404 |
+| `DELETE /calendar-feed` | 끄기. 행을 지운다                                           |
 
 **피드** (인증 없음): `GET /calendar/:token.ics`
 
@@ -142,12 +142,12 @@ export const calendarFeeds = sqliteTable("calendar_feeds", {
 
 ### 3. ICS 생성 — 조용히 깨지는 곳
 
-순수 함수 `apps/api/src/lib/ics.ts`의 `renderIcs(items, { calendarName })`. 틀려도 오류가
+순수 함수 `packages/shared/src/ics.ts`의 `renderIcs(items, { calendarName })`. 틀려도 오류가
 나지 않고 **캘린더 앱이 일정을 말없이 버리거나 하루 밀어 그린다.** 그래서 규칙을 전부
 테스트로 박는다.
 
 - 줄 끝은 `CRLF`.
-- **줄 접기는 75 *바이트* 기준이다.** 한글은 UTF-8로 3바이트라 글자 수로 자르면 줄이
+- **줄 접기는 75 _바이트_ 기준이다.** 한글은 UTF-8로 3바이트라 글자 수로 자르면 줄이
   넘치고, 바이트로 자르되 **글자 중간에서 자르면 안 된다.** 이어지는 줄은 공백 하나로 시작.
 - TEXT 이스케이프: `\` → `\\`, `;` → `\;`, `,` → `\,`, 줄바꿈 → `\n`.
 - **종일 일정의 `DTEND`는 배타적이다.** `endDate + 1일`을 `VALUE=DATE`로 적는다. 그대로
