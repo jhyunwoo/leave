@@ -17,9 +17,25 @@ import {
 export const deviceExportSupported = true;
 
 const CALENDAR_TITLE = "리브";
-/** 사용자가 지운 캘린더와 지금 일정을 모두 덮을 만큼 넓은 범위. */
-const SCAN_START = new Date(Date.UTC(2000, 0, 1));
-const SCAN_END = new Date(Date.UTC(2100, 0, 1));
+const SCAN_YEARS = 3;
+
+/**
+ * 지울 일정을 찾는 범위. Instances 조회는 모든 캘린더의 반복 일정을 그 범위만큼
+ * 펼치므로 좁게 잡는다. 매 동기화가 전부 다시 쓰니 우리 일정은 이 범위 안에만
+ * 있다(복무 기간이 휴가 날짜를 묶는다).
+ */
+function scanWindow(): { start: Date; end: Date } {
+  const now = new Date();
+  const [year, month, day] = [
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  ];
+  return {
+    start: new Date(Date.UTC(year - SCAN_YEARS, month, day)),
+    end: new Date(Date.UTC(year + SCAN_YEARS, month, day)),
+  };
+}
 
 export async function requestExportPermission(): Promise<boolean> {
   const { status } = await Calendar.requestCalendarPermissionsAsync();
@@ -75,7 +91,8 @@ export async function writeItems(
   calendarId: string | null,
 ): Promise<string> {
   const id = (await findOwnCalendarId(calendarId)) ?? (await createCalendar());
-  const existing = await Calendar.getEventsAsync([id], SCAN_START, SCAN_END);
+  const { start, end } = scanWindow();
+  const existing = await Calendar.getEventsAsync([id], start, end);
   for (const event of existing) {
     await Calendar.deleteEventAsync(event.id);
   }
@@ -83,6 +100,20 @@ export async function writeItems(
     await Calendar.createEventAsync(id, toDeviceEvent(item));
   }
   return id;
+}
+
+/**
+ * 우리 캘린더가 아직 있는지. 제공자 오류는 "있다"로 본다 — 없다고 잘못 판단하면
+ * 고장 난 제공자에 다시 쓰기를 거듭한다.
+ */
+export async function ownCalendarPresent(
+  calendarId: string | null,
+): Promise<boolean> {
+  try {
+    return (await findOwnCalendarId(calendarId)) !== null;
+  } catch {
+    return true;
+  }
 }
 
 /**

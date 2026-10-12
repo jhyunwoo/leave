@@ -22,4 +22,10 @@ export async function writeItems(
   return calendarId ?? "";
 }
 
+export async function ownCalendarPresent(
+  _calendarId: string | null,
+): Promise<boolean> {
+  return true;
+}
+
 export async function removeExportCalendar(): Promise<void> {}

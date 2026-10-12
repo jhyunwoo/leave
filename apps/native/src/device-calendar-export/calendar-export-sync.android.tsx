@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { captureHandledError } from "@/lib/observability";
 import {
   hasExportPermission,
+  ownCalendarPresent,
   removeExportCalendar,
   writeItems,
 } from "./bridge";
@@ -32,7 +33,7 @@ function ReadyCalendarExportSync() {
     const data = items.data?.items;
     if (!preferences.enabled || !data || running.current) return;
     const signature = itemsSignature(data);
-    if (signature === preferences.signature) return;
+    const unchanged = signature === preferences.signature;
 
     running.current = true;
     void (async () => {
@@ -43,6 +44,17 @@ function ReadyCalendarExportSync() {
             ...getExportPreferences(),
             enabled: false,
           });
+          return;
+        }
+        if (unchanged) {
+          // 일정이 그대로여도 사용자가 `리브` 캘린더를 지웠을 수 있다. 서명을 비워 다음 실행이
+          // 다시 만들게 한다. 쓰기가 끝나면 서명이 다시 채워지고, 캘린더가 있으면 아무것도 바꾸지 않아 반복되지 않는다.
+          if (!(await ownCalendarPresent(getExportPreferences().calendarId))) {
+            await saveExportPreferences({
+              ...getExportPreferences(),
+              signature: null,
+            });
+          }
           return;
         }
         const calendarId = await writeItems(
