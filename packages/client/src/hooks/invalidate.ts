@@ -62,12 +62,14 @@ export function invalidateCalendarMonths(
  * 나가 있는 날이 바뀌면 남은 일과일도 함께 바뀐다.
  * 알림은 초과 날짜가 생긴 등록·수정에서만 추가되므로 mutation 응답을 보고
  * 해당 훅에서 조건부로 무효화한다. 삭제는 기존 알림을 지우지 않는다.
+ * 외부 캘린더로 내보내는 일정도 함께 낡는다.
  */
 export const LEAVE_MUTATION_KEYS = [
   queryKeys.myLeaves,
   queryKeys.leaveBalances,
   queryKeys.leaveGrants,
   queryKeys.dutyDays,
+  queryKeys.calendarFeedItems,
 ] as const;
 
 /** 제한 기간을 바꾸면 달력의 표시가 함께 바뀐다. */

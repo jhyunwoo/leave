@@ -17,6 +17,8 @@ import {
 } from "../src/hooks/leaves";
 import { useUpdateProfile } from "../src/hooks/auth";
 import { useCreateBlackout } from "../src/hooks/blackouts";
+import { useCreatePersonalEvent } from "../src/hooks/personal-events";
+import { useCreateUnitEvent } from "../src/hooks/unit-events";
 import { useLeaveUnit } from "../src/hooks/units";
 import { queryKeys } from "../src/query-keys";
 import { testAdapter, testQueryClient, wrapperFor } from "./react-query";
@@ -74,6 +76,7 @@ describe("휴가 등록", () => {
       },
     };
     const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.calendarFeedItems, { seeded: true });
     const { result } = renderHook(() => useCreateLeave(), { wrapper });
 
     result.current.mutate({
@@ -92,6 +95,7 @@ describe("휴가 등록", () => {
             queryKeys.myLeaves,
             queryKeys.leaveBalances,
             queryKeys.leaveGrants,
+            queryKeys.calendarFeedItems,
           ].map((key) => JSON.stringify(key)),
         ),
       ),
@@ -464,6 +468,70 @@ describe("제한 기간 등록", () => {
             queryKeys.calendar("unit-1", "2026-11"),
           ].map((key) => JSON.stringify(key)),
         ),
+      ),
+    );
+  });
+});
+
+describe("개인 일정 등록", () => {
+  it("외부 캘린더로 내보내는 항목을 비운다", async () => {
+    const client = {
+      "personal-events": {
+        $post: () =>
+          Promise.resolve({
+            event: { startDate: "2026-09-01", endDate: "2026-09-01" },
+          }),
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.calendarFeedItems, { seeded: true });
+    const { result } = renderHook(() => useCreatePersonalEvent(), { wrapper });
+
+    result.current.mutate({
+      title: "약속",
+      startDate: "2026-09-01",
+      endDate: "2026-09-01",
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() =>
+      expect(staleKeys(queryClient)).toContain(
+        JSON.stringify(queryKeys.calendarFeedItems),
+      ),
+    );
+  });
+});
+
+describe("부대 일정 등록", () => {
+  it("외부 캘린더로 내보내는 항목을 비운다", async () => {
+    const client = {
+      units: {
+        ":id": {
+          events: {
+            $post: () =>
+              Promise.resolve({
+                event: { startDate: "2026-09-01", endDate: "2026-09-01" },
+              }),
+          },
+        },
+      },
+    };
+    const { queryClient, wrapper } = setup(client);
+    queryClient.setQueryData(queryKeys.calendarFeedItems, { seeded: true });
+    const { result } = renderHook(() => useCreateUnitEvent("unit-1"), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      title: "훈련",
+      startDate: "2026-09-01",
+      endDate: "2026-09-01",
+    } as never);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() =>
+      expect(staleKeys(queryClient)).toContain(
+        JSON.stringify(queryKeys.calendarFeedItems),
       ),
     );
   });

@@ -20,6 +20,7 @@ async function invalidateEventMonths(
   const months = new Set(
     ranges.flatMap((range) => monthsSpanning(range.startDate, range.endDate)),
   );
+  void queryClient.invalidateQueries({ queryKey: queryKeys.calendarFeedItems });
   await Promise.all(
     [...months].map((month) =>
       queryClient.invalidateQueries({
