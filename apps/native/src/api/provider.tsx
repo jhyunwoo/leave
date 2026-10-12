@@ -12,6 +12,7 @@ import { LeaveApiProvider, type LeaveApiAdapter } from "@leave/client/context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { useEffect, useMemo, type ReactNode } from "react";
+import { removeExportCalendar } from "@/device-calendar-export/bridge";
 import { clearPendingInvite } from "@/lib/pending-invite-link";
 import { clearPendingProfile } from "@/lib/pending-profile-link";
 import {
@@ -37,6 +38,7 @@ export function ApiProvider(props: { children: ReactNode }) {
         level: "info",
       });
       void resetWidgetSession(false);
+      void removeExportCalendar();
       clearObservabilityUser();
       queryClient.clear();
       void clearPersistedQueryCache();
@@ -56,6 +58,7 @@ export function ApiProvider(props: { children: ReactNode }) {
         await resetWidgetSession(token !== null);
         await clearPersistedQueryCache();
         if (token === null) {
+          await removeExportCalendar();
           clearPendingProfile();
           clearPendingInvite();
           clearObservabilityUser();

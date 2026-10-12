@@ -52,6 +52,7 @@ import { resolveStartupGate } from "@/lib/startup-gate";
 import { useMilestonePushNavigation } from "@/lib/milestone-navigation";
 import { useNotificationLogging } from "@/lib/use-notification-logging";
 import { usePushTokenSync } from "@/lib/use-push-token-sync";
+import { CalendarExportSync } from "@/device-calendar-export/calendar-export-sync";
 import type { WidgetState } from "@/widgets/payload";
 import { WidgetSync } from "@/widgets/widget-sync";
 import { tokenAtom } from "@/state/auth";
@@ -259,6 +260,7 @@ function RootNavigator() {
         sessionReady={sessionReady}
       />
       {widgetStateKnown ? <WidgetSync state={widgetState} /> : null}
+      {widgetState === "ready" ? <CalendarExportSync authenticated /> : null}
     </>
   );
 

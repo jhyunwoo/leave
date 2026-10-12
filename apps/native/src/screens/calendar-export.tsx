@@ -20,6 +20,14 @@ import {
 } from "@leave/shared/calendar-feed";
 import { Button } from "@/components/button";
 import { ContentPanel } from "@/components/content-panel";
+import { NativeCheckbox } from "@/components/native-checkbox";
+import {
+  deviceExportSupported,
+  removeExportCalendar,
+  requestExportPermission,
+} from "@/device-calendar-export/bridge";
+import { saveExportPreferences } from "@/device-calendar-export/preferences";
+import { useExportPreferences } from "@/device-calendar-export/use-export-preferences";
 import { confirmAction } from "@/lib/dialog";
 import { makeStyles, spacing } from "@/theme";
 
@@ -29,8 +37,30 @@ export function CalendarExportScreen() {
   const enable = useEnableCalendarFeed();
   const disable = useDisableCalendarFeed();
   const [copied, setCopied] = useState(false);
+  const exportPreferences = useExportPreferences();
+  const [deviceError, setDeviceError] = useState<string | null>(null);
   const url = feed.data?.url ?? null;
   const busy = enable.isPending || disable.isPending;
+
+  const toggleDeviceExport = async (next: boolean) => {
+    setDeviceError(null);
+    if (!next) {
+      await removeExportCalendar();
+      return;
+    }
+    if (!(await requestExportPermission())) {
+      setDeviceError(
+        "캘린더 권한이 없어 추가할 수 없어요. 기기 설정에서 허용해 주세요.",
+      );
+      return;
+    }
+    // 켜기만 저장한다. 실제 쓰기는 CalendarExportSync가 항목을 받아 맡는다.
+    await saveExportPreferences({
+      ...exportPreferences,
+      enabled: true,
+      signature: null,
+    });
+  };
 
   const rotate = async () => {
     if (
@@ -67,6 +97,28 @@ export function CalendarExportScreen() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
     >
+      {deviceExportSupported ? (
+        <ContentPanel style={styles.card}>
+          <Text selectable style={styles.sectionTitle}>
+            휴대폰 캘린더에 바로 추가
+          </Text>
+          <Text selectable style={styles.sectionBody}>
+            이 휴대폰에 ‘리브’ 캘린더를 만들고 일정을 넣어요. 삼성 캘린더에서
+            바로 보여요. 앱을 열 때마다 맞춰요.
+          </Text>
+          <NativeCheckbox
+            value={exportPreferences.enabled}
+            onValueChange={(next) => void toggleDeviceExport(next)}
+            label="휴대폰 캘린더에 추가"
+            testID="device-calendar-export-toggle"
+          />
+          {deviceError ? (
+            <Text selectable style={styles.error}>
+              {deviceError}
+            </Text>
+          ) : null}
+        </ContentPanel>
+      ) : null}
       <ContentPanel style={styles.card}>
         <Text selectable style={styles.sectionTitle}>
           캘린더 구독 링크

@@ -3,6 +3,7 @@ export type ObservabilityLevel = "fatal" | "error" | "warning" | "info";
 export type ErrorSource =
   | "api_malformed_response"
   | "api_server_error"
+  | "device_calendar_export"
   | "global_error_handler"
   | "handled_exception"
   | "home_widget"
