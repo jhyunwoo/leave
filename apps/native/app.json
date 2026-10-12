@@ -127,7 +127,10 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "package": "app.leave.mobile",
-      "permissions": [],
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ],
       "blockedPermissions": [
         "android.permission.CAMERA",
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -174,6 +177,12 @@
     "plugins": [
       "expo-router",
       "@bacons/apple-targets",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "리브 일정을 이 기기의 캘린더에 추가하려면 캘린더 접근 권한이 필요해요."
+        }
+      ],
       [
         "expo-splash-screen",
         {
