@@ -31,11 +31,26 @@ export async function hasExportPermission(): Promise<boolean> {
   return status === "granted";
 }
 
-async function calendarExists(id: string): Promise<boolean> {
+/**
+ * 우리가 만든 캘린더(`name: "leave"` + 로컬 계정)만 고른다. 저장된 id가 낡아 사용자의
+ * 다른 캘린더를 가리킬 수 있어 id만 믿으면 그 캘린더를 비우거나 지우게 된다.
+ * 쓰기가 중간에 실패해 설정에 id가 남지 않은 고아 캘린더도 여기서 다시 찾아 재사용한다.
+ */
+async function findOwnCalendarId(
+  preferredId: string | null,
+): Promise<string | null> {
   const calendars = await Calendar.getCalendarsAsync(
     Calendar.EntityTypes.EVENT,
   );
-  return calendars.some((calendar) => calendar.id === id);
+  const own = calendars.filter(
+    (calendar) =>
+      calendar.name === "leave" && calendar.source?.isLocalAccount === true,
+  );
+  return (
+    own.find((calendar) => calendar.id === preferredId)?.id ??
+    own[0]?.id ??
+    null
+  );
 }
 
 async function createCalendar(): Promise<string> {
@@ -59,10 +74,7 @@ export async function writeItems(
   items: readonly FeedItem[],
   calendarId: string | null,
 ): Promise<string> {
-  const id =
-    calendarId !== null && (await calendarExists(calendarId))
-      ? calendarId
-      : await createCalendar();
+  const id = (await findOwnCalendarId(calendarId)) ?? (await createCalendar());
   const existing = await Calendar.getEventsAsync([id], SCAN_START, SCAN_END);
   for (const event of existing) {
     await Calendar.deleteEventAsync(event.id);
@@ -79,8 +91,9 @@ export async function removeExportCalendar(): Promise<void> {
   const { calendarId } = getExportPreferences();
   if (calendarId !== null && (await hasExportPermission())) {
     try {
-      if (await calendarExists(calendarId)) {
-        await Calendar.deleteCalendarAsync(calendarId);
+      const ownId = await findOwnCalendarId(calendarId);
+      if (ownId !== null) {
+        await Calendar.deleteCalendarAsync(ownId);
       }
     } catch {
       // 캘린더 제공자 오류로 남은 캘린더는 사용자가 기기 설정에서 지울 수 있다.
