@@ -92,8 +92,8 @@ export const queryKeys = {
   /** 외부 캘린더 구독 링크. */
   calendarFeed: ["calendarFeed"] as const,
   /**
-   * 외부 캘린더로 내보낼 내 일정. 링크 접두사 아래라 링크를 바꿀 때 함께 무효화되지만,
-   * 일정이 바뀌는 쓰기(휴가·개인·부대 일정)는 이 키를 따로 무효화한다(invalidate.ts).
+   * 외부 캘린더로 내보낼 내 일정. 키는 링크 접두사 아래에 있지만 링크가 바뀌어도
+   * 건드리지 않는다. 일정을 쓰면 무효화한다(invalidate.ts, personal-events.ts, unit-events.ts).
    */
   calendarFeedItems: ["calendarFeed", "items"] as const,
 };
