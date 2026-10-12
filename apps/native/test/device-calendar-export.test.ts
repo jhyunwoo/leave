@@ -4,6 +4,7 @@ import {
   itemsSignature,
   toDeviceEvent,
 } from "../src/device-calendar-export/convert";
+import { normalizeExportPreferences } from "../src/device-calendar-export/preferences";
 
 function item(overrides: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -68,5 +69,34 @@ describe("itemsSignature", () => {
       itemsSignature([item(), item({ uid: "leave-2", title: "바뀜" })]),
     );
     expect(itemsSignature([])).not.toBe(itemsSignature(a));
+  });
+});
+
+describe("normalizeExportPreferences", () => {
+  it("저장된 적 없으면 꺼짐", () => {
+    expect(normalizeExportPreferences(undefined)).toEqual({
+      enabled: false,
+      calendarId: null,
+      signature: null,
+    });
+  });
+
+  it("모양이 어긋난 값은 버린다", () => {
+    expect(
+      normalizeExportPreferences({
+        enabled: "yes",
+        calendarId: 3,
+        signature: ["x"],
+      }),
+    ).toEqual({
+      enabled: false,
+      calendarId: null,
+      signature: null,
+    });
+  });
+
+  it("아는 값은 지킨다", () => {
+    const value = { enabled: true, calendarId: "12", signature: "3:abc" };
+    expect(normalizeExportPreferences(value)).toEqual(value);
   });
 });
