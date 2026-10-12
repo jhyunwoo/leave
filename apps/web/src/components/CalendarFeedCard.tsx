@@ -20,13 +20,19 @@ export function CalendarFeedCard() {
   const enable = useEnableCalendarFeed();
   const disable = useDisableCalendarFeed();
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const url = feed.data?.url ?? null;
   const busy = enable.isPending || disable.isPending;
 
   const copy = async () => {
     if (!url) return;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setCopyFailed(false);
+    } catch {
+      setCopyFailed(true);
+    }
   };
 
   const rotate = () => {
@@ -61,7 +67,22 @@ export function CalendarFeedCard() {
         외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서 볼
         수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
       </p>
-      {feed.isPending ? null : url === null ? (
+      {feed.isPending ? null : url === null && feed.isError ? (
+        // 불러오지 못한 것을 "링크 없음"으로 읽으면 만들기가 기존 토큰을 갈아 끼워 구독이 끊긴다.
+        <>
+          <p className="body-sm" role="alert">
+            링크 정보를 불러오지 못했어요.
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void feed.refetch()}
+          >
+            <ActionIcon name="refresh" />
+            다시 시도
+          </button>
+        </>
+      ) : url === null ? (
         <button
           type="button"
           className="btn btn-primary"
@@ -121,6 +142,11 @@ export function CalendarFeedCard() {
           </div>
         </>
       )}
+      {copyFailed ? (
+        <p className="body-sm" role="alert">
+          링크를 복사하지 못했어요.
+        </p>
+      ) : null}
       {enable.error || disable.error ? (
         <p className="body-sm" role="alert">
           {(enable.error ?? disable.error)?.message}

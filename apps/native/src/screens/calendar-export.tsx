@@ -37,6 +37,7 @@ export function CalendarExportScreen() {
   const enable = useEnableCalendarFeed();
   const disable = useDisableCalendarFeed();
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const exportPreferences = useExportPreferences();
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [deviceBusy, setDeviceBusy] = useState(false);
@@ -135,7 +136,20 @@ export function CalendarExportScreen() {
           외출·외박·휴가·개인 일정·부대 일정을 아이폰 캘린더나 구글 캘린더에서
           볼 수 있어요. 삼성 캘린더는 구글 캘린더에 추가하면 함께 보여요.
         </Text>
-        {feed.isPending ? null : url === null ? (
+        {feed.isPending ? null : url === null && feed.isError ? (
+          // 불러오지 못한 것을 "링크 없음"으로 읽으면 만들기가 기존 토큰을 갈아 끼워 구독이 끊긴다.
+          <>
+            <Text selectable style={styles.error}>
+              링크 정보를 불러오지 못했어요.
+            </Text>
+            <Button
+              icon="refresh"
+              title="다시 시도"
+              variant="secondary"
+              onPress={() => void feed.refetch()}
+            />
+          </>
+        ) : url === null ? (
           <Button
             icon="calendarAdd"
             title="구독 링크 만들기"
@@ -165,7 +179,13 @@ export function CalendarExportScreen() {
               title={copied ? "복사했어요" : "링크 복사"}
               variant="secondary"
               onPress={() => {
-                void Clipboard.setStringAsync(url).then(() => setCopied(true));
+                Clipboard.setStringAsync(url).then(
+                  () => {
+                    setCopied(true);
+                    setCopyFailed(false);
+                  },
+                  () => setCopyFailed(true),
+                );
               }}
             />
             <Text selectable style={styles.sectionBody}>
@@ -188,6 +208,11 @@ export function CalendarExportScreen() {
             />
           </View>
         )}
+        {copyFailed ? (
+          <Text selectable style={styles.error}>
+            링크를 복사하지 못했어요.
+          </Text>
+        ) : null}
         {enable.error || disable.error ? (
           <Text selectable style={styles.error}>
             {(enable.error ?? disable.error)?.message}
