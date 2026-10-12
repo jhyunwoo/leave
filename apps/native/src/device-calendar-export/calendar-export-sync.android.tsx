@@ -12,7 +12,11 @@
 import { useCalendarFeedItems } from "@leave/client/hooks/calendar-feed";
 import { useEffect, useRef, useState } from "react";
 import { captureHandledError } from "@/lib/observability";
-import { hasExportPermission, writeItems } from "./bridge";
+import {
+  hasExportPermission,
+  removeExportCalendar,
+  writeItems,
+} from "./bridge";
 import { itemsSignature } from "./convert";
 import { getExportPreferences, saveExportPreferences } from "./preferences";
 import { useExportPreferences } from "./use-export-preferences";
@@ -45,10 +49,12 @@ function ReadyCalendarExportSync() {
           data,
           getExportPreferences().calendarId,
         );
-        // 쓰는 동안 사용자가 껐으면 켜짐으로 되돌려 놓지 않는다. 끄기가 캘린더를 지운다.
-        if (getExportPreferences().enabled) {
-          await saveExportPreferences({ enabled: true, calendarId, signature });
+        // 쓰는 동안 사용자가 껐으면(첫 쓰기라 저장된 id가 없어 끄기가 못 지웠다) 방금 쓴 캘린더를 지운다.
+        if (!getExportPreferences().enabled) {
+          await removeExportCalendar();
+          return;
         }
+        await saveExportPreferences({ enabled: true, calendarId, signature });
         // 성공했을 때만 다시 본다. 실패마다 다시 돌면 고장 난 캘린더 제공자에 무한히 쓴다.
         setRetry((count) => count + 1);
       } catch (error) {

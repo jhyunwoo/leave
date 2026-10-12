@@ -39,27 +39,35 @@ export function CalendarExportScreen() {
   const [copied, setCopied] = useState(false);
   const exportPreferences = useExportPreferences();
   const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [deviceBusy, setDeviceBusy] = useState(false);
   const url = feed.data?.url ?? null;
   const busy = enable.isPending || disable.isPending;
 
   const toggleDeviceExport = async (next: boolean) => {
+    // 권한 창이나 삭제가 끝나기 전의 연타가 켜기·끄기 경로를 섞지 않게 한다.
+    if (deviceBusy) return;
+    setDeviceBusy(true);
     setDeviceError(null);
-    if (!next) {
-      await removeExportCalendar();
-      return;
+    try {
+      if (!next) {
+        await removeExportCalendar();
+        return;
+      }
+      if (!(await requestExportPermission())) {
+        setDeviceError(
+          "캘린더 권한이 없어 추가할 수 없어요. 기기 설정에서 허용해 주세요.",
+        );
+        return;
+      }
+      // 켜기만 저장한다. 실제 쓰기는 CalendarExportSync가 항목을 받아 맡는다.
+      await saveExportPreferences({
+        ...exportPreferences,
+        enabled: true,
+        signature: null,
+      });
+    } finally {
+      setDeviceBusy(false);
     }
-    if (!(await requestExportPermission())) {
-      setDeviceError(
-        "캘린더 권한이 없어 추가할 수 없어요. 기기 설정에서 허용해 주세요.",
-      );
-      return;
-    }
-    // 켜기만 저장한다. 실제 쓰기는 CalendarExportSync가 항목을 받아 맡는다.
-    await saveExportPreferences({
-      ...exportPreferences,
-      enabled: true,
-      signature: null,
-    });
   };
 
   const rotate = async () => {

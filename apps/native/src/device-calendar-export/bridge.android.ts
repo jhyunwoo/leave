@@ -85,19 +85,27 @@ export async function writeItems(
   return id;
 }
 
-/** 끄기·로그아웃·인증 만료. 권한이 없으면 지울 수 없으니 설정만 비운다. */
+/**
+ * 끄기·로그아웃·인증 만료. 권한이 없으면 지울 수 없으니 설정만 비운다.
+ *
+ * 로그아웃이 캘린더 정리에 걸리면 안 되므로 어떤 오류도 밖으로 던지지 않는다.
+ * 저장된 id가 없어도(첫 쓰기 도중에 껐을 때) 소유 캘린더를 찾아 지운다.
+ */
 export async function removeExportCalendar(): Promise<void> {
-  await loadExportPreferences();
-  const { calendarId } = getExportPreferences();
-  if (calendarId !== null && (await hasExportPermission())) {
-    try {
-      const ownId = await findOwnCalendarId(calendarId);
+  try {
+    await loadExportPreferences();
+    if (await hasExportPermission()) {
+      const ownId = await findOwnCalendarId(getExportPreferences().calendarId);
       if (ownId !== null) {
         await Calendar.deleteCalendarAsync(ownId);
       }
-    } catch {
-      // 캘린더 제공자 오류로 남은 캘린더는 사용자가 기기 설정에서 지울 수 있다.
     }
+  } catch {
+    // 캘린더 제공자 오류로 남은 캘린더는 사용자가 기기 설정에서 지울 수 있다.
   }
-  await saveExportPreferences(defaultExportPreferences);
+  try {
+    await saveExportPreferences(defaultExportPreferences);
+  } catch {
+    // 저장소 오류가 로그아웃을 막지 않는다.
+  }
 }
