@@ -57,7 +57,9 @@ function clampHeader(value: string | undefined, max: number): string | null {
  * 들고 있게 된다(routes/calendar-public.ts).
  */
 export function maskSecretPath(path: string): string {
-  return path.startsWith("/calendar/") ? "/calendar/:token" : path;
+  return path.toLowerCase().startsWith("/calendar/")
+    ? "/calendar/:token"
+    : path;
 }
 
 /**

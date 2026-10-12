@@ -106,24 +106,28 @@ test("피드는 iCalendar로, 내 휴가·개인 일정과 소속 그룹 일정�
   const created = await createUnit(owner.token, { name: "피드중대" });
   const unitId = created.data.unit.id;
   const peer = await signup();
-  await req("POST", "/units/join", {
+  // 동료 일정이 만들어지지 않았다면 아래의 "동료 것은 없다" 단언이 아무것도 증명하지 못한다.
+  const joined = await req("POST", "/units/join", {
     token: peer.token,
     body: { code: created.data.invite.code },
   });
+  assert.equal(joined.status, 200, JSON.stringify(joined.data));
   const day = isoDaysFromToday(20);
 
   await req("POST", "/leaves", {
     token: owner.token,
     body: leaveBody("내 휴가", day, day),
   });
-  await req("POST", "/leaves", {
+  const peerLeave = await req("POST", "/leaves", {
     token: peer.token,
     body: leaveBody("동료 휴가", day, day),
   });
-  await req("POST", "/personal-events", {
+  assert.equal(peerLeave.status, 201, JSON.stringify(peerLeave.data));
+  const peerEvent = await req("POST", "/personal-events", {
     token: peer.token,
     body: { title: "동료 개인", startDate: day, endDate: day },
   });
+  assert.equal(peerEvent.status, 201, JSON.stringify(peerEvent.data));
   await req("POST", "/personal-events", {
     token: owner.token,
     body: {
@@ -194,6 +198,9 @@ test("피드 rate limit은 IP가 아니라 피드 주인 단위다", async () =>
 test("접속 기록에는 피드 토큰이 남지 않는다", async () => {
   const url = await enableFeed((await signup()).token);
   await fetchFeed(url);
+  // 대소문자만 바꾼 경로도 같은 마스킹을 받는다(아래 LIKE는 ASCII에서 대소문자를 가리지 않는다).
+  const base = process.env.API_URL ?? "http://localhost:8799";
+  await fetchFeed(`${base}/Calendar/${"x".repeat(43)}.ics`);
   await sleep(800);
   const db = openTestDb();
   try {
