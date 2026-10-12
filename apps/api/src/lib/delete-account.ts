@@ -16,7 +16,7 @@
  * D1은 ON DELETE CASCADE를 실제로 적용하므로, users를 참조하는 표
  * (leaves→leave_segments, leave_grants, regular_overnight_configs,
  *  sessions, notifications, user_notification_prefs, user_friend_sharing,
- *  milestone_deliveries)는
+ *  milestone_deliveries, calendar_feeds)는
  * 마지막 한 줄로 함께 사라진다. 그래도 명시적으로 지우는 것들이 있는데,
  * 이유가 둘로 갈린다.
  *  - 외래키가 **없어서** 반드시 직접 지워야 하는 것: access_logs, push_logs,
@@ -28,6 +28,7 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import {
   accessLogs,
+  calendarFeeds,
   contentReports,
   friendships,
   leaves,
@@ -106,6 +107,7 @@ async function purgeUserData(db: Db, userId: string): Promise<void> {
     db
       .delete(milestoneDeliveries)
       .where(eq(milestoneDeliveries.userId, userId)),
+    db.delete(calendarFeeds).where(eq(calendarFeeds.userId, userId)),
 
     // 내가 건 차단과 남이 나를 건 차단 모두 지운다. 남으면 없는 id를 계속 숨긴다.
     db.delete(userBlocks).where(eq(userBlocks.userId, userId)),

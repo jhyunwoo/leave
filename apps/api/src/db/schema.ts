@@ -773,6 +773,21 @@ export const personalEvents = sqliteTable(
   ],
 );
 
+/**
+ * 외부 캘린더 구독 링크. 사용자당 하나이고, 재발급은 토큰을 덮어써 예전 링크를 죽인다.
+ *
+ * 토큰을 세션처럼 해시하지 않는 이유: 이 토큰은 DB에 이미 있는 일정을 **읽게만** 한다.
+ * DB를 읽을 수 있는 사람은 토큰 없이도 일정을 본다. 원문이 있어야 사용자가 나중에
+ * 링크를 다시 복사할 수 있다(아이폰에 붙인 다음 날 구글에 붙이기).
+ */
+export const calendarFeeds = sqliteTable("calendar_feeds", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type UnitRow = typeof units.$inferSelect;
 export type UnitInviteRow = typeof unitInvites.$inferSelect;
@@ -785,6 +800,7 @@ export type ContentReportRow = typeof contentReports.$inferSelect;
 export type UserBlockRow = typeof userBlocks.$inferSelect;
 export type FriendshipRow = typeof friendships.$inferSelect;
 export type PersonalEventRow = typeof personalEvents.$inferSelect;
+export type CalendarFeedRow = typeof calendarFeeds.$inferSelect;
 export type LeaveRow = typeof leaves.$inferSelect;
 export type LeaveSegmentRow = typeof leaveSegments.$inferSelect;
 export type LeaveGrantRow = typeof leaveGrants.$inferSelect;
