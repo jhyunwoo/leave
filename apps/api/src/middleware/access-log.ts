@@ -53,6 +53,14 @@ function clampHeader(value: string | undefined, max: number): string | null {
 }
 
 /**
+ * 구독 피드 주소의 토큰은 비밀번호와 같다. 경로째 남기면 관리 화면이 남의 일정 열쇠를
+ * 들고 있게 된다(routes/calendar-public.ts).
+ */
+export function maskSecretPath(path: string): string {
+  return path.startsWith("/calendar/") ? "/calendar/:token" : path;
+}
+
+/**
  * 접속 기록 미들웨어 — 요청(프리플라이트 제외)의 메타데이터를 D1 access_logs에 저장한다.
  * 가장 바깥에서 실행되므로 next() 이후에는 인증 미들웨어가 설정한 c.var.user를 읽을 수 있다.
  * 수집 범위는 접속 시각·경로·상태·명시적 앱 플랫폼/버전으로 한정한다.
@@ -93,7 +101,7 @@ export const accessLogMiddleware = createMiddleware<AppEnv>(async (c, next) => {
         id: crypto.randomUUID(),
         userId: user?.id ?? null,
         method: req.method,
-        path: clamp(req.path, MAX_PATH_LENGTH),
+        path: clamp(maskSecretPath(req.path), MAX_PATH_LENGTH),
         status: c.res.status,
         platform: clampHeader(
           req.header("X-Client-Platform"),

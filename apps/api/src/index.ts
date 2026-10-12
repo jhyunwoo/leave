@@ -32,6 +32,7 @@ import { leaveRoutes } from "./routes/leaves";
 import { friendRoutes } from "./routes/friends";
 import { personalEventRoutes } from "./routes/personal-events";
 import { calendarFeedRoutes } from "./routes/calendar-feed";
+import { calendarPublicRoutes } from "./routes/calendar-public";
 import { moderationRoutes } from "./routes/moderation";
 import { notificationRoutes } from "./routes/notifications";
 import { publicUserRoutes } from "./routes/public-users";
@@ -115,6 +116,7 @@ const routes = app
   .route("/friends", friendRoutes)
   .route("/personal-events", personalEventRoutes)
   .route("/calendar-feed", calendarFeedRoutes)
+  .route("/calendar", calendarPublicRoutes)
   .route("/notifications", notificationRoutes)
   .route("/push", pushRoutes)
   .route("/moderation", moderationRoutes);
