@@ -64,7 +64,7 @@ type FeedItem = {
 `updatedAt`은 두지 않는다. `leaves`에는 수정 시각 컬럼이 없고, 구독 캘린더는 매번 피드
 전체를 받아 바꿔 끼우므로 `LAST-MODIFIED`가 없어도 갱신된다.
 
-자리: `apps/api/src/lib/calendar-feed.ts`(조회 + 조립). 응답이 "누가 보느냐"에 따라
+자리: 순수 조립은 `packages/shared/src/calendar-feed.ts`, 렌더러는 `packages/shared/src/ics.ts`, 조회는 `apps/api/src/lib/calendar-feed.ts`. 응답이 "누가 보느냐"에 따라
 달라지는 점은 `lib/calendar.ts`와 같다 — 이 응답을 캐싱하려면 키에 사용자 id가 반드시
 들어가야 한다.
 
@@ -90,9 +90,10 @@ type FeedItem = {
 
 **시간 규칙** (개인·부대 일정. 스키마상 시작·끝 시간이 각각 비어 있을 수 있다):
 
-- 시작 시간이 없으면 종일 일정이다. 끝 시간만 있으면 설명 첫 줄에 `~HH:mm`으로 적는다.
-- 시작 시간만 있으면 끝을 두지 않는다(RFC 5545: DTEND가 없으면 시작 시각에 끝난다).
-- 둘 다 있으면 `startDate startTime` ~ `endDate endTime`.
+- 시작 시간이 있고 (끝 시간이 있거나 하루짜리)일 때만 시각 일정이다. 시작 시간만 있는
+  하루짜리는 끝을 두지 않는다(RFC 5545: DTEND가 없으면 시작 시각에 끝난다).
+- 나머지(시작 시간이 없거나, 여러 날짜에 시작 시간만 있는 경우)는 종일 일정이고, 시간이
+  있으면 설명 첫 줄에 `HH:mm~HH:mm`으로 적는다.
 
 ### 2. 구독 URL
 
@@ -116,21 +117,25 @@ export const calendarFeeds = sqliteTable("calendar_feeds", {
 - `delete-account.ts`의 삭제 목록에 적는다. 외래키 cascade로도 지워지지만, 그 파일은
   "무엇이 지워지는가"를 한 곳에서 읽게 하려고 외래키가 있는 표도 적어 둔다.
 
-**API** (인증 필요, `routes/users.ts`에 붙인다):
+**API** (인증 필요, `routes/calendar-feed.ts`를 `/calendar-feed`에 붙인다):
 
 | 경로 | 동작 |
 |---|---|
-| `GET /users/me/calendar-feed` | `{ url: string \| null }` |
-| `POST /users/me/calendar-feed` | 만들거나 **재발급**. 새 토큰으로 덮어써 예전 URL은 즉시 404 |
-| `DELETE /users/me/calendar-feed` | 끄기. 행을 지운다 |
+| `GET /calendar-feed` | `{ url: string \| null }` |
+| `POST /calendar-feed` | 만들거나 **재발급**. 새 토큰으로 덮어써 예전 URL은 즉시 404 |
+| `DELETE /calendar-feed` | 끄기. 행을 지운다 |
 
 **피드** (인증 없음): `GET /calendar/:token.ics`
 
 - `index.ts`에 `/calendar` 라우트로 붙인다. 최소 버전 미들웨어는 `X-Client-Version`이
   없으면 통과시키므로 캘린더 앱의 요청이 막히지 않는다.
 - 모르는 토큰은 404. 존재 여부 말고는 아무것도 알려 주지 않는다.
-- `rateLimit({ name: "calendar-feed", limit: 60, windowSeconds: 600 })`. 캘린더 앱은
-  많아야 몇 분에 한 번 오므로 정상 사용은 닿지 않고, 토큰 대입은 막힌다.
+- rate limit은 **피드 주인 단위**다. 토큰으로 주인을 찾아 `c.set("user", …)`한 뒤
+  `rateLimit({ name: "calendar-feed", limit: 60, windowSeconds: 600 })`를 건다. 기본
+  키인 IP를 쓰면 안 된다 — 구글은 모든 사용자의 피드를 같은 IP 대역에서 받아 가서,
+  한 사람의 피드가 모두의 갱신을 막는다. 토큰 대입은 256비트 무작위라 막을 필요가 없다.
+- 접속 기록(`access_logs.path`)에는 `/calendar/:token`으로 가려 저장한다. 관리 화면이
+  그 표를 읽는다.
 - 헤더: `Content-Type: text/calendar; charset=utf-8`, `Cache-Control: private, max-age=300`.
 - 응답 URL은 `API_ORIGIN` 환경변수로 만든다(인증 메일 링크와 같은 이유 — wrangler dev가
   요청 주소를 바꿔 보낸다).
@@ -157,7 +162,7 @@ export const calendarFeeds = sqliteTable("calendar_feeds", {
 
 ### 4. 안드로이드 기기 캘린더 쓰기 (릴리스 2)
 
-**데이터** — 인증 엔드포인트 `GET /users/me/calendar-items`가 `buildFeedItems`의 결과를
+**데이터** — 인증 엔드포인트 `GET /calendar-feed/items`가 `buildFeedItems`의 결과를
 JSON으로 준다. 구독 URL을 켜지 않아도 쓸 수 있다(토큰과 무관).
 
 **자리** — `apps/native/src/device-calendar-export/`. 모양은 `widgets/`를 따른다.
