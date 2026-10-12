@@ -20,6 +20,7 @@ import { LegalLinks } from "../components/LegalLinks";
 import { OfficialDisclaimer } from "../components/OfficialDisclaimer";
 import { ServiceProgress } from "../components/ServiceProgress";
 import { PasskeyManager } from "../components/PasskeyManager";
+import { CalendarFeedCard } from "../components/CalendarFeedCard";
 import "./profile.css";
 
 /**
@@ -277,6 +278,8 @@ export function ProfilePage(props: { me: Me }) {
           <UsernameCard username={user.username} />
 
           <PasskeyManager />
+
+          <CalendarFeedCard />
 
           <OfficialDisclaimer />
 
