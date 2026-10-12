@@ -88,4 +88,12 @@ export const queryKeys = {
   personalEventsMonth: (month: string) =>
     ["personalEvents", "month", month] as const,
   personalEvent: (id: string) => ["personalEvents", "detail", id] as const,
+
+  /** 외부 캘린더 구독 링크. */
+  calendarFeed: ["calendarFeed"] as const,
+  /**
+   * 외부 캘린더로 내보낼 내 일정. 링크 접두사 아래라 링크를 바꿀 때 함께 무효화되지만,
+   * 일정이 바뀌는 쓰기(휴가·개인·부대 일정)는 이 키를 따로 무효화한다(invalidate.ts).
+   */
+  calendarFeedItems: ["calendarFeed", "items"] as const,
 };

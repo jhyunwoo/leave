@@ -31,6 +31,7 @@ export * from "./hooks/moderation";
 export * from "./hooks/friends";
 export * from "./hooks/users";
 export * from "./hooks/personal-events";
+export * from "./hooks/calendar-feed";
 
 export * from "./forms/use-leave-form";
 export * from "./hooks/notification-leave";
