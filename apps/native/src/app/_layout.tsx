@@ -406,6 +406,18 @@ function RootNavigator() {
               headerTitleStyle: { fontWeight: "600", color: colors.ink },
             }}
           />
+          <Stack.Screen
+            name="calendar-export"
+            options={{
+              headerShown: true,
+              title: "외부 캘린더",
+              headerBackTitle: "프로필",
+              headerTransparent: process.env.EXPO_OS === "ios",
+              headerShadowVisible: false,
+              headerTintColor: colors.brand,
+              headerTitleStyle: { fontWeight: "600", color: colors.ink },
+            }}
+          />
           {/* 알림 탭·내 휴가 탭 양쪽에서 들어오므로 돌아갈 곳을 고정하지 않는다. */}
           <Stack.Screen
             name="leave/[leaveId]"

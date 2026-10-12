@@ -223,6 +223,21 @@ export function ProfileScreen() {
             testID="open-widget-settings"
           />
         </ContentPanel>
+        <ContentPanel style={styles.card}>
+          <Text selectable style={styles.sectionTitle}>
+            외부 캘린더
+          </Text>
+          <Text selectable style={styles.sectionBody}>
+            리브 일정을 아이폰·구글·삼성 캘린더에서 함께 볼 수 있어요.
+          </Text>
+          <Button
+            icon="calendar"
+            title="외부 캘린더 연결"
+            variant="secondary"
+            onPress={() => router.push("/calendar-export")}
+            testID="open-calendar-export"
+          />
+        </ContentPanel>
       </ScrollView>
 
       <Stack.Toolbar placement="right">
