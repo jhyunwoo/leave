@@ -3053,10 +3053,9 @@ import: `import { CalendarExportSync } from "@/device-calendar-export/calendar-e
 
 `lifecycle` 프래그먼트의 `WidgetSync` 줄 다음에:
 
+<!-- prettier-ignore -->
 ```tsx
-{
-  widgetState === "ready" ? <CalendarExportSync authenticated /> : null;
-}
+      {widgetState === "ready" ? <CalendarExportSync authenticated /> : null}
 ```
 
 (`ready`는 로그인 + 온보딩 완료다. 온보딩 전에는 `/calendar-feed/items`가 onboarding 미들웨어에 막힌다.)
@@ -3123,31 +3122,30 @@ const toggleDeviceExport = async (next: boolean) => {
 
 `ScrollView`의 첫 자식으로(구독 링크 `ContentPanel` 앞에):
 
+<!-- prettier-ignore -->
 ```tsx
-{
-  deviceExportSupported ? (
-    <ContentPanel style={styles.card}>
-      <Text selectable style={styles.sectionTitle}>
-        휴대폰 캘린더에 바로 추가
-      </Text>
-      <Text selectable style={styles.sectionBody}>
-        이 휴대폰에 `리브` 캘린더를 만들고 일정을 넣어요. 삼성 캘린더에서 바로
-        보여요. 앱을 열 때마다 맞춰요.
-      </Text>
-      <NativeCheckbox
-        value={exportPreferences.enabled}
-        onValueChange={(next) => void toggleDeviceExport(next)}
-        label="휴대폰 캘린더에 추가"
-        testID="device-calendar-export-toggle"
-      />
-      {deviceError ? (
-        <Text selectable style={styles.error}>
-          {deviceError}
-        </Text>
+      {deviceExportSupported ? (
+        <ContentPanel style={styles.card}>
+          <Text selectable style={styles.sectionTitle}>
+            휴대폰 캘린더에 바로 추가
+          </Text>
+          <Text selectable style={styles.sectionBody}>
+            이 휴대폰에 `리브` 캘린더를 만들고 일정을 넣어요. 삼성 캘린더에서 바로
+            보여요. 앱을 열 때마다 맞춰요.
+          </Text>
+          <NativeCheckbox
+            value={exportPreferences.enabled}
+            onValueChange={(next) => void toggleDeviceExport(next)}
+            label="휴대폰 캘린더에 추가"
+            testID="device-calendar-export-toggle"
+          />
+          {deviceError ? (
+            <Text selectable style={styles.error}>
+              {deviceError}
+            </Text>
+          ) : null}
+        </ContentPanel>
       ) : null}
-    </ContentPanel>
-  ) : null;
-}
 ```
 
 본문의 백틱은 쓰지 말고 `‘리브’ 캘린더`처럼 따옴표로 바꾼다(JSX 텍스트에 백틱이 그대로 보인다).
