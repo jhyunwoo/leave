@@ -16,7 +16,9 @@ import {
   cycleState,
   cycleUsedDays,
   cyclesInRange,
+  holdingsIncludeOvernightDefault,
   isOutingCycleBased,
+  isOvernightBalanceKey,
   isRegularOvernightCycleBased,
   nextGrantDateAfter,
   normalizeLegacyDischargeDate,
@@ -52,7 +54,19 @@ type User = {
   branch: Branch;
   enlistedAt: string;
   dischargeAt: string;
+  holdingsIncludeOvernight: boolean | null;
 };
+
+/** "남은 휴가"에 외박 재원을 더할지. 고른 적 없으면(null) 군종 기본값. */
+export function includeOvernightInHoldings(user: {
+  branch: Branch;
+  holdingsIncludeOvernight: boolean | null;
+}): boolean {
+  return (
+    user.holdingsIncludeOvernight ??
+    holdingsIncludeOvernightDefault(user.branch)
+  );
+}
 
 /**
  * 주기 계산에 쓰는 전역일.
@@ -352,7 +366,13 @@ export async function buildGrantsPage(db: Db, user: User) {
 
   // 주기 재원은 적립분 원장이 없어 재원 합계로는 0이다. 대신 아래 주기 목록에서 뽑은
   // 합계를 얹는다 — 전역까지 받을 몫까지 세야 "앞으로 쓸 수 있는 휴가"가 된다.
-  const countable = funds.filter((fund) => !fund.cycleScoped);
+  // 외박을 빼기로 했으면 적립분이든 주기든 외박 재원은 합계에 넣지 않는다.
+  const includeOvernight = includeOvernightInHoldings(user);
+  const countable = funds.filter(
+    (fund) =>
+      !fund.cycleScoped &&
+      (includeOvernight || !isOvernightBalanceKey(fund.key)),
+  );
   const sum = (pick: (fund: (typeof funds)[number]) => number) =>
     countable.reduce((acc, fund) => acc + pick(fund), 0);
   /**
@@ -365,7 +385,7 @@ export async function buildGrantsPage(db: Db, user: User) {
    */
   const overnightCycleSum = (
     pick: (totals: (typeof cycles)["totals"]) => number,
-  ): number => pick(cycles.totals);
+  ): number => (includeOvernight ? pick(cycles.totals) : 0);
   const totals = {
     totalDays: sum((f) => f.totalDays) + overnightCycleSum((c) => c.totalDays),
     usedDays: sum((f) => f.usedDays) + overnightCycleSum((c) => c.usedDays),
@@ -409,6 +429,7 @@ export async function buildGrantsPage(db: Db, user: User) {
       ...serializeOutingConfig(fund.kind, fund.config, today),
       cycles: fund.summary.list,
     })),
+    includeOvernightInHoldings: includeOvernight,
   };
 }
 

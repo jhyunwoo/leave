@@ -1,6 +1,11 @@
 /** 잔여량의 근거를 확인하도록 부여·만기별 적립분을 펼치며, 넓은 창에서는 합계와 재원을 나란히 비교한다. */
 
-import { fmtDateShort, fmtRangeTiny, type BalanceKey } from "@leave/shared";
+import {
+  fmtDateShort,
+  fmtRangeTiny,
+  isOvernightBalanceKey,
+  type BalanceKey,
+} from "@leave/shared";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -81,6 +86,9 @@ export function LeaveGrantsScreen() {
   const upcomingCycleDays = regularOvernight.cycles
     .filter((cycle) => cycle.state === "future")
     .reduce((sum, cycle) => sum + cycle.remainingAsOfTodayDays, 0);
+  const hasOvernight =
+    regularOvernight.cycles.length > 0 ||
+    funds.some((fund) => isOvernightBalanceKey(fund.key) && fund.totalDays > 0);
   // 막대는 "총량 = 사용 + (계획 + 자유)" 로 쪼갠다. 계획분은 남은 휴가에서 빠지지 않고
   // 그 안에 잡혀 있을 뿐이라 초록 안쪽을 옅은 색으로 나눈다.
   const plannedBar = Math.min(
@@ -160,12 +168,18 @@ export function LeaveGrantsScreen() {
         </Text>
       )}
 
-      {upcomingCycleDays > 0 && (
-        <Text style={styles.rule} selectable>
-          전역까지 받을 정기외박 {upcomingCycleDays}일이 남은 휴가에 들어
-          있어요.
-        </Text>
-      )}
+      {page.data.includeOvernightInHoldings
+        ? upcomingCycleDays > 0 && (
+            <Text style={styles.rule} selectable>
+              전역까지 받을 정기외박 {upcomingCycleDays}일이 남은 휴가에 들어
+              있어요.
+            </Text>
+          )
+        : hasOvernight && (
+            <Text style={styles.rule} selectable>
+              외박은 남은 휴가에 넣지 않았어요. 내 휴가 탭에서 바꿀 수 있어요.
+            </Text>
+          )}
 
       {/* 배분 규칙이 보이지 않으면 건별 사용 일수를 믿기 어렵다. */}
       <Text style={styles.rule} selectable>

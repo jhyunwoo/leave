@@ -10,10 +10,11 @@
  * 여기 남긴 것은 "요청을 받아 권한을 확인하고 위 작업을 부르고 응답을 고르는" 흐름뿐이다.
  */
 
-import type {
-  LoginInput,
-  ProfileUpdateInput,
-  SignupInput,
+import {
+  LATEST_WHATS_NEW,
+  type LoginInput,
+  type ProfileUpdateInput,
+  type SignupInput,
 } from "@leave/shared";
 import type {
   AuthenticationResponseJSON,
@@ -128,6 +129,9 @@ function newUserRow(input: SignupInput): UserRow {
     // 가입 시 개인정보 수집·이용에 동의했음을 기록 (동의는 스키마에서 필수)
     consentedAt: input.dataConsent ? now : null,
     onboardingCompletedAt: hasProfile ? now : null,
+    holdingsIncludeOvernight: null,
+    // 막 가입한 사람에게 지금 앱에 이미 있는 기능을 "새 기능"이라 알리지 않는다.
+    seenWhatsNewId: LATEST_WHATS_NEW.id,
     createdAt: now,
   };
 }

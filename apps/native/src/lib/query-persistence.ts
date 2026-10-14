@@ -32,7 +32,9 @@ export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1_000;
 //     캐시에는 먼 달이 잔뜩 들어 있어 그대로 되살리면 이번 변경의 목적이 사라진다.
 // v5: 온보딩 상태를 저장 목록에 넣었다(아래 PERSISTED_QUERY_ROOTS 주석). 옛 캐시에는
 //     그 항목이 없어 첫 실행이 예전처럼 게이트에서 멈추므로 이어 쓸 이유가 없다.
-const CACHE_BUSTER = "native-offline-read-v5";
+// v6: 잔여 응답에 includeOvernightInHoldings가 추가됐다. 필드가 없는 옛 캐시가
+//     되살아나면 외박을 빼기로 한 육군 사용자에게 외박을 더한 숫자가 잠깐 보인다.
+const CACHE_BUSTER = "native-offline-read-v6";
 const CACHE_KEY = "tanstack-query-cache";
 
 /**

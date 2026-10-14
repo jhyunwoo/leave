@@ -19,6 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryRequestOptions, useLeaveApi } from "../context";
 import { queryKeys } from "../query-keys";
 import type {
+  Me,
   PublicUserProfile,
   UserProfile,
   UserSearchResults,
@@ -147,6 +148,28 @@ export function useSetUsername() {
           queryKeys.publicUserProfiles,
           queryKeys.friends,
         ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      );
+    },
+  });
+}
+
+/**
+ * 새 기능 안내를 닫았다고 기록한다.
+ *
+ * 요청이 끝나기 전에 내 정보 캐시부터 고친다. 닫는 순간 모달이 사라져야 하고,
+ * 응답을 기다리는 사이 다시 그려지면 "한 번만"이 깨진다.
+ */
+export function useMarkWhatsNewSeen() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap<{ ok: true }>(
+        await client.users.me["whats-new"].$put({ json: { id } }),
+      ),
+    onMutate: (id) => {
+      queryClient.setQueryData<Me>(queryKeys.me, (me) =>
+        me?.user ? { ...me, user: { ...me.user, seenWhatsNewId: id } } : me,
       );
     },
   });

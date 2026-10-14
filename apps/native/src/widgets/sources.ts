@@ -144,7 +144,9 @@ export function buildWidgetSource(input: WidgetSourceInput): WidgetSource {
     leaveRanges,
     snapshot: {
       holdings: input.balances
-        ? summarizeHoldings(input.balances.balances)
+        ? summarizeHoldings(input.balances.balances, {
+            includeOvernight: input.balances.includeOvernightInHoldings,
+          })
         : null,
       headroom: dayStat
         ? {

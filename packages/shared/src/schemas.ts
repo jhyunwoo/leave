@@ -485,6 +485,16 @@ const cycleIntervalRefine = (
   }
 };
 
+/** 새 기능 안내를 봤다는 기록. */
+export const whatsNewSeenSchema = z.object({
+  id: z.string().min(1).max(100),
+});
+
+/** "남은 휴가"에 외박 재원을 더할지. 내 휴가 화면의 스위치가 보낸다. */
+export const holdingsPreferenceSchema = z.object({
+  includeOvernight: z.boolean(),
+});
+
 /** 정기외박 자동 적립 설정. */
 export const regularOvernightConfigSchema = z.discriminatedUnion("enabled", [
   z.object({ enabled: z.literal(false) }),
@@ -832,6 +842,7 @@ export type LeaveBalanceUpdateInput = z.infer<typeof leaveBalanceUpdateSchema>;
 export type LeaveGrantCreateInput = z.infer<typeof leaveGrantCreateSchema>;
 export type LeaveGrantUpdateInput = z.infer<typeof leaveGrantUpdateSchema>;
 export type OutingConfigInput = z.infer<typeof outingConfigSchema>;
+export type HoldingsPreferenceInput = z.infer<typeof holdingsPreferenceSchema>;
 export type RegularOvernightConfigInput = z.infer<
   typeof regularOvernightConfigSchema
 >;

@@ -8,6 +8,7 @@ import {
   BALANCE_LABELS,
   fmtRange,
   fmtRangeTiny,
+  isOvernightBalanceKey,
   LEAVE_KIND_LABELS,
   LEAVE_KINDS,
   segmentBalanceKey,
@@ -23,6 +24,7 @@ import {
   useDeleteLeave,
   useLeaveBalances,
   useMyLeaves,
+  useUpdateHoldingsPreference,
 } from "@leave/client";
 import {
   LazyLeaveFormModal,
@@ -31,6 +33,7 @@ import {
 import { NextLeaveCards } from "../components/NextLeaveCard";
 import { LeaveStatusControl } from "../components/LeaveStatusControl";
 import { QueryErrorState } from "../components/QueryErrorState";
+import { ShareLeavesModal } from "../components/ShareLeavesModal";
 
 /** Bound the first render on slow CPUs; keyboard-accessible expansion reveals the remaining history. */
 const LEAVE_SECTION_PAGE_SIZE = 20;
@@ -41,11 +44,24 @@ export function LeavesPage() {
   const { mutateAsync: deleteLeave, isPending: deleting } = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const today = todayInSeoul();
 
   // 이 셈은 웹·앱·보유 휴가 화면이 함께 쓴다(@leave/client의 summarizeHoldings).
   // 규칙이 미묘해서 화면마다 적어 두면 한 곳만 고쳐졌을 때 숫자가 갈린다.
-  const holdings = summarizeHoldings(balances.data?.balances);
+  const holdingsPreference = useUpdateHoldingsPreference();
+  // 저장이 끝나기 전에도 체크와 숫자가 함께 움직이게 보낸 값을 먼저 쓴다.
+  const includeOvernight = holdingsPreference.isPending
+    ? holdingsPreference.variables.includeOvernight
+    : balances.data?.includeOvernightInHoldings;
+  const hasOvernight = (balances.data?.balances ?? []).some(
+    (item) =>
+      isOvernightBalanceKey(item.key) &&
+      (item.totalDays > 0 || item.cycleScoped),
+  );
+  const holdings = summarizeHoldings(balances.data?.balances, {
+    includeOvernight,
+  });
   const visibleBalances = (balances.data?.balances ?? []).filter(
     (item) =>
       item.totalDays > 0 ||
@@ -94,16 +110,27 @@ export function LeavesPage() {
             등록한 휴가를 고치거나 지울 수 있어요.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onMouseEnter={preloadLeaveFormModal}
-          onFocus={preloadLeaveFormModal}
-          onClick={() => setCreating(true)}
-        >
-          <ActionIcon name="calendarAdd" />
-          휴가 등록
-        </button>
+        <div style={{ display: "flex", gap: "var(--sp-sm)", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!leaves.data}
+            onClick={() => setSharing(true)}
+          >
+            <ActionIcon name="share" />
+            공유
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onMouseEnter={preloadLeaveFormModal}
+            onFocus={preloadLeaveFormModal}
+            onClick={() => setCreating(true)}
+          >
+            <ActionIcon name="calendarAdd" />
+            휴가 등록
+          </button>
+        </div>
       </header>
 
       <div className="workspace-columns leaves-workspace">
@@ -155,6 +182,34 @@ export function LeavesPage() {
                 ›
               </span>
             </Link>
+          )}
+
+          {/* 외박이 없으면 이 체크는 숫자를 바꾸지 못하므로 그리지 않는다. */}
+          {balances.data && hasOvernight && (
+            <label
+              className="check-field"
+              style={{ padding: "0 var(--sp-lg)" }}
+            >
+              <input
+                type="checkbox"
+                checked={includeOvernight}
+                disabled={holdingsPreference.isPending}
+                onChange={(event) =>
+                  holdingsPreference.mutate({
+                    includeOvernight: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                <strong>남은 휴가에 외박 포함</strong>
+                <small>외박을 휴가에 붙여 쓸 수 없는 부대라면 끄세요</small>
+              </span>
+            </label>
+          )}
+          {holdingsPreference.isError && (
+            <p className="caption" role="alert" style={{ color: "#a72027" }}>
+              설정을 저장하지 못했어요. 다시 시도해주세요.
+            </p>
           )}
 
           {visibleBalances.length > 0 && (
@@ -307,6 +362,12 @@ export function LeavesPage() {
             setEditing(null);
           }}
           onSaved={() => undefined}
+        />
+      )}
+      {sharing && leaves.data && (
+        <ShareLeavesModal
+          leaves={leaves.data.leaves}
+          onClose={() => setSharing(false)}
         />
       )}
     </div>

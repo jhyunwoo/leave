@@ -54,3 +54,5 @@ export * from "./availability";
 export * from "./friends";
 export * from "./invite-code";
 export * from "./username";
+export * from "./share-card";
+export * from "./whats-new";

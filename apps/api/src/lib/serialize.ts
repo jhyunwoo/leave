@@ -48,6 +48,7 @@ export function serializeUser(
     nextPromotionDate: info.nextPromotionDate,
     serviceProgress: info.serviceProgress,
     daysUntilDischarge: info.daysUntilDischarge,
+    seenWhatsNewId: user.seenWhatsNewId,
   };
 }
 

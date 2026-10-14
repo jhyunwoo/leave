@@ -15,10 +15,12 @@ import {
   usernameQuerySchema,
   usernameSchema,
   usernameSetSchema,
+  whatsNewSeenSchema,
 } from "@leave/shared";
 import {
   errorResponse,
   jsonContent,
+  okSchema,
   userProfileSchema,
 } from "../lib/responses";
 import { onboardingMiddleware } from "../middleware/onboarding";
@@ -57,6 +59,25 @@ export const setUsernameRoute = createRoute({
     401: errorResponse("인증 실패"),
     409: errorResponse("이미 사용 중인 사용자 이름"),
     429: errorResponse("요청이 너무 잦음"),
+  },
+});
+
+/** 새 기능 안내를 닫았다. 계정에 남겨 다른 기기에서도 다시 뜨지 않게 한다. */
+export const whatsNewSeenRoute = createRoute({
+  method: "put",
+  path: "/me/whats-new",
+  tags: TAGS,
+  summary: "새 기능 안내를 본 것으로 기록",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: whatsNewSeenSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(okSchema, "기록됨"),
+    401: errorResponse("인증 실패"),
   },
 });
 

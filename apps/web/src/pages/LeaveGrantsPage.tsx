@@ -2,7 +2,11 @@
 
 import { ActionIcon } from "../components/ActionIcon";
 
-import { fmtRangeTiny, type BalanceKey } from "@leave/shared";
+import {
+  fmtRangeTiny,
+  isOvernightBalanceKey,
+  type BalanceKey,
+} from "@leave/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { LeaveGrantFund, LeaveGrantItem, Me } from "@leave/client";
@@ -61,6 +65,13 @@ export function LeaveGrantsPage(props: { me: Me }) {
     (fund) =>
       !fund.cycleScoped && fund.grants.length === 0 && fund.usedDays === 0,
   );
+
+  const overnightExcluded =
+    !page.data.includeOvernightInHoldings &&
+    (regularOvernight.cycles.length > 0 ||
+      funds.some(
+        (fund) => isOvernightBalanceKey(fund.key) && fund.totalDays > 0,
+      ));
 
   // 막대는 "총량 = 사용 + (계획 + 자유)" 로 쪼갠다. 계획분은 남은 휴가에서 빠지지 않고
   // 그 안에 잡혀 있을 뿐이라 초록 안쪽을 옅은 색으로 나눈다.
@@ -152,6 +163,12 @@ export function LeaveGrantsPage(props: { me: Me }) {
             <span className="badge">예정 {totals.upcomingDays}일</span>
           )}
         </div>
+
+        {overnightExcluded && (
+          <p className="caption text-body">
+            외박은 남은 휴가에 넣지 않았어요. 내 휴가에서 바꿀 수 있어요.
+          </p>
+        )}
 
         {totals.unattributedDays > 0 && (
           <p className="field-error" role="alert">

@@ -66,6 +66,12 @@ export const users = sqliteTable(
     consentedAt: text("consented_at"),
     /** null이면 계정은 있으나 필수 온보딩을 마치지 않은 상태다. */
     onboardingCompletedAt: text("onboarding_completed_at"),
+    /** "남은 휴가"에 외박을 더할지. null이면 군종 기본값(holdingsIncludeOvernightDefault). */
+    holdingsIncludeOvernight: integer("holdings_include_overnight", {
+      mode: "boolean",
+    }),
+    /** 마지막으로 본 새 기능 안내의 id(@leave/shared의 LATEST_WHATS_NEW). */
+    seenWhatsNewId: text("seen_whats_new_id"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [

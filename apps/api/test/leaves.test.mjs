@@ -1174,6 +1174,67 @@ test("남은 휴가에 앞으로 받을 주기 몫까지 들어간다", async ()
   assert.equal(regularItem.remainingDays + regularItem.upcomingDays, ahead);
 });
 
+test("육군은 기본으로 남은 휴가에서 외박을 빼고, 스위치로 다시 넣을 수 있다", async () => {
+  const quarterly = {
+    enabled: true,
+    startDate: "2026-01-05",
+    intervalMonths: 3,
+    daysPerGrant: 2,
+  };
+  const army = await signup({ branch: "army" });
+  await req("PUT", "/leaves/regular-overnight", {
+    token: army.token,
+    body: quarterly,
+  });
+  const navy = await signup({ branch: "navy" });
+  await req("PUT", "/leaves/regular-overnight", {
+    token: navy.token,
+    body: { ...quarterly, intervalMonths: undefined, intervalDays: 42 },
+  });
+
+  const armyBalances = await req("GET", "/leaves/balances", {
+    token: army.token,
+  });
+  assert.equal(armyBalances.data.includeOvernightInHoldings, false);
+  const navyBalances = await req("GET", "/leaves/balances", {
+    token: navy.token,
+  });
+  assert.equal(navyBalances.data.includeOvernightInHoldings, true);
+
+  // 보유 휴가의 합계도 같은 값을 따른다 — 두 화면의 "남은 휴가"가 갈리면 안 된다.
+  const nonOvernight = (page) =>
+    page.funds
+      .filter(
+        (fund) =>
+          fund.key !== "regular_overnight" && fund.key !== "other_overnight",
+      )
+      .filter((fund) => !fund.cycleScoped)
+      .reduce((sum, fund) => sum + fund.remainingAsOfTodayDays, 0);
+  const excluded = await req("GET", "/leaves/grants", { token: army.token });
+  assert.equal(excluded.data.includeOvernightInHoldings, false);
+  assert.equal(
+    excluded.data.totals.remainingAsOfTodayDays,
+    nonOvernight(excluded.data),
+  );
+
+  const switched = await req("PUT", "/leaves/holdings-preference", {
+    token: army.token,
+    body: { includeOvernight: true },
+  });
+  assert.equal(switched.status, 200);
+  assert.equal(switched.data.includeOvernightInHoldings, true);
+
+  const included = await req("GET", "/leaves/grants", { token: army.token });
+  const ahead = included.data.regularOvernight.cycles
+    .filter((cycle) => cycle.state !== "past")
+    .reduce((sum, cycle) => sum + cycle.remainingAsOfTodayDays, 0);
+  assert.ok(ahead > 0);
+  assert.equal(
+    included.data.totals.remainingAsOfTodayDays,
+    nonOvernight(included.data) + ahead,
+  );
+});
+
 test("적립분 입력값 검증 — 0일과 뒤집힌 만기는 거절한다", async () => {
   const { token } = await signup();
   assert.equal(

@@ -362,7 +362,9 @@ export function CalendarScreen() {
   }, [regularOvernight, today, dischargeAt]);
   const hasBanner = Boolean(currentCycle || pendingFirstGrant);
   // 넓은 창 요약 패널의 "남은 휴가". 내 휴가 화면과 같은 셈을 쓴다.
-  const holdings = summarizeHoldings(balances.data?.balances);
+  const holdings = summarizeHoldings(balances.data?.balances, {
+    includeOvernight: balances.data?.includeOvernightInHoldings,
+  });
 
   const glassStripHeight =
     STRIP_TOP_GAP +

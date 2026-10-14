@@ -1,5 +1,6 @@
 /** 휴가 변경 후 목록·잔여량·달력의 캐시를 함께 갱신한다. */
 import type {
+  HoldingsPreferenceInput,
   LeaveBalanceUpdateInput,
   LeaveCreateInput,
   LeaveGrantCreateInput,
@@ -286,6 +287,30 @@ export function useUpdateRegularOvernight() {
     mutationFn: async (input: RegularOvernightConfigInput) =>
       unwrap<LeaveBalanceSummary>(
         await client.leaves["regular-overnight"].$put({ json: input }),
+      ),
+    onSuccess: async (data) => {
+      await setAuthoritativeQueryData(
+        queryClient,
+        queryKeys.leaveBalances,
+        data,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leaveGrants });
+    },
+  });
+}
+
+/**
+ * "남은 휴가"에 외박을 넣을지 바꾼다. 보유 휴가 화면의 합계도 이 값을 따르므로
+ * 함께 다시 받는다.
+ */
+export function useUpdateHoldingsPreference() {
+  const { client, unwrap } = useLeaveApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    scope: LEAVE_HOLDINGS_MUTATION_SCOPE,
+    mutationFn: async (input: HoldingsPreferenceInput) =>
+      unwrap<LeaveBalanceSummary>(
+        await client.leaves["holdings-preference"].$put({ json: input }),
       ),
     onSuccess: async (data) => {
       await setAuthoritativeQueryData(

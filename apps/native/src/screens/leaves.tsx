@@ -3,6 +3,7 @@
 
 import { fmtRange } from "@leave/shared/calendar";
 import {
+  isOvernightBalanceKey,
   LEAVE_KIND_LABELS,
   LEAVE_KINDS,
   type LeaveKind,
@@ -15,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -27,6 +29,7 @@ import {
   useLeaveBalances,
   useLeaveGrants,
   useMyLeaves,
+  useUpdateHoldingsPreference,
 } from "@leave/client";
 import {
   sideColumnWidth,
@@ -42,6 +45,7 @@ import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { NextLeaveCard } from "@/components/next-leave-card";
 import { NativeSegmentedControl } from "@/components/segmented-control";
 import { SegmentBadges } from "@/components/segment-badges";
+import { ShareLeavesSheet } from "@/components/share-leaves-sheet";
 import { WebScreenActions } from "@/components/web-screen-actions";
 import { confirmAction } from "@/lib/dialog";
 import { useActiveGate, useServiceTicker } from "@/lib/service-progress-clock";
@@ -73,6 +77,7 @@ export function LeavesScreen() {
   const del = useDeleteLeave();
   const [editing, setEditing] = useState<MyLeave | null>(null);
   const [creating, setCreating] = useState(false);
+  const [sharing, setSharing] = useState(false);
   // 넓은 창에서만 쓰는 선택. 라우트가 아니라 화면 안의 선택이라 뒤로가기를
   // 만들지 않는다 — 목록에서 항목을 훑는 동안 히스토리가 쌓이면 안 된다.
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
@@ -80,7 +85,19 @@ export function LeavesScreen() {
   const active = useActiveGate();
   const now = useServiceTicker(active, 1_000);
 
-  const holdings = summarizeHoldings(balances.data?.balances);
+  const holdingsPreference = useUpdateHoldingsPreference();
+  // 저장이 끝나기 전에도 스위치와 숫자가 함께 움직이게 보낸 값을 먼저 쓴다.
+  const includeOvernight = holdingsPreference.isPending
+    ? holdingsPreference.variables.includeOvernight
+    : balances.data?.includeOvernightInHoldings;
+  const hasOvernight = (balances.data?.balances ?? []).some(
+    (item) =>
+      isOvernightBalanceKey(item.key) &&
+      (item.totalDays > 0 || item.cycleScoped),
+  );
+  const holdings = summarizeHoldings(balances.data?.balances, {
+    includeOvernight,
+  });
   /** 만료·소멸처럼 눈에 띄어야 하는 것만 경고 색으로. 계획은 경고가 아니다. */
   const holdingsWarning = [
     holdings.expiringSoon > 0 ? `만료 임박 ${holdings.expiringSoon}일` : null,
@@ -188,6 +205,31 @@ export function LeavesScreen() {
           </View>
           <Text style={styles.detailLink}>자세히</Text>
         </Pressable>
+      ) : null}
+      {/* 외박이 없으면 이 스위치는 숫자를 바꾸지 못하므로 그리지 않는다. */}
+      {balances.data && hasOvernight ? (
+        <View style={styles.preferenceRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.preferenceTitle}>남은 휴가에 외박 포함</Text>
+            <Text style={styles.holdingsHint}>
+              외박을 휴가에 붙여 쓸 수 없는 부대라면 끄세요
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel="남은 휴가에 외박 포함"
+            value={includeOvernight}
+            disabled={holdingsPreference.isPending}
+            onValueChange={(value) =>
+              holdingsPreference.mutate({ includeOvernight: value })
+            }
+            trackColor={{ true: colors.primary, false: colors.hairline }}
+          />
+        </View>
+      ) : null}
+      {holdingsPreference.isError ? (
+        <Text style={styles.preferenceError} selectable>
+          설정을 저장하지 못했어요. 다시 시도해주세요.
+        </Text>
       ) : null}
     </View>
   );
@@ -354,7 +396,10 @@ export function LeavesScreen() {
           contentContainerStyle={styles.content}
           refreshControl={refreshControl}
         >
-          <WebHeader onCreate={() => setCreating(true)} />
+          <WebHeader
+            onCreate={() => setCreating(true)}
+            onShare={() => setSharing(true)}
+          />
           {balanceColumn}
           {leaveList}
         </ScrollView>
@@ -376,7 +421,10 @@ export function LeavesScreen() {
                 showsVerticalScrollIndicator={false}
                 refreshControl={refreshControl}
               >
-                <WebHeader onCreate={() => setCreating(true)} />
+                <WebHeader
+                  onCreate={() => setCreating(true)}
+                  onShare={() => setSharing(true)}
+                />
                 {balanceColumn}
               </ScrollView>
             </View>
@@ -408,6 +456,13 @@ export function LeavesScreen() {
 
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
+          icon="square.and.arrow.up"
+          disabled={!leaves.data}
+          onPress={() => setSharing(true)}
+        >
+          공유
+        </Stack.Toolbar.Button>
+        <Stack.Toolbar.Button
           icon="plus"
           variant="prominent"
           tintColor={colors.brand}
@@ -416,6 +471,14 @@ export function LeavesScreen() {
           등록
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
+
+      {sharing && leaves.data ? (
+        <ShareLeavesSheet
+          visible
+          leaves={leaves.data.leaves}
+          onClose={() => setSharing(false)}
+        />
+      ) : null}
 
       {(creating || editing) && (
         <LazyLeaveFormModal
@@ -443,7 +506,7 @@ export function LeavesScreen() {
 }
 
 /** 웹에는 네이티브 툴바가 없으므로 제목과 등록 버튼을 본문 맨 위에 둔다. */
-function WebHeader(props: { onCreate: () => void }) {
+function WebHeader(props: { onCreate: () => void; onShare: () => void }) {
   const styles = useStyles();
   if (process.env.EXPO_OS !== "web") return null;
   return (
@@ -451,6 +514,14 @@ function WebHeader(props: { onCreate: () => void }) {
       <Text style={styles.webTitle}>내 휴가</Text>
       <WebScreenActions
         actions={[
+          {
+            id: "share",
+            icon: "share" as const,
+            title: "공유",
+            variant: "secondary",
+            onPress: props.onShare,
+            testID: "leaves-share",
+          },
           {
             id: "create",
             icon: "calendarAdd" as const,
@@ -540,6 +611,18 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   holdingsHint: { fontSize: 12, color: colors.mute, paddingTop: 2 },
   detailLink: { fontSize: 13, fontWeight: "700", color: colors.brand },
+  preferenceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  preferenceTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  preferenceError: {
+    fontSize: 12,
+    color: colors.negative,
+    paddingHorizontal: spacing.xl,
+  },
   empty: {
     padding: spacing.xxxl,
     alignItems: "center",

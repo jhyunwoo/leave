@@ -45,6 +45,7 @@ import {
   setUsernameRoute,
   usernameAvailabilityRoute,
   userProfileRoute,
+  whatsNewSeenRoute,
 } from "./users.contract";
 
 /** 어느 방향으로든 차단이 걸린 사용자를 SQL 단계에서 지운다. */
@@ -138,6 +139,14 @@ const app = createApp();
 app.use("*", authMiddleware);
 
 export const userRoutes = app
+  .openapi(whatsNewSeenRoute, async (c) => {
+    const db = drizzle(c.env.DB);
+    await db
+      .update(users)
+      .set({ seenWhatsNewId: c.req.valid("json").id })
+      .where(eq(users.id, c.get("user").id));
+    return c.json({ ok: true as const }, 200);
+  })
   .openapi(setUsernameRoute, async (c) => {
     const { username } = c.req.valid("json");
     const db = drizzle(c.env.DB);

@@ -39,6 +39,7 @@ import {
   todayInSeoul,
   type BalanceKey,
   type Branch,
+  type HoldingsPreferenceInput,
   type LeaveSegment,
   type OutingConfigInput,
   type OutingKind,
@@ -67,6 +68,7 @@ import type { Db } from "./db";
 import { LeaveRuleError } from "./errors";
 import {
   cycleDischargeDate,
+  includeOvernightInHoldings,
   loadAllocationInputs,
   outingSummary,
   regularOvernightSummary,
@@ -109,6 +111,15 @@ export type LeaveBalanceItem = {
   expiringSoonDays: number;
 };
 
+/** 잔여 요약을 돌려주는 함수들이 받는 사용자. 계정 행(users)이 그대로 들어온다. */
+type SummaryUser = {
+  id: string;
+  branch: Branch;
+  enlistedAt: string;
+  dischargeAt: string;
+  holdingsIncludeOvernight: boolean | null;
+};
+
 /** 이미 읽어 둔 구간 중 정기외박(자동 적립 대상)만 고른다. */
 function onlyRegularOvernight<
   T extends { category: string; overnightKind: string | null },
@@ -142,10 +153,7 @@ export function isCycleScoped(
   return kind ? isOutingCycleBased(outing[kind]) : false;
 }
 
-export async function getLeaveBalanceSummary(
-  db: Db,
-  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
-) {
+export async function getLeaveBalanceSummary(db: Db, user: SummaryUser) {
   const { grantRows, segments, config, outing } = await loadAllocationInputs(
     db,
     user.id,
@@ -328,7 +336,23 @@ export async function getLeaveBalanceSummary(
     outing: OUTING_KINDS.map((kind) =>
       serializeOutingConfig(kind, outing[kind], today),
     ),
+    includeOvernightInHoldings: includeOvernightInHoldings(user),
   };
+}
+
+export async function saveHoldingsPreference(
+  db: Db,
+  user: SummaryUser,
+  input: HoldingsPreferenceInput,
+) {
+  await db
+    .update(users)
+    .set({ holdingsIncludeOvernight: input.includeOvernight })
+    .where(eq(users.id, user.id));
+  return getLeaveBalanceSummary(db, {
+    ...user,
+    holdingsIncludeOvernight: input.includeOvernight,
+  });
 }
 
 /**
@@ -341,7 +365,7 @@ export async function getLeaveBalanceSummary(
  */
 export async function updateLeaveBalanceTotals(
   db: Db,
-  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
+  user: SummaryUser,
   totals: Partial<Record<BalanceKey, number>>,
 ) {
   const { grantRows, segments, config, outing } = await loadAllocationInputs(
@@ -423,7 +447,7 @@ export async function updateLeaveBalanceTotals(
 
 export async function saveRegularOvernightConfig(
   db: Db,
-  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
+  user: SummaryUser,
   input: RegularOvernightConfigInput,
 ) {
   // 군종별 제한은 두지 않는다. 육군도 분기마다 정기외박을 운영하고(2012.12 개정),
@@ -495,7 +519,7 @@ export async function saveRegularOvernightConfig(
  */
 export async function saveOutingConfig(
   db: Db,
-  user: { id: string; branch: Branch; enlistedAt: string; dischargeAt: string },
+  user: SummaryUser,
   input: OutingConfigInput,
 ) {
   if (input.enabled) {

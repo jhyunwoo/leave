@@ -8,6 +8,7 @@ import {
   useNotificationSummary,
   useNotifications,
 } from "@leave/client/hooks/notifications";
+import { WhatsNewSheet } from "@/components/whats-new-sheet";
 import { useColors } from "@/theme";
 
 /**
@@ -43,58 +44,61 @@ export default function TabLayout() {
       : summary.data?.unreadCount) ?? 0;
 
   return (
-    <NativeTabs
-      tintColor={colors.brand}
-      // iOS 26의 탭바 축소를 끈다. 스크롤할 때 탭바가 왼쪽 알약으로 접히면
-      // 탭 이름이 사라져 지금 어디에 있는지, 어디로 갈 수 있는지가 함께 사라진다.
-      // 달력·목록처럼 계속 스크롤하는 화면이 대부분이라 접힌 상태가 기본이 된다.
-      minimizeBehavior={process.env.EXPO_OS === "ios" ? "never" : undefined}
-      sidebarAdaptable={process.env.EXPO_OS === "ios" ? true : undefined}
-    >
-      <NativeTabs.Trigger name="(calendar)">
-        <NativeTabs.Trigger.Label>달력</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "calendar", selected: "calendar" }}
-          md="calendar_month"
-        />
-      </NativeTabs.Trigger>
+    <>
+      <NativeTabs
+        tintColor={colors.brand}
+        // iOS 26의 탭바 축소를 끈다. 스크롤할 때 탭바가 왼쪽 알약으로 접히면
+        // 탭 이름이 사라져 지금 어디에 있는지, 어디로 갈 수 있는지가 함께 사라진다.
+        // 달력·목록처럼 계속 스크롤하는 화면이 대부분이라 접힌 상태가 기본이 된다.
+        minimizeBehavior={process.env.EXPO_OS === "ios" ? "never" : undefined}
+        sidebarAdaptable={process.env.EXPO_OS === "ios" ? true : undefined}
+      >
+        <NativeTabs.Trigger name="(calendar)">
+          <NativeTabs.Trigger.Label>달력</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "calendar", selected: "calendar" }}
+            md="calendar_month"
+          />
+        </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="leaves">
-        <NativeTabs.Trigger.Label>내 휴가</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "airplane", selected: "airplane" }}
-          md="luggage"
-        />
-      </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="leaves">
+          <NativeTabs.Trigger.Label>내 휴가</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "airplane", selected: "airplane" }}
+            md="luggage"
+          />
+        </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="(friends)">
-        <NativeTabs.Trigger.Label>친구</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "person.2", selected: "person.2.fill" }}
-          md="group"
-        />
-      </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="(friends)">
+          <NativeTabs.Trigger.Label>친구</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "person.2", selected: "person.2.fill" }}
+            md="group"
+          />
+        </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="notifications">
-        <NativeTabs.Trigger.Label>알림</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "bell", selected: "bell.fill" }}
-          md="notifications"
-        />
-        {unread > 0 && (
-          <NativeTabs.Trigger.Badge>
-            {unread > 99 ? "99+" : String(unread)}
-          </NativeTabs.Trigger.Badge>
-        )}
-      </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="notifications">
+          <NativeTabs.Trigger.Label>알림</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "bell", selected: "bell.fill" }}
+            md="notifications"
+          />
+          {unread > 0 && (
+            <NativeTabs.Trigger.Badge>
+              {unread > 99 ? "99+" : String(unread)}
+            </NativeTabs.Trigger.Badge>
+          )}
+        </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.Label>프로필</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "person", selected: "person.fill" }}
-          md="person"
-        />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+        <NativeTabs.Trigger name="profile">
+          <NativeTabs.Trigger.Label>프로필</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "person", selected: "person.fill" }}
+            md="person"
+          />
+        </NativeTabs.Trigger>
+      </NativeTabs>
+      <WhatsNewSheet />
+    </>
   );
 }

@@ -9,6 +9,7 @@ import type { Me } from "@leave/client";
 import { useNotifications, useNotificationSummary } from "@leave/client";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
+import { WhatsNewModal } from "../components/WhatsNewModal";
 
 const navClassName = ({ isActive }: { isActive: boolean }) =>
   `app-nav-item${isActive ? " is-active" : ""}`;
@@ -77,6 +78,7 @@ export function AppLayout(props: { me: Me }) {
           <Outlet />
         </Suspense>
       </main>
+      <WhatsNewModal me={props.me} />
     </div>
   );
 }

@@ -18,8 +18,10 @@
  *    정의이고(@leave/shared의 duty-days), 월 2회를 2일로 더하면 화면이 없는 휴가를
  *    있다고 말한다. 서버의 보유 휴가 합계도 같은 이유로 외출을 뺀다
  *    (apps/api/src/lib/leave-grants.ts의 cycleSum). 두 화면이 갈리면 안 된다.
+ *  - 외박 재원은 사용자가 고른 대로 넣거나 뺀다(`includeOvernightInHoldings`).
+ *    서버의 보유 휴가 합계도 같은 값을 보고 뺀다.
  */
-import { isOutingBalanceKey } from "@leave/shared";
+import { isOutingBalanceKey, isOvernightBalanceKey } from "@leave/shared";
 import type { LeaveBalanceSummary } from "./types";
 
 export type LeaveHoldings = {
@@ -33,9 +35,11 @@ export type LeaveHoldings = {
 
 export function summarizeHoldings(
   balances: LeaveBalanceSummary["balances"] | undefined,
+  { includeOvernight = true }: { includeOvernight?: boolean } = {},
 ): LeaveHoldings {
   return (balances ?? [])
     .filter((item) => !isOutingBalanceKey(item.key))
+    .filter((item) => includeOvernight || !isOvernightBalanceKey(item.key))
     .reduce<LeaveHoldings>(
       (sum, item) => ({
         remaining:

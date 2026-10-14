@@ -7,6 +7,7 @@
 
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  holdingsPreferenceSchema,
   leaveBalanceUpdateSchema,
   leaveCreateSchema,
   leaveGrantCreateSchema,
@@ -96,6 +97,24 @@ export const regularOvernightRoute = createRoute({
   responses: {
     200: jsonContent(leaveBalanceSummarySchema, "정기외박 설정"),
     400: errorResponse("입력값 오류 또는 지원하지 않는 군종"),
+    401: errorResponse("인증 실패"),
+  },
+});
+
+export const holdingsPreferenceRoute = createRoute({
+  method: "put",
+  path: "/holdings-preference",
+  tags: ["휴가"],
+  summary: "남은 휴가에 외박 포함 여부",
+  security: [{ Bearer: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: holdingsPreferenceSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: jsonContent(leaveBalanceSummarySchema, "바뀐 휴가 재원 현황"),
     401: errorResponse("인증 실패"),
   },
 });

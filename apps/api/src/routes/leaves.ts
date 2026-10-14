@@ -29,6 +29,7 @@ import { leaveRuleMessage } from "../lib/errors";
 import {
   foldSegmentRows,
   getLeaveBalanceSummary,
+  saveHoldingsPreference,
   saveOutingConfig,
   saveRegularOvernightConfig,
   segmentsForLeaves,
@@ -53,6 +54,7 @@ import {
   deleteGrantRoute,
   deleteLeaveRoute,
   grantsRoute,
+  holdingsPreferenceRoute,
   mineRoute,
   outingRoute,
   regularOvernightRoute,
@@ -134,6 +136,14 @@ export const leaveRoutes = app
       if (message === null) throw error;
       return c.json({ error: message }, 400);
     }
+  })
+  .openapi(holdingsPreferenceRoute, async (c) => {
+    const user = c.get("user");
+    const db = drizzle(c.env.DB);
+    return c.json(
+      await saveHoldingsPreference(db, user, c.req.valid("json")),
+      200,
+    );
   })
   .openapi(outingRoute, async (c) => {
     const user = c.get("user");

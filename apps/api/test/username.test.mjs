@@ -1,7 +1,7 @@
 import { markEmailVerified } from "./helpers.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { req, setUsername, signup, uniq } from "./helpers.mjs";
+import { openTestDb, req, setUsername, signup, uniq } from "./helpers.mjs";
 
 /** 이름을 정하지 않은 채 계정만 만든다(0023 이전 가입자와 같은 상태). */
 function nameless(overrides = {}) {
@@ -206,4 +206,29 @@ test("온보딩은 이름 없이 완료되지 않고, 기존 계정은 완료 �
     (await req("GET", "/auth/me", { token: legacy.token })).data.user.username,
     null,
   );
+});
+
+test("새 기능 안내는 계정마다 한 번만 뜬다", async () => {
+  const { token, email } = await signup();
+  // 막 가입한 계정은 최신 안내를 이미 본 것으로 시작한다.
+  const fresh = await req("GET", "/auth/me", { token });
+  const latest = fresh.data.user.seenWhatsNewId;
+  assert.ok(latest);
+
+  // 안내가 나오기 전부터 있던 계정을 흉내 낸다.
+  const db = openTestDb();
+  db.prepare("UPDATE users SET seen_whats_new_id = NULL WHERE email = ?").run(
+    email,
+  );
+  db.close();
+  const before = await req("GET", "/auth/me", { token });
+  assert.equal(before.data.user.seenWhatsNewId, null);
+
+  const seen = await req("PUT", "/users/me/whats-new", {
+    token,
+    body: { id: latest },
+  });
+  assert.equal(seen.status, 200);
+  const after = await req("GET", "/auth/me", { token });
+  assert.equal(after.data.user.seenWhatsNewId, latest);
 });

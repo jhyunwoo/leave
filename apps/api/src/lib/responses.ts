@@ -51,6 +51,8 @@ export const userSchema = z
     nextPromotionDate: z.string().nullable(),
     serviceProgress: z.number(),
     daysUntilDischarge: z.number(),
+    /** 마지막으로 본 새 기능 안내의 id. 최신 안내와 다르면 앱이 한 번 띄운다. */
+    seenWhatsNewId: z.string().nullable(),
   })
   .openapi("User");
 
@@ -577,6 +579,8 @@ export const leaveGrantsPageSchema = z
     }),
     /** 갈래(평일·주말)마다 한 벌. 꺼져 있어도 항목 자체는 온다. */
     outing: z.array(outingFundSchema),
+    /** totals가 외박 재원을 더했는지. 내 휴가 화면의 스위치와 같은 값이다. */
+    includeOvernightInHoldings: z.boolean(),
   })
   .openapi("LeaveGrantsPage");
 
@@ -597,6 +601,8 @@ export const leaveBalanceSummarySchema = z
     }),
     /** 외출 설정 — 갈래마다 한 벌. 폼이 주기 잔여를 계산하는 데 쓴다. */
     outing: z.array(outingConfigResponseSchema),
+    /** "남은 휴가"에 외박 재원을 더할지. 고른 적 없으면 군종 기본값이 온다. */
+    includeOvernightInHoldings: z.boolean(),
   })
   .openapi("LeaveBalanceSummary");
 

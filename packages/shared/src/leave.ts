@@ -246,6 +246,26 @@ export function balanceUnitLabel(key: BalanceKey): string {
   return key === "outing" || key === "weekend_outing" ? "회" : "일";
 }
 
+/** 외박 재원. "남은 휴가"에 더할지를 사용자가 고르는 묶음이다. */
+export const OVERNIGHT_BALANCE_KEYS = [
+  "regular_overnight",
+  "other_overnight",
+] as const satisfies readonly BalanceKey[];
+
+export function isOvernightBalanceKey(key: BalanceKey): boolean {
+  return (OVERNIGHT_BALANCE_KEYS as readonly BalanceKey[]).includes(key);
+}
+
+/**
+ * 사용자가 고르기 전의 "남은 휴가에 외박 포함" 값.
+ *
+ * 육군은 외박을 휴가에 붙여 쓰지 못하게 하는 부대가 많아, 외박까지 더한 숫자는
+ * 실제로 쓸 수 있는 휴가보다 크게 읽힌다. 그래서 육군만 기본으로 뺀다.
+ */
+export function holdingsIncludeOvernightDefault(branch: Branch): boolean {
+  return branch !== "army";
+}
+
 /** 국방부 안내 기준의 기본 제안값이며, 사용자가 프로필에서 자유롭게 수정한다. */
 export const DEFAULT_ANNUAL_DAYS: Record<Branch, number> = {
   army: 24,
