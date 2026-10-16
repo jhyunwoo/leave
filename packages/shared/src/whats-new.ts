@@ -8,47 +8,28 @@
  * 새 id로 바꾸기만 하면 모든 사용자에게 한 번씩 다시 뜬다 — id는 다시 쓰지 않는다.
  */
 
-export type WhatsNewFeature = {
-  title: string;
-  /** 왜 좋은지 한두 문장. */
-  pitch: string;
-  /** 어디서 어떻게 쓰는지, 누르는 순서대로. */
-  steps: readonly string[];
-};
+import {
+  TOUR_HOLDINGS_SCENE,
+  TOUR_SHARE_SCENE,
+  type TourScene,
+} from "./onboarding-tour";
 
 export type WhatsNew = {
   id: string;
   title: string;
-  intro: string;
-  features: readonly WhatsNewFeature[];
+  /**
+   * 기능마다 한 장. 온보딩 사용법 투어와 같은 모션 그래픽 장면이라 그림이 직접
+   * 눌러 보이고, 장면의 제목·설명(title·body)이 그 아래 짧은 글이 된다.
+   */
+  scenes: readonly TourScene[];
 };
 
 export const LATEST_WHATS_NEW: WhatsNew = {
-  id: "2026-10-share-image-overnight-toggle",
+  // 2026-10-share-image-overnight-toggle은 같은 기능을 글로만 안내했다. 그림으로 다시
+  // 보여주려고 id를 바꿨다 — 그 안내를 본 사람에게도 한 번 더 뜬다.
+  id: "2026-10-share-image-motion",
   title: "리브에 새 기능이 생겼어요",
-  intro:
-    "캡처 대신 깔끔한 이미지로 휴가를 자랑하고, 남은 휴가는 내 부대 기준으로 보세요.",
-  features: [
-    {
-      title: "휴가 일정을 이미지로 공유",
-      pitch:
-        "한 달 달력에 내 휴가를 색으로 칠한 이미지를 바로 만들어요. 인스타그램 스토리나 카카오톡에 그대로 올릴 수 있어요.",
-      steps: [
-        "내 휴가 탭에서 공유 버튼을 눌러요.",
-        "화살표로 공유할 달을 골라요.",
-        "이미지로 공유를 누르고 올릴 앱을 고르면 끝이에요.",
-      ],
-    },
-    {
-      title: "남은 휴가에 외박을 넣을지 직접 정하기",
-      pitch:
-        "외박을 휴가에 붙여 쓸 수 없는 부대라면 남은 휴가에서 외박을 뺄 수 있어요. 육군은 처음부터 빼 두었어요.",
-      steps: [
-        "내 휴가 탭의 보유 휴가 카드 아래를 봐요.",
-        "남은 휴가에 외박 포함 스위치를 켜거나 꺼요.",
-      ],
-    },
-  ],
+  scenes: [TOUR_SHARE_SCENE, TOUR_HOLDINGS_SCENE],
 };
 
 /** 이 사용자에게 안내를 띄워야 하는가. */

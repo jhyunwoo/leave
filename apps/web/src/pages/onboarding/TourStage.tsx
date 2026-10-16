@@ -1,7 +1,8 @@
 /**
  * 사용법 투어의 무대 — 장면 하나를 끝없이 돌리는 모션 그래픽.
  *
- * 사용처: `pages/OnboardingPage.tsx`(사용법 단계에서 히어로 자리를 대신한다).
+ * 사용처: `pages/OnboardingPage.tsx`(사용법 단계에서 히어로 자리를 대신한다),
+ *         `components/WhatsNewModal.tsx`(새 기능 안내).
  *
  * 장면의 좌표·색·시간표는 전부 `@leave/shared`의 onboarding-tour 모듈에서 온다.
  * 네이티브 `screens/onboarding/tour-stage.tsx`가 같은 데이터를 같은 샘플러로
@@ -31,6 +32,7 @@ import {
 } from "@leave/shared";
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { useReducedMotion } from "../../components/use-reduced-motion";
+import "./tour-stage.css";
 
 // 웹은 라이트 스킴 하나뿐이다(global.css에 다크 토큰이 없다).
 const palette = TOUR_PALETTE.light;

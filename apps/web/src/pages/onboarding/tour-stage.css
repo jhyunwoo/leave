@@ -1,0 +1,50 @@
+/* 사용법 투어 무대. 온보딩 사용법 단계와 새 기능 안내가 함께 쓴다(TourStage.tsx). */
+
+/* 무대. 캔버스(320×260)를 폭에 맞춰 zoom으로 키운다(TourStage 주석). 장면이
+   바뀌면 캔버스만 새로 마운트되고 바탕색은 그대로 옮겨 칠해진다 — 무대 전체가
+   깜빡이는 대신 색이 흘러가며 다음 기능으로 넘어간다. */
+.ob-tour-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 320 / 260;
+  border-radius: 28px;
+  overflow: hidden;
+  transition: background 520ms var(--ease-out);
+  /* 세로 스크롤은 브라우저에 맡기고 가로 쓸기만 받는다. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ob-tour-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  animation: ob-tour-in 520ms var(--ease-out) backwards;
+}
+
+@keyframes ob-tour-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+.ob-tour-node {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.ob-tour-text {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .ob-tour-frame {
+    border-radius: 24px;
+  }
+}

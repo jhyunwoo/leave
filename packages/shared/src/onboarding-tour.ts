@@ -168,6 +168,11 @@ export const TOUR_ICONS = {
   ],
   check: ["M5 12.5l4.5 4.5L19 7.5"],
   search: ["M11 4a7 7 0 1 1 0 14a7 7 0 0 1 0-14z", "M16.2 16.2L20 20"],
+  share: [
+    "M12 15V3.5",
+    "M7.5 8L12 3.5L16.5 8",
+    "M5 12.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5",
+  ],
 } as const;
 
 export type TourIconName = keyof typeof TOUR_ICONS;
@@ -1740,7 +1745,366 @@ function progressScene(): TourNode[] {
   return nodes;
 }
 
-export type TourSceneId = "leave" | "grants" | "unit" | "friends" | "progress";
+/* 새 기능 안내: 휴가 이미지 공유 장면 */
+
+/** 공유 시트 미리보기에 고를 수 있는 바탕. 실제 SHARE_BACKGROUNDS와 같은 색이 나오는 톤만 골랐다. */
+const SWATCHES: readonly TourTone[] = [
+  "pale",
+  "overnight",
+  "award",
+  "friend",
+  "ink",
+];
+
+function shareScene(): TourNode[] {
+  const cardIn = life({ at: 0, from: { y: 14 }, dur: 0.07 });
+  const pill = merge(cardIn, press(0.112, 0.92));
+  const nodes: TourNode[] = [
+    box("card", 16, 16, 288, 228, { fill: "card", radius: 18, keys: cardIn }),
+    text("title", 32, 28, 120, 22, "내 휴가", {
+      size: 15,
+      weight: 800,
+      keys: cardIn,
+    }),
+    box("pill", 214, 26, 74, 26, { fill: "soft", radius: 13, keys: pill }),
+    icon("pill-icon", 226, 32, 14, "share", "ink", pill),
+    text("pill-t", 244, 26, 36, 26, "공유", {
+      size: 11.5,
+      weight: 800,
+      keys: pill,
+    }),
+  ];
+  const rows: [string, string][] = [
+    ["11/15 – 11/19", "5일"],
+    ["11/28 – 11/29", "2일"],
+    ["12/24 – 12/27", "4일"],
+  ];
+  rows.forEach(([range, days], index) => {
+    const y = 66 + index * 44;
+    nodes.push(
+      box(`row-${index}`, 32, y, 256, 36, {
+        fill: "soft",
+        radius: 10,
+        keys: cardIn,
+      }),
+      box(`row-${index}-chip`, 44, y + 13, 10, 10, {
+        fill: "primary",
+        radius: 3,
+        keys: cardIn,
+      }),
+      text(`row-${index}-t`, 62, y, 140, 36, range, {
+        size: 12,
+        weight: 700,
+        keys: cardIn,
+      }),
+      text(`row-${index}-n`, 210, y, 66, 36, days, {
+        size: 12,
+        weight: 800,
+        color: "brand",
+        align: "right",
+        keys: cardIn,
+      }),
+    );
+  });
+
+  // 공유 버튼을 누르면 올라오는 시트. 끝날 때까지 떠 있다.
+  const sheet = life({ at: 0.17, from: { y: 220 }, dur: 0.07 });
+  nodes.push(
+    box("sheet", 16, 24, 288, 220, {
+      fill: "card",
+      radius: 18,
+      shadow: true,
+      keys: sheet,
+    }),
+    box("sheet-grip", 144, 32, 32, 4, { fill: "line", radius: 2, keys: sheet }),
+    text("sheet-title", 32, 40, 160, 20, "휴가 일정 공유", {
+      size: 14,
+      weight: 800,
+      keys: sheet,
+    }),
+  );
+
+  // 왼쪽: 만들어질 이미지의 미리보기. 바탕은 고른 색이 위로 덮이며 바뀐다.
+  const pick = (at: number) => life({ at, from: {}, dur: 0.05 });
+  nodes.push(
+    box("pv", 32, 68, 104, 130, { fill: "pale", radius: 10, keys: sheet }),
+    box("pv-sky", 32, 68, 104, 130, {
+      fill: "overnight",
+      radius: 10,
+      keys: pick(0.39),
+    }),
+    box("pv-peach", 32, 68, 104, 130, {
+      fill: "award",
+      radius: 10,
+      keys: pick(0.51),
+    }),
+    text("pv-title", 40, 74, 90, 18, "11월 휴가", {
+      size: 11,
+      weight: 900,
+      keys: sheet,
+    }),
+    box("pv-cal", 40, 96, 88, 80, { fill: "card", radius: 6, keys: sheet }),
+    box("pv-bar-1", 46, 118, 52, 7, {
+      fill: "primary",
+      radius: 3,
+      keys: sheet,
+    }),
+    box("pv-bar-2", 84, 156, 38, 7, {
+      fill: "primary",
+      radius: 3,
+      keys: sheet,
+    }),
+    // 외출을 켜면 회색 막대가 하나 더 깔린다.
+    box("pv-outing", 104, 137, 18, 7, {
+      fill: "outing",
+      radius: 3,
+      origin: "left",
+      keys: life({ at: 0.66, from: { sx: 0 }, dur: 0.05 }),
+    }),
+    text("pv-brand", 40, 180, 60, 14, "리브", {
+      size: 8.5,
+      weight: 900,
+      keys: sheet,
+    }),
+  );
+
+  // 오른쪽: 배경색 고르기, 외출 표시 스위치, 공유 버튼.
+  nodes.push(
+    text("bg-label", 150, 70, 80, 16, "배경", {
+      size: 10.5,
+      weight: 700,
+      color: "mute",
+      keys: sheet,
+    }),
+  );
+  SWATCHES.forEach((tone, index) => {
+    nodes.push(
+      box(`sw-${index}`, 150 + index * 26, 92, 18, 18, {
+        fill: tone,
+        stroke: "line",
+        radius: 9,
+        keys: sheet,
+      }),
+    );
+  });
+  nodes.push(
+    box("sw-ring", 147, 89, 24, 24, {
+      stroke: "ink",
+      radius: 12,
+      keys: merge(sheet, [
+        { at: 0.39, x: 0 },
+        { at: 0.44, x: 26, ease: "inOut" },
+        { at: 0.51, x: 26 },
+        { at: 0.56, x: 52, ease: "inOut" },
+      ]),
+    }),
+    text("outing-label", 150, 128, 96, 16, "외출도 표시", {
+      size: 10.5,
+      weight: 700,
+      keys: sheet,
+    }),
+    box("sw-track", 252, 126, 34, 20, {
+      fill: "line",
+      radius: 10,
+      keys: sheet,
+    }),
+    box("sw-track-on", 252, 126, 34, 20, {
+      fill: "primary",
+      radius: 10,
+      keys: pick(0.65),
+    }),
+    box("sw-knob", 254, 128, 16, 16, {
+      fill: "card",
+      radius: 8,
+      keys: merge(sheet, [
+        { at: 0.65, x: 0 },
+        { at: 0.7, x: 14, ease: "out" },
+      ]),
+    }),
+    box("send", 150, 164, 138, 30, {
+      fill: "primary",
+      radius: 15,
+      keys: merge(sheet, press(0.775, 0.94)),
+    }),
+    text("send-t", 150, 164, 138, 30, "이미지로 공유", {
+      size: 11.5,
+      weight: 800,
+      color: "onPrimary",
+      align: "center",
+      keys: merge(sheet, press(0.775, 0.94)),
+    }),
+  );
+
+  const toast = life({
+    at: 0.8,
+    from: { y: 8, scale: 0.9 },
+    dur: 0.05,
+    ease: "back",
+  });
+  nodes.push(
+    box("toast", 60, 208, 200, 26, {
+      fill: "toast",
+      radius: 13,
+      shadow: true,
+      keys: toast,
+    }),
+    text("toast-t", 60, 208, 200, 26, "올릴 앱을 고르면 끝이에요", {
+      size: 10.5,
+      weight: 800,
+      color: "onToast",
+      align: "center",
+      keys: toast,
+    }),
+  );
+
+  nodes.push(
+    ...finger(
+      "finger",
+      [
+        { at: 0.1, cx: 251, cy: 39, tap: true },
+        { at: 0.36, cx: 185, cy: 101, tap: true },
+        { at: 0.48, cx: 211, cy: 101, tap: true },
+        { at: 0.62, cx: 269, cy: 136, tap: true },
+        { at: 0.76, cx: 219, cy: 179, tap: true },
+      ],
+      0.84,
+    ),
+  );
+  return nodes;
+}
+
+/* 새 기능 안내: 남은 휴가의 외박 포함 장면 */
+
+function holdingsScene(): TourNode[] {
+  const cardIn = life({ at: 0, from: { y: 14 }, dur: 0.07 });
+  const total = swapKeys(0.42, 0);
+  const nodes: TourNode[] = [
+    box("card", 16, 16, 288, 228, { fill: "card", radius: 18, keys: cardIn }),
+    text("title", 32, 28, 120, 22, "보유 휴가", {
+      size: 15,
+      weight: 800,
+      keys: cardIn,
+    }),
+    text("left-label", 32, 58, 120, 16, "남은 휴가", {
+      size: 10.5,
+      weight: 700,
+      color: "mute",
+      keys: cardIn,
+    }),
+    text("left-32", 32, 74, 140, 40, "32일", {
+      size: 32,
+      weight: 900,
+      keys: total.before,
+    }),
+    text("left-24", 32, 74, 140, 40, "24일", {
+      size: 32,
+      weight: 900,
+      keys: total.after,
+    }),
+  ];
+
+  // 연가 21 + 포상 3 + 정기외박 8 = 32. 외박을 빼면 24.
+  const rows: [string, TourTone, string, string][] = [
+    ["annual", "annual", "연가", "21일"],
+    ["award", "award", "포상휴가", "3일"],
+    ["overnight", "overnight", "정기외박", "8일"],
+  ];
+  rows.forEach(([id, tone, label, days], index) => {
+    const y = 124 + index * 24;
+    // 외박 줄만 스위치를 끄면 흐려진다. 마지막까지 흐린 채로 남는다.
+    const keys: TourKey[] =
+      id === "overnight"
+        ? [
+            { at: 0, opacity: 0, y: 10 },
+            { at: 0.07, opacity: 1, y: 0, ease: "out" },
+            { at: 0.42, opacity: 1 },
+            { at: 0.47, opacity: 0.3, ease: "out" },
+            { at: EXIT_FROM, opacity: 0.3 },
+            { at: EXIT_TO, opacity: 0 },
+          ]
+        : cardIn;
+    nodes.push(
+      box(`row-${id}`, 32, y + 3, 10, 10, { fill: tone, radius: 3, keys }),
+      text(`row-${id}-t`, 50, y, 120, 16, label, {
+        size: 11.5,
+        weight: 700,
+        color: "body",
+        keys,
+      }),
+      text(`row-${id}-n`, 188, y, 100, 16, days, {
+        size: 11.5,
+        weight: 800,
+        align: "right",
+        keys,
+      }),
+    );
+  });
+
+  // 스위치는 켜진 채로 시작해 손가락이 끈다.
+  const trackOn: TourKey[] = [
+    { at: 0, opacity: 0 },
+    { at: 0.07, opacity: 1 },
+    { at: 0.38, opacity: 1 },
+    { at: 0.42, opacity: 0, ease: "out" },
+  ];
+  nodes.push(
+    box("divider", 32, 200, 256, 1, { fill: "line", keys: cardIn }),
+    text("pref", 32, 210, 190, 18, "남은 휴가에 외박 포함", {
+      size: 11.5,
+      weight: 800,
+      keys: cardIn,
+    }),
+    box("sw-track", 252, 209, 34, 20, {
+      fill: "line",
+      radius: 10,
+      keys: cardIn,
+    }),
+    box("sw-track-on", 252, 209, 34, 20, {
+      fill: "primary",
+      radius: 10,
+      keys: trackOn,
+    }),
+    box("sw-knob", 268, 211, 16, 16, {
+      fill: "card",
+      radius: 8,
+      keys: merge(cardIn, [
+        { at: 0.38, x: 0 },
+        { at: 0.43, x: -14, ease: "out" },
+      ]),
+    }),
+  );
+
+  const toast = life({
+    at: 0.48,
+    from: { y: 8, scale: 0.9 },
+    dur: 0.05,
+    ease: "back",
+    leave: 0.8,
+  });
+  nodes.push(
+    box("toast", 166, 82, 122, 26, {
+      fill: "toast",
+      radius: 13,
+      shadow: true,
+      keys: toast,
+    }),
+    text("toast-t", 166, 82, 122, 26, "외박 8일을 뺐어요", {
+      size: 10.5,
+      weight: 800,
+      color: "onToast",
+      align: "center",
+      keys: toast,
+    }),
+  );
+
+  nodes.push(
+    ...finger("finger", [{ at: 0.3, cx: 269, cy: 219, tap: true }], 0.5),
+  );
+  return nodes;
+}
+
+export type TourSceneId =
+  "leave" | "grants" | "unit" | "friends" | "progress" | "share" | "holdings";
 
 export interface TourScene {
   id: TourSceneId;
@@ -1842,3 +2206,31 @@ export const ONBOARDING_TOUR: readonly TourScene[] = [
     nodes: progressScene(),
   },
 ];
+
+/**
+ * 새 기능 안내(whats-new.ts)가 돌리는 장면. 온보딩 투어와 같은 무대로 그린다.
+ * 요점(points)은 안내 화면이 쓰지 않아 비워 둔다 — 그림과 한두 문장으로 끝낸다.
+ */
+export const TOUR_SHARE_SCENE: TourScene = {
+  id: "share",
+  label: "이미지 공유",
+  title: "휴가 일정을 이미지로 공유해요",
+  body: "내 휴가나 달력 탭의 공유 버튼을 누르고 배경색과 외출 표시를 고른 뒤, 이미지로 공유를 누르면 끝이에요.",
+  points: [],
+  backdrop: "green",
+  duration: 8400,
+  poster: 0.9,
+  nodes: shareScene(),
+};
+
+export const TOUR_HOLDINGS_SCENE: TourScene = {
+  id: "holdings",
+  label: "외박 포함",
+  title: "남은 휴가에 외박을 넣을지 정해요",
+  body: "외박을 휴가에 붙여 쓸 수 없는 부대라면 내 휴가 탭에서 스위치를 끄세요. 남은 휴가에서 외박만큼 빠져요. 육군은 처음부터 빼 두었어요.",
+  points: [],
+  backdrop: "amber",
+  duration: 6400,
+  poster: 0.9,
+  nodes: holdingsScene(),
+};

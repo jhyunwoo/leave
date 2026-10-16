@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   ONBOARDING_TOUR,
   TOUR_CANVAS,
+  TOUR_HOLDINGS_SCENE,
   TOUR_ICONS,
   TOUR_PALETTE,
+  TOUR_SHARE_SCENE,
   sampleTourPose,
   tourAnimatedProps,
   type TourKey,
 } from "../src";
+
+// 그림의 꼴을 지키는 검사는 새 기능 안내 장면에도 똑같이 건다.
+const ALL_SCENES = [...ONBOARDING_TOUR, TOUR_SHARE_SCENE, TOUR_HOLDINGS_SCENE];
 
 describe("사용법 투어 장면", () => {
   it("앱의 핵심 기능을 실제로 밟는 순서대로 모두 보여준다", () => {
@@ -42,14 +47,14 @@ describe("사용법 투어 장면", () => {
 
   it("노드 id는 장면 안에서 겹치지 않는다", () => {
     // 두 앱 모두 id를 React key로 쓴다. 겹치면 한쪽 노드가 사라진다.
-    for (const scene of ONBOARDING_TOUR) {
+    for (const scene of ALL_SCENES) {
       const ids = scene.nodes.map((node) => node.id);
       expect(new Set(ids).size, scene.id).toBe(ids.length);
     }
   });
 
   it("모든 노드가 캔버스 안에 놓인다", () => {
-    for (const scene of ONBOARDING_TOUR)
+    for (const scene of ALL_SCENES)
       for (const node of scene.nodes) {
         expect(node.x, `${scene.id}/${node.id}`).toBeGreaterThanOrEqual(0);
         expect(node.y, `${scene.id}/${node.id}`).toBeGreaterThanOrEqual(0);
@@ -63,7 +68,7 @@ describe("사용법 투어 장면", () => {
   });
 
   it("키프레임 시점이 0~1 안에 있고 순서대로다", () => {
-    for (const scene of ONBOARDING_TOUR)
+    for (const scene of ALL_SCENES)
       for (const node of scene.nodes) {
         const ats = (node.keys ?? []).map((key) => key.at);
         for (const at of ats) {
@@ -77,7 +82,7 @@ describe("사용법 투어 장면", () => {
   });
 
   it("한 바퀴의 끝과 처음이 이어져 반복할 때 깜빡이지 않는다", () => {
-    for (const scene of ONBOARDING_TOUR)
+    for (const scene of ALL_SCENES)
       for (const node of scene.nodes) {
         const start = sampleTourPose(node.keys, 0);
         const end = sampleTourPose(node.keys, 1);
@@ -95,7 +100,7 @@ describe("사용법 투어 장면", () => {
   });
 
   it("멈춘 장면(동작 줄이기)에는 결과만 남고 손가락은 없다", () => {
-    for (const scene of ONBOARDING_TOUR) {
+    for (const scene of ALL_SCENES) {
       const visible = scene.nodes.filter(
         (node) => sampleTourPose(node.keys, scene.poster).opacity > 0.5,
       );
@@ -107,7 +112,7 @@ describe("사용법 투어 장면", () => {
   });
 
   it("쓰는 색과 아이콘이 모두 정의돼 있다", () => {
-    for (const scene of ONBOARDING_TOUR)
+    for (const scene of ALL_SCENES)
       for (const node of scene.nodes) {
         const tones =
           node.kind === "box" ? [node.fill, node.stroke] : [node.color];
