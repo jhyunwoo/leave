@@ -23,6 +23,11 @@ import { makeStyles } from "@/theme";
 export function FormSheet(props: {
   isPresented: boolean;
   onDismiss: () => void;
+  /**
+   * `formSheet`은 iPad에서 가운데 뜨는 작은 시트다(아이폰에서는 pageSheet와 같다).
+   * 내용이 짧아 iPad의 큰 pageSheet를 채우지 못하는 안내 화면이 쓴다.
+   */
+  presentationStyle?: "pageSheet" | "formSheet";
   testID?: string;
   children: ReactElement;
 }) {
@@ -31,7 +36,7 @@ export function FormSheet(props: {
     <Modal
       visible={props.isPresented}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={props.presentationStyle ?? "pageSheet"}
       onRequestClose={props.onDismiss}
       // 스와이프로 내렸을 때도 폼 상태를 닫힌 것으로 맞춘다.
       onDismiss={props.onDismiss}

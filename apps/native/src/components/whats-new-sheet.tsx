@@ -21,6 +21,13 @@ import { FormSheet } from "@/components/form-sheet";
 import { TourStage } from "@/screens/onboarding/tour-stage";
 import { makeStyles, spacing } from "@/theme";
 
+/**
+ * 안내 내용의 최대 폭. 무대는 폭에 비례해 커지므로 태블릿에서 화면을 채우면 그림이
+ * 지나치게 커진다. iPad formSheet(540pt)과 안드로이드 태블릿의 전체 화면 다이얼로그
+ * 모두에서 그림·글·버튼이 한눈에 들어오는 폭이다.
+ */
+const CONTENT_MAX_WIDTH = 440;
+
 export function WhatsNewSheet() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -39,7 +46,11 @@ export function WhatsNewSheet() {
   };
 
   return (
-    <FormSheet isPresented={visible} onDismiss={close}>
+    <FormSheet
+      isPresented={visible}
+      onDismiss={close}
+      presentationStyle="formSheet"
+    >
       {/* RN Modal은 앱 루트 밖에 뜬다. 무대의 쓸기 제스처가 안드로이드에서도
           잡히려면 시트 안에 제스처 루트가 따로 있어야 한다. */}
       <GestureHandlerRootView style={styles.gestureRoot}>
@@ -92,7 +103,13 @@ export function WhatsNewSheet() {
 
 const useStyles = makeStyles(({ colors }) => ({
   gestureRoot: { flex: 1 },
-  content: { padding: spacing.xl, gap: spacing.lg },
+  content: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+    padding: spacing.xl,
+    gap: spacing.lg,
+  },
   title: { fontSize: 26, fontWeight: "800", color: colors.ink },
   copy: { gap: spacing.xs },
   count: { fontSize: 13, fontWeight: "700", color: colors.mute },
