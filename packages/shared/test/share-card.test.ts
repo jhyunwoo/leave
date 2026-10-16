@@ -175,6 +175,104 @@ describe("buildLeaveShareCard", () => {
   });
 });
 
+describe("다음 달로 이어지는 휴가", () => {
+  const nextFills = (card: ReturnType<typeof buildLeaveShareCard>) =>
+    card.shapes.filter(
+      (shape): shape is ShareRect =>
+        shape.kind === "rect" && shape.fill === "#f2f4f0",
+    );
+
+  it("휴가가 끝나는 다음 달 날짜까지 줄을 늘려 그리고, 다음 달 칸을 따로 표시한다", () => {
+    // 2026-02는 일요일에 시작해 4주로 끝난다. 2/25(수)~3/5(목) 휴가.
+    const card = build("2026-02", [
+      leave("a", "approved", [annual("2026-02-25", "2026-03-05")]),
+    ]);
+    const texts = textsOf(card.shapes);
+    // 다음 달 1일은 달을 붙여 적고, 휴가 기간은 달로 자르지 않는다.
+    expect(texts).toContain("3/1");
+    expect(texts).toContain("2/25–3/5");
+    // 나가는 날 수는 이 달 몫만 센다.
+    expect(card.outDays).toBe(4);
+    // 이 달 막대(2/25~28)와 다음 달 막대(3/1~5).
+    expect(barsOf(card.shapes)).toHaveLength(2);
+    // 다음 달 줄(3/1~3/7)에 옅은 바탕이 깔린다.
+    expect(nextFills(card)).toHaveLength(1);
+    // 같은 숫자가 두 달에 다 있으면 뒤의 것이 다음 달이다.
+    const day = (label: string) =>
+      card.shapes
+        .filter(
+          (shape): shape is ShareText =>
+            shape.kind === "text" && shape.size === 30 && shape.text === label,
+        )
+        .at(-1);
+    // 다음 달 평일 숫자는 이 달 평일 숫자보다 흐리다.
+    expect(day("4")?.fill).not.toBe(day("24")?.fill);
+  });
+
+  it("다음 달로 넘어가는 휴가가 없으면 이 달 밖의 칸은 그리지 않는다", () => {
+    const card = build("2026-02", [
+      leave("a", "approved", [annual("2026-02-10", "2026-02-12")]),
+    ]);
+    expect(nextFills(card)).toHaveLength(0);
+    expect(textsOf(card.shapes)).not.toContain("3/1");
+  });
+
+  it("아주 길게 이어져도 줄 수에 상한을 두고 모든 도형이 이미지 안에 든다", () => {
+    // 2026-08은 6주짜리 달이다. 8/20~9/30이면 두 줄까지만 늘린다.
+    const card = build("2026-08", [
+      leave("a", "approved", [annual("2026-08-20", "2026-09-30")]),
+    ]);
+    const days = card.shapes.filter(
+      (shape) =>
+        shape.kind === "text" && shape.weight === 600 && shape.size < 30,
+    );
+    expect(days.length).toBeGreaterThan(0);
+    for (const shape of card.shapes) {
+      if (shape.kind !== "rect") continue;
+      expect(shape.x + shape.width).toBeLessThanOrEqual(SHARE_CARD_WIDTH);
+      expect(shape.y + shape.height).toBeLessThanOrEqual(SHARE_CARD_HEIGHT);
+    }
+    // 8줄째(9/13~9/19)까지만 그린다. 19는 8월·9월 두 번, 20은 8월 한 번만 나온다.
+    const count = (label: string) =>
+      card.shapes.filter(
+        (shape) => shape.kind === "text" && shape.text === label,
+      ).length;
+    expect(count("19")).toBe(2);
+    expect(count("20")).toBe(1);
+  });
+});
+
+describe("날짜 색", () => {
+  const colorOf = (
+    card: ReturnType<typeof buildLeaveShareCard>,
+    label: string,
+  ) =>
+    card.shapes.find(
+      (shape): shape is ShareText =>
+        shape.kind === "text" && shape.size === 30 && shape.text === label,
+    )?.fill;
+
+  it("토·일과 공휴일(대체공휴일 포함)은 빨갛게, 평일은 검게 칠한다", () => {
+    // 2026-10: 3일(토) 개천절, 9일(금) 한글날, 10일(토), 11일(일), 13일(화).
+    const october = build("2026-10", []);
+    const red = colorOf(october, "4");
+    expect(colorOf(october, "10")).toBe(red);
+    expect(colorOf(october, "3")).toBe(red);
+    expect(colorOf(october, "9")).toBe(red);
+    expect(colorOf(october, "13")).not.toBe(red);
+    // 2026-03-02(월)은 삼일절(일요일)의 대체공휴일이다.
+    expect(colorOf(build("2026-03", []), "2")).toBe(red);
+    // 요일 머리의 토도 빨갛다.
+    const header = (label: string) =>
+      october.shapes.find(
+        (shape): shape is ShareText =>
+          shape.kind === "text" && shape.size === 28 && shape.text === label,
+      )?.fill;
+    expect(header("토")).toBe(red);
+    expect(header("월")).not.toBe(red);
+  });
+});
+
 describe("defaultShareMonth", () => {
   it("가장 가까운 다가오는 휴가의 달을 고른다", () => {
     const leaves = [

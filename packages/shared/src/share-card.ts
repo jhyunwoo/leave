@@ -12,10 +12,11 @@ import {
   buildMonthGrid,
   fmtDateTiny,
   fmtRangeTiny,
+  shiftMonth,
   splitMonth,
   WEEKDAYS,
 } from "./calendar";
-import { eachDate, type ISODate } from "./dates";
+import { addDays, eachDate, type ISODate } from "./dates";
 import { isHoliday } from "./holidays";
 import { isCountedLeaveStatus, type LeaveSegment } from "./leave";
 
@@ -115,10 +116,22 @@ export const SHARE_BACKGROUNDS = [
 
 export type ShareBackgroundId = (typeof SHARE_BACKGROUNDS)[number]["id"];
 
+/** 토·일은 공휴일과 같이 빨갛게 칠한다. 휴가를 받아 보는 사람에게는 모두 쉬는 날이다. */
+const isWeekend = (col: number) => col === 0 || col === 6;
+
 const INK = "#0e0f0c";
 const BODY = "#454745";
+const MUTE = "#666864";
 const RED = "#c4262e";
 const CANVAS = "#ffffff";
+/** 다음 달 칸의 바탕. 이 달과 다른 달이라는 것을 숫자 색과 함께 알린다. */
+const NEXT_MONTH_FILL = "#f2f4f0";
+
+/**
+ * 달력 줄 수의 상한. 다음 달로 이어지는 휴가가 길어도 이 이상 늘리지 않는다 —
+ * 줄이 늘수록 칸이 낮아져 8줄(칸 높이 84)이 날짜와 막대가 겹치지 않는 한계다.
+ */
+const MAX_ROWS = 8;
 
 /**
  * 공유 이미지에 넣는 휴가인가. 부대원에게 보이는 상태(출타 집계 대상)만 넣는다 —
@@ -146,8 +159,11 @@ export function defaultShareMonth(
 type ShareRun = { kind: ShareKind; label: string; shortLabel: string };
 
 /**
- * 그 달의 날짜마다 어떤 묶음에 속하는지. 휴가는 서로 겹칠 수 없어 하루에 하나다.
- * 묶음의 기간은 달로 자르지 않는다 — 9/29에 시작한 휴가는 10월 이미지에서도 "9/29–10/2"다.
+ * 날짜마다 어떤 묶음에 속하는지. 휴가는 서로 겹칠 수 없어 하루에 하나다.
+ *
+ * 그 달에 하루라도 걸친 묶음만 넣고, 그 묶음의 다음 달 이후 날짜까지 넣는다 — 2/25에
+ * 시작해 3/5에 끝나는 휴가는 2월 이미지에 3/5까지 보여야 한다. 지난달 날짜는 넣지 않는다.
+ * 묶음의 기간 글자도 달로 자르지 않는다 — 9/29에 시작한 휴가는 10월 이미지에서도 "9/29–10/2"다.
  */
 function marksFor(
   month: string,
@@ -182,10 +198,12 @@ function marksFor(
               ? `${Number(start.slice(8))}–${Number(end.slice(8))}일`
               : fmtRangeTiny(start, end),
       };
-      for (const segment of segments) {
-        for (const date of eachDate(segment.startDate, segment.endDate)) {
-          if (date.slice(0, 7) === month) marks.set(date, run);
-        }
+      const dates = segments.flatMap((segment) =>
+        eachDate(segment.startDate, segment.endDate),
+      );
+      if (!dates.some((date) => date.slice(0, 7) === month)) continue;
+      for (const date of dates) {
+        if (date.slice(0, 7) >= month) marks.set(date, run);
       }
     }
   }
@@ -265,8 +283,26 @@ export function buildLeaveShareCard(input: {
     anchor: "start",
   });
 
-  // 달력 카드.
+  // 달력 카드. 다음 달로 이어지는 휴가가 있으면 그 휴가가 끝나는 주까지 줄을 늘린다.
+  const monthEnd = addDays(`${shiftMonth(month, 1)}-01`, -1);
+  const lastMarked = [...marks.keys()].reduce(
+    (max, date) => (date > max ? date : max),
+    monthEnd,
+  );
   const weeks = buildMonthGrid(month);
+  while (weeks.length < MAX_ROWS && weeks.at(-1)!.at(-1)!.date < lastMarked) {
+    const start = addDays(weeks.at(-1)!.at(-1)!.date, 1);
+    weeks.push(
+      Array.from({ length: 7 }, (_, day) => ({
+        date: addDays(start, day),
+        inMonth: false,
+      })),
+    );
+  }
+  // 이 달 뒤의 칸은 다음 달로 이어지는 휴가가 있을 때만 그린다. 지난달 칸은 그리지 않는다.
+  const showsNext = lastMarked > monthEnd;
+  const visible = (cell: { date: ISODate; inMonth: boolean }) =>
+    cell.inMonth || (showsNext && cell.date > monthEnd);
   const cardX = 48;
   const cardY = 312;
   const cardWidth = SHARE_CARD_WIDTH - cardX * 2;
@@ -274,7 +310,9 @@ export function buildLeaveShareCard(input: {
   const cellWidth = (cardWidth - 40) / 7;
   const headerHeight = 84;
   // 5주짜리 달도 6주짜리와 같은 카드 높이를 쓴다. 줄어든 만큼 아래가 비면 어색하다.
+  // 7줄 이상이면 칸이 낮아지는 만큼 칸 안의 숫자·막대·글자를 같은 비율로 줄인다.
   const cellHeight = (6 * 112) / weeks.length;
+  const k = Math.min(1, cellHeight / 112);
   const cardHeight = headerHeight + weeks.length * cellHeight + 20;
   rect({
     x: cardX,
@@ -291,23 +329,35 @@ export function buildLeaveShareCard(input: {
       text: label,
       size: 28,
       weight: 700,
-      fill: col === 0 ? RED : BODY,
+      fill: isWeekend(col) ? RED : BODY,
       anchor: "middle",
     });
   });
 
-  // 기간 글자는 묶음마다 가장 넓은 막대 하나에만 단다. 나머지 막대는 색이 말해 준다.
-  const labelSlots = new Map<
-    ShareRun,
-    { x: number; y: number; width: number }
-  >();
+  // 기간 글자는 묶음마다 막대 하나에만 단다. 나머지 막대는 색이 말해 준다.
+  type Slot = { x: number; y: number; width: number };
+  const labelSlots = new Map<ShareRun, Slot[]>();
   weeks.forEach((week, row) => {
     const top = cardY + headerHeight + row * cellHeight;
+    // 다음 달 칸은 옅은 바탕을 깐다. 이어진 칸은 한 덩어리로 칠한다.
+    const nextCols = week.flatMap((cell, index) =>
+      visible(cell) && !cell.inMonth ? [index] : [],
+    );
+    if (nextCols.length > 0) {
+      rect({
+        x: gridX + nextCols[0]! * cellWidth + 2,
+        y: top + 2,
+        width: nextCols.length * cellWidth - 4,
+        height: cellHeight - 4,
+        radius: 18 * k,
+        fill: NEXT_MONTH_FILL,
+      });
+    }
     // 같은 묶음이 이어지는 날은 막대 하나로 그린다.
     let col = 0;
     while (col < 7) {
       const cell = week[col]!;
-      const mark = cell.inMonth ? marks.get(cell.date) : undefined;
+      const mark = visible(cell) ? marks.get(cell.date) : undefined;
       if (!mark) {
         col += 1;
         continue;
@@ -315,53 +365,62 @@ export function buildLeaveShareCard(input: {
       let end = col;
       while (end + 1 < 7) {
         const next = week[end + 1]!;
-        if ((next.inMonth ? marks.get(next.date) : undefined) !== mark) break;
+        if ((visible(next) ? marks.get(next.date) : undefined) !== mark) break;
         end += 1;
       }
       const x = gridX + col * cellWidth + 4;
       const width = (end - col + 1) * cellWidth - 8;
       rect({
         x,
-        y: top + 54,
+        y: top + 54 * k,
         width,
-        height: 52,
-        radius: 14,
+        height: 52 * k,
+        radius: 14 * k,
         fill: SHARE_KIND_COLORS[mark.kind].bg,
       });
-      const slot = labelSlots.get(mark);
-      if (!slot || width > slot.width) {
-        labelSlots.set(mark, { x, y: top + 89, width });
-      }
+      labelSlots.set(mark, [
+        ...(labelSlots.get(mark) ?? []),
+        { x, y: top + 89 * k, width },
+      ]);
       col = end + 1;
     }
     week.forEach((cell, index) => {
-      if (!cell.inMonth) return;
-      const red = index === 0 || isHoliday(cell.date);
+      if (!visible(cell)) return;
+      const red = isWeekend(index) || isHoliday(cell.date);
+      const day = Number(cell.date.slice(8));
+      // 다음 달은 1일에 "3/1"처럼 달을 적고, 숫자를 한 톤 흐리게 쓴다.
+      const nextMonth = !cell.inMonth;
       text({
         x: gridX + index * cellWidth + 16,
-        y: top + 40,
-        text: String(Number(cell.date.slice(8))),
-        size: 30,
+        y: top + 40 * k,
+        text: nextMonth && day === 1 ? fmtDateTiny(cell.date) : String(day),
+        size: 30 * k,
         weight: 600,
-        fill: red ? RED : INK,
+        fill: red ? RED : nextMonth ? MUTE : INK,
         anchor: "start",
       });
     });
   });
 
-  for (const [run, slot] of labelSlots) {
+  for (const [run, slots] of labelSlots) {
     // 왼쪽을 날짜 숫자와 같은 선(칸 +16)에 맞추고, 오른쪽은 그보다 조금 좁게 둔다.
+    const size = 26 * k;
+    const fits = (slot: Slot) =>
+      fitShareText(run.label, slot.width - 22, size) === run.label;
+    // 휴가가 시작하는 첫 막대에 다는 게 읽기 쉽다. 거기 안 들어가면 가장 넓은 막대에 단다.
+    const slot =
+      slots.find(fits) ??
+      slots.reduce((wide, next) => (next.width > wide.width ? next : wide));
     const room = slot.width - 22;
-    const label =
-      fitShareText(run.label, room, 26) === run.label
-        ? run.label
-        : fitShareText(run.shortLabel, room, 26);
+    const label = fits(slot)
+      ? run.label
+      : fitShareText(run.shortLabel, room, size);
     if (!label) continue;
     text({
       x: slot.x + 12,
       y: slot.y,
       text: label,
-      size: 26,
+      size,
       weight: 700,
       fill: SHARE_KIND_COLORS[run.kind].fg,
       anchor: "start",
@@ -415,6 +474,7 @@ export function buildLeaveShareCard(input: {
     width: SHARE_CARD_WIDTH,
     height: SHARE_CARD_HEIGHT,
     shapes,
-    outDays: marks.size,
+    outDays: [...marks.keys()].filter((date) => date.slice(0, 7) === month)
+      .length,
   };
 }
