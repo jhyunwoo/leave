@@ -72,6 +72,7 @@ import {
 } from "@/components/calendar-scroll";
 import { LazyLeaveFormModal } from "@/components/lazy-leave-form-modal";
 import { NativeBottomSheet } from "@/components/native-bottom-sheet";
+import { ShareLeavesSheet } from "@/components/share-leaves-sheet";
 import {
   SHEET_GRABBER_INSET,
   SheetScaffold,
@@ -121,7 +122,7 @@ const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 });
 
 /**
- * 달력에서 시작할 수 있는 이동. 좁은 창에서는 넷 다 날짜 시트가 닫히기를 기다려야
+ * 달력에서 시작할 수 있는 이동. 좁은 창에서는 모두 날짜 시트가 닫히기를 기다려야
  * 하므로(iOS 단일 모달 규칙), 한 타입으로 묶어 대기·수행을 한 자리에서 다룬다.
  */
 type CalendarIntent =
@@ -130,7 +131,8 @@ type CalendarIntent =
   | { kind: "personalEvent"; date: ISODate }
   /** 이미 있는 개인 일정을 연다. 달력에서 길게 눌러 "수정"을 고른 경우. */
   | { kind: "personalEventEdit"; eventId: string; month: string }
-  | { kind: "unitEvent"; date: ISODate };
+  | { kind: "unitEvent"; date: ISODate }
+  | { kind: "share" };
 
 export function CalendarScreen() {
   const styles = useStyles();
@@ -147,6 +149,7 @@ export function CalendarScreen() {
   // 하기 때문에 시작일을 selectedDate와 따로 기억해야 한다.
   const [formDate, setFormDate] = useState<ISODate | null>(null);
   const [editingLeave, setEditingLeave] = useState<MyLeave | null>(null);
+  const [sharing, setSharing] = useState(false);
   /**
    * 시트가 닫히기를 기다리는 다음 행동. 아래 openAfterSheet 주석 참고.
    *
@@ -257,6 +260,9 @@ export function CalendarScreen() {
             pathname: "/(tabs)/(calendar)/unit-event",
             params: { date: intent.date, month: intent.date.slice(0, 7) },
           });
+          return;
+        case "share":
+          setSharing(true);
           return;
       }
     },
@@ -666,7 +672,7 @@ export function CalendarScreen() {
       />
 
       {/*
-        툴바에는 두 개만 둔다 — "오늘"과 "일정 추가".
+        툴바에는 "오늘"·"공유"·"일정 추가"만 둔다(공유는 내 휴가 화면과 같은 버튼).
         예전에는 개인 일정·부대 일정·오늘·＋가 나란히 있었는데, 네 개가 되면
         어느 것이 주 행동인지 사라지고 좁은 화면에서는 글자가 잘렸다.
         추가할 수 있는 세 가지는 서로 배타적인 선택이므로 메뉴가 맞는 자리다.
@@ -686,6 +692,13 @@ export function CalendarScreen() {
           onPress={() => scrollRef.current?.scrollToToday()}
         >
           오늘
+        </Stack.Toolbar.Button>
+        <Stack.Toolbar.Button
+          icon="square.and.arrow.up"
+          disabled={!myLeaves.data}
+          onPress={() => openAfterSheet({ kind: "share" })}
+        >
+          공유
         </Stack.Toolbar.Button>
         <Stack.Toolbar.Menu
           variant="prominent"
@@ -837,6 +850,13 @@ export function CalendarScreen() {
         </SheetScaffold>
       </NativeBottomSheet>
 
+      {sharing && myLeaves.data ? (
+        <ShareLeavesSheet
+          visible
+          leaves={myLeaves.data.leaves}
+          onClose={() => setSharing(false)}
+        />
+      ) : null}
       {formDate && (
         <LazyLeaveFormModal
           visible

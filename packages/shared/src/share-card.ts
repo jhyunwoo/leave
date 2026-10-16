@@ -8,17 +8,16 @@
  * 캔버스의 `alphabetic`과 SVG `<text>`의 기본값이 같은 뜻이다.
  */
 
-import { buildMonthGrid, splitMonth, WEEKDAYS } from "./calendar";
+import {
+  buildMonthGrid,
+  fmtDateTiny,
+  fmtRangeTiny,
+  splitMonth,
+  WEEKDAYS,
+} from "./calendar";
 import { eachDate, type ISODate } from "./dates";
 import { isHoliday } from "./holidays";
-import {
-  BALANCE_KEYS,
-  BALANCE_LABELS,
-  isCountedLeaveStatus,
-  segmentBalanceKey,
-  type BalanceKey,
-  type LeaveSegment,
-} from "./leave";
+import { isCountedLeaveStatus, type LeaveSegment } from "./leave";
 
 export const SHARE_CARD_WIDTH = 1080;
 /** 인스타그램 피드 세로형(4:5). 스토리에 올려도 위아래 여백만 생긴다. */
@@ -49,43 +48,77 @@ export type ShareShape = ShareRect | ShareText;
 
 export type ShareLeave = {
   id: string;
-  title: string;
   status: string;
-  segments: readonly (Pick<
-    LeaveSegment,
-    "category" | "overnightKind" | "outingKind" | "startDate" | "endDate"
-  > & { overnightKind?: LeaveSegment["overnightKind"] | null })[];
+  segments: readonly Pick<LeaveSegment, "category" | "startDate" | "endDate">[];
 };
 
 /**
- * 재원별 막대 색. 앱 라이트 테마(apps/native/src/theme.ts의 lightBalance)·웹 달력
- * (calendar.css의 `.cal-mine`)과 같은 쌍이다 — 공유 이미지는 다크 모드와 무관하게
- * 밝은 바탕으로 나가므로 라이트 값만 둔다.
+ * 이미지는 재원(연가·포상·외박…)을 가르지 않고 "휴가" 하나로 칠한다. 보는 사람에게는
+ * 언제 나가는지가 중요하고, 재원은 내 사정이다. 외출만은 하루 안에 돌아오는 것이라
+ * 휴가와 섞이면 오해를 사므로 따로 칠하고, 넣을지는 사용자가 고른다.
  */
-export const SHARE_BALANCE_COLORS: Record<
-  BalanceKey,
-  { fg: string; bg: string }
-> = {
-  annual: { fg: "#1f5e10", bg: "#d8f3c4" },
-  award: { fg: "#8a4b00", bg: "#ffe8c7" },
-  compensation: { fg: "#4c2c9c", bg: "#e6ddff" },
-  consolation: { fg: "#9c1d55", bg: "#ffdcea" },
-  petition: { fg: "#0b5c55", bg: "#c9efeb" },
-  sick: { fg: "#a72027", bg: "#ffdcdd" },
-  regular_overnight: { fg: "#12439c", bg: "#d8e6ff" },
-  other_overnight: { fg: "#065b7a", bg: "#cdeaf6" },
-  outing: { fg: "#454745", bg: "#e4e7e2" },
-  weekend_outing: { fg: "#3f4668", bg: "#e0e3f0" },
-  other: { fg: "#5a5c59", bg: "#eceee9" },
+export type ShareKind = "leave" | "outing";
+
+export const SHARE_KIND_COLORS: Record<ShareKind, { fg: string; bg: string }> =
+  {
+    leave: { fg: "#163300", bg: "#9fe870" },
+    outing: { fg: "#454745", bg: "#e4e7e2" },
+  };
+
+const SHARE_KIND_LABELS: Record<ShareKind, string> = {
+  leave: "휴가",
+  outing: "외출",
 };
 
+/**
+ * 고를 수 있는 이미지 바탕. 달력 카드는 늘 흰색이라 바탕은 머리·바닥 글자의 색만
+ * 함께 정하면 된다. 밝은 색은 앱 재원 팔레트에서 가져와 앱과 같은 톤을 유지한다.
+ */
+export const SHARE_BACKGROUNDS = [
+  {
+    id: "green",
+    label: "연두",
+    fill: "#e2f6d5",
+    ink: "#0e0f0c",
+    sub: "#454745",
+  },
+  { id: "sky", label: "하늘", fill: "#d8e6ff", ink: "#0e0f0c", sub: "#454745" },
+  {
+    id: "pink",
+    label: "분홍",
+    fill: "#ffdcea",
+    ink: "#0e0f0c",
+    sub: "#454745",
+  },
+  {
+    id: "peach",
+    label: "살구",
+    fill: "#ffe8c7",
+    ink: "#0e0f0c",
+    sub: "#454745",
+  },
+  {
+    id: "lavender",
+    label: "보라",
+    fill: "#e6ddff",
+    ink: "#0e0f0c",
+    sub: "#454745",
+  },
+  {
+    id: "black",
+    label: "검정",
+    fill: "#0e0f0c",
+    ink: "#ffffff",
+    sub: "#c8cbc4",
+  },
+] as const;
+
+export type ShareBackgroundId = (typeof SHARE_BACKGROUNDS)[number]["id"];
+
 const INK = "#0e0f0c";
-const INK_DEEP = "#163300";
 const BODY = "#454745";
 const RED = "#c4262e";
 const CANVAS = "#ffffff";
-const BACKDROP = "#e2f6d5";
-const ACCENT = "#9fe870";
 
 /**
  * 공유 이미지에 넣는 휴가인가. 부대원에게 보이는 상태(출타 집계 대상)만 넣는다 —
@@ -109,25 +142,50 @@ export function defaultShareMonth(
     : next.startDate.slice(0, 7);
 }
 
-type DayMark = { leaveId: string; title: string; key: BalanceKey };
+/** 휴가 하나 안에서 같은 갈래(휴가/외출)인 날들. 막대를 잇고 기간 글자를 다는 단위다. */
+type ShareRun = { kind: ShareKind; label: string; shortLabel: string };
 
-/** 그 달의 날짜마다 어떤 휴가의 어떤 재원인지. 휴가는 서로 겹칠 수 없어 하루에 하나다. */
+/**
+ * 그 달의 날짜마다 어떤 묶음에 속하는지. 휴가는 서로 겹칠 수 없어 하루에 하나다.
+ * 묶음의 기간은 달로 자르지 않는다 — 9/29에 시작한 휴가는 10월 이미지에서도 "9/29–10/2"다.
+ */
 function marksFor(
   month: string,
   leaves: readonly ShareLeave[],
-): Map<ISODate, DayMark> {
-  const marks = new Map<ISODate, DayMark>();
+  showOutings: boolean,
+): Map<ISODate, ShareRun> {
+  const marks = new Map<ISODate, ShareRun>();
   for (const leave of leaves) {
     if (!isShareableLeave(leave)) continue;
-    for (const segment of leave.segments) {
-      const key = segmentBalanceKey({
-        category: segment.category,
-        overnightKind: segment.overnightKind ?? undefined,
-        outingKind: segment.outingKind ?? undefined,
-      });
-      for (const date of eachDate(segment.startDate, segment.endDate)) {
-        if (date.slice(0, 7) !== month) continue;
-        marks.set(date, { leaveId: leave.id, title: leave.title, key });
+    for (const kind of ["leave", "outing"] as const) {
+      if (kind === "outing" && !showOutings) continue;
+      const segments = leave.segments.filter(
+        (segment) => (segment.category === "outing") === (kind === "outing"),
+      );
+      if (segments.length === 0) continue;
+      const start = segments.reduce(
+        (min, segment) => (segment.startDate < min ? segment.startDate : min),
+        segments[0]!.startDate,
+      );
+      const end = segments.reduce(
+        (max, segment) => (segment.endDate > max ? segment.endDate : max),
+        segments[0]!.endDate,
+      );
+      const run: ShareRun = {
+        kind,
+        label: fmtRangeTiny(start, end),
+        // 한 칸짜리 막대(토|일로 갈린 외박 등)에는 "10/3–10/4"가 안 들어간다.
+        shortLabel:
+          start === end
+            ? fmtDateTiny(start)
+            : start.slice(0, 7) === end.slice(0, 7)
+              ? `${Number(start.slice(8))}–${Number(end.slice(8))}일`
+              : fmtRangeTiny(start, end),
+      };
+      for (const segment of segments) {
+        for (const date of eachDate(segment.startDate, segment.endDate)) {
+          if (date.slice(0, 7) === month) marks.set(date, run);
+        }
       }
     }
   }
@@ -163,10 +221,15 @@ export type ShareCard = {
 export function buildLeaveShareCard(input: {
   month: string;
   leaves: readonly ShareLeave[];
+  background: ShareBackgroundId;
+  showOutings: boolean;
 }): ShareCard {
   const { month } = input;
   const { year, monthNum } = splitMonth(month);
-  const marks = marksFor(month, input.leaves);
+  const marks = marksFor(month, input.leaves, input.showOutings);
+  const backdrop =
+    SHARE_BACKGROUNDS.find((option) => option.id === input.background) ??
+    SHARE_BACKGROUNDS[0];
   const shapes: ShareShape[] = [];
   const rect = (r: Omit<ShareRect, "kind">) =>
     shapes.push({ kind: "rect", ...r });
@@ -179,7 +242,7 @@ export function buildLeaveShareCard(input: {
     width: SHARE_CARD_WIDTH,
     height: SHARE_CARD_HEIGHT,
     radius: 0,
-    fill: BACKDROP,
+    fill: backdrop.fill,
   });
 
   // 머리: 연도, 그리고 굵은 "N월 휴가". 굵은 숫자가 앱 디자인의 얼굴이라 그대로 가져온다.
@@ -189,7 +252,7 @@ export function buildLeaveShareCard(input: {
     text: `${year}`,
     size: 40,
     weight: 700,
-    fill: INK_DEEP,
+    fill: backdrop.ink,
     anchor: "start",
   });
   text({
@@ -198,32 +261,9 @@ export function buildLeaveShareCard(input: {
     text: `${monthNum}월 휴가`,
     size: 112,
     weight: 900,
-    fill: INK,
+    fill: backdrop.ink,
     anchor: "start",
   });
-  // 유일한 강조색: 이 달에 나가는 날 수.
-  const outDays = marks.size;
-  if (outDays > 0) {
-    const label = `${outDays}일 나가요`;
-    const pillWidth = 56 + [...label].length * 34;
-    rect({
-      x: SHARE_CARD_WIDTH - 64 - pillWidth,
-      y: 168,
-      width: pillWidth,
-      height: 92,
-      radius: 46,
-      fill: ACCENT,
-    });
-    text({
-      x: SHARE_CARD_WIDTH - 64 - pillWidth / 2,
-      y: 228,
-      text: label,
-      size: 40,
-      weight: 900,
-      fill: INK,
-      anchor: "middle",
-    });
-  }
 
   // 달력 카드.
   const weeks = buildMonthGrid(month);
@@ -256,10 +296,14 @@ export function buildLeaveShareCard(input: {
     });
   });
 
-  const titled = new Set<string>();
+  // 기간 글자는 묶음마다 가장 넓은 막대 하나에만 단다. 나머지 막대는 색이 말해 준다.
+  const labelSlots = new Map<
+    ShareRun,
+    { x: number; y: number; width: number }
+  >();
   weeks.forEach((week, row) => {
     const top = cardY + headerHeight + row * cellHeight;
-    // 같은 휴가·같은 재원이 이어지는 날은 막대 하나로 그린다.
+    // 같은 묶음이 이어지는 날은 막대 하나로 그린다.
     let col = 0;
     while (col < 7) {
       const cell = week[col]!;
@@ -271,31 +315,22 @@ export function buildLeaveShareCard(input: {
       let end = col;
       while (end + 1 < 7) {
         const next = week[end + 1]!;
-        const nextMark = next.inMonth ? marks.get(next.date) : undefined;
-        if (nextMark?.leaveId !== mark.leaveId || nextMark.key !== mark.key) {
-          break;
-        }
+        if ((next.inMonth ? marks.get(next.date) : undefined) !== mark) break;
         end += 1;
       }
-      const color = SHARE_BALANCE_COLORS[mark.key];
       const x = gridX + col * cellWidth + 4;
       const width = (end - col + 1) * cellWidth - 8;
-      rect({ x, y: top + 54, width, height: 52, radius: 14, fill: color.bg });
-      // 제목은 휴가마다 처음 나오는 막대에만 적는다. 이어지는 막대는 색이 말해 준다.
-      if (!titled.has(mark.leaveId)) {
-        titled.add(mark.leaveId);
-        const label = fitShareText(mark.title, width - 28, 26);
-        if (label) {
-          text({
-            x: x + 14,
-            y: top + 89,
-            text: label,
-            size: 26,
-            weight: 700,
-            fill: color.fg,
-            anchor: "start",
-          });
-        }
+      rect({
+        x,
+        y: top + 54,
+        width,
+        height: 52,
+        radius: 14,
+        fill: SHARE_KIND_COLORS[mark.kind].bg,
+      });
+      const slot = labelSlots.get(mark);
+      if (!slot || width > slot.width) {
+        labelSlots.set(mark, { x, y: top + 89, width });
       }
       col = end + 1;
     }
@@ -314,19 +349,34 @@ export function buildLeaveShareCard(input: {
     });
   });
 
-  // 범례: 이 달에 나온 재원만, 재원 순서대로.
-  const used = new Set([...marks.values()].map((mark) => mark.key));
+  for (const [run, slot] of labelSlots) {
+    // 왼쪽을 날짜 숫자와 같은 선(칸 +16)에 맞추고, 오른쪽은 그보다 조금 좁게 둔다.
+    const room = slot.width - 22;
+    const label =
+      fitShareText(run.label, room, 26) === run.label
+        ? run.label
+        : fitShareText(run.shortLabel, room, 26);
+    if (!label) continue;
+    text({
+      x: slot.x + 12,
+      y: slot.y,
+      text: label,
+      size: 26,
+      weight: 700,
+      fill: SHARE_KIND_COLORS[run.kind].fg,
+      anchor: "start",
+    });
+  }
+
+  // 범례: 외출이 함께 있을 때만 둔다. 휴가만 있으면 제목이 이미 "N월 휴가"다.
+  const used = new Set([...marks.values()].map((mark) => mark.kind));
   let chipX = 64;
-  let chipY = cardY + cardHeight + 36;
-  for (const key of BALANCE_KEYS) {
+  const chipY = cardY + cardHeight + 36;
+  for (const key of used.has("outing") ? (["leave", "outing"] as const) : []) {
     if (!used.has(key)) continue;
-    const label = BALANCE_LABELS[key];
+    const label = SHARE_KIND_LABELS[key];
     const width = 40 + [...label].length * 28;
-    if (chipX + width > SHARE_CARD_WIDTH - 64) {
-      chipX = 64;
-      chipY += 64;
-    }
-    const color = SHARE_BALANCE_COLORS[key];
+    const color = SHARE_KIND_COLORS[key];
     rect({ x: chipX, y: chipY, width, height: 52, radius: 26, fill: color.bg });
     text({
       x: chipX + width / 2,
@@ -348,7 +398,7 @@ export function buildLeaveShareCard(input: {
     text: "리브",
     size: 40,
     weight: 900,
-    fill: INK,
+    fill: backdrop.ink,
     anchor: "start",
   });
   text({
@@ -357,7 +407,7 @@ export function buildLeaveShareCard(input: {
     text: "leave.moveto.kr",
     size: 28,
     weight: 600,
-    fill: BODY,
+    fill: backdrop.sub,
     anchor: "end",
   });
 
@@ -365,6 +415,6 @@ export function buildLeaveShareCard(input: {
     width: SHARE_CARD_WIDTH,
     height: SHARE_CARD_HEIGHT,
     shapes,
-    outDays,
+    outDays: marks.size,
   };
 }

@@ -11,9 +11,11 @@
 import {
   buildLeaveShareCard,
   defaultShareMonth,
+  SHARE_BACKGROUNDS,
   shiftMonth,
   splitMonth,
   todayInSeoul,
+  type ShareBackgroundId,
   type ShareCard,
 } from "@leave/shared";
 import type { MyLeave } from "@leave/client";
@@ -70,9 +72,17 @@ export function ShareLeavesModal(props: {
   const [month, setMonth] = useState(() =>
     defaultShareMonth(props.leaves, todayInSeoul()),
   );
+  const [background, setBackground] = useState<ShareBackgroundId>("green");
+  const [showOutings, setShowOutings] = useState(false);
   const card = useMemo(
-    () => buildLeaveShareCard({ month, leaves: props.leaves }),
-    [month, props.leaves],
+    () =>
+      buildLeaveShareCard({
+        month,
+        leaves: props.leaves,
+        background,
+        showOutings,
+      }),
+    [month, props.leaves, background, showOutings],
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fontsReady, setFontsReady] = useState(false);
@@ -168,6 +178,73 @@ export function ShareLeavesModal(props: {
             background: "var(--canvas-soft)",
           }}
         />
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "var(--sp-sm)",
+          }}
+        >
+          <p className="body-md strong" id="share-background-label">
+            배경
+          </p>
+          <div
+            role="radiogroup"
+            aria-labelledby="share-background-label"
+            style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
+          >
+            {SHARE_BACKGROUNDS.map((option) => {
+              const selected = option.id === background;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${option.label} 배경`}
+                  onClick={() => setBackground(option.id)}
+                  style={{
+                    // 44px 탭 영역 안에 32px 색 원을 둔다.
+                    width: 44,
+                    height: 44,
+                    padding: 6,
+                    border: 0,
+                    borderRadius: "50%",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: "50%",
+                      background: option.fill,
+                      boxShadow: selected
+                        ? "0 0 0 3px var(--ink)"
+                        : "inset 0 0 0 1px var(--hairline)",
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className="check-field">
+          <input
+            type="checkbox"
+            checked={showOutings}
+            onChange={(event) => setShowOutings(event.target.checked)}
+          />
+          <span>
+            <strong>외출도 표시</strong>
+          </span>
+        </label>
 
         <p className="caption text-body">
           {empty

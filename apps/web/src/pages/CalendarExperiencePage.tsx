@@ -56,6 +56,7 @@ import {
 } from "../components/LazyLeaveFormModal";
 import { Modal } from "../components/Modal";
 import { PersonalEventModal } from "../components/PersonalEventModal";
+import { ShareLeavesModal } from "../components/ShareLeavesModal";
 import { UnitEventModal } from "../components/UnitEventModal";
 import "../components/calendar/calendar.css";
 
@@ -409,6 +410,7 @@ export function CalendarPage(props: { me: Me }) {
   const [unitEventOpen, setUnitEventOpen] = useState(false);
   const [editingUnitEvent, setEditingUnitEvent] = useState<UnitEvent>();
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /**
    * 좁은 화면인가. 달력이 페이지를 스크롤포트로 쓰기 시작하는 폭과 같은 값이다
@@ -608,7 +610,8 @@ export function CalendarPage(props: { me: Me }) {
     !leaveOpen &&
     !eventOpen &&
     !unitEventOpen &&
-    !selectorOpen;
+    !selectorOpen &&
+    !sharing;
 
   return (
     <div className="anim-rise" style={{ paddingBottom: "var(--sp-3xl)" }}>
@@ -668,6 +671,15 @@ export function CalendarPage(props: { me: Me }) {
               오늘
             </button>
           ) : null}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!myLeaves.data}
+            onClick={() => setSharing(true)}
+          >
+            <ActionIcon name="share" />
+            공유
+          </button>
           <button className="btn btn-secondary" onClick={openNewEvent}>
             <ActionIcon name="calendarAdd" />
             개인 일정 추가
@@ -873,6 +885,12 @@ export function CalendarPage(props: { me: Me }) {
                 `${result.exceededDates.map(fmtDateShort).join(", ")}에 최대 출타 인원을 초과해요.`,
               );
           }}
+        />
+      ) : null}
+      {sharing && myLeaves.data ? (
+        <ShareLeavesModal
+          leaves={myLeaves.data.leaves}
+          onClose={() => setSharing(false)}
         />
       ) : null}
       {eventOpen ? (
