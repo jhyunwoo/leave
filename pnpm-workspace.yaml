@@ -107,3 +107,7 @@ minimumReleaseAgeExclude:
 # hoisting a second Expo peer graph. Remove this when upstream fixes the import.
 patchedDependencies:
   "@sentry/react-native@7.11.0": patches/@sentry__react-native@7.11.0.patch
+
+permissions:
+  agent-browser:
+    skills: true

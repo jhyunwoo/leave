@@ -21,18 +21,18 @@
     "types:check": "wrangler types --include-runtime false --strict-vars false --env-interface WorkerEnv worker-env.d.ts --check"
   },
   "dependencies": {
-    "@hono/zod-openapi": "^1.6.0",
+    "@hono/zod-openapi": "^1.6.3",
     "@leave/shared": "workspace:*",
-    "@scalar/hono-api-reference": "^0.11.14",
+    "@scalar/hono-api-reference": "^0.11.16",
     "@simplewebauthn/server": "13.3.3",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.4",
     "hono": "4.13.2",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260817.1",
-    "drizzle-kit": "^0.31.10",
+    "@cloudflare/workers-types": "^5.20261016.1",
+    "drizzle-kit": "^0.31.11",
     "typescript": "5.9.2",
-    "wrangler": "^4.123.0"
+    "wrangler": "^4.151.0"
   }
 }
