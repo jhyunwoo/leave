@@ -1,4 +1,5 @@
 import type { WidgetState, WidgetTimelineEntry } from "./payload";
+import type { LeaveWatchSource } from "./watch-source";
 
 /** 페이스 컴플리케이션 JSON — 워치 `WatchFaceData`와 필드 이름이 같아야 한다. */
 export type LeaveWatchFaceData = {
@@ -30,6 +31,8 @@ export type LeaveWatchFaceData = {
 export type WatchPublishContext = {
   service?: { enlistedAt: string; dischargeAt: string } | null;
   face?: LeaveWatchFaceData | null;
+  /** 워치가 오프라인에서도 지표를 스스로 세는 재료. */
+  source?: LeaveWatchSource | null;
 };
 
 /** Web/Android have no watch companion. Metro selects .ios on iPhone. */

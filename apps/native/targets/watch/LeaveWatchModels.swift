@@ -60,11 +60,37 @@ struct WatchFaceData: Codable {
     let nextOuting: Countdown?
 }
 
+/// 워치가 아이폰·네트워크 없이 지금 시각의 지표를 세는 재료.
+/// apps/native/src/widgets/watch-source.ts의 LeaveWatchSource와 같은 모양.
+struct WatchSource: Codable {
+    struct DutyDays: Codable {
+        /// `from`의 남은 일과일이 `days`. `dates`는 from부터 전역 전날까지의 일과일 날짜.
+        let from: String
+        let days: Int
+        let dates: [String]
+    }
+    struct Leave: Codable {
+        let title: String
+        let startDate: String
+        let endDate: String
+        let returnTime: String?
+        let outing: Bool
+    }
+
+    let enlistedAt: String?
+    let dischargeAt: String?
+    let dutyDays: DutyDays?
+    /// 아직 끝나지 않은 집계 대상 휴가·외출.
+    let leaves: [Leave]
+}
+
 /// 아이폰 → 워치 applicationContext 한 통.
 struct WatchEnvelope: Codable {
     let timeline: [WatchTimelineEntry]
     let service: WatchServiceDates?
     let face: WatchFaceData?
+    /// 이 필드가 없던 아이폰 앱이 보낸 값도 읽히도록 옵셔널 — 없으면 타임라인을 그린다.
+    let source: WatchSource?
     let auth: WatchAuth?
 }
 

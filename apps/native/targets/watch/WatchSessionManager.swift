@@ -2,9 +2,10 @@ import WatchConnectivity
 import WidgetKit
 
 /// 워치의 데이터 원천 두 가지:
-///  - 아이폰이 보낸 타임라인(applicationContext) — 같이 켜져 있으면 이게 주 경로.
-///  - 워치가 토큰으로 직접 API를 두드려 센 지표 — 셀룰러 단독 모드.
-/// 둘 다 최신이 이기도록 `props`만 갱신한다.
+///  - 아이폰이 보낸 봉투(applicationContext) — 같이 켜져 있으면 이게 주 경로.
+///  - 워치가 토큰으로 직접 API를 두드려 받은 재료 — 셀룰러 단독 모드.
+/// 둘 다 최신이 이기도록 저장 봉투를 갈아 끼우고, 지표는 봉투의 재료(`source`)로
+/// 지금 시각에 맞춰 워치가 직접 센다 — 오프라인으로 며칠이 지나도 숫자가 따라간다.
 final class WatchSessionManager: NSObject, ObservableObject {
     private static let storeKey = "leave.watchEnvelope"
     private static let faceSuite = "group.app.leave.mobile"
@@ -47,6 +48,7 @@ final class WatchSessionManager: NSObject, ObservableObject {
             timeline: envelope.timeline,
             service: envelope.service,
             face: envelope.face,
+            source: envelope.source,
             auth: nil
         )
         guard let data = try? JSONEncoder().encode(sanitized),
@@ -82,28 +84,39 @@ final class WatchSessionManager: NSObject, ObservableObject {
         }
         DispatchQueue.main.async {
             self.service = envelope.service
-            self.reselectProps(from: envelope.timeline)
+            self.reselectProps()
             if faceChanged {
                 WidgetCenter.shared.reloadAllTimelines()
             }
         }
     }
 
-    /// 지금 시각의 엔트리를 고르고, 다음 엔트리가 시작되는 순간 다시 고르도록
+    /// 지금 시각의 지표를 세고, 지표가 바뀌는 다음 순간(자정·복귀 시각) 다시 세도록
     /// 타이머를 건다 — 앱이 자정을 넘어 살아 있어도 타일이 어제 값에 멈추지 않는다.
+    /// 재료가 없는 봉투(비로그인, 이 필드 이전의 아이폰 앱)는 타임라인 엔트리를 고른다.
     @MainActor
-    private func reselectProps(from timeline: [WatchTimelineEntry]) {
+    private func reselectProps() {
         reselectTimer?.invalidate()
-        props = LeaveWatchPayload.currentProps(from: timeline)
-        guard let next = LeaveWatchPayload.nextEntryDate(from: timeline) else { return }
+        guard let envelope = stored else { return }
+        let next: Date?
+        if let source = envelope.source {
+            props = WatchMetrics.props(source)
+            next = WatchMetrics.nextChange(source)
+            // 컴플리케이션도 오늘 기준으로 — 끝난 휴가 대신 다음 휴가를 센다.
+            persistFace(WatchMetrics.face(source))
+        } else {
+            props = LeaveWatchPayload.currentProps(from: envelope.timeline)
+            next = LeaveWatchPayload.nextEntryDate(from: envelope.timeline)
+        }
+        guard let next else { return }
         reselectTimer = Timer.scheduledTimer(
             withTimeInterval: next.timeIntervalSinceNow, repeats: false
         ) { [weak self] _ in
-            Task { @MainActor in self?.reselectProps(from: timeline) }
+            Task { @MainActor in self?.reselectProps() }
         }
     }
 
-    /// 단독 갱신 성공 시에도 컴플리케이션 값을 App Group에 쓴다.
+    /// 지금 시각으로 센 컴플리케이션 값을 App Group에 쓴다.
     private func persistFace(_ face: WatchFaceData) {
         guard let data = try? JSONEncoder().encode(face),
               let json = String(data: data, encoding: .utf8) else { return }
@@ -113,47 +126,68 @@ final class WatchSessionManager: NSObject, ObservableObject {
     }
 
     /// 단독 갱신 결과를 저장 봉투에도 심는다 — 재시작해도 최신 값이 살아 있게.
-    /// 지나간 엔트리는 오늘 값으로 갈아 끼우고 미래 엔트리는 그대로 둔다.
+    /// 서버는 오늘의 일과일 수만 주므로, 아이폰이 보낸 일과일 날짜 목록을 이어 붙여
+    /// 내일부터도 오프라인으로 셀 수 있게 한다.
     @MainActor
-    private func mergeRefresh(_ result: WatchApi.Result) {
-        let now = Date()
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let fresh = WatchTimelineEntry(
-            date: formatter.string(from: now), props: result.props
+    private func mergeRefresh(_ fetched: WatchSource) {
+        let dates = stored?.source?.dutyDays?.dates ?? []
+        let source = WatchSource(
+            enlistedAt: fetched.enlistedAt,
+            dischargeAt: fetched.dischargeAt,
+            dutyDays: fetched.dutyDays.map {
+                WatchSource.DutyDays(from: $0.from, days: $0.days, dates: dates)
+            },
+            leaves: fetched.leaves
         )
-        let future = (stored?.timeline ?? []).filter {
-            LeaveWatchPayload.entryDate($0).map { $0 > now } ?? false
+        let service: WatchServiceDates?
+        if let enlistedAt = source.enlistedAt, let dischargeAt = source.dischargeAt {
+            service = WatchServiceDates(enlistedAt: enlistedAt, dischargeAt: dischargeAt)
+        } else {
+            service = stored?.service
         }
         let updated = WatchEnvelope(
-            timeline: [fresh] + future,
-            service: result.service ?? stored?.service,
-            face: result.face,
+            timeline: stored?.timeline ?? [],
+            service: service,
+            face: WatchMetrics.face(source),
+            source: source,
             auth: nil
         )
         stored = updated
         persist(updated)
-        service = updated.service
-        reselectProps(from: updated.timeline)
+        self.service = updated.service
+        reselectProps()
     }
 
     /// 아이폰 없이 API를 직접 쳐서 지표를 새로 고친다. 토큰이 없거나 실패하면 캐시 유지.
     @MainActor
     func refreshStandalone() async {
+        // 오프라인이어도 오늘 날짜로 다시 센다 — 자정을 넘겨 앱을 다시 열었을 때.
+        reselectProps()
         guard let token = WatchKeychain.read() else { return }
         let apiUrl = apiUrl ?? UserDefaults.standard.string(forKey: "leave.watchApiUrl") ?? ""
         guard !apiUrl.isEmpty else { return }
         let today = SeoulDate.today()
         do {
-            let result = try await WatchApi.fetchMetrics(
+            let fetched = try await WatchApi.fetchSource(
                 apiUrl: apiUrl, token: token, today: today
             )
             self.standaloneUpdatedAt = Date()
-            mergeRefresh(result)
-            persistFace(result.face)
+            mergeRefresh(fetched)
         } catch WatchApiError.unauthorized {
-            WatchKeychain.clear()
-            self.props = LeaveWatchProps(state: "signedOut", date: today, metrics: [:])
+            // 비로그인 봉투로 갈아 끼운다 — 토큰·컴플리케이션 값을 지우고, 자정 타이머가
+            // 저장된 재료로 지표를 되살리지 않게 한다.
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            apply(WatchEnvelope(
+                timeline: [WatchTimelineEntry(
+                    date: formatter.string(from: Date()),
+                    props: LeaveWatchProps(state: "signedOut", date: today, metrics: [:])
+                )],
+                service: nil,
+                face: nil,
+                source: nil,
+                auth: nil
+            ))
         } catch {
             // 오프라인 등 — 캐시된 마지막 값을 그대로 보여준다.
         }

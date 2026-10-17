@@ -19,6 +19,7 @@ export function publishWatchTimeline(
       timeline: entries,
       service: context?.service ?? null,
       face: context?.face ?? null,
+      source: context?.source ?? null,
       // 토큰이 없을 때도 null로 보내야 워치가 저장된 토큰을 지운다.
       auth: token ? { apiUrl: API_URL, token } : null,
     };

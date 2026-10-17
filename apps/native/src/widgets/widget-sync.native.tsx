@@ -38,6 +38,7 @@ import {
 } from "./payload";
 import { buildWidgetSource } from "./sources";
 import { buildWatchFaceData } from "./watch-face";
+import { buildWatchSource } from "./watch-source";
 import { useWidgetPreferences } from "./use-widget-preferences";
 
 /** 두 위젯은 같은 payload를 받는다 — 무엇을 고를지만 서로 다르다. */
@@ -133,10 +134,11 @@ function ReadyWidgetSync() {
           ? { enlistedAt: user.enlistedAt, dischargeAt: user.dischargeAt }
           : null,
       face: buildWatchFaceData(source, today),
+      source: buildWatchSource(source, today),
     };
     // 타임라인이 같아도 토큰 회전·페이스 값 변화(예: 다음 외출)는 다시 밀어 넣어야
     // 한다 — 그대로 넘기면 워치는 폐기된 토큰이나 지난 컴플리케이션 값을 쥔다.
-    const signature = `${timelineSignature(entries)}|${getAuthToken() ?? ""}|${JSON.stringify(watchContext.face ?? null)}`;
+    const signature = `${timelineSignature(entries)}|${getAuthToken() ?? ""}|${JSON.stringify(watchContext.face ?? null)}|${JSON.stringify(watchContext.source ?? null)}`;
     if (signature === lastSignature.current) return;
     let active = true;
     void pushTimeline(entries, watchContext).then((published) => {
