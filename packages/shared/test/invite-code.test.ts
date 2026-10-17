@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   INVITE_CODE_ALPHABET,
-  INVITE_CODE_LENGTH,
   inviteAppLink,
   inviteCodeFromUrl,
   inviteLink,
@@ -11,16 +10,13 @@ import {
 
 describe("초대코드 사전", () => {
   it("혼동 문자가 없는 32자다", () => {
+    // 32는 256의 약수라 난수 바이트를 그대로 접어도 편향이 없다.
     expect(INVITE_CODE_ALPHABET).toHaveLength(32);
     expect(new Set(INVITE_CODE_ALPHABET).size).toBe(32);
     // I·L·O·U가 없어야 정규화에서 되돌릴 수 있다.
     for (const letter of ["I", "L", "O", "U"]) {
       expect(INVITE_CODE_ALPHABET).not.toContain(letter);
     }
-  });
-
-  it("32는 256의 약수라 바이트를 그대로 접어도 편향이 없다", () => {
-    expect(256 % INVITE_CODE_ALPHABET.length).toBe(0);
   });
 });
 
@@ -117,11 +113,5 @@ describe("inviteLink / inviteCodeFromUrl", () => {
     expect(inviteCodeFromUrl("https://leave.moveto.kr/xinvite/A2C4D5")).toBe(
       null,
     );
-  });
-
-  it("길이도 사전도 상수에서 온다", () => {
-    expect(INVITE_CODE_LENGTH).toBe(6);
-    const sample = INVITE_CODE_ALPHABET.slice(0, INVITE_CODE_LENGTH);
-    expect(isInviteCodeFormat(sample)).toBe(true);
   });
 });

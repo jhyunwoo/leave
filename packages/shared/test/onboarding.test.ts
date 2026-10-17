@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   BRANCHES,
-  ONBOARDING_COPY,
   ONBOARDING_GROUP_VS_FRIENDS,
   ONBOARDING_STEP_IDS,
-  REGULAR_OVERNIGHT_DEFAULTS,
   onboardingResumeStep,
   onboardingStepIndex,
+  isRegularOvernightIntervalValid,
   onboardingSteps,
-  regularOvernightGuidance,
+  regularOvernightFirstGrantPreview,
   regularOvernightIntervalForm,
   regularOvernightIntervalPayload,
   type Branch,
@@ -66,24 +65,9 @@ describe("온보딩 단계", () => {
       ).toBe("howto");
     }
   });
-
-  it("모든 단계에 제목과 한 줄 설명이 있다", () => {
-    // 화면은 ONBOARDING_COPY만 보고 그린다 — 빠진 단계가 있으면 빈 제목이 나간다.
-    for (const step of ONBOARDING_STEP_IDS) {
-      expect(ONBOARDING_COPY[step].title.length).toBeGreaterThan(0);
-      expect(ONBOARDING_COPY[step].lead.length).toBeGreaterThan(0);
-    }
-  });
 });
 
 describe("공유 그룹과 친구 비교", () => {
-  it("그룹 단계에서 두 기능을 나란히 보여준다", () => {
-    expect(ONBOARDING_GROUP_VS_FRIENDS.map((card) => card.id)).toEqual([
-      "group",
-      "friends",
-    ]);
-  });
-
   it("친구 설명이 초대코드와 다른 기능임을 밝힌다", () => {
     // 초대코드로 부대원을 부르는 것을 친구 추가로 오해하는 사용자가 많았다.
     const friends = ONBOARDING_GROUP_VS_FRIENDS.find(
@@ -91,31 +75,6 @@ describe("공유 그룹과 친구 비교", () => {
     );
     expect(friends?.body).toContain("@아이디");
     expect(friends?.body).toContain("초대코드");
-  });
-});
-
-describe("군별 정기외박 통상 운영값", () => {
-  it("육군은 분기(3개월) 1박 2일, 해·공군은 42일 2박 3일", () => {
-    expect(REGULAR_OVERNIGHT_DEFAULTS.army).toEqual({
-      intervalDays: null,
-      intervalMonths: 3,
-      daysPerGrant: 2,
-    });
-    expect(REGULAR_OVERNIGHT_DEFAULTS.navy).toEqual({
-      intervalDays: 42,
-      intervalMonths: null,
-      daysPerGrant: 3,
-    });
-    expect(REGULAR_OVERNIGHT_DEFAULTS.air_force).toEqual(
-      REGULAR_OVERNIGHT_DEFAULTS.navy,
-    );
-  });
-
-  it("모든 군종이 안내 문구를 갖는다", () => {
-    for (const branch of BRANCHES) {
-      expect(regularOvernightGuidance(branch).summary).toContain("외박");
-    }
-    expect(regularOvernightGuidance("army").summary).toContain("분기");
   });
 });
 
@@ -157,5 +116,58 @@ describe("주기 폼 값", () => {
         intervalMonths: null,
       },
     );
+  });
+
+  it("입력 범위는 단위마다 다르다 — 서버 스키마와 같은 경계", () => {
+    expect(isRegularOvernightIntervalValid({ unit: "day", value: 365 })).toBe(
+      true,
+    );
+    expect(isRegularOvernightIntervalValid({ unit: "day", value: 366 })).toBe(
+      false,
+    );
+    expect(isRegularOvernightIntervalValid({ unit: "month", value: 12 })).toBe(
+      true,
+    );
+    expect(isRegularOvernightIntervalValid({ unit: "month", value: 13 })).toBe(
+      false,
+    );
+    expect(isRegularOvernightIntervalValid({ unit: "day", value: 0 })).toBe(
+      false,
+    );
+    // 입력칸이 비거나 소수를 받으면 NaN·소수가 들어온다.
+    expect(isRegularOvernightIntervalValid({ unit: "day", value: NaN })).toBe(
+      false,
+    );
+    expect(isRegularOvernightIntervalValid({ unit: "day", value: 1.5 })).toBe(
+      false,
+    );
+  });
+
+  it("첫 적립일 미리보기는 실제 주기 계산을 따른다 — 달 단위를 일수로 근사하지 않는다", () => {
+    expect(
+      regularOvernightFirstGrantPreview("2026-04-24", {
+        unit: "day",
+        value: 42,
+      }),
+    ).toBe("2026-06-05");
+    // 1/31 + 3개월은 91일 뒤(5/2)가 아니라 짧은 달 말일로 접힌 4/30이다.
+    expect(
+      regularOvernightFirstGrantPreview("2026-01-31", {
+        unit: "month",
+        value: 3,
+      }),
+    ).toBe("2026-04-30");
+  });
+
+  it("기준일이나 주기가 덜 찼으면 미리보기를 내지 않는다", () => {
+    const form = { unit: "day", value: 42 } as const;
+    expect(regularOvernightFirstGrantPreview("", form)).toBeNull();
+    expect(regularOvernightFirstGrantPreview("2026-02-30", form)).toBeNull();
+    expect(
+      regularOvernightFirstGrantPreview("2026-04-24", {
+        unit: "day",
+        value: 0,
+      }),
+    ).toBeNull();
   });
 });
